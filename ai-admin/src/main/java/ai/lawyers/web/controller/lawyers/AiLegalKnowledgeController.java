@@ -1,5 +1,6 @@
 package ai.lawyers.web.controller.lawyers;
 
+import java.util.Date;
 import java.util.List;
 import javax.servlet.http.HttpServletResponse;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import ai.lawyers.common.annotation.Log;
 import ai.lawyers.common.core.controller.BaseController;
 import ai.lawyers.common.core.domain.AjaxResult;
@@ -123,5 +125,43 @@ public class AiLegalKnowledgeController extends BaseController
     public AjaxResult remove(@PathVariable Long[] knowledgeIds)
     {
         return toAjax(aiLegalKnowledgeService.deleteAiLegalKnowledgeByKnowledgeIds(knowledgeIds));
+    }
+
+    /**
+     * 批量导入法律知识库
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:knowledge:import')")
+    @Log(title = "法律知识库", businessType = BusinessType.IMPORT)
+    @PostMapping("/importData")
+    public AjaxResult importData(MultipartFile file, boolean updateSupport) throws Exception
+    {
+        ExcelUtil<AiLegalKnowledge> util = new ExcelUtil<AiLegalKnowledge>(AiLegalKnowledge.class);
+        List<AiLegalKnowledge> knowledgeList = util.importExcel(file.getInputStream());
+        String operName = getUsername();
+        String message = aiLegalKnowledgeService.importKnowledge(knowledgeList, updateSupport, operName);
+        return success(message);
+    }
+
+    /**
+     * 获取法律知识库导入模板
+     */
+    @PostMapping("/importTemplate")
+    public void importTemplate(HttpServletResponse response)
+    {
+        ExcelUtil<AiLegalKnowledge> util = new ExcelUtil<AiLegalKnowledge>(AiLegalKnowledge.class);
+        util.importTemplateExcel(response, "法律知识库数据");
+    }
+
+    /**
+     * 审核法律知识库
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:knowledge:audit')")
+    @Log(title = "法律知识库", businessType = BusinessType.UPDATE)
+    @PutMapping("/audit")
+    public AjaxResult audit(@RequestBody AiLegalKnowledge aiLegalKnowledge)
+    {
+        aiLegalKnowledge.setAuditBy(getUsername());
+        aiLegalKnowledge.setAuditTime(new Date());
+        return toAjax(aiLegalKnowledgeService.auditAiLegalKnowledge(aiLegalKnowledge));
     }
 }

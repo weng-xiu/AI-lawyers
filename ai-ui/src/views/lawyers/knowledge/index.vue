@@ -78,6 +78,27 @@
           v-hasPermi="['lawyers:knowledge:export']"
         >导出</el-button>
       </el-col>
+      <el-col :span="1.5">
+        <el-button
+          type="info"
+          plain
+          icon="el-icon-upload2"
+          size="mini"
+          @click="handleImport"
+          v-hasPermi="['lawyers:knowledge:import']"
+        >导入</el-button>
+      </el-col>
+      <el-col :span="1.5">
+        <el-button
+          type="success"
+          plain
+          icon="el-icon-check"
+          size="mini"
+          :disabled="multiple"
+          @click="handleAudit"
+          v-hasPermi="['lawyers:knowledge:audit']"
+        >审核</el-button>
+      </el-col>
       <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
@@ -87,6 +108,11 @@
       <el-table-column label="知识标题" align="center" prop="title" :show-overflow-tooltip="true" />
       <el-table-column label="知识分类" align="center" prop="categoryName" />
       <el-table-column label="关键词" align="center" prop="keywords" :show-overflow-tooltip="true" />
+      <el-table-column label="审核状态" align="center" prop="auditStatus">
+        <template slot-scope="scope">
+          <dict-tag :options="dict.type.lawyers_audit_status" :value="scope.row.auditStatus"/>
+        </template>
+      </el-table-column>
       <el-table-column label="浏览次数" align="center" prop="viewCount" />
       <el-table-column label="创建时间" align="center" prop="createTime" width="180">
         <template slot-scope="scope">
@@ -109,6 +135,14 @@
             @click="handleUpdate(scope.row)"
             v-hasPermi="['lawyers:knowledge:edit']"
           >修改</el-button>
+          <el-button
+            size="mini"
+            type="text"
+            icon="el-icon-check"
+            @click="handleSingleAudit(scope.row)"
+            v-hasPermi="['lawyers:knowledge:audit']"
+            v-if="scope.row.auditStatus == 0"
+          >审核</el-button>
           <el-button
             size="mini"
             type="text"
@@ -167,6 +201,9 @@
         <el-descriptions-item label="知识标题">{{ detailForm.title }}</el-descriptions-item>
         <el-descriptions-item label="知识分类">{{ detailForm.categoryName }}</el-descriptions-item>
         <el-descriptions-item label="关键词">{{ detailForm.keywords }}</el-descriptions-item>
+        <el-descriptions-item label="审核状态">
+          <dict-tag :options="dict.type.lawyers_audit_status" :value="detailForm.auditStatus"/>
+        </el-descriptions-item>
         <el-descriptions-item label="浏览次数">{{ detailForm.viewCount }}</el-descriptions-item>
         <el-descriptions-item label="知识内容">
           <div v-html="detailForm.content"></div>
@@ -179,15 +216,65 @@
         <el-button @click="detailOpen = false">关 闭</el-button>
       </div>
     </el-dialog>
+
+    <!-- 知识导入对话框 -->
+    <el-dialog :title="upload.title" :visible.sync="upload.open" width="400px" append-to-body>
+      <el-upload
+        ref="upload"
+        :limit="1"
+        accept=".xlsx, .xls"
+        :headers="upload.headers"
+        :action="upload.url + '?updateSupport=' + upload.updateSupport"
+        :disabled="upload.isUploading"
+        :on-progress="handleFileUploadProgress"
+        :on-success="handleFileSuccess"
+        :auto-upload="false"
+        drag
+      >
+        <i class="el-icon-upload"></i>
+        <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
+        <div class="el-upload__tip text-center" slot="tip">
+          <div class="el-upload__tip" slot="tip">
+            <el-checkbox v-model="upload.updateSupport" /> 是否更新已经存在的知识数据
+          </div>
+          <span>仅允许导入xls、xlsx格式文件。</span>
+          <el-link type="primary" :underline="false" style="font-size:12px;vertical-align: baseline;" @click="importTemplate">下载模板</el-link>
+        </div>
+      </el-upload>
+      <div slot="footer" class="dialog-footer">
+        <el-button type="primary" @click="submitFileForm">确 定</el-button>
+        <el-button @click="upload.open = false">取 消</el-button>
+      </div>
+    </el-dialog>
+
+    <!-- 审核对话框 -->
+    <el-dialog title="知识审核" :visible.sync="auditOpen" width="500px" append-to-body>
+      <el-form ref="auditForm" :model="auditForm" :rules="auditRules" label-width="80px">
+        <el-form-item label="审核状态" prop="auditStatus">
+          <el-radio-group v-model="auditForm.auditStatus">
+            <el-radio :label="1">通过</el-radio>
+            <el-radio :label="2">不通过</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="审核备注" prop="auditRemark">
+          <el-input v-model="auditForm.auditRemark" type="textarea" placeholder="请输入审核备注" :rows="4" />
+        </el-form-item>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button type="primary" @click="submitAuditForm">确 定</el-button>
+        <el-button @click="auditOpen = false">取 消</el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import { listKnowledge, getKnowledge, delKnowledge, addKnowledge, updateKnowledge, exportKnowledge } from "@/api/lawyers/knowledge"
+import { listKnowledge, getKnowledge, delKnowledge, addKnowledge, updateKnowledge, exportKnowledge, importTemplate, importKnowledge, auditKnowledge } from "@/api/lawyers/knowledge"
 import { getValidCategories } from "@/api/lawyers/category"
 
 export default {
   name: "Knowledge",
+  dicts: ['lawyers_audit_status'],
   data() {
     return {
       // 遮罩层
@@ -212,6 +299,25 @@ export default {
       open: false,
       // 是否显示详情弹出层
       detailOpen: false,
+      // 是否显示审核弹出层
+      auditOpen: false,
+      // 知识导入参数
+      upload: {
+        // 是否显示弹出层（知识导入）
+        open: false,
+        // 弹出层标题（知识导入）
+        title: "",
+        // 是否禁用上传
+        isUploading: false,
+        // 是否更新已经存在的知识数据
+        updateSupport: 0,
+        // 设置上传的请求头部
+        headers: { Authorization: "Bearer " + this.$store.state.user.token },
+        // 上传的地址
+        url: process.env.VUE_APP_BASE_API + "/lawyers/knowledge/importData"
+      },
+      // 审核表单
+      auditForm: {},
       // 查询参数
       queryParams: {
         pageNum: 1,
@@ -234,6 +340,15 @@ export default {
         ],
         content: [
           { required: true, message: "知识内容不能为空", trigger: "blur" }
+        ]
+      },
+      // 审核表单校验
+      auditRules: {
+        auditStatus: [
+          { required: true, message: "审核状态不能为空", trigger: "change" }
+        ],
+        auditRemark: [
+          { required: true, message: "审核备注不能为空", trigger: "blur" }
         ]
       }
     }
@@ -352,6 +467,61 @@ export default {
       this.download('lawyers/knowledge/export', {
         ...this.queryParams
       }, `knowledge_${new Date().getTime()}.xlsx`)
+    },
+    /** 导入按钮操作 */
+    handleImport() {
+      this.upload.title = "知识导入";
+      this.upload.open = true;
+    },
+    /** 下载模板操作 */
+    importTemplate() {
+      this.download('lawyers/knowledge/importTemplate', {}, `knowledge_template_${new Date().getTime()}.xlsx`)
+    },
+    // 文件上传中处理
+    handleFileUploadProgress(event, file, fileList) {
+      this.upload.isUploading = true;
+    },
+    // 文件上传成功处理
+    handleFileSuccess(response, file, fileList) {
+      this.upload.open = false;
+      this.upload.isUploading = false;
+      this.$refs.upload.clearFiles();
+      this.$alert("<div style='overflow: auto;overflow-x: hidden;max-height: 70vh;padding: 10px 20px 0;'>" + response.msg + "</div>", "导入结果", { dangerouslyUseHTMLString: true });
+      this.getList();
+    },
+    // 提交上传文件
+    submitFileForm() {
+      this.$refs.upload.submit();
+    },
+    /** 单个审核按钮操作 */
+    handleSingleAudit(row) {
+      this.auditForm = {
+        knowledgeId: row.knowledgeId,
+        auditStatus: undefined,
+        auditRemark: undefined
+      };
+      this.auditOpen = true;
+    },
+    /** 批量审核按钮操作 */
+    handleAudit() {
+      this.auditForm = {
+        knowledgeIds: this.ids,
+        auditStatus: undefined,
+        auditRemark: undefined
+      };
+      this.auditOpen = true;
+    },
+    /** 提交审核表单 */
+    submitAuditForm() {
+      this.$refs["auditForm"].validate(valid => {
+        if (valid) {
+          auditKnowledge(this.auditForm).then(response => {
+            this.$modal.msgSuccess("审核成功");
+            this.auditOpen = false;
+            this.getList();
+          });
+        }
+      });
     }
   }
 }

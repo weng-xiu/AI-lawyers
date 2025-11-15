@@ -5,6 +5,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import ai.lawyers.common.core.text.Convert;
 import ai.lawyers.common.utils.DateUtils;
+import ai.lawyers.common.utils.StringUtils;
+import ai.lawyers.common.utils.security.ShiroUtils;
+import ai.lawyers.common.exception.ServiceException;
 import ai.lawyers.system.domain.lawyers.AiLegalKnowledge;
 import ai.lawyers.system.mapper.lawyers.AiLegalKnowledgeMapper;
 import ai.lawyers.system.service.lawyers.IAiLegalKnowledgeService;
@@ -135,5 +138,102 @@ public class AiLegalKnowledgeServiceImpl implements IAiLegalKnowledgeService
             return updateAiLegalKnowledge(knowledge);
         }
         return 0;
+    }
+
+    /**
+     * 导入法律知识库数据
+     *
+     * @param knowledgeList 知识库数据列表
+     * @param isUpdateSupport 是否更新支持，如果已存在，则进行更新数据
+     * @param operName 操作用户
+     * @return 结果
+     */
+    @Override
+    public String importKnowledge(List<AiLegalKnowledge> knowledgeList, Boolean isUpdateSupport, String operName)
+    {
+        if (StringUtils.isNull(knowledgeList) || knowledgeList.size() == 0)
+        {
+            throw new ServiceException("导入法律知识库数据不能为空！");
+        }
+        int successNum = 0;
+        int failureNum = 0;
+        StringBuilder successMsg = new StringBuilder();
+        StringBuilder failureMsg = new StringBuilder();
+        for (AiLegalKnowledge knowledge : knowledgeList)
+        {
+            try
+            {
+                // 判断这个知识库标题是否存在
+                AiLegalKnowledge k = aiLegalKnowledgeMapper.selectAiLegalKnowledgeByTitle(knowledge.getTitle());
+                if (StringUtils.isNull(k))
+                {
+                    knowledge.setCreateBy(operName);
+                    knowledge.setCreateTime(DateUtils.getNowDate());
+                    knowledge.setViewCount(0L);
+                    knowledge.setAuditStatus("0"); // 待审核状态
+                    this.insertAiLegalKnowledge(knowledge);
+                    successNum++;
+                    successMsg.append("<br/>" + successNum + "、知识库 " + knowledge.getTitle() + " 导入成功");
+                }
+                else if (isUpdateSupport)
+                {
+                    knowledge.setUpdateBy(operName);
+                    knowledge.setUpdateTime(DateUtils.getNowDate());
+                    this.updateAiLegalKnowledge(knowledge);
+                    successNum++;
+                    successMsg.append("<br/>" + successNum + "、知识库 " + knowledge.getTitle() + " 更新成功");
+                }
+                else
+                {
+                    failureNum++;
+                    failureMsg.append("<br/>" + failureNum + "、知识库 " + knowledge.getTitle() + " 已存在");
+                }
+            }
+            catch (Exception e)
+            {
+                failureNum++;
+                String msg = "<br/>" + failureNum + "、知识库 " + knowledge.getTitle() + " 导入失败：";
+                failureMsg.append(msg + e.getMessage());
+            }
+        }
+        if (failureNum > 0)
+        {
+            failureMsg.insert(0, "很抱歉，导入失败！共 " + failureNum + " 条数据格式不正确，错误如下：");
+            throw new ServiceException(failureMsg.toString());
+        }
+        else
+        {
+            successMsg.insert(0, "恭喜您，数据已全部导入成功！共 " + successNum + " 条，数据如下：");
+        }
+        return successMsg.toString();
+    }
+
+    /**
+     * 审核法律知识库
+     * 
+     * @param aiLegalKnowledge 法律知识库
+     * @return 结果
+     */
+    @Override
+    public int auditAiLegalKnowledge(AiLegalKnowledge aiLegalKnowledge)
+    {
+        if (StringUtils.isNull(aiLegalKnowledge) || StringUtils.isNull(aiLegalKnowledge.getKnowledgeId()))
+        {
+            throw new ServiceException("参数错误！");
+        }
+        
+        AiLegalKnowledge knowledge = selectAiLegalKnowledgeByKnowledgeId(aiLegalKnowledge.getKnowledgeId());
+        if (StringUtils.isNull(knowledge))
+        {
+            throw new ServiceException("法律知识库不存在！");
+        }
+        
+        knowledge.setAuditStatus(aiLegalKnowledge.getAuditStatus());
+        knowledge.setAuditBy(aiLegalKnowledge.getAuditBy());
+        knowledge.setAuditTime(aiLegalKnowledge.getAuditTime());
+        knowledge.setAuditRemark(aiLegalKnowledge.getAuditRemark());
+        knowledge.setUpdateTime(DateUtils.getNowDate());
+        
+        return updateAiLegalKnowledge(knowledge);
     }
 }

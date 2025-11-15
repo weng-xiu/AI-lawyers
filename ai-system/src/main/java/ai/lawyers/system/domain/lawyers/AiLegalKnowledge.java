@@ -53,6 +53,27 @@ public class AiLegalKnowledge extends BaseEntity
     @Excel(name = "状态", readConverterExp = "0=正常,1=停用")
     private String status;
 
+    /** 审核状态（0待审核 1审核通过 2审核不通过） */
+    @Excel(name = "审核状态", readConverterExp = "0=待审核,1=审核通过,2=审核不通过")
+    private String auditStatus;
+
+    /** 浏览量 */
+    @Excel(name = "浏览量")
+    private Long viewCount;
+
+    /** 审核人 */
+    @Excel(name = "审核人")
+    private String auditBy;
+
+    /** 审核时间 */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Excel(name = "审核时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    private Date auditTime;
+
+    /** 审核备注 */
+    @Excel(name = "审核备注")
+    private String auditRemark;
+
     public Long getKnowledgeId()
     {
         return knowledgeId;
@@ -146,6 +167,56 @@ public class AiLegalKnowledge extends BaseEntity
     public void setStatus(String status)
     {
         this.status = status;
+    }
+
+    public String getAuditStatus()
+    {
+        return auditStatus;
+    }
+
+    public void setAuditStatus(String auditStatus)
+    {
+        this.auditStatus = auditStatus;
+    }
+
+    public Long getViewCount()
+    {
+        return viewCount;
+    }
+
+    public void setViewCount(Long viewCount)
+    {
+        this.viewCount = viewCount;
+    }
+
+    public String getAuditBy()
+    {
+        return auditBy;
+    }
+
+    public void setAuditBy(String auditBy)
+    {
+        this.auditBy = auditBy;
+    }
+
+    public Date getAuditTime()
+    {
+        return auditTime;
+    }
+
+    public void setAuditTime(Date auditTime)
+    {
+        this.auditTime = auditTime;
+    }
+
+    public String getAuditRemark()
+    {
+        return auditRemark;
+    }
+
+    public void setAuditRemark(String auditRemark)
+    {
+        this.auditRemark = auditRemark;
     }
     
     @Override

@@ -67,3 +67,29 @@ export function exportKnowledge(query) {
     params: query
   })
 }
+
+// 查询法律知识库导入模板
+export function importTemplate() {
+  return request({
+    url: '/lawyers/knowledge/importTemplate',
+    method: 'get'
+  })
+}
+
+// 批量导入法律知识库
+export function importKnowledge(data) {
+  return request({
+    url: '/lawyers/knowledge/importData',
+    method: 'post',
+    data: data
+  })
+}
+
+// 审核法律知识库
+export function auditKnowledge(data) {
+  return request({
+    url: '/lawyers/knowledge/audit',
+    method: 'put',
+    data: data
+  })
+}

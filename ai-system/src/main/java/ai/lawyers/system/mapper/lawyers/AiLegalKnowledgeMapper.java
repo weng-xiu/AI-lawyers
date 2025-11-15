@@ -19,6 +19,14 @@ public interface AiLegalKnowledgeMapper
     public AiLegalKnowledge selectAiLegalKnowledgeById(Long knowledgeId);
 
     /**
+     * 根据标题查询法律知识库
+     * 
+     * @param title 知识库标题
+     * @return 法律知识库
+     */
+    public AiLegalKnowledge selectAiLegalKnowledgeByTitle(String title);
+
+    /**
      * 查询法律知识库列表
      * 
      * @param aiLegalKnowledge 法律知识库

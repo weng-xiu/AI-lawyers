@@ -81,4 +81,22 @@ public interface IAiLegalKnowledgeService
      * @return 结果
      */
     public int increaseViewCount(Long knowledgeId);
+
+    /**
+     * 导入法律知识库数据
+     *
+     * @param knowledgeList 知识库数据列表
+     * @param isUpdateSupport 是否更新支持，如果已存在，则进行更新数据
+     * @param operName 操作用户
+     * @return 结果
+     */
+    public String importKnowledge(List<AiLegalKnowledge> knowledgeList, Boolean isUpdateSupport, String operName);
+
+    /**
+     * 审核法律知识库
+     * 
+     * @param aiLegalKnowledge 法律知识库
+     * @return 结果
+     */
+    public int auditAiLegalKnowledge(AiLegalKnowledge aiLegalKnowledge);
 }
