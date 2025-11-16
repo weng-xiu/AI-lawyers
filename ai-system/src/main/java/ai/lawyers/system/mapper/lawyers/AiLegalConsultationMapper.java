@@ -65,4 +65,62 @@ public interface AiLegalConsultationMapper
      * @return 结果
      */
     public int deleteAiLegalConsultationByIds(Long[] consultationIds);
+    
+    /**
+     * 统计总咨询数
+     * 
+     * @return 总咨询数
+     */
+    public Long countTotalConsultations();
+    
+    /**
+     * 统计今日咨询数
+     * 
+     * @return 今日咨询数
+     */
+    public Long countTodayConsultations();
+    
+    /**
+     * 统计本周咨询数
+     * 
+     * @return 本周咨询数
+     */
+    public Long countWeekConsultations();
+    
+    /**
+     * 统计本月咨询数
+     * 
+     * @return 本月咨询数
+     */
+    public Long countMonthConsultations();
+    
+    /**
+     * 按状态统计咨询数
+     * 
+     * @param status 状态
+     * @return 咨询数
+     */
+    public Long countConsultationsByStatus(String status);
+    
+    /**
+     * 获取平均评分
+     * 
+     * @return 平均评分
+     */
+    public Double getAverageRating();
+    
+    /**
+     * 按分类统计咨询数
+     * 
+     * @return 分类统计数据
+     */
+    public java.util.List<java.util.Map<String, Object>> countConsultationsByCategory();
+    
+    /**
+     * 按日期统计咨询数
+     * 
+     * @param days 统计天数
+     * @return 日期统计数据
+     */
+    public java.util.List<java.util.Map<String, Object>> countConsultationsByDate(Integer days);
 }

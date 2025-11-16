@@ -74,4 +74,26 @@ public interface IAiLegalConsultationService
      * @return AI生成的回答
      */
     public String generateLegalAnswer(String question, Long categoryId);
+    
+    /**
+     * 获取咨询记录统计数据
+     * 
+     * @return 统计数据
+     */
+    public java.util.Map<String, Object> getConsultationStatistics();
+    
+    /**
+     * 获取按分类统计的咨询数据
+     * 
+     * @return 分类统计数据
+     */
+    public java.util.List<java.util.Map<String, Object>> getConsultationByCategory();
+    
+    /**
+     * 获取按日期统计的咨询数据
+     * 
+     * @param days 统计天数
+     * @return 日期统计数据
+     */
+    public java.util.List<java.util.Map<String, Object>> getConsultationByDate(Integer days);
 }

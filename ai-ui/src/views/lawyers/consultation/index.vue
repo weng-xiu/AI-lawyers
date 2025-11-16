@@ -30,6 +30,35 @@
           />
         </el-select>
       </el-form-item>
+      <el-form-item label="问题关键词" prop="questionKeyword">
+        <el-input
+          v-model="queryParams.questionKeyword"
+          placeholder="请输入问题关键词"
+          clearable
+          style="width: 240px"
+          @keyup.enter.native="handleQuery"
+        />
+      </el-form-item>
+      <el-form-item label="回答关键词" prop="answerKeyword">
+        <el-input
+          v-model="queryParams.answerKeyword"
+          placeholder="请输入回答关键词"
+          clearable
+          style="width: 240px"
+          @keyup.enter.native="handleQuery"
+        />
+      </el-form-item>
+      <el-form-item label="评分范围" prop="ratingRange">
+        <el-slider
+          v-model="queryParams.ratingRange"
+          range
+          :max="5"
+          :step="0.5"
+          :marks="{ 0: '0', 1: '1', 2: '2', 3: '3', 4: '4', 5: '5' }"
+          style="width: 240px"
+          @change="handleQuery"
+        ></el-slider>
+      </el-form-item>
       <el-form-item label="创建时间">
         <el-date-picker
           v-model="dateRange"
@@ -41,9 +70,21 @@
           end-placeholder="结束日期"
         ></el-date-picker>
       </el-form-item>
+      <el-form-item label="更新时间">
+        <el-date-picker
+          v-model="updateDateRange"
+          style="width: 240px"
+          value-format="yyyy-MM-dd"
+          type="daterange"
+          range-separator="-"
+          start-placeholder="开始日期"
+          end-placeholder="结束日期"
+        ></el-date-picker>
+      </el-form-item>
       <el-form-item>
         <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
         <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
+        <el-button type="success" icon="el-icon-search" size="mini" @click="toggleAdvancedSearch">高级搜索</el-button>
       </el-form-item>
     </el-form>
 
@@ -89,6 +130,16 @@
           @click="handleExport"
           v-hasPermi="['lawyers:consultation:export']"
         >导出</el-button>
+      </el-col>
+      <el-col :span="1.5">
+        <el-button
+          type="info"
+          plain
+          icon="el-icon-data-line"
+          size="mini"
+          @click="handleStatistics"
+          v-hasPermi="['lawyers:consultation:list']"
+        >统计分析</el-button>
       </el-col>
       <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
@@ -205,12 +256,142 @@
         <el-button @click="detailOpen = false">关 闭</el-button>
       </div>
     </el-dialog>
+
+    <!-- 统计分析对话框 -->
+    <el-dialog title="咨询统计分析" :visible.sync="statisticsOpen" width="900px" append-to-body>
+      <el-row :gutter="20">
+        <el-col :span="6">
+          <el-card class="box-card">
+            <div slot="header" class="clearfix">
+              <span>总咨询数</span>
+            </div>
+            <div class="text item">
+              <h2>{{ statistics.totalCount }}</h2>
+            </div>
+          </el-card>
+        </el-col>
+        <el-col :span="6">
+          <el-card class="box-card">
+            <div slot="header" class="clearfix">
+              <span>今日咨询数</span>
+            </div>
+            <div class="text item">
+              <h2>{{ statistics.todayCount }}</h2>
+            </div>
+          </el-card>
+        </el-col>
+        <el-col :span="6">
+          <el-card class="box-card">
+            <div slot="header" class="clearfix">
+              <span>本周咨询数</span>
+            </div>
+            <div class="text item">
+              <h2>{{ statistics.weekCount }}</h2>
+            </div>
+          </el-card>
+        </el-col>
+        <el-col :span="6">
+          <el-card class="box-card">
+            <div slot="header" class="clearfix">
+              <span>本月咨询数</span>
+            </div>
+            <div class="text item">
+              <h2>{{ statistics.monthCount }}</h2>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+      
+      <el-row :gutter="20" style="margin-top: 20px">
+        <el-col :span="8">
+          <el-card class="box-card">
+            <div slot="header" class="clearfix">
+              <span>已完成咨询</span>
+            </div>
+            <div class="text item">
+              <h2>{{ statistics.completedCount }}</h2>
+            </div>
+          </el-card>
+        </el-col>
+        <el-col :span="8">
+          <el-card class="box-card">
+            <div slot="header" class="clearfix">
+              <span>处理中咨询</span>
+            </div>
+            <div class="text item">
+              <h2>{{ statistics.processingCount }}</h2>
+            </div>
+          </el-card>
+        </el-col>
+        <el-col :span="8">
+          <el-card class="box-card">
+            <div slot="header" class="clearfix">
+              <span>失败咨询</span>
+            </div>
+            <div class="text item">
+              <h2>{{ statistics.failedCount }}</h2>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+      
+      <el-row :gutter="20" style="margin-top: 20px">
+        <el-col :span="12">
+          <el-card class="box-card">
+            <div slot="header" class="clearfix">
+              <span>平均评分</span>
+            </div>
+            <div class="text item">
+              <h2>{{ statistics.avgRating.toFixed(1) }}</h2>
+            </div>
+          </el-card>
+        </el-col>
+        <el-col :span="12">
+          <el-card class="box-card">
+            <div slot="header" class="clearfix">
+              <span>完成率</span>
+            </div>
+            <div class="text item">
+              <h2>{{ statistics.totalCount > 0 ? ((statistics.completedCount / statistics.totalCount) * 100).toFixed(1) : 0 }}%</h2>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+      
+      <el-row :gutter="20" style="margin-top: 20px">
+        <el-col :span="12">
+          <el-card class="box-card">
+            <div slot="header" class="clearfix">
+              <span>按分类统计</span>
+            </div>
+            <div class="text item">
+              <div ref="categoryChart" style="height: 300px;"></div>
+            </div>
+          </el-card>
+        </el-col>
+        <el-col :span="12">
+          <el-card class="box-card">
+            <div slot="header" class="clearfix">
+              <span>按日期统计（最近7天）</span>
+            </div>
+            <div class="text item">
+              <div ref="dateChart" style="height: 300px;"></div>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+      
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="statisticsOpen = false">关 闭</el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import { listConsultation, getConsultation, delConsultation, addConsultation, updateConsultation, exportConsultation } from "@/api/lawyers/consultation"
+import { listConsultation, getConsultation, delConsultation, addConsultation, updateConsultation, exportConsultation, getConsultationStatistics, getConsultationByCategory, getConsultationByDate } from "@/api/lawyers/consultation"
 import { getValidCategories } from "@/api/lawyers/category"
+import * as echarts from 'echarts'
 
 export default {
   name: "Consultation",
@@ -239,20 +420,41 @@ export default {
       open: false,
       // 是否显示详情弹出层
       detailOpen: false,
+      // 是否显示统计分析弹出层
+      statisticsOpen: false,
       // 日期范围
       dateRange: [],
+      // 更新日期范围
+      updateDateRange: [],
+      // 是否显示高级搜索
+      showAdvancedSearch: false,
       // 查询参数
       queryParams: {
         pageNum: 1,
         pageSize: 10,
         userId: undefined,
         categoryId: undefined,
-        status: undefined
+        status: undefined,
+        questionKeyword: undefined,
+        answerKeyword: undefined,
+        minRating: undefined,
+        maxRating: undefined
       },
       // 表单参数
       form: {},
       // 详情表单
       detailForm: {},
+      // 统计数据
+      statistics: {
+        totalCount: 0,
+        todayCount: 0,
+        weekCount: 0,
+        monthCount: 0,
+        completedCount: 0,
+        processingCount: 0,
+        failedCount: 0,
+        avgRating: 0
+      },
       // 表单校验
       rules: {
         userId: [
@@ -270,12 +472,31 @@ export default {
   created() {
     this.getList()
     this.getCategoryOptions()
+    // 初始化评分范围
+    this.queryParams.ratingRange = [0, 5]
   },
   methods: {
     /** 查询法律咨询记录列表 */
     getList() {
       this.loading = true
-      listConsultation(this.addDateRange(this.queryParams, this.dateRange)).then(response => {
+      
+      // 处理评分范围
+      if (this.queryParams.ratingRange && this.queryParams.ratingRange.length === 2) {
+        this.queryParams.minRating = this.queryParams.ratingRange[0]
+        this.queryParams.maxRating = this.queryParams.ratingRange[1]
+      } else {
+        this.queryParams.minRating = undefined
+        this.queryParams.maxRating = undefined
+      }
+      
+      // 合并日期范围参数
+      const params = {
+        ...this.queryParams,
+        ...this.addDateRange(this.queryParams, this.dateRange),
+        ...this.addDateRange({ updateDateRange: this.updateDateRange }, this.updateDateRange, 'updateTime')
+      }
+      
+      listConsultation(params).then(response => {
           this.consultationList = response.rows
           this.total = response.total
           this.loading = false
@@ -314,8 +535,14 @@ export default {
     /** 重置按钮操作 */
     resetQuery() {
       this.dateRange = []
+      this.updateDateRange = []
+      this.queryParams.ratingRange = [0, 5]
       this.resetForm("queryForm")
       this.handleQuery()
+    },
+    /** 切换高级搜索 */
+    toggleAdvancedSearch() {
+      this.showAdvancedSearch = !this.showAdvancedSearch
     },
     /** 新增按钮操作 */
     handleAdd() {
@@ -345,6 +572,114 @@ export default {
       getConsultation(consultationId).then(response => {
         this.detailForm = response.data
         this.detailOpen = true
+      })
+    },
+    /** 统计分析按钮操作 */
+    handleStatistics() {
+      this.statisticsOpen = true
+      this.getStatisticsData()
+    },
+    /** 获取统计数据 */
+    getStatisticsData() {
+      // 获取基本统计数据
+      getConsultationStatistics().then(response => {
+        this.statistics = response.data
+      })
+      
+      // 获取按分类统计数据并绘制图表
+      getConsultationByCategory().then(response => {
+        this.drawCategoryChart(response.data)
+      })
+      
+      // 获取按日期统计数据并绘制图表
+      getConsultationByDate(7).then(response => {
+        this.drawDateChart(response.data)
+      })
+    },
+    /** 绘制分类统计图表 */
+    drawCategoryChart(data) {
+      this.$nextTick(() => {
+        const chartDom = this.$refs.categoryChart
+        if (!chartDom) return
+        
+        const myChart = echarts.init(chartDom)
+        const option = {
+          tooltip: {
+            trigger: 'item',
+            formatter: '{a} <br/>{b}: {c} ({d}%)'
+          },
+          legend: {
+            orient: 'vertical',
+            left: 10,
+            data: data.map(item => item.category_name)
+          },
+          series: [
+            {
+              name: '咨询分类',
+              type: 'pie',
+              radius: ['50%', '70%'],
+              avoidLabelOverlap: false,
+              label: {
+                show: false,
+                position: 'center'
+              },
+              emphasis: {
+                label: {
+                  show: true,
+                  fontSize: '18',
+                  fontWeight: 'bold'
+                }
+              },
+              labelLine: {
+                show: false
+              },
+              data: data.map(item => ({
+                value: item.count,
+                name: item.category_name
+              }))
+            }
+          ]
+        }
+        
+        myChart.setOption(option)
+        window.addEventListener('resize', () => {
+          myChart.resize()
+        })
+      })
+    },
+    /** 绘制日期统计图表 */
+    drawDateChart(data) {
+      this.$nextTick(() => {
+        const chartDom = this.$refs.dateChart
+        if (!chartDom) return
+        
+        const myChart = echarts.init(chartDom)
+        const option = {
+          tooltip: {
+            trigger: 'axis'
+          },
+          xAxis: {
+            type: 'category',
+            data: data.map(item => item.date)
+          },
+          yAxis: {
+            type: 'value'
+          },
+          series: [
+            {
+              name: '咨询数',
+              data: data.map(item => item.count),
+              type: 'line',
+              smooth: true,
+              areaStyle: {}
+            }
+          ]
+        }
+        
+        myChart.setOption(option)
+        window.addEventListener('resize', () => {
+          myChart.resize()
+        })
       })
     },
     /** 提交按钮 */
@@ -379,9 +714,29 @@ export default {
     },
     /** 导出按钮操作 */
     handleExport() {
-      this.download('lawyers/consultation/export', {
-        ...this.queryParams
-      }, `consultation_${new Date().getTime()}.xlsx`)
+      // 处理查询参数
+      let params = { ...this.queryParams }
+      
+      // 处理评分范围
+      if (params.ratingRange && params.ratingRange.length === 2) {
+        params.minRating = params.ratingRange[0]
+        params.maxRating = params.ratingRange[1]
+        delete params.ratingRange
+      }
+      
+      // 处理日期范围
+      if (this.dateRange && this.dateRange.length === 2) {
+        params.beginTime = this.dateRange[0]
+        params.endTime = this.dateRange[1]
+      }
+      
+      // 处理更新时间范围
+      if (this.updateDateRange && this.updateDateRange.length === 2) {
+        params.updateBeginTime = this.updateDateRange[0]
+        params.updateEndTime = this.updateDateRange[1]
+      }
+      
+      this.download('lawyers/consultation/export', params, `consultation_${new Date().getTime()}.xlsx`)
     }
   }
 }

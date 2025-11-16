@@ -1,9 +1,11 @@
 package ai.lawyers.system.domain.lawyers;
 
+import java.util.Date;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.Size;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import ai.lawyers.common.annotation.Excel;
 import ai.lawyers.common.annotation.Excel.ColumnType;
 import ai.lawyers.common.core.domain.BaseEntity;
@@ -56,10 +58,6 @@ public class AiLegalKnowledge extends BaseEntity
     /** 审核状态（0待审核 1审核通过 2审核不通过） */
     @Excel(name = "审核状态", readConverterExp = "0=待审核,1=审核通过,2=审核不通过")
     private String auditStatus;
-
-    /** 浏览量 */
-    @Excel(name = "浏览量")
-    private Long viewCount;
 
     /** 审核人 */
     @Excel(name = "审核人")
@@ -177,16 +175,6 @@ public class AiLegalKnowledge extends BaseEntity
     public void setAuditStatus(String auditStatus)
     {
         this.auditStatus = auditStatus;
-    }
-
-    public Long getViewCount()
-    {
-        return viewCount;
-    }
-
-    public void setViewCount(Long viewCount)
-    {
-        this.viewCount = viewCount;
     }
 
     public String getAuditBy()

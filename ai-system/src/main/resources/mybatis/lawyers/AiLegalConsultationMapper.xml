@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiLegalConsultationMapper">
+    
+    <resultMap type="AiLegalConsultation" id="AiLegalConsultationResult">
+        <result property="consultationId"    column="consultation_id"    />
+        <result property="userId"    column="user_id"    />
+        <result property="question"    column="question"    />
+        <result property="categoryId"    column="category_id"    />
+        <result property="answer"    column="answer"    />
+        <result property="confidence"    column="confidence"    />
+        <result property="status"    column="status"    />
+        <result property="attachmentPath"    column="attachment_path"    />
+        <result property="rating"    column="rating"    />
+        <result property="feedback"    column="feedback"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+        <result property="categoryName"    column="category_name"    />
+    </resultMap>
+
+    <sql id="selectAiLegalConsultationVo">
+        select consultation_id, user_id, question, category_id, answer, confidence, status, attachment_path, rating, feedback, create_by, create_time, update_by, update_time, remark from ai_legal_consultation
+    </sql>
+
+    <sql id="selectAiLegalConsultationVoWithCategory">
+        select c.consultation_id, c.user_id, c.question, c.category_id, c.answer, c.confidence, c.status, c.attachment_path, c.rating, c.feedback, c.create_by, c.create_time, c.update_by, c.update_time, c.remark, cat.category_name 
+        from ai_legal_consultation c
+        left join ai_consultation_category cat on c.category_id = cat.category_id
+    </sql>
+
+    <select id="selectAiLegalConsultationList" parameterType="AiLegalConsultation" resultMap="AiLegalConsultationResultWithCategory">
+        <include refid="selectAiLegalConsultationVoWithCategory"/>
+        <where>  
+            <if test="userId != null "> and c.user_id = #{userId}</if>
+            <if test="question != null  and question != ''"> and c.question like concat('%', #{question}, '%')</if>
+            <if test="categoryId != null "> and c.category_id = #{categoryId}</if>
+            <if test="status != null  and status != ''"> and c.status = #{status}</if>
+            <if test="rating != null "> and c.rating = #{rating}</if>
+            <if test="minRating != null "> and c.rating &gt;= #{minRating}</if>
+            <if test="maxRating != null "> and c.rating &lt;= #{maxRating}</if>
+            <if test="params.questionKeyword != null and params.questionKeyword != ''"> and c.question like concat('%', #{params.questionKeyword}, '%')</if>
+            <if test="params.answerKeyword != null and params.answerKeyword != ''"> and c.answer like concat('%', #{params.answerKeyword}, '%')</if>
+            <if test="params.beginTime != null and params.beginTime != ''"><!-- 开始时间检索 -->
+                and date_format(c.create_time,'%y%m%d') &gt;= date_format(#{params.beginTime},'%y%m%d')
+            </if>
+            <if test="params.endTime != null and params.endTime != ''"><!-- 结束时间检索 -->
+                and date_format(c.create_time,'%y%m%d') &lt;= date_format(#{params.endTime},'%y%m%d')
+            </if>
+            <if test="params.updateBeginTime != null and params.updateBeginTime != ''"><!-- 更新开始时间检索 -->
+                and date_format(c.update_time,'%y%m%d') &gt;= date_format(#{params.updateBeginTime},'%y%m%d')
+            </if>
+            <if test="params.updateEndTime != null and params.updateEndTime != ''"><!-- 更新结束时间检索 -->
+                and date_format(c.update_time,'%y%m%d') &lt;= date_format(#{params.updateEndTime},'%y%m%d')
+            </if>
+        </where>
+        order by c.create_time desc
+    </select>
+    
+    <select id="selectAiLegalConsultationById" parameterType="Long" resultMap="AiLegalConsultationResultWithCategory">
+        <include refid="selectAiLegalConsultationVoWithCategory"/>
+        where c.consultation_id = #{consultationId}
+    </select>
+    
+    <select id="selectAiLegalConsultationByUserId" parameterType="Long" resultMap="AiLegalConsultationResultWithCategory">
+        <include refid="selectAiLegalConsultationVoWithCategory"/>
+        where c.user_id = #{userId}
+        order by c.create_time desc
+    </select>
+        
+    <insert id="insertAiLegalConsultation" parameterType="AiLegalConsultation" useGeneratedKeys="true" keyProperty="consultationId">
+        insert into ai_legal_consultation
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="userId != null">user_id,</if>
+            <if test="question != null and question != ''">question,</if>
+            <if test="categoryId != null">category_id,</if>
+            <if test="answer != null and answer != ''">answer,</if>
+            <if test="confidence != null">confidence,</if>
+            <if test="status != null">status,</if>
+            <if test="attachmentPath != null">attachment_path,</if>
+            <if test="rating != null">rating,</if>
+            <if test="feedback != null">feedback,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="remark != null">remark,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="userId != null">#{userId},</if>
+            <if test="question != null and question != ''">#{question},</if>
+            <if test="categoryId != null">#{categoryId},</if>
+            <if test="answer != null and answer != ''">#{answer},</if>
+            <if test="confidence != null">#{confidence},</if>
+            <if test="status != null">#{status},</if>
+            <if test="attachmentPath != null">#{attachmentPath},</if>
+            <if test="rating != null">#{rating},</if>
+            <if test="feedback != null">#{feedback},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateAiLegalConsultation" parameterType="AiLegalConsultation">
+        update ai_legal_consultation
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="userId != null">user_id = #{userId},</if>
+            <if test="question != null and question != ''">question = #{question},</if>
+            <if test="categoryId != null">category_id = #{categoryId},</if>
+            <if test="answer != null">answer = #{answer},</if>
+            <if test="confidence != null">confidence = #{confidence},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="attachmentPath != null">attachment_path = #{attachmentPath},</if>
+            <if test="rating != null">rating = #{rating},</if>
+            <if test="feedback != null">feedback = #{feedback},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where consultation_id = #{consultationId}
+    </update>
+
+    <delete id="deleteAiLegalConsultationById" parameterType="Long">
+        delete from ai_legal_consultation where consultation_id = #{consultationId}
+    </delete>
+
+    <delete id="deleteAiLegalConsultationByIds" parameterType="String">
+        delete from ai_legal_consultation where consultation_id in 
+        <foreach item="consultationId" collection="array" open="(" separator="," close=")">
+            #{consultationId}
+        </foreach>
+    </delete>
+    
+    <!-- 统计相关查询 -->
+    <select id="countTotalConsultations" resultType="Long">
+        select count(*) from ai_legal_consultation
+    </select>
+    
+    <select id="countTodayConsultations" resultType="Long">
+        select count(*) from ai_legal_consultation 
+        where date_format(create_time,'%y%m%d') = date_format(curdate(),'%y%m%d')
+    </select>
+    
+    <select id="countWeekConsultations" resultType="Long">
+        select count(*) from ai_legal_consultation 
+        where yearweek(date_format(create_time,'%Y-%m-%d')) = yearweek(now())
+    </select>
+    
+    <select id="countMonthConsultations" resultType="Long">
+        select count(*) from ai_legal_consultation 
+        where date_format(create_time,'%Y-%m') = date_format(curdate(),'%Y-%m')
+    </select>
+    
+    <select id="countConsultationsByStatus" parameterType="String" resultType="Long">
+        select count(*) from ai_legal_consultation where status = #{status}
+    </select>
+    
+    <select id="getAverageRating" resultType="Double">
+        select avg(rating) from ai_legal_consultation where rating is not null
+    </select>
+    
+    <select id="countConsultationsByCategory" resultType="java.util.Map">
+        select cat.category_id, cat.category_name, count(c.consultation_id) as count 
+        from ai_legal_consultation c
+        right join ai_consultation_category cat on c.category_id = cat.category_id
+        group by cat.category_id, cat.category_name
+        order by count desc
+    </select>
+    
+    <select id="countConsultationsByDate" parameterType="Integer" resultType="java.util.Map">
+        select date_format(create_time, '%Y-%m-%d') as date, count(*) as count 
+        from ai_legal_consultation 
+        where create_time >= date_sub(curdate(), interval #{days} day)
+        group by date_format(create_time, '%Y-%m-%d')
+        order by date
+    </select>
+    
+    <resultMap type="AiLegalConsultation" id="AiLegalConsultationResultWithCategory" extends="AiLegalConsultationResult">
+        <result property="categoryName"    column="category_name"    />
+    </resultMap>
+
+</mapper>

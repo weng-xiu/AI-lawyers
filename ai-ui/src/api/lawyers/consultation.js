@@ -59,3 +59,28 @@ export function exportConsultation(query) {
     params: query
   })
 }
+
+// 获取咨询记录统计数据
+export function getConsultationStatistics() {
+  return request({
+    url: '/lawyers/consultation/statistics',
+    method: 'get'
+  })
+}
+
+// 获取按分类统计的咨询数据
+export function getConsultationByCategory() {
+  return request({
+    url: '/lawyers/consultation/statistics/category',
+    method: 'get'
+  })
+}
+
+// 获取按日期统计的咨询数据
+export function getConsultationByDate(days) {
+  return request({
+    url: '/lawyers/consultation/statistics/date',
+    method: 'get',
+    params: { days }
+  })
+}

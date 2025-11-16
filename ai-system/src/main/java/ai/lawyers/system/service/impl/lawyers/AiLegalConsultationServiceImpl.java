@@ -138,4 +138,75 @@ public class AiLegalConsultationServiceImpl implements IAiLegalConsultationServi
             return "很抱歉，我暂时无法回答您的问题。建议您咨询专业律师获取更准确的法律建议。";
         }
     }
+    
+    /**
+     * 获取咨询记录统计数据
+     * 
+     * @return 统计数据
+     */
+    @Override
+    public java.util.Map<String, Object> getConsultationStatistics()
+    {
+        java.util.Map<String, Object> statistics = new java.util.HashMap<>();
+        
+        // 总咨询数
+        Long totalCount = aiLegalConsultationMapper.countTotalConsultations();
+        statistics.put("totalCount", totalCount != null ? totalCount : 0);
+        
+        // 今日咨询数
+        Long todayCount = aiLegalConsultationMapper.countTodayConsultations();
+        statistics.put("todayCount", todayCount != null ? todayCount : 0);
+        
+        // 本周咨询数
+        Long weekCount = aiLegalConsultationMapper.countWeekConsultations();
+        statistics.put("weekCount", weekCount != null ? weekCount : 0);
+        
+        // 本月咨询数
+        Long monthCount = aiLegalConsultationMapper.countMonthConsultations();
+        statistics.put("monthCount", monthCount != null ? monthCount : 0);
+        
+        // 已完成咨询数
+        Long completedCount = aiLegalConsultationMapper.countConsultationsByStatus("1");
+        statistics.put("completedCount", completedCount != null ? completedCount : 0);
+        
+        // 处理中咨询数
+        Long processingCount = aiLegalConsultationMapper.countConsultationsByStatus("0");
+        statistics.put("processingCount", processingCount != null ? processingCount : 0);
+        
+        // 失败咨询数
+        Long failedCount = aiLegalConsultationMapper.countConsultationsByStatus("2");
+        statistics.put("failedCount", failedCount != null ? failedCount : 0);
+        
+        // 平均评分
+        Double avgRating = aiLegalConsultationMapper.getAverageRating();
+        statistics.put("avgRating", avgRating != null ? avgRating : 0.0);
+        
+        return statistics;
+    }
+    
+    /**
+     * 获取按分类统计的咨询数据
+     * 
+     * @return 分类统计数据
+     */
+    @Override
+    public java.util.List<java.util.Map<String, Object>> getConsultationByCategory()
+    {
+        return aiLegalConsultationMapper.countConsultationsByCategory();
+    }
+    
+    /**
+     * 获取按日期统计的咨询数据
+     * 
+     * @param days 统计天数
+     * @return 日期统计数据
+     */
+    @Override
+    public java.util.List<java.util.Map<String, Object>> getConsultationByDate(Integer days)
+    {
+        if (days == null || days <= 0) {
+            days = 7; // 默认统计7天
+        }
+        return aiLegalConsultationMapper.countConsultationsByDate(days);
+    }
 }

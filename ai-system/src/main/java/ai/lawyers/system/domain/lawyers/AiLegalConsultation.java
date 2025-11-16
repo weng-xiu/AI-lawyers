@@ -56,6 +56,21 @@ public class AiLegalConsultation extends BaseEntity
     /** 用户反馈 */
     @Excel(name = "用户反馈")
     private String feedback;
+    
+    /** 查询条件：问题关键词 */
+    private String questionKeyword;
+    
+    /** 查询条件：回答关键词 */
+    private String answerKeyword;
+    
+    /** 查询条件：最低评分 */
+    private Double minRating;
+    
+    /** 查询条件：最高评分 */
+    private Double maxRating;
+    
+    /** 查询条件：分类名称 */
+    private String categoryName;
 
     public Long getConsultationId()
     {
@@ -159,6 +174,56 @@ public class AiLegalConsultation extends BaseEntity
         this.feedback = feedback;
     }
     
+    public String getQuestionKeyword()
+    {
+        return questionKeyword;
+    }
+
+    public void setQuestionKeyword(String questionKeyword)
+    {
+        this.questionKeyword = questionKeyword;
+    }
+    
+    public String getAnswerKeyword()
+    {
+        return answerKeyword;
+    }
+
+    public void setAnswerKeyword(String answerKeyword)
+    {
+        this.answerKeyword = answerKeyword;
+    }
+    
+    public Double getMinRating()
+    {
+        return minRating;
+    }
+
+    public void setMinRating(Double minRating)
+    {
+        this.minRating = minRating;
+    }
+    
+    public Double getMaxRating()
+    {
+        return maxRating;
+    }
+
+    public void setMaxRating(Double maxRating)
+    {
+        this.maxRating = maxRating;
+    }
+    
+    public String getCategoryName()
+    {
+        return categoryName;
+    }
+
+    public void setCategoryName(String categoryName)
+    {
+        this.categoryName = categoryName;
+    }
+    
     @Override
     public String toString() {
         return new ToStringBuilder(this,ToStringStyle.MULTI_LINE_STYLE)
@@ -172,6 +237,11 @@ public class AiLegalConsultation extends BaseEntity
             .append("attachmentPath", getAttachmentPath())
             .append("rating", getRating())
             .append("feedback", getFeedback())
+            .append("questionKeyword", getQuestionKeyword())
+            .append("answerKeyword", getAnswerKeyword())
+            .append("minRating", getMinRating())
+            .append("maxRating", getMaxRating())
+            .append("categoryName", getCategoryName())
             .append("createBy", getCreateBy())
             .append("createTime", getCreateTime())
             .append("updateBy", getUpdateBy())

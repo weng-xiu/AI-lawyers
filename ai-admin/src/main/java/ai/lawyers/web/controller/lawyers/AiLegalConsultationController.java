@@ -120,4 +120,37 @@ public class AiLegalConsultationController extends BaseController
     {
         return toAjax(aiLegalConsultationService.deleteAiLegalConsultationByConsultationIds(consultationIds));
     }
+    
+    /**
+     * 获取咨询记录统计数据
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:consultation:list')")
+    @GetMapping("/statistics")
+    public AjaxResult getStatistics()
+    {
+        java.util.Map<String, Object> statistics = aiLegalConsultationService.getConsultationStatistics();
+        return success(statistics);
+    }
+    
+    /**
+     * 获取按分类统计的咨询数据
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:consultation:list')")
+    @GetMapping("/statistics/category")
+    public AjaxResult getStatisticsByCategory()
+    {
+        java.util.List<java.util.Map<String, Object>> data = aiLegalConsultationService.getConsultationByCategory();
+        return success(data);
+    }
+    
+    /**
+     * 获取按日期统计的咨询数据
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:consultation:list')")
+    @GetMapping("/statistics/date")
+    public AjaxResult getStatisticsByDate(Integer days)
+    {
+        java.util.List<java.util.Map<String, Object>> data = aiLegalConsultationService.getConsultationByDate(days);
+        return success(data);
+    }
 }
