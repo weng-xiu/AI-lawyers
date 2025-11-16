@@ -1,4 +1,4 @@
-package ai.lawyers.web.controller.lawyers;
+package ai.lawyers.admin.controller.lawyers;
 
 import java.util.List;
 import javax.servlet.http.HttpServletResponse;
@@ -15,11 +15,11 @@ import org.springframework.web.bind.annotation.RestController;
 import ai.lawyers.common.annotation.Log;
 import ai.lawyers.common.core.controller.BaseController;
 import ai.lawyers.common.core.domain.AjaxResult;
-import ai.lawyers.common.core.page.TableDataInfo;
 import ai.lawyers.common.enums.BusinessType;
-import ai.lawyers.common.utils.poi.ExcelUtil;
 import ai.lawyers.system.domain.lawyers.AiConsultationCategory;
 import ai.lawyers.system.service.lawyers.IAiConsultationCategoryService;
+import ai.lawyers.common.utils.poi.ExcelUtil;
+import ai.lawyers.common.core.page.TableDataInfo;
 
 /**
  * 咨询分类Controller
@@ -69,16 +69,6 @@ public class AiConsultationCategoryController extends BaseController
     }
 
     /**
-     * 获取所有有效的咨询分类
-     */
-    @GetMapping(value = "/valid")
-    public AjaxResult getValidCategories()
-    {
-        List<AiConsultationCategory> list = aiConsultationCategoryService.selectAllValidCategories();
-        return success(list);
-    }
-
-    /**
      * 新增咨询分类
      */
     @PreAuthorize("@ss.hasPermi('lawyers:category:add')")
@@ -86,7 +76,6 @@ public class AiConsultationCategoryController extends BaseController
     @PostMapping
     public AjaxResult add(@RequestBody AiConsultationCategory aiConsultationCategory)
     {
-        aiConsultationCategory.setCreateBy(getUsername());
         return toAjax(aiConsultationCategoryService.insertAiConsultationCategory(aiConsultationCategory));
     }
 
@@ -98,7 +87,6 @@ public class AiConsultationCategoryController extends BaseController
     @PutMapping
     public AjaxResult edit(@RequestBody AiConsultationCategory aiConsultationCategory)
     {
-        aiConsultationCategory.setUpdateBy(getUsername());
         return toAjax(aiConsultationCategoryService.updateAiConsultationCategory(aiConsultationCategory));
     }
 
@@ -107,9 +95,18 @@ public class AiConsultationCategoryController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('lawyers:category:remove')")
     @Log(title = "咨询分类", businessType = BusinessType.DELETE)
-    @DeleteMapping("/{categoryIds}")
+	@DeleteMapping("/{categoryIds}")
     public AjaxResult remove(@PathVariable Long[] categoryIds)
     {
         return toAjax(aiConsultationCategoryService.deleteAiConsultationCategoryByCategoryIds(categoryIds));
+    }
+    
+    /**
+     * 获取所有有效的咨询分类
+     */
+    @GetMapping("/valid")
+    public AjaxResult getValidCategories()
+    {
+        return success(aiConsultationCategoryService.selectAllValidCategories());
     }
 }

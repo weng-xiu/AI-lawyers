@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiModelConfigMapper">
+    
+    <resultMap type="AiModelConfig" id="AiModelConfigResult">
+        <result property="configId"    column="config_id"    />
+        <result property="configName"    column="config_name"    />
+        <result property="modelType"    column="model_type"    />
+        <result property="modelName"    column="model_name"    />
+        <result property="apiKey"    column="api_key"    />
+        <result property="apiUrl"    column="api_url"    />
+        <result property="maxTokens"    column="max_tokens"    />
+        <result property="temperature"    column="temperature"    />
+        <result property="topP"    column="top_p"    />
+        <result property="frequencyPenalty"    column="frequency_penalty"    />
+        <result property="presencePenalty"    column="presence_penalty"    />
+        <result property="timeout"    column="timeout"    />
+        <result property="retryCount"    column="retry_count"    />
+        <result property="status"    column="status"    />
+        <result property="isDefault"    column="is_default"    />
+        <result property="remark"    column="remark"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectAiModelConfigVo">
+        select config_id, config_name, model_type, model_name, api_key, api_url, max_tokens, temperature, top_p, frequency_penalty, presence_penalty, timeout, retry_count, status, is_default, remark, create_by, create_time, update_by, update_time from ai_model_config
+    </sql>
+
+    <select id="selectAiModelConfigList" parameterType="AiModelConfig" resultMap="AiModelConfigResult">
+        <include refid="selectAiModelConfigVo"/>
+        <where>  
+            <if test="configName != null  and configName != ''"> and config_name like concat('%', #{configName}, '%')</if>
+            <if test="modelType != null  and modelType != ''"> and model_type = #{modelType}</if>
+            <if test="modelName != null  and modelName != ''"> and model_name like concat('%', #{modelName}, '%')</if>
+            <if test="status != null  and status != ''"> and status = #{status}</if>
+            <if test="isDefault != null  and isDefault != ''"> and is_default = #{isDefault}</if>
+        </where>
+        order by is_default desc, create_time desc
+    </select>
+    
+    <select id="selectAiModelConfigByConfigId" parameterType="Long" resultMap="AiModelConfigResult">
+        <include refid="selectAiModelConfigVo"/>
+        where config_id = #{configId}
+    </select>
+
+    <select id="selectDefaultAiModelConfig" resultMap="AiModelConfigResult">
+        <include refid="selectAiModelConfigVo"/>
+        where status = '0' and is_default = '1'
+        limit 1
+    </select>
+        
+    <insert id="insertAiModelConfig" parameterType="AiModelConfig" useGeneratedKeys="true" keyProperty="configId">
+        insert into ai_model_config
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="configName != null and configName != ''">config_name,</if>
+            <if test="modelType != null and modelType != ''">model_type,</if>
+            <if test="modelName != null and modelName != ''">model_name,</if>
+            <if test="apiKey != null">api_key,</if>
+            <if test="apiUrl != null">api_url,</if>
+            <if test="maxTokens != null">max_tokens,</if>
+            <if test="temperature != null">temperature,</if>
+            <if test="topP != null">top_p,</if>
+            <if test="frequencyPenalty != null">frequency_penalty,</if>
+            <if test="presencePenalty != null">presence_penalty,</if>
+            <if test="timeout != null">timeout,</if>
+            <if test="retryCount != null">retry_count,</if>
+            <if test="status != null">status,</if>
+            <if test="isDefault != null and isDefault != ''">is_default,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="configName != null and configName != ''">#{configName},</if>
+            <if test="modelType != null and modelType != ''">#{modelType},</if>
+            <if test="modelName != null and modelName != ''">#{modelName},</if>
+            <if test="apiKey != null">#{apiKey},</if>
+            <if test="apiUrl != null">#{apiUrl},</if>
+            <if test="maxTokens != null">#{maxTokens},</if>
+            <if test="temperature != null">#{temperature},</if>
+            <if test="topP != null">#{topP},</if>
+            <if test="frequencyPenalty != null">#{frequencyPenalty},</if>
+            <if test="presencePenalty != null">#{presencePenalty},</if>
+            <if test="timeout != null">#{timeout},</if>
+            <if test="retryCount != null">#{retryCount},</if>
+            <if test="status != null">#{status},</if>
+            <if test="isDefault != null and isDefault != ''">#{isDefault},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateAiModelConfig" parameterType="AiModelConfig">
+        update ai_model_config
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="configName != null and configName != ''">config_name = #{configName},</if>
+            <if test="modelType != null and modelType != ''">model_type = #{modelType},</if>
+            <if test="modelName != null and modelName != ''">model_name = #{modelName},</if>
+            <if test="apiKey != null">api_key = #{apiKey},</if>
+            <if test="apiUrl != null">api_url = #{apiUrl},</if>
+            <if test="maxTokens != null">max_tokens = #{maxTokens},</if>
+            <if test="temperature != null">temperature = #{temperature},</if>
+            <if test="topP != null">top_p = #{topP},</if>
+            <if test="frequencyPenalty != null">frequency_penalty = #{frequencyPenalty},</if>
+            <if test="presencePenalty != null">presence_penalty = #{presencePenalty},</if>
+            <if test="timeout != null">timeout = #{timeout},</if>
+            <if test="retryCount != null">retry_count = #{retryCount},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="isDefault != null and isDefault != ''">is_default = #{isDefault},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where config_id = #{configId}
+    </update>
+
+    <update id="updateDefaultConfig" parameterType="Long">
+        update ai_model_config set is_default = case when config_id = #{configId} then '1' else '0' end
+    </update>
+
+    <delete id="deleteAiModelConfigByConfigId" parameterType="Long">
+        delete from ai_model_config where config_id = #{configId}
+    </delete>
+
+    <delete id="deleteAiModelConfigByConfigIds" parameterType="String">
+        delete from ai_model_config where config_id in 
+        <foreach item="configId" collection="array" open="(" separator="," close=")">
+            #{configId}
+        </foreach>
+    </delete>
+</mapper>

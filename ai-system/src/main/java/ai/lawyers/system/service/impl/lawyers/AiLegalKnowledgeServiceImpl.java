@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service;
 import ai.lawyers.common.core.text.Convert;
 import ai.lawyers.common.utils.DateUtils;
 import ai.lawyers.common.utils.StringUtils;
-import ai.lawyers.common.utils.security.ShiroUtils;
+import ai.lawyers.common.utils.SecurityUtils;
 import ai.lawyers.common.exception.ServiceException;
 import ai.lawyers.system.domain.lawyers.AiLegalKnowledge;
 import ai.lawyers.system.mapper.lawyers.AiLegalKnowledgeMapper;
