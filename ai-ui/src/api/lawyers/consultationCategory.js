@@ -10,10 +10,11 @@ export function listConsultationCategory(query) {
 }
 
 // 查询咨询分类树形结构
-export function listConsultationCategoryTree() {
+export function listConsultationCategoryTree(query) {
   return request({
     url: '/lawyers/category/tree',
-    method: 'get'
+    method: 'get',
+    params: query
   })
 }
 

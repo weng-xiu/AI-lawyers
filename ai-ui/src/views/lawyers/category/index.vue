@@ -66,6 +66,7 @@
       row-key="categoryId"
       :default-expand-all="isExpandAll"
       :tree-props="{children: 'children', hasChildren: 'hasChildren'}"
+      ref="categoryTable"
     >
       <el-table-column label="分类名称" prop="categoryName" :show-overflow-tooltip="true"></el-table-column>
       <el-table-column label="排序" align="center" prop="orderNum" width="100"></el-table-column>
@@ -111,14 +112,18 @@
     <el-dialog :title="title" :visible.sync="open" width="600px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="80px">
         <el-form-item label="上级分类" prop="parentId">
-          <el-tree-select
+          <el-select
             v-model="form.parentId"
-            :data="categoryOptions"
-            :props="{ value: 'categoryId', label: 'categoryName', children: 'children' }"
-            value-key="categoryId"
             placeholder="选择上级分类"
-            check-strictly
-          />
+            clearable
+          >
+            <el-option
+              v-for="item in categoryOptions"
+              :key="item.categoryId"
+              :label="item.categoryName"
+              :value="item.categoryId"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="分类名称" prop="categoryName">
           <el-input v-model="form.categoryName" placeholder="请输入分类名称" />
@@ -214,14 +219,81 @@ export default {
   },
   created() {
     this.getList()
+    this.getTreeselect()
   },
   methods: {
     /** 查询咨询分类列表 */
     getList() {
       this.loading = true
-      listConsultationCategory(this.queryParams).then(response => {
-        this.categoryList = this.handleTree(response.data, "categoryId", "parentId")
+      console.log('开始获取咨询分类列表，查询参数:', this.queryParams)
+      
+      // 优先使用树形结构API获取数据
+      listConsultationCategoryTree(this.queryParams).then(response => {
+        console.log('获取咨询分类树形结构响应:', response)
+        
+        if (response.data && response.data.length > 0) {
+          console.log('使用树形API返回的数据，数据长度:', response.data.length)
+          this.categoryList = response.data
+        } else {
+          console.log('树形API返回空数据，尝试使用列表API')
+          // 如果树形API返回空数据，回退到列表API
+          listConsultationCategory(this.queryParams).then(response => {
+            console.log('获取咨询分类列表响应:', response)
+            // 处理分页数据格式
+            let dataList = []
+            if (response.rows) {
+              // 如果返回的是分页数据格式 {rows: [], total: number}
+              dataList = response.rows
+              console.log('使用分页数据格式，数据长度:', dataList.length)
+            } else if (response.data) {
+              // 如果返回的是直接数据格式 {data: []}
+              dataList = response.data
+              console.log('使用直接数据格式，数据长度:', dataList.length)
+            }
+            
+            // 转换为树形结构
+            if (dataList && dataList.length > 0) {
+              console.log('将列表数据转换为树形结构')
+              this.categoryList = this.handleTree(dataList, "categoryId", "parentId")
+            } else {
+              console.log('列表数据为空')
+              this.categoryList = []
+            }
+          })
+        }
+        
         this.loading = false
+      }).catch(error => {
+        console.error('获取咨询分类树形结构失败，尝试使用列表API:', error)
+        // 如果树形API失败，回退到列表API
+        listConsultationCategory(this.queryParams).then(response => {
+          console.log('获取咨询分类列表响应:', response)
+          // 处理分页数据格式
+          let dataList = []
+          if (response.rows) {
+            // 如果返回的是分页数据格式 {rows: [], total: number}
+            dataList = response.rows
+            console.log('使用分页数据格式，数据长度:', dataList.length)
+          } else if (response.data) {
+            // 如果返回的是直接数据格式 {data: []}
+            dataList = response.data
+            console.log('使用直接数据格式，数据长度:', dataList.length)
+          }
+          
+          // 转换为树形结构
+          if (dataList && dataList.length > 0) {
+            console.log('将列表数据转换为树形结构')
+            this.categoryList = this.handleTree(dataList, "categoryId", "parentId")
+          } else {
+            console.log('列表数据为空')
+            this.categoryList = []
+          }
+          this.loading = false
+        }).catch(error => {
+          console.error('获取咨询分类列表失败:', error)
+          this.categoryList = []
+          this.loading = false
+        })
       })
     },
     /** 转换咨询分类数据结构 */
@@ -237,11 +309,69 @@ export default {
     },
     /** 查询咨询分类下拉树结构 */
     getTreeselect() {
-      listConsultationCategory().then(response => {
+      console.log('开始获取咨询分类树形结构')
+      listConsultationCategoryTree().then(response => {
+        console.log('获取咨询分类树形结构响应:', response)
         this.categoryOptions = []
-        const category = { categoryId: 0, categoryName: '主类目', children: [] }
-        category.children = this.handleTree(response.data, "categoryId", "parentId")
+        const category = { categoryId: 0, categoryName: '主类目' }
         this.categoryOptions.push(category)
+        
+        // 使用树形结构API返回的数据，不需要再进行handleTree处理
+        if (response.data && response.data.length > 0) {
+          console.log('树形数据长度:', response.data.length)
+          // 递归处理树形数据，转换为下拉选项需要的格式
+          const processTreeData = (treeData, level = 0) => {
+            treeData.forEach(node => {
+              // 添加缩进以显示层级关系
+              const indent = level > 0 ? '　'.repeat(level) + '├─ ' : ''
+              this.categoryOptions.push({
+                categoryId: node.categoryId,
+                categoryName: indent + node.categoryName
+              })
+              
+              // 递归处理子节点
+              if (node.children && node.children.length > 0) {
+                processTreeData(node.children, level + 1)
+              }
+            })
+          }
+          
+          processTreeData(response.data)
+          console.log('处理后的分类选项:', this.categoryOptions)
+        } else {
+          console.log('树形数据为空')
+        }
+      }).catch(error => {
+        console.error('获取咨询分类树形结构失败:', error)
+        // 如果树形API失败，回退到使用列表API
+        console.log('回退到使用列表API获取树形结构')
+        listConsultationCategory().then(response => {
+          console.log('使用列表API获取的响应:', response)
+          this.categoryOptions = []
+          const category = { categoryId: 0, categoryName: '主类目' }
+          this.categoryOptions.push(category)
+          
+          if (response.data && response.data.length > 0) {
+            const treeData = this.handleTree(response.data, "categoryId", "parentId")
+            console.log('转换后的树形数据:', treeData)
+            const processTreeData = (treeData, level = 0) => {
+              treeData.forEach(node => {
+                const indent = level > 0 ? '　'.repeat(level) + '├─ ' : ''
+                this.categoryOptions.push({
+                  categoryId: node.categoryId,
+                  categoryName: indent + node.categoryName
+                })
+                
+                if (node.children && node.children.length > 0) {
+                  processTreeData(node.children, level + 1)
+                }
+              })
+            }
+            
+            processTreeData(treeData)
+            console.log('处理后的分类选项:', this.categoryOptions)
+          }
+        })
       })
     },
     // 取消按钮
@@ -290,6 +420,19 @@ export default {
       this.isExpandAll = !this.isExpandAll
       this.$nextTick(() => {
         this.refreshTable = true
+        // 确保表格重新渲染后应用展开/折叠状态
+        this.$nextTick(() => {
+          if (this.$refs.categoryTable) {
+            const rows = this.$refs.categoryTable.store.states.flattenTree
+            if (rows && rows.length > 0) {
+              rows.forEach(row => {
+                if (row.row && row.row.children && row.row.children.length > 0) {
+                  this.$refs.categoryTable.toggleRowExpansion(row.row, this.isExpandAll)
+                }
+              })
+            }
+          }
+        })
       })
     },
     /** 修改按钮操作 */
