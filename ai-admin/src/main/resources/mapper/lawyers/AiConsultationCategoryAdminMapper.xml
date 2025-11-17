@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiConsultationCategoryAdminMapper">
+    
+    <resultMap type="AiConsultationCategory" id="AiConsultationCategoryAdminResult">
+        <result property="categoryId"    column="category_id"    />
+        <result property="categoryName"  column="category_name"  />
+        <result property="parentId"      column="parent_id"      />
+        <result property="ancestors"      column="ancestors"      />
+        <result property="orderNum"       column="order_num"       />
+        <result property="leader"        column="leader"        />
+        <result property="phone"         column="phone"         />
+        <result property="email"         column="email"         />
+        <result property="status"        column="status"        />
+        <result property="delFlag"       column="del_flag"       />
+        <result property="createBy"      column="create_by"      />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"      column="update_by"      />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectAiConsultationCategoryAdminVo">
+        select category_id, category_name, parent_id, ancestors, order_num, leader, phone, email, status, del_flag, create_by, create_time, update_by, update_time from ai_consultation_category
+    </sql>
+
+    <select id="selectAiConsultationCategoryAdminList" parameterType="AiConsultationCategory" resultMap="AiConsultationCategoryAdminResult">
+        <include refid="selectAiConsultationCategoryAdminVo"/>
+        <where>  
+            <if test="categoryName != null  and categoryName != ''"> and category_name like concat('%', #{categoryName}, '%')</if>
+            <if test="parentId != null "> and parent_id = #{parentId}</if>
+            <if test="status != null  and status != ''"> and status = #{status}</if>
+            and del_flag = '0'
+        </where>
+        order by parent_id, order_num
+    </select>
+    
+    <select id="selectAiConsultationCategoryByCategoryId" parameterType="Long" resultMap="AiConsultationCategoryAdminResult">
+        <include refid="selectAiConsultationCategoryAdminVo"/>
+        where category_id = #{categoryId}
+    </select>
+    
+    <select id="selectChildrenCountByParentId" parameterType="Long" resultType="int">
+        select count(*) from ai_consultation_category where parent_id = #{parentId} and del_flag = '0'
+    </select>
+    
+    <select id="selectAllValidCategories" resultMap="AiConsultationCategoryAdminResult">
+        <include refid="selectAiConsultationCategoryAdminVo"/>
+        where status = '0' and del_flag = '0'
+        order by parent_id, order_num
+    </select>
+    
+    <select id="selectAiConsultationCategoryByCategoryName" parameterType="String" resultMap="AiConsultationCategoryAdminResult">
+        <include refid="selectAiConsultationCategoryAdminVo"/>
+        where category_name = #{categoryName} and status = '0' and del_flag = '0'
+        limit 1
+    </select>
+        
+    <insert id="insertAiConsultationCategoryAdmin" parameterType="AiConsultationCategory" useGeneratedKeys="true" keyProperty="categoryId">
+        insert into ai_consultation_category
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="categoryName != null and categoryName != ''">category_name,</if>
+            <if test="parentId != null">parent_id,</if>
+            <if test="ancestors != null and ancestors != ''">ancestors,</if>
+            <if test="orderNum != null">order_num,</if>
+            <if test="leader != null">leader,</if>
+            <if test="phone != null">phone,</if>
+            <if test="email != null">email,</if>
+            <if test="status != null">status,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="categoryName != null and categoryName != ''">#{categoryName},</if>
+            <if test="parentId != null">#{parentId},</if>
+            <if test="ancestors != null and ancestors != ''">#{ancestors},</if>
+            <if test="orderNum != null">#{orderNum},</if>
+            <if test="leader != null">#{leader},</if>
+            <if test="phone != null">#{phone},</if>
+            <if test="email != null">#{email},</if>
+            <if test="status != null">#{status},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateAiConsultationCategoryAdmin" parameterType="AiConsultationCategory">
+        update ai_consultation_category
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="categoryName != null and categoryName != ''">category_name = #{categoryName},</if>
+            <if test="parentId != null">parent_id = #{parentId},</if>
+            <if test="ancestors != null and ancestors != ''">ancestors = #{ancestors},</if>
+            <if test="orderNum != null">order_num = #{orderNum},</if>
+            <if test="leader != null">leader = #{leader},</if>
+            <if test="phone != null">phone = #{phone},</if>
+            <if test="email != null">email = #{email},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where category_id = #{categoryId}
+    </update>
+
+    <delete id="deleteAiConsultationCategoryByCategoryId" parameterType="Long">
+        update ai_consultation_category set del_flag = '2' where category_id = #{categoryId}
+    </delete>
+
+    <delete id="deleteAiConsultationCategoryByCategoryIds" parameterType="String">
+        update ai_consultation_category set del_flag = '2' where category_id in 
+        <foreach item="categoryId" collection="array" open="(" separator="," close=")">
+            #{categoryId}
+        </foreach>
+    </delete>
+</mapper>

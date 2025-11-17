@@ -9,6 +9,14 @@ export function listConsultationCategory(query) {
   })
 }
 
+// 查询咨询分类树形结构
+export function listConsultationCategoryTree() {
+  return request({
+    url: '/lawyers/category/tree',
+    method: 'get'
+  })
+}
+
 // 查询咨询分类详细
 export function getConsultationCategory(categoryId) {
   return request({
@@ -40,5 +48,14 @@ export function delConsultationCategory(categoryId) {
   return request({
     url: '/lawyers/category/' + categoryId,
     method: 'delete'
+  })
+}
+
+// 导出咨询分类
+export function exportConsultationCategory(query) {
+  return request({
+    url: '/lawyers/category/export',
+    method: 'get',
+    params: query
   })
 }
