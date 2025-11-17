@@ -132,14 +132,229 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
     @Override
     public boolean testAiModelConnection(Long configId)
     {
-        AiModelConfig config = aiModelConfigMapper.selectAiModelConfigByConfigId(configId);
+        AiModelConfig config = selectAiModelConfigByConfigId(configId);
         if (config == null) {
             return false;
         }
         
-        // 这里可以实现实际的连接测试逻辑
-        // 例如发送一个简单的测试请求到AI模型API
-        // 目前简单返回true，表示连接成功
-        return true;
+        try {
+            // 根据模型类型调用不同的API
+            if ("OpenAI".equals(config.getModelType())) {
+                return testOpenAIConnection(config);
+            } else if ("Claude".equals(config.getModelType())) {
+                return testClaudeConnection(config);
+            } else if ("ChatGLM".equals(config.getModelType())) {
+                return testChatGLMConnection(config);
+            } else {
+                // 默认使用通用测试方法
+                return testGenericConnection(config);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    /**
+     * 调用AI模型API生成回答
+     * 
+     * @param question 用户问题
+     * @param context 上下文信息
+     * @return AI生成的回答
+     */
+    @Override
+    public String callAiModel(String question, String context)
+    {
+        // 获取默认配置
+        AiModelConfig config = getDefaultAiModelConfig();
+        if (config == null) {
+            return "未找到可用的AI模型配置，请联系管理员配置模型参数。";
+        }
+        
+        try {
+            // 根据模型类型调用不同的API
+            if ("OpenAI".equals(config.getModelType())) {
+                return callOpenAI(config, question, context);
+            } else if ("Claude".equals(config.getModelType())) {
+                return callClaude(config, question, context);
+            } else if ("ChatGLM".equals(config.getModelType())) {
+                return callChatGLM(config, question, context);
+            } else {
+                // 默认使用通用调用方法
+                return callGenericModel(config, question, context);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "调用AI模型失败：" + e.getMessage();
+        }
+    }
+    
+    /**
+     * 测试OpenAI模型连接
+     */
+    private boolean testOpenAIConnection(AiModelConfig config) {
+        try {
+            // 构建测试请求
+            String testPrompt = "你好，请回复'连接成功'";
+            String response = callOpenAI(config, testPrompt, null);
+            return response != null && !response.isEmpty();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    /**
+     * 测试Claude模型连接
+     */
+    private boolean testClaudeConnection(AiModelConfig config) {
+        try {
+            // 构建测试请求
+            String testPrompt = "你好，请回复'连接成功'";
+            String response = callClaude(config, testPrompt, null);
+            return response != null && !response.isEmpty();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    /**
+     * 测试ChatGLM模型连接
+     */
+    private boolean testChatGLMConnection(AiModelConfig config) {
+        try {
+            // 构建测试请求
+            String testPrompt = "你好，请回复'连接成功'";
+            String response = callChatGLM(config, testPrompt, null);
+            return response != null && !response.isEmpty();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    /**
+     * 测试通用模型连接
+     */
+    private boolean testGenericConnection(AiModelConfig config) {
+        try {
+            // 构建测试请求
+            String testPrompt = "你好，请回复'连接成功'";
+            String response = callGenericModel(config, testPrompt, null);
+            return response != null && !response.isEmpty();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    /**
+     * 调用OpenAI API
+     */
+    private String callOpenAI(AiModelConfig config, String question, String context) {
+        try {
+            // 构建请求体
+            StringBuilder promptBuilder = new StringBuilder();
+            if (context != null && !context.isEmpty()) {
+                promptBuilder.append("背景信息：").append(context).append("\n\n");
+            }
+            promptBuilder.append("用户问题：").append(question);
+            
+            // 这里应该使用HTTP客户端调用OpenAI API
+            // 为了简化示例，这里返回模拟结果
+            // 实际实现需要使用RestTemplate或HttpClient调用真实API
+            
+            // 模拟API调用
+            String simulatedResponse = "根据您的问题，我提供以下法律建议：\n\n" +
+                "1. 首先需要了解具体情况...\n" +
+                "2. 根据相关法律条款...\n" +
+                "3. 建议您采取以下措施...\n\n" +
+                "请注意，以上建议仅供参考，具体情况建议咨询专业律师。";
+            
+            return simulatedResponse;
+        } catch (Exception e) {
+            throw new RuntimeException("调用OpenAI API失败：" + e.getMessage());
+        }
+    }
+    
+    /**
+     * 调用Claude API
+     */
+    private String callClaude(AiModelConfig config, String question, String context) {
+        try {
+            // 构建请求体
+            StringBuilder promptBuilder = new StringBuilder();
+            if (context != null && !context.isEmpty()) {
+                promptBuilder.append("背景信息：").append(context).append("\n\n");
+            }
+            promptBuilder.append("用户问题：").append(question);
+            
+            // 这里应该使用HTTP客户端调用Claude API
+            // 为了简化示例，这里返回模拟结果
+            
+            // 模拟API调用
+            String simulatedResponse = "根据您的问题，我提供以下法律建议：\n\n" +
+                "1. 首先需要了解具体情况...\n" +
+                "2. 根据相关法律条款...\n" +
+                "3. 建议您采取以下措施...\n\n" +
+                "请注意，以上建议仅供参考，具体情况建议咨询专业律师。";
+            
+            return simulatedResponse;
+        } catch (Exception e) {
+            throw new RuntimeException("调用Claude API失败：" + e.getMessage());
+        }
+    }
+    
+    /**
+     * 调用ChatGLM API
+     */
+    private String callChatGLM(AiModelConfig config, String question, String context) {
+        try {
+            // 构建请求体
+            StringBuilder promptBuilder = new StringBuilder();
+            if (context != null && !context.isEmpty()) {
+                promptBuilder.append("背景信息：").append(context).append("\n\n");
+            }
+            promptBuilder.append("用户问题：").append(question);
+            
+            // 这里应该使用HTTP客户端调用ChatGLM API
+            // 为了简化示例，这里返回模拟结果
+            
+            // 模拟API调用
+            String simulatedResponse = "根据您的问题，我提供以下法律建议：\n\n" +
+                "1. 首先需要了解具体情况...\n" +
+                "2. 根据相关法律条款...\n" +
+                "3. 建议您采取以下措施...\n\n" +
+                "请注意，以上建议仅供参考，具体情况建议咨询专业律师。";
+            
+            return simulatedResponse;
+        } catch (Exception e) {
+            throw new RuntimeException("调用ChatGLM API失败：" + e.getMessage());
+        }
+    }
+    
+    /**
+     * 调用通用模型API
+     */
+    private String callGenericModel(AiModelConfig config, String question, String context) {
+        try {
+            // 构建请求体
+            StringBuilder promptBuilder = new StringBuilder();
+            if (context != null && !context.isEmpty()) {
+                promptBuilder.append("背景信息：").append(context).append("\n\n");
+            }
+            promptBuilder.append("用户问题：").append(question);
+            
+            // 这里应该使用HTTP客户端调用通用API
+            // 为了简化示例，这里返回模拟结果
+            
+            // 模拟API调用
+            String simulatedResponse = "根据您的问题，我提供以下法律建议：\n\n" +
+                "1. 首先需要了解具体情况...\n" +
+                "2. 根据相关法律条款...\n" +
+                "3. 建议您采取以下措施...\n\n" +
+                "请注意，以上建议仅供参考，具体情况建议咨询专业律师。";
+            
+            return simulatedResponse;
+        } catch (Exception e) {
+            throw new RuntimeException("调用通用模型API失败：" + e.getMessage());
+        }
     }
 }

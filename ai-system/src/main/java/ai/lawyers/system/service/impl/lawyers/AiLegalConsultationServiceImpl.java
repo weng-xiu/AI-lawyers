@@ -10,6 +10,7 @@ import ai.lawyers.system.domain.lawyers.AiLegalKnowledge;
 import ai.lawyers.system.mapper.lawyers.AiLegalConsultationMapper;
 import ai.lawyers.system.service.lawyers.IAiLegalConsultationService;
 import ai.lawyers.system.service.lawyers.IAiLegalKnowledgeService;
+import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 
 /**
  * 法律咨询记录 服务层实现
@@ -24,6 +25,9 @@ public class AiLegalConsultationServiceImpl implements IAiLegalConsultationServi
     
     @Autowired
     private IAiLegalKnowledgeService aiLegalKnowledgeService;
+    
+    @Autowired
+    private IAiModelConfigService aiModelConfigService;
 
     /**
      * 查询法律咨询记录
@@ -121,21 +125,38 @@ public class AiLegalConsultationServiceImpl implements IAiLegalConsultationServi
     @Override
     public String generateLegalAnswer(String question, Long categoryId)
     {
-        // 根据问题关键词搜索相关法律知识
-        List<AiLegalKnowledge> knowledgeList = aiLegalKnowledgeService.searchAiLegalKnowledge(question);
-        
-        if (knowledgeList != null && !knowledgeList.isEmpty())
-        {
-            // 如果找到相关知识，返回最相关的知识内容
-            AiLegalKnowledge knowledge = knowledgeList.get(0);
-            // 增加浏览次数
-            aiLegalKnowledgeService.increaseViewCount(knowledge.getKnowledgeId());
-            return knowledge.getContent();
-        }
-        else
-        {
-            // 如果没有找到相关知识，返回默认回答
-            return "很抱歉，我暂时无法回答您的问题。建议您咨询专业律师获取更准确的法律建议。";
+        try {
+            // 构建上下文信息
+            StringBuilder contextBuilder = new StringBuilder();
+            
+            // 根据问题关键词搜索相关法律知识
+            List<AiLegalKnowledge> knowledgeList = aiLegalKnowledgeService.searchAiLegalKnowledge(question);
+            
+            if (knowledgeList != null && !knowledgeList.isEmpty())
+            {
+                // 如果找到相关知识，将其作为上下文
+                contextBuilder.append("相关法律知识：\n");
+                for (int i = 0; i < Math.min(knowledgeList.size(), 3); i++) {
+                    AiLegalKnowledge knowledge = knowledgeList.get(i);
+                    contextBuilder.append(i + 1).append(". ").append(knowledge.getTitle()).append("\n");
+                    contextBuilder.append(knowledge.getContent()).append("\n\n");
+                    // 增加浏览次数
+                    aiLegalKnowledgeService.increaseViewCount(knowledge.getKnowledgeId());
+                }
+            }
+            
+            // 调用AI模型生成回答
+            String aiAnswer = aiModelConfigService.callAiModel(question, contextBuilder.toString());
+            
+            // 如果AI模型调用失败，返回默认回答
+            if (aiAnswer == null || aiAnswer.isEmpty()) {
+                return "很抱歉，我暂时无法回答您的问题。建议您咨询专业律师获取更准确的法律建议。";
+            }
+            
+            return aiAnswer;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "生成回答时发生错误：" + e.getMessage() + "。建议您咨询专业律师获取更准确的法律建议。";
         }
     }
     

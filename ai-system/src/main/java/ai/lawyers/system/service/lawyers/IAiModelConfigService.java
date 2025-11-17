@@ -81,4 +81,13 @@ public interface IAiModelConfigService
      * @return 测试结果
      */
     public boolean testAiModelConnection(Long configId);
+    
+    /**
+     * 调用AI模型API生成回答
+     * 
+     * @param question 用户问题
+     * @param context 上下文信息
+     * @return AI生成的回答
+     */
+    public String callAiModel(String question, String context);
 }
