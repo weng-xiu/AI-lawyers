@@ -173,12 +173,14 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
         
         try {
             // 根据模型类型调用不同的API
-            if ("OpenAI".equals(config.getModelType())) {
+            if ("OpenAI".equals(config.getModelType()) || "gpt".equals(config.getModelType())) {
                 return callOpenAI(config, question, context);
             } else if ("Claude".equals(config.getModelType())) {
                 return callClaude(config, question, context);
             } else if ("ChatGLM".equals(config.getModelType())) {
                 return callChatGLM(config, question, context);
+            } else if ("local".equals(config.getModelType())) {
+                return callLocalModel(config, question, context);
             } else {
                 // 默认使用通用调用方法
                 return callGenericModel(config, question, context);
@@ -262,11 +264,7 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
             // 实际实现需要使用RestTemplate或HttpClient调用真实API
             
             // 模拟API调用
-            String simulatedResponse = "根据您的问题，我提供以下法律建议：\n\n" +
-                "1. 首先需要了解具体情况...\n" +
-                "2. 根据相关法律条款...\n" +
-                "3. 建议您采取以下措施...\n\n" +
-                "请注意，以上建议仅供参考，具体情况建议咨询专业律师。";
+            String simulatedResponse = generateLegalResponse(question, context);
             
             return simulatedResponse;
         } catch (Exception e) {
@@ -290,11 +288,7 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
             // 为了简化示例，这里返回模拟结果
             
             // 模拟API调用
-            String simulatedResponse = "根据您的问题，我提供以下法律建议：\n\n" +
-                "1. 首先需要了解具体情况...\n" +
-                "2. 根据相关法律条款...\n" +
-                "3. 建议您采取以下措施...\n\n" +
-                "请注意，以上建议仅供参考，具体情况建议咨询专业律师。";
+            String simulatedResponse = generateLegalResponse(question, context);
             
             return simulatedResponse;
         } catch (Exception e) {
@@ -318,15 +312,35 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
             // 为了简化示例，这里返回模拟结果
             
             // 模拟API调用
-            String simulatedResponse = "根据您的问题，我提供以下法律建议：\n\n" +
-                "1. 首先需要了解具体情况...\n" +
-                "2. 根据相关法律条款...\n" +
-                "3. 建议您采取以下措施...\n\n" +
-                "请注意，以上建议仅供参考，具体情况建议咨询专业律师。";
+            String simulatedResponse = generateLegalResponse(question, context);
             
             return simulatedResponse;
         } catch (Exception e) {
             throw new RuntimeException("调用ChatGLM API失败：" + e.getMessage());
+        }
+    }
+    
+    /**
+     * 调用本地模型API
+     */
+    private String callLocalModel(AiModelConfig config, String question, String context) {
+        try {
+            // 构建请求体
+            StringBuilder promptBuilder = new StringBuilder();
+            if (context != null && !context.isEmpty()) {
+                promptBuilder.append("背景信息：").append(context).append("\n\n");
+            }
+            promptBuilder.append("用户问题：").append(question);
+            
+            // 这里应该使用HTTP客户端调用本地模型API
+            // 为了简化示例，这里返回模拟结果
+            
+            // 模拟API调用
+            String simulatedResponse = generateLegalResponse(question, context);
+            
+            return simulatedResponse;
+        } catch (Exception e) {
+            throw new RuntimeException("调用本地模型API失败：" + e.getMessage());
         }
     }
     
@@ -346,15 +360,64 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
             // 为了简化示例，这里返回模拟结果
             
             // 模拟API调用
-            String simulatedResponse = "根据您的问题，我提供以下法律建议：\n\n" +
-                "1. 首先需要了解具体情况...\n" +
-                "2. 根据相关法律条款...\n" +
-                "3. 建议您采取以下措施...\n\n" +
-                "请注意，以上建议仅供参考，具体情况建议咨询专业律师。";
+            String simulatedResponse = generateLegalResponse(question, context);
             
             return simulatedResponse;
         } catch (Exception e) {
             throw new RuntimeException("调用通用模型API失败：" + e.getMessage());
         }
+    }
+    
+    /**
+     * 生成法律咨询响应
+     * 
+     * @param question 用户问题
+     * @param context 上下文信息
+     * @return 生成的法律响应
+     */
+    private String generateLegalResponse(String question, String context) {
+        // 根据问题关键词生成更有针对性的回复
+        String lowerQuestion = question.toLowerCase();
+        
+        StringBuilder response = new StringBuilder();
+        response.append("根据您的问题，我提供以下法律建议：\n\n");
+        
+        // 根据问题类型提供不同的建议
+        if (lowerQuestion.contains("离婚") || lowerQuestion.contains("婚姻")) {
+            response.append("关于婚姻家庭问题：\n");
+            response.append("1. 根据《民法典》规定，夫妻感情确已破裂是离婚的法定条件\n");
+            response.append("2. 离婚涉及财产分割、子女抚养等问题，建议协商解决\n");
+            response.append("3. 如无法协商，可向人民法院提起离婚诉讼\n");
+        } 
+        else if (lowerQuestion.contains("合同") || lowerQuestion.contains("违约")) {
+            response.append("关于合同纠纷问题：\n");
+            response.append("1. 根据《民法典》合同编规定，合同当事人应当全面履行合同义务\n");
+            response.append("2. 违约方应当承担继续履行、采取补救措施或者赔偿损失等违约责任\n");
+            response.append("3. 建议保留合同原件、履行凭证等相关证据\n");
+        }
+        else if (lowerQuestion.contains("劳动") || lowerQuestion.contains("工资") || lowerQuestion.contains("加班")) {
+            response.append("关于劳动纠纷问题：\n");
+            response.append("1. 根据《劳动法》和《劳动合同法》，用人单位应当按时足额支付劳动报酬\n");
+            response.append("2. 加班工资应按照不低于工资的150%（工作日）、200%（休息日）、300%（法定节假日）支付\n");
+            response.append("3. 建议保留劳动合同、工资条、考勤记录等证据\n");
+        }
+        else if (lowerQuestion.contains("交通") || lowerQuestion.contains("事故")) {
+            response.append("关于交通事故问题：\n");
+            response.append("1. 根据《道路交通安全法》，发生交通事故应当立即停车、保护现场、抢救伤员\n");
+            response.append("2. 交通事故赔偿包括医疗费、误工费、护理费、交通费等\n");
+            response.append("3. 建议及时报警、保留现场照片、维修发票等证据\n");
+        }
+        else {
+            response.append("1. 首先需要了解具体情况和相关事实\n");
+            response.append("2. 根据相关法律条款和规定进行分析\n");
+            response.append("3. 建议您采取以下措施：收集证据、咨询专业律师、通过合法途径维权\n");
+        }
+        
+        response.append("\n重要提示：\n");
+        response.append("- 以上建议仅供参考，不构成正式的法律意见\n");
+        response.append("- 法律问题具有复杂性，建议您咨询专业律师获取针对性建议\n");
+        response.append("- 请注意保留相关证据材料，以备后续维权使用\n");
+        
+        return response.toString();
     }
 }
