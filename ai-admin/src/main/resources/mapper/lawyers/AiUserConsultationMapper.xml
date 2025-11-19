@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiUserConsultationMapper">
+    
+    <resultMap type="AiUserConsultation" id="AiUserConsultationResult">
+        <result property="consultationId"    column="consultation_id"    />
+        <result property="userId"           column="user_id"           />
+        <result property="category"          column="category"          />
+        <result property="content"           column="content"           />
+        <result property="attachments"       column="attachments"       />
+        <result property="aiAnswer"          column="ai_answer"         />
+        <result property="relatedLaws"       column="related_laws"      />
+        <result property="relatedCases"      column="related_cases"     />
+        <result property="confidence"        column="confidence"        />
+        <result property="status"            column="status"            />
+        <result property="processTime"        column="process_time"      />
+        <result property="createBy"          column="create_by"         />
+        <result property="createTime"        column="create_time"       />
+        <result property="updateBy"          column="update_by"         />
+        <result property="updateTime"        column="update_time"       />
+        <result property="remark"            column="remark"            />
+    </resultMap>
+
+    <sql id="selectAiUserConsultationVo">
+        select consultation_id, user_id, category, content, attachments, ai_answer, related_laws, related_cases, confidence, status, process_time, create_by, create_time, update_by, update_time, remark from ai_user_consultation
+    </sql>
+
+    <select id="selectAiUserConsultationList" parameterType="AiUserConsultation" resultMap="AiUserConsultationResult">
+        <include refid="selectAiUserConsultationVo"/>
+        <where>  
+            <if test="userId != null "> and user_id = #{userId}</if>
+            <if test="category != null  and category != ''"> and category = #{category}</if>
+            <if test="content != null  and content != ''"> and content like concat('%', #{content}, '%')</if>
+            <if test="status != null  and status != ''"> and status = #{status}</if>
+            <if test="processTime != null "> and process_time = #{processTime}</if>
+        </where>
+        order by create_time desc
+    </select>
+    
+    <select id="selectAiUserConsultationById" parameterType="Long" resultMap="AiUserConsultationResult">
+        <include refid="selectAiUserConsultationVo"/>
+        where consultation_id = #{consultationId}
+    </select>
+        
+    <insert id="insertAiUserConsultation" parameterType="AiUserConsultation" useGeneratedKeys="true" keyProperty="consultationId">
+        insert into ai_user_consultation
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="userId != null">user_id,</if>
+            <if test="category != null and category != ''">category,</if>
+            <if test="content != null and content != ''">content,</if>
+            <if test="attachments != null">attachments,</if>
+            <if test="aiAnswer != null">ai_answer,</if>
+            <if test="relatedLaws != null">related_laws,</if>
+            <if test="relatedCases != null">related_cases,</if>
+            <if test="confidence != null">confidence,</if>
+            <if test="status != null">status,</if>
+            <if test="processTime != null">process_time,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="remark != null">remark,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="userId != null">#{userId},</if>
+            <if test="category != null and category != ''">#{category},</if>
+            <if test="content != null and content != ''">#{content},</if>
+            <if test="attachments != null">#{attachments},</if>
+            <if test="aiAnswer != null">#{aiAnswer},</if>
+            <if test="relatedLaws != null">#{relatedLaws},</if>
+            <if test="relatedCases != null">#{relatedCases},</if>
+            <if test="confidence != null">#{confidence},</if>
+            <if test="status != null">#{status},</if>
+            <if test="processTime != null">#{processTime},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateAiUserConsultation" parameterType="AiUserConsultation">
+        update ai_user_consultation
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="userId != null">user_id = #{userId},</if>
+            <if test="category != null and category != ''">category = #{category},</if>
+            <if test="content != null and content != ''">content = #{content},</if>
+            <if test="attachments != null">attachments = #{attachments},</if>
+            <if test="aiAnswer != null">ai_answer = #{aiAnswer},</if>
+            <if test="relatedLaws != null">related_laws = #{relatedLaws},</if>
+            <if test="relatedCases != null">related_cases = #{relatedCases},</if>
+            <if test="confidence != null">confidence = #{confidence},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="processTime != null">process_time = #{processTime},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where consultation_id = #{consultationId}
+    </update>
+
+    <delete id="deleteAiUserConsultationById" parameterType="Long">
+        delete from ai_user_consultation where consultation_id = #{consultationId}
+    </delete>
+
+    <delete id="deleteAiUserConsultationByIds" parameterType="String">
+        delete from ai_user_consultation where consultation_id in 
+        <foreach item="consultationId" collection="array" open="(" separator="," close=")">
+            #{consultationId}
+        </foreach>
+    </delete>
+</mapper>

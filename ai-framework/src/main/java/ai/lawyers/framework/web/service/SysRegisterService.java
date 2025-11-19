@@ -76,9 +76,16 @@ public class SysRegisterService
         }
         else
         {
-            sysUser.setNickName(username);
+            // 设置用户信息
+            sysUser.setNickName(StringUtils.isNotEmpty(registerBody.getNickName()) ? registerBody.getNickName() : username);
+            sysUser.setEmail(registerBody.getEmail());
+            sysUser.setPhonenumber(registerBody.getPhonenumber());
+            sysUser.setSex(registerBody.getSex());
+            // 设置用户类型，默认为普通用户'01'
+            sysUser.setUserType(StringUtils.isNotEmpty(registerBody.getUserType()) ? registerBody.getUserType() : "01");
             sysUser.setPwdUpdateDate(DateUtils.getNowDate());
             sysUser.setPassword(SecurityUtils.encryptPassword(password));
+            
             boolean regFlag = userService.registerUser(sysUser);
             if (!regFlag)
             {

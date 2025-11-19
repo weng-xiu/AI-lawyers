@@ -13,6 +13,10 @@ ruoyi:
   # 验证码类型 math 数字计算 char 字符验证
   captchaType: math
 
+# 文件上传路径配置
+file:
+  path: D:/ruoyi/uploadPath
+
 # 开发环境配置
 server:
   # 服务器的HTTP端口，默认为8080

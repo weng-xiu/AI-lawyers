@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiUserEvaluationMapper">
+    
+    <resultMap type="AiUserEvaluation" id="AiUserEvaluationResult">
+        <result property="evaluationId"     column="evaluation_id"     />
+        <result property="consultationId"   column="consultation_id"   />
+        <result property="userId"           column="user_id"           />
+        <result property="rating"           column="rating"            />
+        <result property="feedback"         column="feedback"          />
+        <result property="suggestions"      column="suggestions"       />
+        <result property="createBy"         column="create_by"         />
+        <result property="createTime"       column="create_time"       />
+        <result property="updateBy"         column="update_by"         />
+        <result property="updateTime"       column="update_time"       />
+        <result property="remark"           column="remark"            />
+    </resultMap>
+
+    <sql id="selectAiUserEvaluationVo">
+        select evaluation_id, consultation_id, user_id, rating, feedback, suggestions, create_by, create_time, update_by, update_time, remark from ai_user_evaluation
+    </sql>
+
+    <select id="selectAiUserEvaluationList" parameterType="AiUserEvaluation" resultMap="AiUserEvaluationResult">
+        <include refid="selectAiUserEvaluationVo"/>
+        <where>  
+            <if test="consultationId != null "> and consultation_id = #{consultationId}</if>
+            <if test="userId != null "> and user_id = #{userId}</if>
+            <if test="rating != null "> and rating = #{rating}</if>
+            <if test="feedback != null  and feedback != ''"> and feedback like concat('%', #{feedback}, '%')</if>
+        </where>
+        order by create_time desc
+    </select>
+    
+    <select id="selectAiUserEvaluationById" parameterType="Long" resultMap="AiUserEvaluationResult">
+        <include refid="selectAiUserEvaluationVo"/>
+        where evaluation_id = #{evaluationId}
+    </select>
+        
+    <insert id="insertAiUserEvaluation" parameterType="AiUserEvaluation" useGeneratedKeys="true" keyProperty="evaluationId">
+        insert into ai_user_evaluation
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="consultationId != null">consultation_id,</if>
+            <if test="userId != null">user_id,</if>
+            <if test="rating != null">rating,</if>
+            <if test="feedback != null and feedback != ''">feedback,</if>
+            <if test="suggestions != null and suggestions != ''">suggestions,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="remark != null">remark,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="consultationId != null">#{consultationId},</if>
+            <if test="userId != null">#{userId},</if>
+            <if test="rating != null">#{rating},</if>
+            <if test="feedback != null and feedback != ''">#{feedback},</if>
+            <if test="suggestions != null and suggestions != ''">#{suggestions},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateAiUserEvaluation" parameterType="AiUserEvaluation">
+        update ai_user_evaluation
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="consultationId != null">consultation_id = #{consultationId},</if>
+            <if test="userId != null">user_id = #{userId},</if>
+            <if test="rating != null">rating = #{rating},</if>
+            <if test="feedback != null and feedback != ''">feedback = #{feedback},</if>
+            <if test="suggestions != null and suggestions != ''">suggestions = #{suggestions},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where evaluation_id = #{evaluationId}
+    </update>
+
+    <delete id="deleteAiUserEvaluationById" parameterType="Long">
+        delete from ai_user_evaluation where evaluation_id = #{evaluationId}
+    </delete>
+
+    <delete id="deleteAiUserEvaluationByIds" parameterType="String">
+        delete from ai_user_evaluation where evaluation_id in 
+        <foreach item="evaluationId" collection="array" open="(" separator="," close=")">
+            #{evaluationId}
+        </foreach>
+    </delete>
+</mapper>

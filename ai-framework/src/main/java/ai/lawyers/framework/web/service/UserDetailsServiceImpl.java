@@ -53,6 +53,12 @@ public class UserDetailsServiceImpl implements UserDetailsService
             log.info("登录用户：{} 已被停用.", username);
             throw new ServiceException(MessageUtils.message("user.blocked"));
         }
+        // 验证用户类型，只有普通用户('01')可以通过用户端登录
+        else if (!"01".equals(user.getUserType()))
+        {
+            log.info("登录用户：{} 不是普通用户，无法通过用户端登录.", username);
+            throw new ServiceException("非普通用户无法通过用户端登录");
+        }
 
         passwordService.validate(user);
 

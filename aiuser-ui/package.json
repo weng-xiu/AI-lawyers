@@ -1,0 +1,37 @@
+{
+  "name": "aiuser-ui",
+  "version": "1.0.0",
+  "description": "AI律师用户端",
+  "author": "AI律师团队",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vue-cli-service serve",
+    "build:prod": "vue-cli-service build",
+    "build:stage": "vue-cli-service build --mode staging",
+    "preview": "node build/index.js --preview"
+  },
+  "dependencies": {
+    "axios": "0.28.1",
+    "core-js": "3.37.1",
+    "element-ui": "2.15.14",
+    "vue": "2.6.12",
+    "vue-router": "3.4.9",
+    "vuex": "3.6.0"
+  },
+  "devDependencies": {
+    "@vue/cli-plugin-babel": "4.4.6",
+    "@vue/cli-service": "4.4.6",
+    "babel-plugin-dynamic-import-node": "2.3.3",
+    "sass": "1.32.13",
+    "sass-loader": "10.1.1",
+    "vue-template-compiler": "2.6.12"
+  },
+  "engines": {
+    "node": ">=8.9",
+    "npm": ">= 3.0.0"
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions"
+  ]
+}
