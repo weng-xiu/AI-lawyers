@@ -1,8 +1,10 @@
 package ai.lawyers.framework.config;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
@@ -34,6 +36,7 @@ public class SecurityConfig
      * 自定义用户认证逻辑
      */
     @Autowired
+    @Qualifier("aiUserDetailsService")
     private UserDetailsService userDetailsService;
     
     /**
@@ -70,6 +73,7 @@ public class SecurityConfig
      * 身份验证实现
      */
     @Bean
+    @Primary
     public AuthenticationManager authenticationManager()
     {
         DaoAuthenticationProvider daoAuthenticationProvider = new DaoAuthenticationProvider();

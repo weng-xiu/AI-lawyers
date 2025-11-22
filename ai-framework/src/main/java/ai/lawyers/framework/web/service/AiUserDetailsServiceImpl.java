@@ -16,14 +16,14 @@ import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.system.service.ISysUserService;
 
 /**
- * 用户验证处理
+ * 用户端用户验证处理
  *
- * @author ruoyi
+ * @author AI律师
  */
-@Service
-public class UserDetailsServiceImpl implements UserDetailsService
+@Service("aiUserDetailsService")
+public class AiUserDetailsServiceImpl implements UserDetailsService
 {
-    private static final Logger log = LoggerFactory.getLogger(UserDetailsServiceImpl.class);
+    private static final Logger log = LoggerFactory.getLogger(AiUserDetailsServiceImpl.class);
 
     @Autowired
     private ISysUserService userService;

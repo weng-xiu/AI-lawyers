@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Iterator;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ai.lawyers.common.utils.StringUtils;
@@ -19,6 +20,7 @@ import ai.lawyers.system.service.lawyers.IAiConsultationCategoryService;
  * @date 2025-06-23
  */
 @Service("aiConsultationCategoryAdminServiceImpl")
+@Primary
 public class AiConsultationCategoryServiceImpl implements IAiConsultationCategoryService 
 {
     @Autowired

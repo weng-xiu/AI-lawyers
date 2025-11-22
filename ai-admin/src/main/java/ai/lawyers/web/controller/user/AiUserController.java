@@ -15,6 +15,7 @@ import ai.lawyers.common.core.domain.model.RegisterBody;
 import ai.lawyers.common.enums.UserStatus;
 import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.framework.web.service.SysRegisterService;
+import ai.lawyers.system.service.ISysConfigService;
 import ai.lawyers.system.service.ISysUserService;
 
 /**
@@ -31,6 +32,9 @@ public class AiUserController extends BaseController
     
     @Autowired
     private SysRegisterService registerService;
+    
+    @Autowired
+    private ISysConfigService configService;
 
     /**
      * 获取用户类型

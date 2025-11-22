@@ -1,0 +1,26 @@
+{
+  "name": "AI-lawyers",
+  "version": "1.0.0",
+  "description": "1. **智能法律咨询**      - 用户输入法律问题，AI 自动生成简要解答（基于法律知识库 + NLP 问答模型）。   2. **合同审查与生成**      - 上传合同文本，AI 自动检测风险条款（如违约条款模糊、格式陷阱等），并生成标准化合同模板。   3. **案件分析与预测**      - 输入案件描述，AI 分析案件类型、相关法条，并预测可能的判决结果（基于历史案例库 + 机器学习）。   4. **法律文书生成**      - 根据用户输入信息自动生成起诉状、答辩状等文书（模板 + 动态填充技术）。   5. **智能检索与推荐**      - 支持法条、案例、律所/律师的语义化检索（基于知识图谱 + 向量检索技术）。",
+  "main": "test_frontend_login.js",
+  "directories": {
+    "doc": "doc"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/weng-xiu/AI-lawyers.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/weng-xiu/AI-lawyers/issues"
+  },
+  "homepage": "https://github.com/weng-xiu/AI-lawyers#readme",
+  "dependencies": {
+    "axios": "^1.13.2"
+  }
+}

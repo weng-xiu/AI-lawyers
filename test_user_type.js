@@ -25,8 +25,8 @@ async function testLogin() {
       
       try {
         const loginResponse = await api.post('/login', {
-          username: 'testuser',
-          password: 'admin123',
+        username: 'user01',
+        password: 'admin123',
           code: answer,
           uuid: captchaResponse.data.uuid
         });

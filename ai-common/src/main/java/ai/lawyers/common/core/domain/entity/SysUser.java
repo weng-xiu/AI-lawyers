@@ -72,6 +72,9 @@ public class SysUser extends BaseEntity
 
     /** 密码最后更新时间 */
     private Date pwdUpdateDate;
+    
+    /** 用户类型（00系统用户 01普通用户） */
+    private String userType;
 
     /** 部门对象 */
     @Excels({
@@ -258,6 +261,16 @@ public class SysUser extends BaseEntity
     public void setPwdUpdateDate(Date pwdUpdateDate)
     {
         this.pwdUpdateDate = pwdUpdateDate;
+    }
+    
+    public String getUserType()
+    {
+        return userType;
+    }
+    
+    public void setUserType(String userType)
+    {
+        this.userType = userType;
     }
 
     public SysDept getDept()

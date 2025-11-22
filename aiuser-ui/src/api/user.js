@@ -3,7 +3,7 @@ import request from '@/utils/http'
 // 用户登录
 export function login(data) {
   return request({
-    url: '/login',
+    url: '/aiuser/login',
     method: 'post',
     data: data
   })
@@ -12,7 +12,7 @@ export function login(data) {
 // 获取用户信息
 export function getInfo() {
   return request({
-    url: '/getInfo',
+    url: '/aiuser/getInfo',
     method: 'get'
   })
 }
@@ -20,7 +20,7 @@ export function getInfo() {
 // 用户登出
 export function logout() {
   return request({
-    url: '/logout',
+    url: '/aiuser/logout',
     method: 'post'
   })
 }
@@ -28,7 +28,7 @@ export function logout() {
 // 获取验证码
 export function getCodeImg() {
   return request({
-    url: '/captchaImage',
+    url: '/aiuser/captchaImage',
     method: 'get'
   })
 }
@@ -36,7 +36,7 @@ export function getCodeImg() {
 // 用户注册
 export function register(data) {
   return request({
-    url: '/register',
+    url: '/aiuser/register',
     method: 'post',
     data: data
   })
@@ -45,7 +45,7 @@ export function register(data) {
 // 获取用户类型
 export function getUserType() {
   return request({
-    url: '/user/type',
+    url: '/aiuser/user/type',
     method: 'get'
   })
 }
