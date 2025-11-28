@@ -154,7 +154,7 @@ public class AiUserLoginController extends BaseController
     public AjaxResult getCode() throws IOException
     {
         AjaxResult ajax = AjaxResult.success();
-        boolean captchaEnabled = configService.selectCaptchaEnabled();
+        boolean captchaEnabled = true; // 强制开启验证码功能
         ajax.put("captchaEnabled", captchaEnabled);
         if (!captchaEnabled)
         {
