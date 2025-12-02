@@ -36,7 +36,7 @@ public class SecurityConfig
      * 自定义用户认证逻辑
      */
     @Autowired
-    @Qualifier("aiUserDetailsService")
+    @Qualifier("userDetailsService")
     private UserDetailsService userDetailsService;
     
     /**
@@ -101,6 +101,8 @@ public class SecurityConfig
     protected SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception
     {
         return httpSecurity
+            // 只处理非/aiuser开头的请求
+            .requestMatchers((matchers) -> matchers.antMatchers("/**").regexMatchers("^(?!/aiuser).*"))
             // CSRF禁用，因为不使用session
             .csrf(csrf -> csrf.disable())
             // 禁用HTTP响应标头
