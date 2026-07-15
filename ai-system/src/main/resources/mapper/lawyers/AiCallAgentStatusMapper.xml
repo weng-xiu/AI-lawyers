@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiCallAgentStatusMapper">
+    
+    <resultMap type="AiCallAgentStatus" id="AiCallAgentStatusResult">
+        <result property="agentId"        column="agent_id"        />
+        <result property="userId"         column="user_id"         />
+        <result property="agentName"      column="agent_name"      />
+        <result property="status"         column="status"          />
+        <result property="loginTime"      column="login_time"      />
+        <result property="logoutTime"     column="logout_time"     />
+        <result property="lastLoginIp"    column="last_login_ip"   />
+        <result property="createBy"       column="create_by"       />
+        <result property="createTime"     column="create_time"     />
+        <result property="updateBy"       column="update_by"       />
+        <result property="updateTime"     column="update_time"     />
+        <result property="remark"         column="remark"          />
+    </resultMap>
+
+    <sql id="selectAiCallAgentStatusVo">
+        select agent_id, user_id, agent_name, status, login_time, logout_time, last_login_ip, create_by, create_time, update_by, update_time, remark 
+        from ai_call_agent_status
+    </sql>
+    
+    <select id="selectAiCallAgentStatusList" parameterType="AiCallAgentStatus" resultMap="AiCallAgentStatusResult">
+        <include refid="selectAiCallAgentStatusVo"/>
+        <where>
+            <if test="agentName != null and agentName != ''"> and agent_name like concat('%', #{agentName}, '%')</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+        </where>
+        order by create_time desc
+    </select>
+    
+    <select id="selectAiCallAgentStatusByAgentId" parameterType="Long" resultMap="AiCallAgentStatusResult">
+        <include refid="selectAiCallAgentStatusVo"/>
+        where agent_id = #{agentId}
+    </select>
+    
+    <select id="selectAiCallAgentStatusByUserId" parameterType="Long" resultMap="AiCallAgentStatusResult">
+        <include refid="selectAiCallAgentStatusVo"/>
+        where user_id = #{userId}
+    </select>
+    
+    <select id="selectOnlineAgents" resultMap="AiCallAgentStatusResult">
+        <include refid="selectAiCallAgentStatusVo"/>
+        where status in ('1', '2')
+        order by agent_id
+    </select>
+        
+    <insert id="insertAiCallAgentStatus" parameterType="AiCallAgentStatus">
+        insert into ai_call_agent_status
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="userId != null">user_id,</if>
+            <if test="agentName != null and agentName != ''">agent_name,</if>
+            <if test="status != null">status,</if>
+            <if test="loginTime != null">login_time,</if>
+            <if test="logoutTime != null">logout_time,</if>
+            <if test="lastLoginIp != null">last_login_ip,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="userId != null">#{userId},</if>
+            <if test="agentName != null and agentName != ''">#{agentName},</if>
+            <if test="status != null">#{status},</if>
+            <if test="loginTime != null">#{loginTime},</if>
+            <if test="logoutTime != null">#{logoutTime},</if>
+            <if test="lastLoginIp != null">#{lastLoginIp},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate()
+         </trim>
+    </insert>
+
+    <update id="updateAiCallAgentStatus" parameterType="AiCallAgentStatus">
+        update ai_call_agent_status
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="userId != null">user_id = #{userId},</if>
+            <if test="agentName != null and agentName != ''">agent_name = #{agentName},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="loginTime != null">login_time = #{loginTime},</if>
+            <if test="logoutTime != null">logout_time = #{logoutTime},</if>
+            <if test="lastLoginIp != null">last_login_ip = #{lastLoginIp},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where agent_id = #{agentId}
+    </update>
+
+    <delete id="deleteAiCallAgentStatusByAgentId" parameterType="Long">
+        delete from ai_call_agent_status where agent_id = #{agentId}
+    </delete>
+
+    <delete id="deleteAiCallAgentStatusByAgentIds" parameterType="String">
+        delete from ai_call_agent_status where agent_id in 
+        <foreach item="agentId" collection="array" open="(" separator="," close=")">
+            #{agentId}
+        </foreach>
+    </delete>
+</mapper>

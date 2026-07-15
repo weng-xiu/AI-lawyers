@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiCallTransferMapper">
+    
+    <resultMap type="AiCallTransfer" id="AiCallTransferResult">
+        <result property="transferId"     column="transfer_id"     />
+        <result property="recordId"       column="record_id"       />
+        <result property="fromAgentId"    column="from_agent_id"   />
+        <result property="fromAgentName"  column="from_agent_name" />
+        <result property="toAgentId"      column="to_agent_id"     />
+        <result property="toAgentName"    column="to_agent_name"   />
+        <result property="transferTime"   column="transfer_time"   />
+        <result property="reason"         column="reason"          />
+        <result property="createBy"       column="create_by"       />
+        <result property="createTime"     column="create_time"     />
+        <result property="remark"         column="remark"          />
+    </resultMap>
+
+    <sql id="selectAiCallTransferVo">
+        select transfer_id, record_id, from_agent_id, from_agent_name, 
+               to_agent_id, to_agent_name, transfer_time, reason, 
+               create_by, create_time, remark
+        from ai_call_transfer
+    </sql>
+    
+    <select id="selectAiCallTransferList" parameterType="AiCallTransfer" resultMap="AiCallTransferResult">
+        <include refid="selectAiCallTransferVo"/>
+        <where>
+            <if test="recordId != null"> and record_id = #{recordId}</if>
+            <if test="fromAgentId != null"> and from_agent_id = #{fromAgentId}</if>
+            <if test="toAgentId != null"> and to_agent_id = #{toAgentId}</if>
+        </where>
+        order by transfer_time desc
+    </select>
+    
+    <select id="selectAiCallTransferByTransferId" parameterType="Long" resultMap="AiCallTransferResult">
+        <include refid="selectAiCallTransferVo"/>
+        where transfer_id = #{transferId}
+    </select>
+    
+    <select id="selectAiCallTransferByRecordId" parameterType="Long" resultMap="AiCallTransferResult">
+        <include refid="selectAiCallTransferVo"/>
+        where record_id = #{recordId}
+        order by transfer_time desc
+    </select>
+        
+    <insert id="insertAiCallTransfer" parameterType="AiCallTransfer">
+        insert into ai_call_transfer
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="recordId != null">record_id,</if>
+            <if test="fromAgentId != null">from_agent_id,</if>
+            <if test="fromAgentName != null and fromAgentName != ''">from_agent_name,</if>
+            <if test="toAgentId != null">to_agent_id,</if>
+            <if test="toAgentName != null and toAgentName != ''">to_agent_name,</if>
+            <if test="transferTime != null">transfer_time,</if>
+            <if test="reason != null">reason,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="recordId != null">#{recordId},</if>
+            <if test="fromAgentId != null">#{fromAgentId},</if>
+            <if test="fromAgentName != null and fromAgentName != ''">#{fromAgentName},</if>
+            <if test="toAgentId != null">#{toAgentId},</if>
+            <if test="toAgentName != null and toAgentName != ''">#{toAgentName},</if>
+            <if test="transferTime != null">#{transferTime},</if>
+            <if test="reason != null">#{reason},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate()
+         </trim>
+    </insert>
+
+    <delete id="deleteAiCallTransferByTransferId" parameterType="Long">
+        delete from ai_call_transfer where transfer_id = #{transferId}
+    </delete>
+
+    <delete id="deleteAiCallTransferByTransferIds" parameterType="String">
+        delete from ai_call_transfer where transfer_id in 
+        <foreach item="transferId" collection="array" open="(" separator="," close=")">
+            #{transferId}
+        </foreach>
+    </delete>
+</mapper>

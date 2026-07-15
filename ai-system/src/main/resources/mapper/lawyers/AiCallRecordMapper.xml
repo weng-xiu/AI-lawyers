@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiCallRecordMapper">
+    
+    <resultMap type="AiCallRecord" id="AiCallRecordResult">
+        <result property="recordId"        column="record_id"        />
+        <result property="callerNumber"    column="caller_number"    />
+        <result property="callerName"      column="caller_name"      />
+        <result property="callerAddress"   column="caller_address"   />
+        <result property="callTime"        column="call_time"        />
+        <result property="endTime"         column="end_time"         />
+        <result property="duration"        column="duration"         />
+        <result property="agentId"         column="agent_id"         />
+        <result property="categoryId"      column="category_id"      />
+        <result property="content"         column="content"          />
+        <result property="answer"          column="answer"           />
+        <result property="status"          column="status"           />
+        <result property="transferId"      column="transfer_id"      />
+        <result property="ticketId"        column="ticket_id"        />
+        <result property="agentName"       column="agent_name"       />
+        <result property="categoryName"    column="category_name"    />
+        <result property="createBy"        column="create_by"        />
+        <result property="createTime"      column="create_time"      />
+        <result property="updateBy"        column="update_by"        />
+        <result property="updateTime"      column="update_time"      />
+        <result property="remark"          column="remark"           />
+    </resultMap>
+
+    <sql id="selectAiCallRecordVo">
+        select cr.record_id, cr.caller_number, cr.caller_name, cr.caller_address, cr.call_time, 
+               cr.end_time, cr.duration, cr.agent_id, cr.category_id, cr.content, cr.answer, 
+               cr.status, cr.transfer_id, cr.ticket_id, cr.create_by, cr.create_time, 
+               cr.update_by, cr.update_time, cr.remark,
+               a.agent_name, c.category_name
+        from ai_call_record cr
+        left join ai_call_agent_status a on cr.agent_id = a.agent_id
+        left join ai_consultation_category c on cr.category_id = c.category_id
+    </sql>
+    
+    <select id="selectAiCallRecordList" parameterType="AiCallRecord" resultMap="AiCallRecordResult">
+        <include refid="selectAiCallRecordVo"/>
+        <where>
+            <if test="callerNumber != null and callerNumber != ''"> and cr.caller_number like concat('%', #{callerNumber}, '%')</if>
+            <if test="callerName != null and callerName != ''"> and cr.caller_name like concat('%', #{callerName}, '%')</if>
+            <if test="agentId != null"> and cr.agent_id = #{agentId}</if>
+            <if test="categoryId != null"> and cr.category_id = #{categoryId}</if>
+            <if test="status != null and status != ''"> and cr.status = #{status}</if>
+            <if test="callTime != null"> and date(cr.call_time) = date(#{callTime})</if>
+        </where>
+        order by cr.call_time desc
+    </select>
+    
+    <select id="selectAiCallRecordByRecordId" parameterType="Long" resultMap="AiCallRecordResult">
+        <include refid="selectAiCallRecordVo"/>
+        where cr.record_id = #{recordId}
+    </select>
+    
+    <select id="selectAiCallRecordByAgentId" parameterType="Long" resultMap="AiCallRecordResult">
+        <include refid="selectAiCallRecordVo"/>
+        where cr.agent_id = #{agentId}
+        order by cr.call_time desc
+    </select>
+    
+    <select id="getCallStatistics" resultType="map">
+        select count(*) as total_count,
+               sum(case when status = '1' then 1 else 0 end) as completed_count,
+               sum(case when status = '2' then 1 else 0 end) as transferred_count,
+               sum(case when status = '3' then 1 else 0 end) as missed_count,
+               avg(duration) as avg_duration
+        from ai_call_record
+    </select>
+    
+    <select id="getCallStatisticsByAgent" resultType="map">
+        select a.agent_name, count(*) as call_count,
+               sum(case when cr.status = '1' then 1 else 0 end) as completed_count,
+               avg(cr.duration) as avg_duration
+        from ai_call_record cr
+        left join ai_call_agent_status a on cr.agent_id = a.agent_id
+        group by cr.agent_id, a.agent_name
+        order by call_count desc
+    </select>
+    
+    <select id="getCallStatisticsByCategory" resultType="map">
+        select c.category_name, count(*) as call_count
+        from ai_call_record cr
+        left join ai_consultation_category c on cr.category_id = c.category_id
+        group by cr.category_id, c.category_name
+        order by call_count desc
+    </select>
+    
+    <select id="getCallStatisticsByDate" parameterType="Integer" resultType="map">
+        select date(call_time) as date, count(*) as call_count
+        from ai_call_record
+        where call_time >= date_sub(curdate(), interval #{days} day)
+        group by date(call_time)
+        order by date
+    </select>
+        
+    <insert id="insertAiCallRecord" parameterType="AiCallRecord">
+        insert into ai_call_record
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="callerNumber != null and callerNumber != ''">caller_number,</if>
+            <if test="callerName != null and callerName != ''">caller_name,</if>
+            <if test="callerAddress != null and callerAddress != ''">caller_address,</if>
+            <if test="callTime != null">call_time,</if>
+            <if test="endTime != null">end_time,</if>
+            <if test="duration != null">duration,</if>
+            <if test="agentId != null">agent_id,</if>
+            <if test="categoryId != null">category_id,</if>
+            <if test="content != null">content,</if>
+            <if test="answer != null">answer,</if>
+            <if test="status != null">status,</if>
+            <if test="transferId != null">transfer_id,</if>
+            <if test="ticketId != null">ticket_id,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="callerNumber != null and callerNumber != ''">#{callerNumber},</if>
+            <if test="callerName != null and callerName != ''">#{callerName},</if>
+            <if test="callerAddress != null and callerAddress != ''">#{callerAddress},</if>
+            <if test="callTime != null">#{callTime},</if>
+            <if test="endTime != null">#{endTime},</if>
+            <if test="duration != null">#{duration},</if>
+            <if test="agentId != null">#{agentId},</if>
+            <if test="categoryId != null">#{categoryId},</if>
+            <if test="content != null">#{content},</if>
+            <if test="answer != null">#{answer},</if>
+            <if test="status != null">#{status},</if>
+            <if test="transferId != null">#{transferId},</if>
+            <if test="ticketId != null">#{ticketId},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate()
+         </trim>
+    </insert>
+
+    <update id="updateAiCallRecord" parameterType="AiCallRecord">
+        update ai_call_record
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="callerNumber != null and callerNumber != ''">caller_number = #{callerNumber},</if>
+            <if test="callerName != null and callerName != ''">caller_name = #{callerName},</if>
+            <if test="callerAddress != null and callerAddress != ''">caller_address = #{callerAddress},</if>
+            <if test="callTime != null">call_time = #{callTime},</if>
+            <if test="endTime != null">end_time = #{endTime},</if>
+            <if test="duration != null">duration = #{duration},</if>
+            <if test="agentId != null">agent_id = #{agentId},</if>
+            <if test="categoryId != null">category_id = #{categoryId},</if>
+            <if test="content != null">content = #{content},</if>
+            <if test="answer != null">answer = #{answer},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="transferId != null">transfer_id = #{transferId},</if>
+            <if test="ticketId != null">ticket_id = #{ticketId},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where record_id = #{recordId}
+    </update>
+
+    <delete id="deleteAiCallRecordByRecordId" parameterType="Long">
+        delete from ai_call_record where record_id = #{recordId}
+    </delete>
+
+    <delete id="deleteAiCallRecordByRecordIds" parameterType="String">
+        delete from ai_call_record where record_id in 
+        <foreach item="recordId" collection="array" open="(" separator="," close=")">
+            #{recordId}
+        </foreach>
+    </delete>
+</mapper>

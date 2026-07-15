@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiCallTicketMapper">
+    
+    <resultMap type="AiCallTicket" id="AiCallTicketResult">
+        <result property="ticketId"        column="ticket_id"        />
+        <result property="ticketNo"        column="ticket_no"        />
+        <result property="recordId"        column="record_id"        />
+        <result property="title"           column="title"            />
+        <result property="content"         column="content"          />
+        <result property="priority"        column="priority"         />
+        <result property="status"          column="status"           />
+        <result property="assignUserId"    column="assign_user_id"   />
+        <result property="assignUserName"  column="assign_user_name" />
+        <result property="processContent"  column="process_content"  />
+        <result property="processTime"     column="process_time"     />
+        <result property="closeTime"       column="close_time"       />
+        <result property="callerNumber"    column="caller_number"    />
+        <result property="callerName"      column="caller_name"      />
+        <result property="createBy"        column="create_by"        />
+        <result property="createTime"      column="create_time"      />
+        <result property="updateBy"        column="update_by"        />
+        <result property="updateTime"      column="update_time"      />
+        <result property="remark"          column="remark"           />
+    </resultMap>
+
+    <sql id="selectAiCallTicketVo">
+        select t.ticket_id, t.ticket_no, t.record_id, t.title, t.content, 
+               t.priority, t.status, t.assign_user_id, t.assign_user_name, 
+               t.process_content, t.process_time, t.close_time, t.create_by, 
+               t.create_time, t.update_by, t.update_time, t.remark,
+               cr.caller_number, cr.caller_name
+        from ai_call_ticket t
+        left join ai_call_record cr on t.record_id = cr.record_id
+    </sql>
+    
+    <select id="selectAiCallTicketList" parameterType="AiCallTicket" resultMap="AiCallTicketResult">
+        <include refid="selectAiCallTicketVo"/>
+        <where>
+            <if test="ticketNo != null and ticketNo != ''"> and t.ticket_no like concat('%', #{ticketNo}, '%')</if>
+            <if test="title != null and title != ''"> and t.title like concat('%', #{title}, '%')</if>
+            <if test="priority != null and priority != ''"> and t.priority = #{priority}</if>
+            <if test="status != null and status != ''"> and t.status = #{status}</if>
+            <if test="assignUserId != null"> and t.assign_user_id = #{assignUserId}</if>
+            <if test="callerNumber != null and callerNumber != ''"> and cr.caller_number like concat('%', #{callerNumber}, '%')</if>
+        </where>
+        order by t.create_time desc
+    </select>
+    
+    <select id="selectAiCallTicketByTicketId" parameterType="Long" resultMap="AiCallTicketResult">
+        <include refid="selectAiCallTicketVo"/>
+        where t.ticket_id = #{ticketId}
+    </select>
+    
+    <select id="selectAiCallTicketByTicketNo" parameterType="String" resultMap="AiCallTicketResult">
+        <include refid="selectAiCallTicketVo"/>
+        where t.ticket_no = #{ticketNo}
+    </select>
+    
+    <select id="selectAiCallTicketByAssignUserId" parameterType="Long" resultMap="AiCallTicketResult">
+        <include refid="selectAiCallTicketVo"/>
+        where t.assign_user_id = #{assignUserId}
+        order by t.create_time desc
+    </select>
+        
+    <insert id="insertAiCallTicket" parameterType="AiCallTicket">
+        insert into ai_call_ticket
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="ticketNo != null and ticketNo != ''">ticket_no,</if>
+            <if test="recordId != null">record_id,</if>
+            <if test="title != null and title != ''">title,</if>
+            <if test="content != null">content,</if>
+            <if test="priority != null">priority,</if>
+            <if test="status != null">status,</if>
+            <if test="assignUserId != null">assign_user_id,</if>
+            <if test="assignUserName != null">assign_user_name,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="ticketNo != null and ticketNo != ''">#{ticketNo},</if>
+            <if test="recordId != null">#{recordId},</if>
+            <if test="title != null and title != ''">#{title},</if>
+            <if test="content != null">#{content},</if>
+            <if test="priority != null">#{priority},</if>
+            <if test="status != null">#{status},</if>
+            <if test="assignUserId != null">#{assignUserId},</if>
+            <if test="assignUserName != null">#{assignUserName},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate()
+         </trim>
+    </insert>
+
+    <update id="updateAiCallTicket" parameterType="AiCallTicket">
+        update ai_call_ticket
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="ticketNo != null and ticketNo != ''">ticket_no = #{ticketNo},</if>
+            <if test="recordId != null">record_id = #{recordId},</if>
+            <if test="title != null and title != ''">title = #{title},</if>
+            <if test="content != null">content = #{content},</if>
+            <if test="priority != null">priority = #{priority},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="assignUserId != null">assign_user_id = #{assignUserId},</if>
+            <if test="assignUserName != null">assign_user_name = #{assignUserName},</if>
+            <if test="processContent != null">process_content = #{processContent},</if>
+            <if test="processTime != null">process_time = #{processTime},</if>
+            <if test="closeTime != null">close_time = #{closeTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where ticket_id = #{ticketId}
+    </update>
+
+    <update id="updateTicketStatus" parameterType="map">
+        update ai_call_ticket
+        set status = #{status},
+            update_time = sysdate()
+        where ticket_id = #{ticketId}
+    </update>
+
+    <update id="updateTicketProcess" parameterType="map">
+        update ai_call_ticket
+        set process_content = #{processContent},
+            assign_user_id = #{assignUserId},
+            assign_user_name = #{assignUserName},
+            status = '1',
+            process_time = sysdate(),
+            update_time = sysdate()
+        where ticket_id = #{ticketId}
+    </update>
+
+    <update id="archiveTicket" parameterType="Long">
+        update ai_call_ticket
+        set status = '3',
+            close_time = sysdate(),
+            update_time = sysdate()
+        where ticket_id = #{ticketId}
+    </update>
+
+    <delete id="deleteAiCallTicketByTicketId" parameterType="Long">
+        delete from ai_call_ticket where ticket_id = #{ticketId}
+    </delete>
+
+    <delete id="deleteAiCallTicketByTicketIds" parameterType="String">
+        delete from ai_call_ticket where ticket_id in 
+        <foreach item="ticketId" collection="array" open="(" separator="," close=")">
+            #{ticketId}
+        </foreach>
+    </delete>
+</mapper>
