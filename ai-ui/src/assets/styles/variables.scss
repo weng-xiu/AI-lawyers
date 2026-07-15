@@ -1,25 +1,41 @@
-// base color
-$blue:#324157;
-$light-blue:#3A71A8;
-$red:#C03639;
+// base color - 司法蓝政务风格
+$blue:#3a5cb8;
+$light-blue:#4a6dd4;
+$red:#f56c6c;
 $pink: #E65D6E;
-$green: #30B08F;
+$green: #52c41a;
 $tiffany: #4AB7BD;
-$yellow:#FEC171;
-$panGreen: #30B08F;
+$yellow:#e6a23c;
+$panGreen: #52c41a;
 
-// 默认菜单主题风格
-$base-menu-color:#bfcbd9;
-$base-menu-color-active:#f4f4f5;
-$base-menu-background:#304156;
+// 司法蓝政务主题
+$justice-primary: #3a5cb8;
+$justice-primary-light: #4a6dd4;
+$justice-primary-dark: #2a4a9c;
+$justice-bg: #f0f2f5;
+$justice-bg-card: #ffffff;
+$justice-bg-hover: #f5f7fa;
+$justice-border: #e4e7ed;
+$justice-border-light: #ebeef5;
+$justice-text-primary: #303133;
+$justice-text-secondary: #606266;
+$justice-text-muted: #909399;
+$justice-success: #52c41a;
+$justice-warning: #e6a23c;
+$justice-danger: #f56c6c;
+
+// 默认菜单主题风格 - 司法蓝渐变
+$base-menu-color:#ffffff;
+$base-menu-color-active:#ffffff;
+$base-menu-background:#3a5cb8;
 $base-logo-title-color: #ffffff;
 
 $base-menu-light-color:rgba(0,0,0,.70);
 $base-menu-light-background:#ffffff;
 $base-logo-light-title-color: #001529;
 
-$base-sub-menu-background:#1f2d3d;
-$base-sub-menu-hover:#001528;
+$base-sub-menu-background:#2a4a9c;
+$base-sub-menu-hover:#3a5cb8;
 
 // 自定义暗色菜单风格
 /**

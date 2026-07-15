@@ -1,0 +1,183 @@
+// 12348话务系统司法蓝政务风格 - 全局覆盖样式
+// 引入此文件到话务系统相关页面即可应用
+
+// 颜色定义
+$cc-bg: #f0f2f5;
+$cc-bg-card: #ffffff;
+$cc-bg-hover: #f5f7fa;
+$cc-border: #e4e7ed;
+$cc-border-light: #ebeef5;
+$cc-text-primary: #303133;
+$cc-text-secondary: #606266;
+$cc-text-muted: #909399;
+$cc-primary: #3a5cb8;
+$cc-primary-light: #4a6dd4;
+$cc-primary-dark: #2a4a9c;
+$cc-success: #52c41a;
+$cc-warning: #e6a23c;
+$cc-danger: #f56c6c;
+
+// 话务系统页面容器
+.cc-page {
+  min-height: calc(100vh - 84px);
+  background: $cc-bg;
+  color: $cc-text-primary;
+  padding: 16px;
+
+  // 页面标题
+  .cc-page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+
+    .cc-page-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: $cc-text-primary;
+
+      i {
+        color: $cc-primary;
+        margin-right: 8px;
+      }
+    }
+  }
+
+  // 搜索表单
+  .search-form {
+    background: $cc-bg-card;
+    padding: 16px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  }
+
+  // 按钮
+  .el-button--primary {
+    background: $cc-primary;
+    border-color: $cc-primary;
+  }
+  .el-button--primary:hover {
+    background: $cc-primary-light;
+    border-color: $cc-primary-light;
+  }
+  .el-button--danger {
+    background: $cc-danger;
+    border-color: $cc-danger;
+  }
+  .el-button--success {
+    background: $cc-success;
+    border-color: $cc-success;
+  }
+  .el-button--warning {
+    background: $cc-warning;
+    border-color: $cc-warning;
+  }
+  .el-button--text {
+    color: $cc-primary;
+  }
+
+  // 卡片
+  .el-card {
+    background: $cc-bg-card;
+    border-color: $cc-border-light;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  }
+  .el-card__header {
+    background: $cc-bg-card;
+    border-color: $cc-border-light;
+    color: $cc-text-primary;
+    font-weight: 600;
+  }
+
+  // 表格
+  .el-table {
+    background: $cc-bg-card;
+    color: $cc-text-primary;
+    border-radius: 8px;
+
+    th {
+      background: #f8f9fb;
+      color: $cc-text-secondary;
+      font-weight: 600;
+    }
+    td {
+      border-color: $cc-border-light;
+    }
+    th.is-leaf {
+      border-color: $cc-border-light;
+    }
+    &::before {
+      background: $cc-border-light;
+    }
+    .el-table__body tr:hover > td {
+      background: $cc-bg-hover !important;
+    }
+    .el-table__body tr.el-table__row--striped td {
+      background: #fafbfc;
+    }
+    &--border {
+      border-color: $cc-border-light;
+    }
+  }
+
+  // 分页
+  .el-pagination {
+    margin-top: 16px;
+  }
+
+  // 对话框
+  .el-dialog {
+    background: $cc-bg-card;
+    border-radius: 8px;
+  }
+  .el-dialog__header {
+    border-bottom: 1px solid $cc-border-light;
+  }
+  .el-dialog__title {
+    color: $cc-text-primary;
+    font-weight: 600;
+  }
+  .el-dialog__body {
+    color: $cc-text-primary;
+  }
+  .el-dialog__footer {
+    border-top: 1px solid $cc-border-light;
+  }
+
+  // 描述列表
+  .el-descriptions {
+    color: $cc-text-primary;
+  }
+  .el-descriptions__title {
+    color: $cc-text-primary;
+  }
+
+  // Tag标签
+  .el-tag--info {
+    background: #f4f4f5;
+    border-color: #e9e9eb;
+    color: $cc-text-secondary;
+  }
+  .el-tag--success {
+    background: #f0f9eb;
+    border-color: #e1f3d8;
+    color: #67c23a;
+  }
+  .el-tag--warning {
+    background: #fdf6ec;
+    border-color: #faecd8;
+    color: #e6a23c;
+  }
+  .el-tag--danger {
+    background: #fef0f0;
+    border-color: #fde2e2;
+    color: #f56c6c;
+  }
+
+  // 工具栏
+  .mb8 {
+    margin-bottom: 8px;
+  }
+}

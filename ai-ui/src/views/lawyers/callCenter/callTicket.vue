@@ -1,5 +1,5 @@
 <template>
-  <div class="app-container">
+  <div class="app-container cc-page">
     <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
       <el-form-item label="工单号" prop="ticketNo">
         <el-input
@@ -431,3 +431,7 @@ export default {
   }
 }
 </script>
+
+<style lang="scss" scoped>
+@import '~@/assets/styles/call-center-light.scss';
+</style>

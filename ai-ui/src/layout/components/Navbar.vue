@@ -115,8 +115,9 @@ export default {
   height: 50px;
   overflow: hidden;
   position: relative;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0,21,41,.08);
+  background: #ffffff;
+  border-bottom: 1px solid #e4e7ed;
+  box-shadow: 0 1px 4px rgba(0,21,41,.06);
 
   .hamburger-container {
     line-height: 46px;
@@ -125,9 +126,10 @@ export default {
     cursor: pointer;
     transition: background .3s;
     -webkit-tap-highlight-color:transparent;
+    color: #606266;
 
     &:hover {
-      background: rgba(0, 0, 0, .025)
+      background: rgba(58, 92, 184, 0.06)
     }
   }
 
@@ -159,7 +161,7 @@ export default {
       padding: 0 8px;
       height: 100%;
       font-size: 18px;
-      color: #5a5e66;
+      color: #606266;
       vertical-align: text-bottom;
 
       &.hover-effect {
@@ -167,7 +169,7 @@ export default {
         transition: background .3s;
 
         &:hover {
-          background: rgba(0, 0, 0, .025)
+          background: rgba(58, 92, 184, 0.06)
         }
       }
     }
@@ -185,6 +187,7 @@ export default {
           width: 30px;
           height: 30px;
           border-radius: 50%;
+          border: 1px solid #e4e7ed;
         }
 
         .user-nickname{
@@ -192,6 +195,7 @@ export default {
           bottom: 10px;
           font-size: 14px;
           font-weight: bold;
+          color: #303133;
         }
 
         .el-icon-caret-bottom {
@@ -200,6 +204,7 @@ export default {
           right: -20px;
           top: 25px;
           font-size: 12px;
+          color: #909399;
         }
       }
     }
