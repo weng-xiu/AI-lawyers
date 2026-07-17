@@ -112,24 +112,23 @@ export default {
 
 <style lang="scss" scoped>
 .navbar {
-  height: 50px;
+  height: 56px;
   overflow: hidden;
   position: relative;
-  background: #ffffff;
-  border-bottom: 1px solid #e4e7ed;
-  box-shadow: 0 1px 4px rgba(0,21,41,.06);
+  background: #1e3a8a;
+  border-bottom: 1px solid #1e40af;
 
   .hamburger-container {
-    line-height: 46px;
+    line-height: 56px;
     height: 100%;
     float: left;
     cursor: pointer;
     transition: background .3s;
     -webkit-tap-highlight-color:transparent;
-    color: #606266;
+    color: #e2e8f0;
 
     &:hover {
-      background: rgba(58, 92, 184, 0.06)
+      background: rgba(255, 255, 255, 0.08)
     }
   }
 
@@ -150,7 +149,7 @@ export default {
   .right-menu {
     float: right;
     height: 100%;
-    line-height: 50px;
+    line-height: 56px;
 
     &:focus {
       outline: none;
@@ -161,7 +160,7 @@ export default {
       padding: 0 8px;
       height: 100%;
       font-size: 18px;
-      color: #606266;
+      color: #e2e8f0;
       vertical-align: text-bottom;
 
       &.hover-effect {
@@ -169,7 +168,7 @@ export default {
         transition: background .3s;
 
         &:hover {
-          background: rgba(58, 92, 184, 0.06)
+          background: rgba(255, 255, 255, 0.08)
         }
       }
     }
@@ -179,7 +178,7 @@ export default {
       padding-right: 0px;
 
       .avatar-wrapper {
-        margin-top: 10px;
+        margin-top: 13px;
         position: relative;
 
         .user-avatar {
@@ -187,7 +186,7 @@ export default {
           width: 30px;
           height: 30px;
           border-radius: 50%;
-          border: 1px solid #e4e7ed;
+          border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .user-nickname{
@@ -195,7 +194,7 @@ export default {
           bottom: 10px;
           font-size: 14px;
           font-weight: bold;
-          color: #303133;
+          color: #f1f5f9;
         }
 
         .el-icon-caret-bottom {
@@ -204,7 +203,7 @@ export default {
           right: -20px;
           top: 25px;
           font-size: 12px;
-          color: #909399;
+          color: #cbd5e1;
         }
       }
     }

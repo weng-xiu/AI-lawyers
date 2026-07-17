@@ -267,3 +267,49 @@ export function getTransfersByRecordId(recordId) {
     method: 'get'
   })
 }
+
+// ==================== 台账记录 ====================
+export function listLedger(query) {
+  return request({
+    url: '/lawyers/call/ledger/list',
+    method: 'get',
+    params: query
+  })
+}
+
+export function getLedger(ledgerId) {
+  return request({
+    url: '/lawyers/call/ledger/' + ledgerId,
+    method: 'get'
+  })
+}
+
+export function addLedger(data) {
+  return request({
+    url: '/lawyers/call/ledger',
+    method: 'post',
+    data: data
+  })
+}
+
+export function updateLedger(data) {
+  return request({
+    url: '/lawyers/call/ledger',
+    method: 'put',
+    data: data
+  })
+}
+
+export function delLedger(ledgerIds) {
+  return request({
+    url: '/lawyers/call/ledger/' + ledgerIds,
+    method: 'delete'
+  })
+}
+
+export function generateLedgerNo() {
+  return request({
+    url: '/lawyers/call/ledger/generateNo',
+    method: 'get'
+  })
+}

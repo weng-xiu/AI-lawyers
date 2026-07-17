@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiCallLedgerMapper">
+    
+    <resultMap type="AiCallLedger" id="AiCallLedgerResult">
+        <result property="ledgerId"        column="ledger_id"        />
+        <result property="ledgerNo"        column="ledger_no"        />
+        <result property="callerName"      column="caller_name"      />
+        <result property="callerPhone"     column="caller_phone"     />
+        <result property="callerIdCard"    column="caller_id_card"   />
+        <result property="callerGender"    column="caller_gender"    />
+        <result property="callerAge"       column="caller_age"       />
+        <result property="callerJob"       column="caller_job"       />
+        <result property="callerCompany"   column="caller_company"   />
+        <result property="callerAddress"   column="caller_address"   />
+        <result property="categoryId"      column="category_id"      />
+        <result property="categoryName"    column="category_name"    />
+        <result property="subCategory"     column="sub_category"     />
+        <result property="serviceType"     column="service_type"     />
+        <result property="sourceChannel"   column="source_channel"   />
+        <result property="lawyerId"        column="lawyer_id"        />
+        <result property="lawyerName"      column="lawyer_name"      />
+        <result property="consultContent"  column="consult_content"  />
+        <result property="involveAmount"   column="involve_amount"   />
+        <result property="lawyerAnswer"    column="lawyer_answer"    />
+        <result property="consultDuration" column="consult_duration" />
+        <result property="satisfaction"    column="satisfaction"    />
+        <result property="isVisit"         column="is_visit"         />
+        <result property="visitTime"       column="visit_time"       />
+        <result property="visitBy"         column="visit_by"         />
+        <result property="visitOpinion"    column="visit_opinion"    />
+        <result property="createBy"        column="create_by"        />
+        <result property="createTime"      column="create_time"      />
+        <result property="updateBy"        column="update_by"        />
+        <result property="updateTime"      column="update_time"      />
+        <result property="remark"          column="remark"           />
+        <result property="delFlag"         column="del_flag"         />
+    </resultMap>
+
+    <sql id="selectAiCallLedgerVo">
+        select ledger_id, ledger_no, caller_name, caller_phone, caller_id_card,
+               caller_gender, caller_age, caller_job, caller_company, caller_address,
+               category_id, category_name, sub_category, service_type, source_channel,
+               lawyer_id, lawyer_name, consult_content, involve_amount, lawyer_answer,
+               consult_duration, satisfaction, is_visit, visit_time, visit_by,
+               visit_opinion, create_by, create_time, update_by, update_time, remark, del_flag
+        from ai_call_ledger
+    </sql>
+    
+    <select id="selectAiCallLedgerList" parameterType="AiCallLedger" resultMap="AiCallLedgerResult">
+        <include refid="selectAiCallLedgerVo"/>
+        <where>  
+            del_flag = '0'
+            <if test="callerName != null and callerName != ''"> and caller_name like concat('%', #{callerName}, '%')</if>
+            <if test="callerPhone != null and callerPhone != ''"> and caller_phone like concat('%', #{callerPhone}, '%')</if>
+            <if test="categoryId != null"> and category_id = #{categoryId}</if>
+            <if test="categoryName != null and categoryName != ''"> and category_name like concat('%', #{categoryName}, '%')</if>
+            <if test="serviceType != null and serviceType != ''"> and service_type = #{serviceType}</if>
+            <if test="satisfaction != null and satisfaction != ''"> and satisfaction = #{satisfaction}</if>
+            <if test="params.beginTime != null and params.beginTime != ''"> and date_format(create_time,'%y%m%d') &gt;= date_format(#{params.beginTime},'%y%m%d')</if>
+            <if test="params.endTime != null and params.endTime != ''"> and date_format(create_time,'%y%m%d') &lt;= date_format(#{params.endTime},'%y%m%d')</if>
+        </where>
+        order by create_time desc
+    </select>
+    
+    <select id="selectAiCallLedgerByLedgerId" parameterType="Long" resultMap="AiCallLedgerResult">
+        <include refid="selectAiCallLedgerVo"/>
+        where ledger_id = #{ledgerId} and del_flag = '0'
+    </select>
+    
+    <select id="selectAiCallLedgerByLedgerNo" parameterType="String" resultMap="AiCallLedgerResult">
+        <include refid="selectAiCallLedgerVo"/>
+        where ledger_no = #{ledgerNo} and del_flag = '0'
+    </select>
+        
+    <insert id="insertAiCallLedger" parameterType="AiCallLedger">
+        insert into ai_call_ledger
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="ledgerNo != null and ledgerNo != ''">ledger_no,</if>
+            <if test="callerName != null">caller_name,</if>
+            <if test="callerPhone != null">caller_phone,</if>
+            <if test="callerIdCard != null">caller_id_card,</if>
+            <if test="callerGender != null">caller_gender,</if>
+            <if test="callerAge != null">caller_age,</if>
+            <if test="callerJob != null">caller_job,</if>
+            <if test="callerCompany != null">caller_company,</if>
+            <if test="callerAddress != null">caller_address,</if>
+            <if test="categoryId != null">category_id,</if>
+            <if test="categoryName != null">category_name,</if>
+            <if test="subCategory != null">sub_category,</if>
+            <if test="serviceType != null">service_type,</if>
+            <if test="sourceChannel != null">source_channel,</if>
+            <if test="lawyerId != null">lawyer_id,</if>
+            <if test="lawyerName != null">lawyer_name,</if>
+            <if test="consultContent != null">consult_content,</if>
+            <if test="involveAmount != null">involve_amount,</if>
+            <if test="lawyerAnswer != null">lawyer_answer,</if>
+            <if test="consultDuration != null">consult_duration,</if>
+            <if test="satisfaction != null">satisfaction,</if>
+            <if test="isVisit != null">is_visit,</if>
+            <if test="visitTime != null">visit_time,</if>
+            <if test="visitBy != null">visit_by,</if>
+            <if test="visitOpinion != null">visit_opinion,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="remark != null">remark,</if>
+            <if test="delFlag != null">del_flag,</if>
+            create_time
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="ledgerNo != null and ledgerNo != ''">#{ledgerNo},</if>
+            <if test="callerName != null">#{callerName},</if>
+            <if test="callerPhone != null">#{callerPhone},</if>
+            <if test="callerIdCard != null">#{callerIdCard},</if>
+            <if test="callerGender != null">#{callerGender},</if>
+            <if test="callerAge != null">#{callerAge},</if>
+            <if test="callerJob != null">#{callerJob},</if>
+            <if test="callerCompany != null">#{callerCompany},</if>
+            <if test="callerAddress != null">#{callerAddress},</if>
+            <if test="categoryId != null">#{categoryId},</if>
+            <if test="categoryName != null">#{categoryName},</if>
+            <if test="subCategory != null">#{subCategory},</if>
+            <if test="serviceType != null">#{serviceType},</if>
+            <if test="sourceChannel != null">#{sourceChannel},</if>
+            <if test="lawyerId != null">#{lawyerId},</if>
+            <if test="lawyerName != null">#{lawyerName},</if>
+            <if test="consultContent != null">#{consultContent},</if>
+            <if test="involveAmount != null">#{involveAmount},</if>
+            <if test="lawyerAnswer != null">#{lawyerAnswer},</if>
+            <if test="consultDuration != null">#{consultDuration},</if>
+            <if test="satisfaction != null">#{satisfaction},</if>
+            <if test="isVisit != null">#{isVisit},</if>
+            <if test="visitTime != null">#{visitTime},</if>
+            <if test="visitBy != null">#{visitBy},</if>
+            <if test="visitOpinion != null">#{visitOpinion},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            sysdate()
+         </trim>
+    </insert>
+
+    <update id="updateAiCallLedger" parameterType="AiCallLedger">
+        update ai_call_ledger
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="ledgerNo != null and ledgerNo != ''">ledger_no = #{ledgerNo},</if>
+            <if test="callerName != null">caller_name = #{callerName},</if>
+            <if test="callerPhone != null">caller_phone = #{callerPhone},</if>
+            <if test="callerIdCard != null">caller_id_card = #{callerIdCard},</if>
+            <if test="callerGender != null">caller_gender = #{callerGender},</if>
+            <if test="callerAge != null">caller_age = #{callerAge},</if>
+            <if test="callerJob != null">caller_job = #{callerJob},</if>
+            <if test="callerCompany != null">caller_company = #{callerCompany},</if>
+            <if test="callerAddress != null">caller_address = #{callerAddress},</if>
+            <if test="categoryId != null">category_id = #{categoryId},</if>
+            <if test="categoryName != null">category_name = #{categoryName},</if>
+            <if test="subCategory != null">sub_category = #{subCategory},</if>
+            <if test="serviceType != null">service_type = #{serviceType},</if>
+            <if test="sourceChannel != null">source_channel = #{sourceChannel},</if>
+            <if test="lawyerId != null">lawyer_id = #{lawyerId},</if>
+            <if test="lawyerName != null">lawyer_name = #{lawyerName},</if>
+            <if test="consultContent != null">consult_content = #{consultContent},</if>
+            <if test="involveAmount != null">involve_amount = #{involveAmount},</if>
+            <if test="lawyerAnswer != null">lawyer_answer = #{lawyerAnswer},</if>
+            <if test="consultDuration != null">consult_duration = #{consultDuration},</if>
+            <if test="satisfaction != null">satisfaction = #{satisfaction},</if>
+            <if test="isVisit != null">is_visit = #{isVisit},</if>
+            <if test="visitTime != null">visit_time = #{visitTime},</if>
+            <if test="visitBy != null">visit_by = #{visitBy},</if>
+            <if test="visitOpinion != null">visit_opinion = #{visitOpinion},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            update_time = sysdate()
+        </trim>
+        where ledger_id = #{ledgerId}
+    </update>
+
+    <delete id="deleteAiCallLedgerByLedgerId" parameterType="Long">
+        update ai_call_ledger set del_flag = '2' where ledger_id = #{ledgerId}
+    </delete>
+
+    <delete id="deleteAiCallLedgerByLedgerIds" parameterType="String">
+        update ai_call_ledger set del_flag = '2' where ledger_id in 
+        <foreach item="ledgerId" collection="array" open="(" separator="," close=")">
+            #{ledgerId}
+        </foreach>
+    </delete>
+</mapper>

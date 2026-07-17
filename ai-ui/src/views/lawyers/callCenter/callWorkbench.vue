@@ -1,411 +1,441 @@
 <template>
-  <div class="call-workbench cc-page">
-    <!-- 统计卡片区 -->
-    <el-row :gutter="16" class="wb-stats-row">
-      <el-col :span="4" :xs="12" v-for="(stat, idx) in statsList" :key="idx">
-        <div class="wb-stat-card" :class="'wb-stat-' + stat.type">
-          <div class="wb-stat-icon">
-            <i :class="stat.icon"></i>
+  <div class="call-workbench">
+    <!-- 欢迎横幅 -->
+    <div class="wb-welcome-banner">
+      <div class="wb-welcome-left">
+        <h2>欢迎回来，张律师</h2>
+        <p>{{ currentDate }}</p>
+      </div>
+      <div class="wb-welcome-right">
+        <div class="wb-welcome-stat">
+          <span class="wb-welcome-num">23</span>
+          <span class="wb-welcome-label">今日已服务群众</span>
+        </div>
+        <div class="wb-welcome-stat">
+          <span class="wb-welcome-num">98.5%</span>
+          <span class="wb-welcome-label">满意度</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 个人统计卡片 -->
+    <el-row :gutter="16" class="wb-stat-row">
+      <el-col :span="6" v-for="(stat, idx) in personalStats" :key="idx">
+        <div class="wb-stat-card">
+          <div class="wb-stat-header">
+            <span class="wb-stat-title">{{ stat.title }}</span>
+            <span class="wb-stat-trend" :class="'wb-trend-' + stat.trendType">
+              <i :class="stat.trendType === 'up' ? 'el-icon-top' : 'el-icon-bottom'"></i>
+              {{ stat.trend }}
+            </span>
           </div>
-          <div class="wb-stat-body">
-            <div class="wb-stat-value">{{ stat.value }}</div>
-            <div class="wb-stat-label">{{ stat.label }}</div>
+          <div class="wb-stat-value">{{ stat.value }}</div>
+          <div class="wb-stat-icon" :class="'wb-icon-' + stat.type">
+            <i :class="stat.icon"></i>
           </div>
         </div>
       </el-col>
     </el-row>
 
-    <!-- 快捷入口 -->
+    <!-- 团队概览 -->
+    <el-card shadow="never" class="wb-card wb-team-card">
+      <div slot="header" class="wb-card-header">
+        <span><i class="el-icon-s-custom"></i> 团队概览</span>
+      </div>
+      <el-row :gutter="16">
+        <el-col :span="6" v-for="(item, idx) in teamStats" :key="idx">
+          <div class="wb-team-item">
+            <div class="wb-team-value">{{ item.value }}</div>
+            <div class="wb-team-label">{{ item.label }}</div>
+          </div>
+        </el-col>
+      </el-row>
+    </el-card>
+
+    <!-- 公告 + 快捷入口 -->
     <el-row :gutter="16" class="wb-section">
-      <el-col :span="24">
-        <el-card shadow="never" class="wb-quick-card">
+      <el-col :span="16">
+        <el-card shadow="never" class="wb-card">
+          <div slot="header" class="wb-card-header">
+            <span><i class="el-icon-bell"></i> 公告通知</span>
+            <el-button type="text" size="mini">查看全部</el-button>
+          </div>
+          <div class="wb-notice-list">
+            <div class="wb-notice-item" v-for="(item, idx) in noticeList" :key="idx">
+              <span class="wb-notice-date">{{ item.date }}</span>
+              <span class="wb-notice-title">{{ item.title }}</span>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :span="8">
+        <el-card shadow="never" class="wb-card">
           <div slot="header" class="wb-card-header">
             <span><i class="el-icon-menu"></i> 快捷入口</span>
           </div>
           <div class="wb-quick-grid">
-            <div class="wb-quick-item" @click="goToRecords">
-              <div class="wb-quick-icon wb-icon-blue"><i class="el-icon-phone"></i></div>
-              <span>未接来电</span>
-            </div>
-            <div class="wb-quick-item" @click="goToTickets">
-              <div class="wb-quick-icon wb-icon-green"><i class="el-icon-tickets"></i></div>
-              <span>工单处理</span>
-            </div>
-            <div class="wb-quick-item" @click="goToAgents">
-              <div class="wb-quick-icon wb-icon-orange"><i class="el-icon-user"></i></div>
-              <span>坐席管理</span>
-            </div>
-            <div class="wb-quick-item" @click="goToStatistics">
-              <div class="wb-quick-icon wb-icon-purple"><i class="el-icon-data-line"></i></div>
-              <span>统计分析</span>
-            </div>
-            <div class="wb-quick-item" @click="handleLogin" v-if="agentStatus.status != '1'">
-              <div class="wb-quick-icon wb-icon-blue"><i class="el-icon-switch-button"></i></div>
-              <span>坐席登录</span>
-            </div>
-            <div class="wb-quick-item" @click="handleLogout" v-else>
-              <div class="wb-quick-icon wb-icon-red"><i class="el-icon-switch-button"></i></div>
-              <span>退出坐席</span>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <!-- 两列内容 -->
-    <el-row :gutter="16" class="wb-section">
-      <!-- 最近来电 -->
-      <el-col :span="14" :xs="24">
-        <el-card shadow="never" class="wb-list-card">
-          <div slot="header" class="wb-card-header">
-            <span><i class="el-icon-phone"></i> 最近来电</span>
-            <el-button type="text" size="mini" @click="goToRecords">查看更多 ></el-button>
-          </div>
-          <el-table :data="recentRecords" size="small" :stripe="true">
-            <el-table-column label="来电号码" align="center" prop="callerNumber" />
-            <el-table-column label="来电姓名" align="center" prop="callerName" />
-            <el-table-column label="咨询分类" align="center" prop="consultationCategory" />
-            <el-table-column label="状态" align="center" prop="status" width="80">
-              <template slot-scope="scope">
-                <span :class="'wb-status-dot wb-status-' + scope.row.status"></span>
-                {{ getStatusLabel(scope.row.status) }}
-              </template>
-            </el-table-column>
-            <el-table-column label="来电时间" align="center" prop="callTime" width="150">
-              <template slot-scope="scope">{{ parseTime(scope.row.callTime) }}</template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-      </el-col>
-
-      <!-- 右侧：坐席状态 + 待处理工单 -->
-      <el-col :span="10" :xs="24">
-        <!-- 我的坐席 -->
-        <el-card shadow="never" class="wb-agent-card">
-          <div slot="header" class="wb-card-header">
-            <span><i class="el-icon-user"></i> 我的坐席</span>
-          </div>
-          <div class="wb-agent-info">
-            <div class="wb-agent-avatar" :class="{ 'wb-agent-online': agentStatus.status == '1' }">
-              <i class="el-icon-user-solid"></i>
-            </div>
-            <div class="wb-agent-meta">
-              <div class="wb-agent-name">{{ agentStatus.agentName }}</div>
-              <div class="wb-agent-dept">{{ agentStatus.deptName }}</div>
-              <div class="wb-agent-status" :class="'wb-agent-status-' + agentStatus.status">
-                {{ getAgentStatusLabel(agentStatus.status) }}
+            <div class="wb-quick-item" v-for="(item, idx) in quickList" :key="idx" @click="handleQuickClick(item.path)">
+              <div class="wb-quick-icon" :class="'wb-qicon-' + item.type">
+                <i :class="item.icon"></i>
               </div>
-            </div>
-            <div class="wb-agent-actions">
-              <el-button v-if="agentStatus.status != '1'" type="primary" size="small" @click="handleLogin" style="width:100%">登录坐席</el-button>
-              <template v-else>
-                <el-button type="danger" size="small" @click="handleLogout" style="width:100%;margin-bottom:8px">退出坐席</el-button>
-                <el-select v-model="statusSelect" @change="handleStatusChange" size="small" style="width:100%">
-                  <el-option label="在线" value="1" />
-                  <el-option label="忙碌" value="2" />
-                  <el-option label="休息" value="3" />
-                </el-select>
-              </template>
+              <span>{{ item.name }}</span>
             </div>
           </div>
-        </el-card>
-
-        <!-- 待处理工单 -->
-        <el-card shadow="never" class="wb-ticket-card">
-          <div slot="header" class="wb-card-header">
-            <span><i class="el-icon-tickets"></i> 待处理工单</span>
-            <el-button type="text" size="mini" @click="goToTickets">查看更多 ></el-button>
-          </div>
-          <div v-for="ticket in pendingTickets" :key="ticket.ticketId" class="wb-ticket-item">
-            <div class="wb-ticket-title">
-              <span class="wb-ticket-no">{{ ticket.ticketNo }}</span>
-              <span class="wb-ticket-priority" :class="'wb-priority-' + ticket.priority">{{ getPriorityLabel(ticket.priority) }}</span>
-            </div>
-            <div class="wb-ticket-desc">{{ ticket.title }}</div>
-            <div class="wb-ticket-time">{{ parseTime(ticket.createTime) }}</div>
-          </div>
-          <div v-if="pendingTickets.length === 0" class="wb-empty">暂无待处理工单</div>
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- 最近通话记录 -->
+    <el-card shadow="never" class="wb-card">
+      <div slot="header" class="wb-card-header">
+        <span><i class="el-icon-phone"></i> 最近通话记录</span>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <el-select v-model="todayFilter" size="mini" style="width:80px;">
+            <el-option label="今天" value="today" />
+            <el-option label="本周" value="week" />
+            <el-option label="本月" value="month" />
+          </el-select>
+          <el-button type="text" size="mini">查看全部</el-button>
+        </div>
+      </div>
+      <el-table :data="recentRecords" size="small" :show-header="true">
+        <el-table-column label="来电号码" align="left" prop="callerNumber" width="140" />
+        <el-table-column label="服务类型" align="center" prop="serviceType" width="120">
+          <template slot-scope="scope">
+            <el-tag size="mini" :type="scope.row.serviceType === '语音咨询' ? 'primary' : scope.row.serviceType === '图文咨询' ? 'success' : scope.row.serviceType === '视频咨询' ? 'warning' : 'info'" effect="light">{{ scope.row.serviceType }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="咨询内容摘要" align="left" prop="summary" />
+        <el-table-column label="通话时长" align="center" prop="duration" width="100" />
+        <el-table-column label="满意度" align="center" prop="satisfaction" width="100">
+          <template slot-scope="scope">
+            <span :style="{ color: scope.row.satisfaction === '满意' ? '#52c41a' : '#e6a23c' }">{{ scope.row.satisfaction }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
   </div>
 </template>
 
 <script>
-import { agentLogin, agentLogout, updateAgentStatus, getOnlineAgents, listRecord, listTicket, getCallStatistics } from "@/api/lawyers/callCenter"
-
 export default {
   name: "CallWorkbench",
   data() {
     return {
-      agentStatus: { agentId: undefined, agentName: '当前用户', deptName: '法务部', status: '0' },
-      statusSelect: '1',
-      todayStats: { totalCount: 0, answeredCount: 0, unansweredCount: 0, totalDuration: 0 },
-      recentRecords: [],
-      pendingTickets: []
-    }
-  },
-  computed: {
-    statsList() {
-      return [
-        { icon: 'el-icon-phone-incoming', value: this.todayStats.totalCount, label: '今日总来电', type: 'blue' },
-        { icon: 'el-icon-phone', value: this.todayStats.answeredCount, label: '已接来电', type: 'green' },
-        { icon: 'el-icon-phone-outline', value: this.todayStats.unansweredCount, label: '未接来电', type: 'red' },
-        { icon: 'el-icon-time', value: this.formatDuration(this.todayStats.totalDuration), label: '通话时长', type: 'orange' },
-        { icon: 'el-icon-user', value: this.todayStats.onlineCount || 0, label: '在线坐席', type: 'purple' },
-        { icon: 'el-icon-tickets', value: this.pendingTickets.length, label: '待处理工单', type: 'cyan' }
+      todayFilter: 'today',
+      currentDate: '',
+      personalStats: [
+        { title: '总通话数', value: '156 次', trend: '+12%', trendType: 'up', icon: 'el-icon-phone', type: 'blue' },
+        { title: '通话时长', value: '4小时32分', trend: '+8%', trendType: 'up', icon: 'el-icon-time', type: 'green' },
+        { title: '服务满意度', value: '98.5%', trend: '+2.1%', trendType: 'up', icon: 'el-icon-star-on', type: 'orange' },
+        { title: '在线时长', value: '6小时15分', trend: '+5%', trendType: 'up', icon: 'el-icon-user', type: 'purple' }
+      ],
+      teamStats: [
+        { value: '1,234', label: '团队总通话' },
+        { value: '3分42秒', label: '平均通话时长' },
+        { value: '96.8%', label: '团队满意度' },
+        { value: '7小时', label: '平均在线时长' }
+      ],
+      noticeList: [
+        { date: '07-16', title: '关于2026年7月排班调整的通知' },
+        { date: '07-15', title: '知识库更新：民法典婚姻家庭编修订要点' },
+        { date: '07-14', title: '系统维护公告：7月20日凌晨2:00-4:00' }
+      ],
+      quickList: [
+        { name: '语音咨询', icon: 'el-icon-phone', type: 'blue', path: '/lawyers/callCenter/callPanel' },
+        { name: '图文咨询', icon: 'el-icon-chat-dot-round', type: 'green', path: '' },
+        { name: '视频咨询', icon: 'el-icon-video-camera', type: 'yellow', path: '' },
+        { name: '外呼服务', icon: 'el-icon-phone-outline', type: 'red', path: '' },
+        { name: '工单登记', icon: 'el-icon-edit', type: 'blue2', path: '/lawyers/callCenter/callTicket' },
+        { name: '台账填写', icon: 'el-icon-document', type: 'teal', path: '/lawyers/callCenter/callLedger' },
+        { name: '知识检索', icon: 'el-icon-search', type: 'pink', path: '' },
+        { name: '回访任务', icon: 'el-icon-back', type: 'purple2', path: '' }
+      ],
+      recentRecords: [
+        { callerNumber: '138****2761', serviceType: '语音咨询', summary: '劳动者因工伤后用人单位拒绝申请工伤认定，咨询如何自行申请及所需材料', duration: '8分32秒', satisfaction: '满意' },
+        { callerNumber: '136****0084', serviceType: '图文咨询', summary: '离婚后财产分割问题，婚前购买的房屋婚后共同还贷，咨询离婚时如何分割', duration: '12分15秒', satisfaction: '满意' },
+        { callerNumber: '189****5523', serviceType: '语音咨询', summary: '公司未签订劳动合同，工作半年后被辞退，咨询经济补偿金计算', duration: '6分40秒', satisfaction: '满意' },
+        { callerNumber: '135****8890', serviceType: '语音咨询', summary: '继承纠纷咨询，父母去世后房产继承分配问题', duration: '15分20秒', satisfaction: '非常满意' },
+        { callerNumber: '187****3341', serviceType: '视频咨询', summary: '交通事故责任认定不服，咨询复核程序和时限', duration: '10分05秒', satisfaction: '满意' }
       ]
     }
   },
   created() {
-    this.loadData()
+    this.initDate()
   },
   methods: {
-    loadData() {
-      this.getTodayStats()
-      this.getRecentRecords()
-      this.getPendingTickets()
+    initDate() {
+      const now = new Date()
+      const weekDays = ['日', '一', '二', '三', '四', '五', '六']
+      const y = now.getFullYear()
+      const m = now.getMonth() + 1
+      const d = now.getDate()
+      const w = weekDays[now.getDay()]
+      this.currentDate = `${y}年${m}月${d}日 星期${w}`
     },
-    getTodayStats() {
-      getCallStatistics().then(response => {
-        const stats = response.data || {}
-        this.todayStats = {
-          totalCount: stats.todayCount || 0,
-          answeredCount: stats.answeredCount || 0,
-          unansweredCount: stats.unansweredCount || 0,
-          totalDuration: stats.totalDuration || 0,
-          onlineCount: stats.onlineCount || 0
-        }
-      })
-    },
-    getRecentRecords() {
-      listRecord({ pageNum: 1, pageSize: 8 }).then(response => { this.recentRecords = response.rows || [] })
-    },
-    getPendingTickets() {
-      listTicket({ pageNum: 1, pageSize: 8, status: '0' }).then(response => { this.pendingTickets = response.rows || [] })
-    },
-    handleLogin() {
-      agentLogin({ agentId: this.agentStatus.agentId || 1 }).then(() => {
-        this.$modal.msgSuccess("登录成功")
-        this.agentStatus.status = '1'
-        this.statusSelect = '1'
-        this.loadData()
-      })
-    },
-    handleLogout() {
-      agentLogout({ agentId: this.agentStatus.agentId || 1 }).then(() => {
-        this.$modal.msgSuccess("退出成功")
-        this.agentStatus.status = '0'
-        this.statusSelect = '1'
-        this.loadData()
-      })
-    },
-    handleStatusChange() {
-      updateAgentStatus({ agentId: this.agentStatus.agentId || 1, status: this.statusSelect }).then(() => {
-        this.$modal.msgSuccess("状态更新成功")
-        this.agentStatus.status = this.statusSelect
-      })
-    },
-    getStatusLabel(s) { return { '0':'未接','1':'已接','2':'已转接','3':'已结束' }[s] || '未知' },
-    getAgentStatusLabel(s) { return { '0':'离线','1':'在线','2':'忙碌','3':'休息' }[s] || '未知' },
-    getPriorityLabel(p) { return { '0':'低','1':'中','2':'高' }[p] || '未知' },
-    formatDuration(seconds) {
-      const h = Math.floor(seconds / 3600), m = Math.floor((seconds % 3600) / 60), s = seconds % 60
-      if (h > 0) return `${h}时${m}分`
-      if (m > 0) return `${m}分${s}秒`
-      return `${s}秒`
-    },
-    goToRecords() { this.$router.push({ path: '/lawyers/callCenter/callRecord' }) },
-    goToTickets() { this.$router.push({ path: '/lawyers/callCenter/callTicket' }) },
-    goToAgents() { this.$router.push({ path: '/lawyers/callCenter/callAgent' }) },
-    goToStatistics() { this.$router.push({ path: '/lawyers/callCenter/callRecord' }) }
+    handleQuickClick(path) {
+      if (path) {
+        this.$router.push({ path })
+      }
+    }
   }
 }
 </script>
 
 <style lang="scss" scoped>
-@import '~@/assets/styles/call-center-light.scss';
-
 .call-workbench {
-  background: #f0f2f5;
+  background: #f1f5f9;
+  min-height: 100vh;
+  margin: -20px;
+  padding: 20px;
+}
+
+// 欢迎横幅
+.wb-welcome-banner {
+  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+  border-radius: 10px;
+  padding: 24px 28px;
+  color: #fff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+}
+.wb-welcome-banner::before {
+  content: '';
+  position: absolute;
+  right: -40px;
+  top: -40px;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+}
+.wb-welcome-banner::after {
+  content: '';
+  position: absolute;
+  right: 60px;
+  bottom: -60px;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.04);
+}
+.wb-welcome-left h2 {
+  margin: 0 0 6px 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+.wb-welcome-left p {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.85;
+}
+.wb-welcome-right {
+  display: flex;
+  gap: 40px;
+  z-index: 1;
+}
+.wb-welcome-stat {
+  text-align: right;
+}
+.wb-welcome-num {
+  display: block;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.wb-welcome-label {
+  display: block;
+  font-size: 12px;
+  opacity: 0.8;
+  margin-top: 4px;
 }
 
 // 统计卡片
-.wb-stats-row {
-  margin-bottom: 16px;
+.wb-stat-row {
+  margin-bottom: 20px;
 }
 .wb-stat-card {
-  display: flex;
-  align-items: center;
   background: #fff;
-  border-radius: 8px;
-  padding: 16px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  border-radius: 10px;
+  padding: 18px 20px;
+  position: relative;
+  border: 1px solid #e2e8f0;
   transition: all 0.3s;
 }
 .wb-stat-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(58, 92, 184, 0.12);
+}
+.wb-stat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.wb-stat-title {
+  font-size: 13px;
+  color: #64748b;
+}
+.wb-stat-trend {
+  font-size: 12px;
+  font-weight: 600;
+}
+.wb-trend-up {
+  color: #16a34a;
+}
+.wb-trend-down {
+  color: #ef4444;
+}
+.wb-stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1.2;
 }
 .wb-stat-icon {
-  width: 48px;
-  height: 48px;
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  width: 38px;
+  height: 38px;
   border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
-  margin-right: 12px;
+  font-size: 18px;
+  opacity: 0.9;
 }
-.wb-stat-blue .wb-stat-icon { background: rgba(58, 92, 184, 0.1); color: #3a5cb8; }
-.wb-stat-green .wb-stat-icon { background: rgba(82, 196, 26, 0.1); color: #52c41a; }
-.wb-stat-red .wb-stat-icon { background: rgba(245, 108, 108, 0.1); color: #f56c6c; }
-.wb-stat-orange .wb-stat-icon { background: rgba(230, 162, 60, 0.1); color: #e6a23c; }
-.wb-stat-purple .wb-stat-icon { background: rgba(140, 100, 220, 0.1); color: #8c64dc; }
-.wb-stat-cyan .wb-stat-icon { background: rgba(58, 170, 220, 0.1); color: #3aaadc; }
-.wb-stat-value { font-size: 22px; font-weight: 700; color: #303133; line-height: 1.2; }
-.wb-stat-label { font-size: 12px; color: #909399; margin-top: 4px; }
+.wb-icon-blue { background: #eff6ff; color: #3b82f6; }
+.wb-icon-green { background: #f0fdf4; color: #16a34a; }
+.wb-icon-orange { background: #fff7ed; color: #f97316; }
+.wb-icon-purple { background: #faf5ff; color: #a855f7; }
 
-// 卡片头部
+// 通用卡片
+.wb-card {
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
 .wb-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   font-weight: 600;
-  font-size: 15px;
+  font-size: 14px;
+  color: #1e293b;
 }
 .wb-card-header i {
+  color: #3b82f6;
   margin-right: 6px;
-  color: #3a5cb8;
+}
+
+// 团队概览
+.wb-team-card {
+  margin-bottom: 20px;
+  .el-card__body { padding-top: 16px; padding-bottom: 16px; }
+}
+.wb-team-item {
+  text-align: center;
+  padding: 8px 0;
+}
+.wb-team-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
+.wb-team-label {
+  font-size: 12px;
+  color: #64748b;
+}
+
+// 公告
+.wb-section {
+  margin-bottom: 20px;
+}
+.wb-notice-list {
+  padding: 4px 0;
+}
+.wb-notice-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+.wb-notice-item:last-child { border-bottom: none; }
+.wb-notice-date {
+  color: #94a3b8;
+  font-size: 12px;
+  margin-right: 16px;
+  width: 50px;
+  flex-shrink: 0;
+}
+.wb-notice-title {
+  color: #3b82f6;
+  font-size: 13px;
+  cursor: pointer;
+}
+.wb-notice-title:hover {
+  color: #1d4ed8;
 }
 
 // 快捷入口
-.wb-section { margin-bottom: 16px; }
-.wb-quick-card {
-  .el-card__body { padding: 24px; }
-}
 .wb-quick-grid {
-  display: flex;
-  gap: 24px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 8px;
 }
 .wb-quick-item {
   display: flex;
   flex-direction: column;
   align-items: center;
+  padding: 12px 4px;
   cursor: pointer;
-  min-width: 80px;
-  transition: all 0.3s;
+  border-radius: 8px;
+  transition: all 0.2s;
 }
 .wb-quick-item:hover {
-  transform: translateY(-3px);
-}
-.wb-quick-item:hover .wb-quick-icon {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  background: #f8fafc;
 }
 .wb-quick-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
-  margin-bottom: 10px;
-  transition: all 0.3s;
-}
-.wb-icon-blue { background: rgba(58, 92, 184, 0.1); color: #3a5cb8; }
-.wb-icon-green { background: rgba(82, 196, 26, 0.1); color: #52c41a; }
-.wb-icon-orange { background: rgba(230, 162, 60, 0.1); color: #e6a23c; }
-.wb-icon-purple { background: rgba(140, 100, 220, 0.1); color: #8c64dc; }
-.wb-icon-red { background: rgba(245, 108, 108, 0.1); color: #f56c6c; }
-.wb-quick-item span { font-size: 13px; color: #606266; }
-
-// 列表卡片
-.wb-list-card {
-  min-height: 480px;
-}
-
-// 坐席卡片
-.wb-agent-card {
-  margin-bottom: 16px;
-}
-.wb-agent-info {
-  display: flex;
-  gap: 16px;
-}
-.wb-agent-avatar {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  background: #f0f2f5;
-  border: 2px solid #e4e7ed;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 32px;
-  color: #909399;
-  flex-shrink: 0;
-}
-.wb-agent-avatar.wb-agent-online {
-  border-color: #52c41a;
-  color: #52c41a;
-  background: rgba(82, 196, 26, 0.08);
-}
-.wb-agent-meta {
-  flex: 1;
-}
-.wb-agent-name { font-size: 16px; font-weight: 600; color: #303133; margin-bottom: 4px; }
-.wb-agent-dept { font-size: 12px; color: #909399; margin-bottom: 8px; }
-.wb-agent-status {
-  display: inline-block;
-  padding: 2px 10px;
-  border-radius: 12px;
-  font-size: 12px;
-}
-.wb-agent-status-0 { background: #f4f4f5; color: #909399; }
-.wb-agent-status-1 { background: #f0f9eb; color: #52c41a; }
-.wb-agent-status-2 { background: #fdf6ec; color: #e6a23c; }
-.wb-agent-status-3 { background: #fef0f0; color: #f56c6c; }
-.wb-agent-actions { margin-top: 16px; }
-
-// 工单卡片
-.wb-ticket-card { min-height: 320px; }
-.wb-ticket-item {
-  padding: 12px 0;
-  border-bottom: 1px solid #f0f2f5;
-}
-.wb-ticket-item:last-child { border-bottom: none; }
-.wb-ticket-title {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  font-size: 20px;
   margin-bottom: 6px;
 }
-.wb-ticket-no { font-size: 13px; font-weight: 600; color: #3a5cb8; }
-.wb-ticket-priority {
-  font-size: 11px;
-  padding: 1px 6px;
-  border-radius: 4px;
+.wb-qicon-blue { background: #eff6ff; color: #3b82f6; }
+.wb-qicon-green { background: #f0fdf4; color: #16a34a; }
+.wb-qicon-yellow { background: #fef3c7; color: #d97706; }
+.wb-qicon-red { background: #fee2e2; color: #ef4444; }
+.wb-qicon-blue2 { background: #e0e7ff; color: #6366f1; }
+.wb-qicon-teal { background: #ccfbf1; color: #0d9488; }
+.wb-qicon-pink { background: #fce7f3; color: #db2777; }
+.wb-qicon-purple2 { background: #ede9fe; color: #7c3aed; }
+.wb-quick-item span {
+  font-size: 12px;
+  color: #475569;
 }
-.wb-priority-0 { background: #f4f4f5; color: #909399; }
-.wb-priority-1 { background: #fdf6ec; color: #e6a23c; }
-.wb-priority-2 { background: #fef0f0; color: #f56c6c; }
-.wb-ticket-desc { font-size: 13px; color: #303133; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wb-ticket-time { font-size: 11px; color: #909399; }
-.wb-empty { text-align: center; color: #909399; padding: 32px 0; font-size: 13px; }
 
-// 状态圆点
-.wb-status-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  margin-right: 4px;
-  vertical-align: middle;
+// 最近通话
+::v-deep .el-table {
+  th {
+    background: #f8fafc !important;
+    color: #64748b !important;
+    font-weight: 600 !important;
+    border-color: #e2e8f0 !important;
+  }
+  td {
+    border-color: #f1f5f9 !important;
+  }
+  tr:hover > td {
+    background: #f8fafc !important;
+  }
 }
-.wb-status-0 { background: #f56c6c; }
-.wb-status-1 { background: #52c41a; }
-.wb-status-2 { background: #e6a23c; }
-.wb-status-3 { background: #909399; }
 </style>

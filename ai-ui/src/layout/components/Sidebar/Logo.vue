@@ -78,10 +78,10 @@ export default {
   width: 100%;
   height: 60px;
   line-height: 60px;
-  background: rgba(255, 255, 255, 0.1);
+  background: #1e293b;
   text-align: center;
   overflow: hidden;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  border-bottom: 1px solid #0f172a;
 
   & .sidebar-logo-link {
     height: 100%;
