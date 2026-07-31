@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.ivr.AiIvrIntentionLogMapper">
+
+    <resultMap type="AiIvrIntentionLog" id="AiIvrIntentionLogResult">
+        <result property="logId"                 column="log_id"                 />
+        <result property="recordId"              column="record_id"              />
+        <result property="sessionId"             column="session_id"             />
+        <result property="flowId"                column="flow_id"                />
+        <result property="nodeId"                column="node_id"                />
+        <result property="inputText"             column="input_text"             />
+        <result property="matchedIntention"      column="matched_intention"      />
+        <result property="matchedIntentionName"  column="matched_intention_name" />
+        <result property="confidence"            column="confidence"             />
+        <result property="matchMethod"           column="match_method"           />
+        <result property="allResults"            column="all_results"            />
+        <result property="createTime"            column="create_time"            />
+    </resultMap>
+
+    <sql id="selectAiIvrIntentionLogVo">
+        select log_id, record_id, session_id, flow_id, node_id, input_text, matched_intention, matched_intention_name, confidence, match_method, all_results, create_time from ai_ivr_intention_log
+    </sql>
+
+    <select id="selectAiIvrIntentionLogList" parameterType="AiIvrIntentionLog" resultMap="AiIvrIntentionLogResult">
+        <include refid="selectAiIvrIntentionLogVo"/>
+        <where>
+            <if test="recordId != null"> and record_id = #{recordId}</if>
+            <if test="sessionId != null and sessionId != ''"> and session_id = #{sessionId}</if>
+            <if test="flowId != null"> and flow_id = #{flowId}</if>
+            <if test="nodeId != null"> and node_id = #{nodeId}</if>
+            <if test="matchedIntention != null and matchedIntention != ''"> and matched_intention = #{matchedIntention}</if>
+            <if test="matchMethod != null and matchMethod != ''"> and match_method = #{matchMethod}</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectAiIvrIntentionLogByLogId" parameterType="Long" resultMap="AiIvrIntentionLogResult">
+        <include refid="selectAiIvrIntentionLogVo"/>
+        where log_id = #{logId}
+    </select>
+
+    <select id="selectAiIvrIntentionLogByRecordId" parameterType="Long" resultMap="AiIvrIntentionLogResult">
+        <include refid="selectAiIvrIntentionLogVo"/>
+        where record_id = #{recordId}
+        order by create_time desc
+    </select>
+
+    <insert id="insertAiIvrIntentionLog" parameterType="AiIvrIntentionLog" useGeneratedKeys="true" keyProperty="logId">
+        insert into ai_ivr_intention_log
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="recordId != null">record_id,</if>
+            <if test="sessionId != null and sessionId != ''">session_id,</if>
+            <if test="flowId != null">flow_id,</if>
+            <if test="nodeId != null">node_id,</if>
+            <if test="inputText != null and inputText != ''">input_text,</if>
+            <if test="matchedIntention != null and matchedIntention != ''">matched_intention,</if>
+            <if test="matchedIntentionName != null and matchedIntentionName != ''">matched_intention_name,</if>
+            <if test="confidence != null">confidence,</if>
+            <if test="matchMethod != null and matchMethod != ''">match_method,</if>
+            <if test="allResults != null">all_results,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="recordId != null">#{recordId},</if>
+            <if test="sessionId != null and sessionId != ''">#{sessionId},</if>
+            <if test="flowId != null">#{flowId},</if>
+            <if test="nodeId != null">#{nodeId},</if>
+            <if test="inputText != null and inputText != ''">#{inputText},</if>
+            <if test="matchedIntention != null and matchedIntention != ''">#{matchedIntention},</if>
+            <if test="matchedIntentionName != null and matchedIntentionName != ''">#{matchedIntentionName},</if>
+            <if test="confidence != null">#{confidence},</if>
+            <if test="matchMethod != null and matchMethod != ''">#{matchMethod},</if>
+            <if test="allResults != null">#{allResults},</if>
+            sysdate()
+        </trim>
+    </insert>
+</mapper>

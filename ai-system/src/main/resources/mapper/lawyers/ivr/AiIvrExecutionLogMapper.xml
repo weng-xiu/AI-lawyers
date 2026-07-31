@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.ivr.AiIvrExecutionLogMapper">
+
+    <resultMap type="AiIvrExecutionLog" id="AiIvrExecutionLogResult">
+        <result property="execId"           column="exec_id"           />
+        <result property="recordId"         column="record_id"         />
+        <result property="sessionId"        column="session_id"        />
+        <result property="flowId"           column="flow_id"           />
+        <result property="flowName"         column="flow_name"         />
+        <result property="currentNodeId"    column="current_node_id"   />
+        <result property="currentNodeType"  column="current_node_type" />
+        <result property="currentNodeName"  column="current_node_name" />
+        <result property="executeResult"    column="execute_result"    />
+        <result property="variables"        column="variables"         />
+        <result property="status"           column="status"            />
+        <result property="errorMsg"         column="error_msg"         />
+        <result property="startTime"        column="start_time"        />
+        <result property="endTime"          column="end_time"          />
+        <result property="createTime"       column="create_time"       />
+    </resultMap>
+
+    <sql id="selectAiIvrExecutionLogVo">
+        select exec_id, record_id, session_id, flow_id, flow_name, current_node_id, current_node_type, current_node_name, execute_result, variables, status, error_msg, start_time, end_time, create_time from ai_ivr_execution_log
+    </sql>
+
+    <select id="selectAiIvrExecutionLogList" parameterType="AiIvrExecutionLog" resultMap="AiIvrExecutionLogResult">
+        <include refid="selectAiIvrExecutionLogVo"/>
+        <where>
+            <if test="recordId != null"> and record_id = #{recordId}</if>
+            <if test="sessionId != null and sessionId != ''"> and session_id = #{sessionId}</if>
+            <if test="flowId != null"> and flow_id = #{flowId}</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+            <if test="currentNodeType != null and currentNodeType != ''"> and current_node_type = #{currentNodeType}</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectAiIvrExecutionLogByExecId" parameterType="Long" resultMap="AiIvrExecutionLogResult">
+        <include refid="selectAiIvrExecutionLogVo"/>
+        where exec_id = #{execId}
+    </select>
+
+    <select id="selectAiIvrExecutionLogBySessionId" parameterType="String" resultMap="AiIvrExecutionLogResult">
+        <include refid="selectAiIvrExecutionLogVo"/>
+        where session_id = #{sessionId}
+        order by start_time asc
+    </select>
+
+    <insert id="insertAiIvrExecutionLog" parameterType="AiIvrExecutionLog" useGeneratedKeys="true" keyProperty="execId">
+        insert into ai_ivr_execution_log
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="recordId != null">record_id,</if>
+            <if test="sessionId != null and sessionId != ''">session_id,</if>
+            <if test="flowId != null">flow_id,</if>
+            <if test="flowName != null and flowName != ''">flow_name,</if>
+            <if test="currentNodeId != null">current_node_id,</if>
+            <if test="currentNodeType != null and currentNodeType != ''">current_node_type,</if>
+            <if test="currentNodeName != null and currentNodeName != ''">current_node_name,</if>
+            <if test="executeResult != null">execute_result,</if>
+            <if test="variables != null">variables,</if>
+            <if test="status != null">status,</if>
+            <if test="errorMsg != null">error_msg,</if>
+            <if test="startTime != null">start_time,</if>
+            <if test="endTime != null">end_time,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="recordId != null">#{recordId},</if>
+            <if test="sessionId != null and sessionId != ''">#{sessionId},</if>
+            <if test="flowId != null">#{flowId},</if>
+            <if test="flowName != null and flowName != ''">#{flowName},</if>
+            <if test="currentNodeId != null">#{currentNodeId},</if>
+            <if test="currentNodeType != null and currentNodeType != ''">#{currentNodeType},</if>
+            <if test="currentNodeName != null and currentNodeName != ''">#{currentNodeName},</if>
+            <if test="executeResult != null">#{executeResult},</if>
+            <if test="variables != null">#{variables},</if>
+            <if test="status != null">#{status},</if>
+            <if test="errorMsg != null">#{errorMsg},</if>
+            <if test="startTime != null">#{startTime},</if>
+            <if test="endTime != null">#{endTime},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateAiIvrExecutionLog" parameterType="AiIvrExecutionLog">
+        update ai_ivr_execution_log
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="recordId != null">record_id = #{recordId},</if>
+            <if test="sessionId != null and sessionId != ''">session_id = #{sessionId},</if>
+            <if test="flowId != null">flow_id = #{flowId},</if>
+            <if test="flowName != null and flowName != ''">flow_name = #{flowName},</if>
+            <if test="currentNodeId != null">current_node_id = #{currentNodeId},</if>
+            <if test="currentNodeType != null and currentNodeType != ''">current_node_type = #{currentNodeType},</if>
+            <if test="currentNodeName != null and currentNodeName != ''">current_node_name = #{currentNodeName},</if>
+            <if test="executeResult != null">execute_result = #{executeResult},</if>
+            <if test="variables != null">variables = #{variables},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="errorMsg != null">error_msg = #{errorMsg},</if>
+            <if test="startTime != null">start_time = #{startTime},</if>
+            <if test="endTime != null">end_time = #{endTime},</if>
+        </trim>
+        where exec_id = #{execId}
+    </update>
+</mapper>

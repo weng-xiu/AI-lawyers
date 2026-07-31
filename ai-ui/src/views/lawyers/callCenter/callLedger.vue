@@ -13,41 +13,37 @@
             end-placeholder="结束日期"
           ></el-date-picker>
         </el-form-item>
-        <el-form-item label="咨询类型" prop="consultType">
-          <el-select v-model="queryParams.consultType" placeholder="请选择" clearable style="width: 150px">
-            <el-option label="全部" value="" />
-            <el-option label="民商事" value="1" />
-            <el-option label="劳动纠纷" value="2" />
-            <el-option label="婚姻家庭" value="3" />
-            <el-option label="刑事行政" value="4" />
-            <el-option label="其他" value="5" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="咨询人" prop="consultantName">
+        <el-form-item label="咨询类型" prop="categoryName">
           <el-input
-            v-model="queryParams.consultantName"
+            v-model="queryParams.categoryName"
+            placeholder="请输入咨询类型"
+            clearable
+            style="width: 150px"
+          />
+        </el-form-item>
+        <el-form-item label="咨询人" prop="callerName">
+          <el-input
+            v-model="queryParams.callerName"
             placeholder="请输入咨询人"
             clearable
             style="width: 150px"
           />
         </el-form-item>
-        <el-form-item label="联系电话" prop="phone">
+        <el-form-item label="联系电话" prop="callerPhone">
           <el-input
-            v-model="queryParams.phone"
+            v-model="queryParams.callerPhone"
             placeholder="请输入联系电话"
             clearable
             style="width: 150px"
           />
         </el-form-item>
-        <el-form-item label="承办律师" prop="lawyer">
-          <el-select v-model="queryParams.lawyer" placeholder="请选择" clearable style="width: 150px">
-            <el-option label="全部" value="" />
-            <el-option label="张律师" value="1" />
-            <el-option label="李律师" value="2" />
-            <el-option label="王律师" value="3" />
-            <el-option label="刘律师" value="4" />
-            <el-option label="陈律师" value="5" />
-          </el-select>
+        <el-form-item label="承办律师" prop="lawyerName">
+          <el-input
+            v-model="queryParams.lawyerName"
+            placeholder="请输入承办律师"
+            clearable
+            style="width: 150px"
+          />
         </el-form-item>
         <el-form-item label="服务方式" prop="serviceType">
           <el-select v-model="queryParams.serviceType" placeholder="请选择" clearable style="width: 150px">
@@ -156,18 +152,18 @@
 
       <el-table v-loading="loading" :data="ledgerList" @selection-change="handleSelectionChange" border>
         <el-table-column type="selection" width="55" align="center" />
-        <el-table-column label="登记编号" align="center" prop="registerNo" width="160">
+        <el-table-column label="登记编号" align="center" prop="ledgerNo" width="160">
           <template slot-scope="scope">
-            <span class="link-blue" @click="handleDetail(scope.row)">{{ scope.row.registerNo }}</span>
+            <span class="link-blue" @click="handleDetail(scope.row)">{{ scope.row.ledgerNo }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="登记时间" align="center" prop="registerTime" width="170" />
-        <el-table-column label="咨询人" align="center" prop="consultantName" width="100" />
-        <el-table-column label="联系电话" align="center" prop="phone" width="130" />
-        <el-table-column label="身份证号" align="center" prop="idCard" width="180" />
-        <el-table-column label="咨询类型" align="center" prop="consultType" width="100">
+        <el-table-column label="登记时间" align="center" prop="createTime" width="170" />
+        <el-table-column label="咨询人" align="center" prop="callerName" width="100" />
+        <el-table-column label="联系电话" align="center" prop="callerPhone" width="130" />
+        <el-table-column label="身份证号" align="center" prop="callerIdCard" width="180" />
+        <el-table-column label="咨询类型" align="center" prop="categoryName" width="100">
           <template slot-scope="scope">
-            <el-tag :type="getConsultTypeTag(scope.row.consultType)">{{ getConsultTypeLabel(scope.row.consultType) }}</el-tag>
+            <el-tag :type="getConsultTypeTag(scope.row.categoryName)">{{ scope.row.categoryName }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="服务方式" align="center" prop="serviceType" width="100">
@@ -176,8 +172,8 @@
           </template>
         </el-table-column>
         <el-table-column label="承办律师" align="center" prop="lawyerName" width="100" />
-        <el-table-column label="咨询时长" align="center" prop="duration" width="100">
-          <template slot-scope="scope">{{ scope.row.duration }}分钟</template>
+        <el-table-column label="咨询时长" align="center" prop="consultDuration" width="100">
+          <template slot-scope="scope">{{ scope.row.consultDuration }}分钟</template>
         </el-table-column>
         <el-table-column label="满意度" align="center" prop="satisfaction" width="130">
           <template slot-scope="scope">
@@ -216,14 +212,14 @@
           <span>基本信息</span>
         </div>
         <el-descriptions :column="3" border size="small">
-          <el-descriptions-item label="登记编号">{{ detailForm.registerNo }}</el-descriptions-item>
-          <el-descriptions-item label="登记时间">{{ detailForm.registerTime }}</el-descriptions-item>
+          <el-descriptions-item label="登记编号">{{ detailForm.ledgerNo }}</el-descriptions-item>
+          <el-descriptions-item label="登记时间">{{ detailForm.createTime }}</el-descriptions-item>
           <el-descriptions-item label="服务方式">
             <el-tag :type="getServiceTypeTag(detailForm.serviceType)" effect="plain">{{ getServiceTypeLabel(detailForm.serviceType) }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="来源渠道">{{ detailForm.sourceChannel }}</el-descriptions-item>
           <el-descriptions-item label="承办律师">{{ detailForm.lawyerName }}</el-descriptions-item>
-          <el-descriptions-item label="咨询时长">{{ detailForm.duration }}分钟</el-descriptions-item>
+          <el-descriptions-item label="咨询时长">{{ detailForm.consultDuration }}分钟</el-descriptions-item>
         </el-descriptions>
       </div>
 
@@ -233,14 +229,14 @@
           <span>咨询人信息</span>
         </div>
         <el-descriptions :column="3" border size="small">
-          <el-descriptions-item label="姓名">{{ detailForm.consultantName }}</el-descriptions-item>
-          <el-descriptions-item label="性别">{{ detailForm.gender }}</el-descriptions-item>
-          <el-descriptions-item label="年龄">{{ detailForm.age }}岁</el-descriptions-item>
-          <el-descriptions-item label="联系电话">{{ detailForm.phone }}</el-descriptions-item>
-          <el-descriptions-item label="身份证号">{{ detailForm.idCard }}</el-descriptions-item>
-          <el-descriptions-item label="职业">{{ detailForm.occupation }}</el-descriptions-item>
-          <el-descriptions-item label="工作单位">{{ detailForm.company }}</el-descriptions-item>
-          <el-descriptions-item label="联系地址" :span="2">{{ detailForm.address }}</el-descriptions-item>
+          <el-descriptions-item label="姓名">{{ detailForm.callerName }}</el-descriptions-item>
+          <el-descriptions-item label="性别">{{ getGenderLabel(detailForm.callerGender) }}</el-descriptions-item>
+          <el-descriptions-item label="年龄">{{ detailForm.callerAge }}岁</el-descriptions-item>
+          <el-descriptions-item label="联系电话">{{ detailForm.callerPhone }}</el-descriptions-item>
+          <el-descriptions-item label="身份证号">{{ detailForm.callerIdCard }}</el-descriptions-item>
+          <el-descriptions-item label="职业">{{ detailForm.callerJob }}</el-descriptions-item>
+          <el-descriptions-item label="工作单位">{{ detailForm.callerCompany }}</el-descriptions-item>
+          <el-descriptions-item label="联系地址" :span="2">{{ detailForm.callerAddress }}</el-descriptions-item>
         </el-descriptions>
       </div>
 
@@ -251,14 +247,14 @@
         </div>
         <el-descriptions :column="2" border size="small">
           <el-descriptions-item label="咨询类型">
-            <el-tag :type="getConsultTypeTag(detailForm.consultType)">{{ getConsultTypeLabel(detailForm.consultType) }}</el-tag>
+            <el-tag :type="getConsultTypeTag(detailForm.categoryName)">{{ detailForm.categoryName }}</el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="问题分类">{{ detailForm.questionCategory }}</el-descriptions-item>
-          <el-descriptions-item label="涉及金额" v-if="detailForm.amount">
-            <span style="color: #f56c6c; font-weight: bold;">¥{{ detailForm.amount }}</span>
+          <el-descriptions-item label="问题分类">{{ detailForm.subCategory }}</el-descriptions-item>
+          <el-descriptions-item label="涉及金额" v-if="detailForm.involveAmount">
+            <span style="color: #f56c6c; font-weight: bold;">¥{{ detailForm.involveAmount }}</span>
           </el-descriptions-item>
           <el-descriptions-item label="咨询摘要" :span="2">
-            <div class="content-text">{{ detailForm.consultSummary }}</div>
+            <div class="content-text">{{ detailForm.consultContent }}</div>
           </el-descriptions-item>
         </el-descriptions>
       </div>
@@ -269,7 +265,7 @@
           <span>律师回复/解答意见</span>
         </div>
         <div class="reply-content">
-          {{ detailForm.lawyerReply }}
+          {{ detailForm.lawyerAnswer }}
         </div>
       </div>
 
@@ -279,9 +275,9 @@
           <span>回访信息</span>
         </div>
         <el-descriptions :column="3" border size="small">
-          <el-descriptions-item label="是否回访">{{ detailForm.isVisit ? '是' : '否' }}</el-descriptions-item>
+          <el-descriptions-item label="是否回访">{{ detailForm.isVisit === '1' ? '是' : '否' }}</el-descriptions-item>
           <el-descriptions-item label="回访时间">{{ detailForm.visitTime || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="回访人">{{ detailForm.visitor || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="回访人">{{ detailForm.visitBy || '-' }}</el-descriptions-item>
           <el-descriptions-item label="满意度">
             <span :class="['satisfaction-text', 'satisfaction-' + detailForm.satisfaction]">
               <i v-for="n in getSatisfactionStars(detailForm.satisfaction)" :key="n" class="el-icon-star-on"></i>
@@ -303,6 +299,8 @@
 </template>
 
 <script>
+import { listLedger, getLedger, addLedger, updateLedger, delLedger, generateLedgerNo } from "@/api/lawyers/callCenter"
+
 export default {
   name: "CallLedger",
   data() {
@@ -316,20 +314,20 @@ export default {
       queryParams: {
         pageNum: 1,
         pageSize: 10,
-        consultType: '',
-        consultantName: '',
-        phone: '',
-        lawyer: '',
+        categoryName: '',
+        callerName: '',
+        callerPhone: '',
+        lawyerName: '',
         serviceType: '',
         satisfaction: ''
       },
       statistics: {
-        totalCount: 289,
-        phoneCount: 198,
-        siteCount: 45,
-        onlineCount: 32,
-        videoCount: 14,
-        avgSatisfaction: 97.2
+        totalCount: 0,
+        phoneCount: 0,
+        siteCount: 0,
+        onlineCount: 0,
+        videoCount: 0,
+        avgSatisfaction: 0
       },
       detailForm: {}
     }
@@ -340,47 +338,30 @@ export default {
   methods: {
     getList() {
       this.loading = true
-      setTimeout(() => {
-        this.ledgerList = this.generateMockData()
-        this.total = 56
+      listLedger(this.addDateRange(this.queryParams, this.dateRange)).then(response => {
+        this.ledgerList = response.rows
+        this.total = response.total
         this.loading = false
-      }, 500)
+        this.calcStatistics()
+      }).catch(() => { this.loading = false })
     },
-    generateMockData() {
-      const consultTypes = ['1', '2', '3', '4', '5']
-      const serviceTypes = ['1', '2', '3', '4']
-      const satisfactions = ['1', '2', '3', '4']
-      const lawyers = ['张律师', '李律师', '王律师', '刘律师', '陈律师']
-      const names = ['张三', '李四', '王五', '赵六', '钱七', '孙八', '周九', '吴十']
-      const list = []
-      for (let i = 0; i < 10; i++) {
-        const day = String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')
-        const hour = String(Math.floor(Math.random() * 24)).padStart(2, '0')
-        const minute = String(Math.floor(Math.random() * 60)).padStart(2, '0')
-        const id = String(i + 1).padStart(3, '0')
-        list.push({
-          id: i + 1,
-          registerNo: `DJ202503${day}${id}`,
-          registerTime: `2025-03-${day} ${hour}:${minute}:00`,
-          consultantName: names[Math.floor(Math.random() * names.length)],
-          phone: `138${String(Math.floor(Math.random() * 100000000)).padStart(8, '0')}`,
-          idCard: `440101199${Math.floor(Math.random() * 10)}${String(Math.floor(Math.random() * 100000000)).padStart(8, '*')}`,
-          consultType: consultTypes[Math.floor(Math.random() * consultTypes.length)],
-          serviceType: serviceTypes[Math.floor(Math.random() * serviceTypes.length)],
-          lawyerName: lawyers[Math.floor(Math.random() * lawyers.length)],
-          duration: Math.floor(Math.random() * 60) + 5,
-          satisfaction: satisfactions[Math.floor(Math.random() * satisfactions.length)]
-        })
+    calcStatistics() {
+      this.statistics.totalCount = this.total
+      this.statistics.phoneCount = this.ledgerList.filter(item => item.serviceType === '1').length
+      this.statistics.siteCount = this.ledgerList.filter(item => item.serviceType === '2').length
+      this.statistics.onlineCount = this.ledgerList.filter(item => item.serviceType === '3').length
+      this.statistics.videoCount = this.ledgerList.filter(item => item.serviceType === '4').length
+      const satisfactionMap = { '1': 100, '2': 80, '3': 60, '4': 20 }
+      const satisfiedItems = this.ledgerList.filter(item => item.satisfaction)
+      if (satisfiedItems.length > 0) {
+        const sum = satisfiedItems.reduce((acc, item) => acc + (satisfactionMap[item.satisfaction] || 0), 0)
+        this.statistics.avgSatisfaction = (sum / satisfiedItems.length).toFixed(1)
+      } else {
+        this.statistics.avgSatisfaction = 0
       }
-      return list
-    },
-    getConsultTypeLabel(type) {
-      const labels = { '1': '民商事', '2': '劳动纠纷', '3': '婚姻家庭', '4': '刑事行政', '5': '其他' }
-      return labels[type] || '未知'
     },
     getConsultTypeTag(type) {
-      const types = { '1': '', '2': 'warning', '3': 'danger', '4': 'info', '5': 'success' }
-      return types[type] || ''
+      return 'info'
     },
     getServiceTypeLabel(type) {
       const labels = { '1': '电话咨询', '2': '现场咨询', '3': '网络咨询', '4': '视频咨询' }
@@ -398,6 +379,10 @@ export default {
       const stars = { '1': 5, '2': 4, '3': 3, '4': 1 }
       return stars[satisfaction] || 0
     },
+    getGenderLabel(gender) {
+      const labels = { '0': '男', '1': '女', '2': '未知' }
+      return labels[String(gender)] || '未知'
+    },
     handleQuery() {
       this.queryParams.pageNum = 1
       this.getList()
@@ -407,56 +392,48 @@ export default {
       this.queryParams = {
         pageNum: 1,
         pageSize: 10,
-        consultType: '',
-        consultantName: '',
-        phone: '',
-        lawyer: '',
+        categoryName: '',
+        callerName: '',
+        callerPhone: '',
+        lawyerName: '',
         serviceType: '',
         satisfaction: ''
       }
       this.handleQuery()
     },
     handleSelectionChange(selection) {
-      this.ids = selection.map(item => item.id)
+      this.ids = selection.map(item => item.ledgerId)
     },
     handleDetail(row) {
-      this.detailForm = {
-        ...row,
-        sourceChannel: '12348热线',
-        gender: Math.random() > 0.5 ? '男' : '女',
-        age: Math.floor(Math.random() * 50) + 20,
-        occupation: '公司职员',
-        company: '某某科技有限公司',
-        address: '广东省广州市天河区某某路某某号',
-        questionCategory: '合同纠纷',
-        consultSummary: '当事人咨询关于劳动合同解除的相关法律问题。当事人于2023年入职某公司，现公司提出解除劳动合同，当事人想了解自己可以获得哪些经济补偿，以及如何维护自己的合法权益。',
-        amount: 50000,
-        lawyerReply: '根据《中华人民共和国劳动合同法》第四十七条规定，经济补偿按劳动者在本单位工作的年限，每满一年支付一个月工资的标准向劳动者支付。六个月以上不满一年的，按一年计算；不满六个月的，向劳动者支付半个月工资的经济补偿。建议您先与公司协商，协商不成可以向劳动争议仲裁委员会申请仲裁。',
-        isVisit: true,
-        visitTime: '2025-03-15 10:30:00',
-        visitor: '回访员小王',
-        visitOpinion: '当事人对解答非常满意，表示会按照律师建议的方式处理问题，并对12348服务表示感谢。'
-      }
-      this.detailOpen = true
+      getLedger(row.ledgerId).then(response => {
+        this.detailForm = response.data
+        this.detailOpen = true
+      }).catch(() => {})
     },
     handleEdit(row) {
       this.$message.info('编辑功能待实现')
     },
     handleDelete(row) {
-      this.$confirm('是否确认删除登记编号为"' + row.registerNo + '"的数据项？', '警告', {
+      this.$confirm('是否确认删除登记编号为"' + row.ledgerNo + '"的数据项？', '警告', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
         type: 'warning'
       }).then(() => {
-        this.$message.success('删除成功')
-        this.getList()
+        delLedger(row.ledgerId).then(() => {
+          this.$message.success('删除成功')
+          this.getList()
+        }).catch(() => {})
       }).catch(() => {})
     },
     handleAdd() {
-      this.$message.info('新增登记功能待实现')
+      generateLedgerNo().then(response => {
+        this.$message.info('新增登记，编号：' + response.data)
+      }).catch(() => {})
     },
     handleExport() {
-      this.$message.success('导出成功')
+      this.download('lawyers/call/ledger/export', {
+        ...this.queryParams
+      }, `ledger_${new Date().getTime()}.xlsx`)
     },
     handleBatchPrint() {
       if (this.ids.length === 0) {

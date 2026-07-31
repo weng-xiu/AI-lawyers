@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.outbound.AiOutboundResultMapper">
+
+    <resultMap type="AiOutboundResult" id="AiOutboundResultResult">
+        <result property="resultId"        column="result_id"        />
+        <result property="taskId"          column="task_id"          />
+        <result property="calleeId"        column="callee_id"        />
+        <result property="calleeNumber"    column="callee_number"    />
+        <result property="calleeName"      column="callee_name"      />
+        <result property="recordId"        column="record_id"        />
+        <result property="callResult"      column="call_result"      />
+        <result property="callDuration"    column="call_duration"    />
+        <result property="startTime"       column="start_time"       />
+        <result property="endTime"         column="end_time"         />
+        <result property="agentId"         column="agent_id"         />
+        <result property="agentName"       column="agent_name"       />
+        <result property="intentionCode"   column="intention_code"   />
+        <result property="intentionName"   column="intention_name"   />
+        <result property="keywords"        column="keywords"         />
+        <result property="satisfaction"    column="satisfaction"     />
+        <result property="needCallback"    column="need_callback"    />
+        <result property="callbackTime"    column="callback_time"    />
+        <result property="transcript"      column="transcript"       />
+        <result property="summary"         column="summary"          />
+        <result property="recordingUrl"    column="recording_url"    />
+        <result property="flowData"        column="flow_data"        />
+        <result property="createTime"      column="create_time"      />
+    </resultMap>
+
+    <sql id="selectAiOutboundResultVo">
+        select result_id, task_id, callee_id, callee_number, callee_name, record_id, call_result, call_duration,
+               start_time, end_time, agent_id, agent_name, intention_code, intention_name, keywords, satisfaction,
+               need_callback, callback_time, transcript, summary, recording_url, flow_data, create_time
+        from ai_outbound_result
+    </sql>
+
+    <select id="selectAiOutboundResultList" parameterType="AiOutboundResult" resultMap="AiOutboundResultResult">
+        <include refid="selectAiOutboundResultVo"/>
+        <where>
+            <if test="taskId != null"> and task_id = #{taskId}</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectAiOutboundResultByResultId" parameterType="Long" resultMap="AiOutboundResultResult">
+        <include refid="selectAiOutboundResultVo"/>
+        where result_id = #{resultId}
+    </select>
+
+    <select id="selectAiOutboundResultByTaskId" parameterType="Long" resultMap="AiOutboundResultResult">
+        <include refid="selectAiOutboundResultVo"/>
+        where task_id = #{taskId}
+        order by start_time desc
+    </select>
+
+    <select id="selectAiOutboundResultByCalleeId" parameterType="Long" resultMap="AiOutboundResultResult">
+        <include refid="selectAiOutboundResultVo"/>
+        where callee_id = #{calleeId}
+        order by create_time desc
+    </select>
+
+    <insert id="insertAiOutboundResult" parameterType="AiOutboundResult" useGeneratedKeys="true" keyProperty="resultId">
+        insert into ai_outbound_result
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="taskId != null">task_id,</if>
+            <if test="calleeId != null">callee_id,</if>
+            <if test="calleeNumber != null and calleeNumber != ''">callee_number,</if>
+            <if test="calleeName != null and calleeName != ''">callee_name,</if>
+            <if test="recordId != null and recordId != ''">record_id,</if>
+            <if test="callResult != null and callResult != ''">call_result,</if>
+            <if test="callDuration != null">call_duration,</if>
+            <if test="startTime != null">start_time,</if>
+            <if test="endTime != null">end_time,</if>
+            <if test="agentId != null and agentId != ''">agent_id,</if>
+            <if test="agentName != null and agentName != ''">agent_name,</if>
+            <if test="intentionCode != null and intentionCode != ''">intention_code,</if>
+            <if test="intentionName != null and intentionName != ''">intention_name,</if>
+            <if test="keywords != null and keywords != ''">keywords,</if>
+            <if test="satisfaction != null">satisfaction,</if>
+            <if test="needCallback != null and needCallback != ''">need_callback,</if>
+            <if test="callbackTime != null">callback_time,</if>
+            <if test="transcript != null and transcript != ''">transcript,</if>
+            <if test="summary != null and summary != ''">summary,</if>
+            <if test="recordingUrl != null and recordingUrl != ''">recording_url,</if>
+            <if test="flowData != null and flowData != ''">flow_data,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="taskId != null">#{taskId},</if>
+            <if test="calleeId != null">#{calleeId},</if>
+            <if test="calleeNumber != null and calleeNumber != ''">#{calleeNumber},</if>
+            <if test="calleeName != null and calleeName != ''">#{calleeName},</if>
+            <if test="recordId != null and recordId != ''">#{recordId},</if>
+            <if test="callResult != null and callResult != ''">#{callResult},</if>
+            <if test="callDuration != null">#{callDuration},</if>
+            <if test="startTime != null">#{startTime},</if>
+            <if test="endTime != null">#{endTime},</if>
+            <if test="agentId != null and agentId != ''">#{agentId},</if>
+            <if test="agentName != null and agentName != ''">#{agentName},</if>
+            <if test="intentionCode != null and intentionCode != ''">#{intentionCode},</if>
+            <if test="intentionName != null and intentionName != ''">#{intentionName},</if>
+            <if test="keywords != null and keywords != ''">#{keywords},</if>
+            <if test="satisfaction != null">#{satisfaction},</if>
+            <if test="needCallback != null and needCallback != ''">#{needCallback},</if>
+            <if test="callbackTime != null">#{callbackTime},</if>
+            <if test="transcript != null and transcript != ''">#{transcript},</if>
+            <if test="summary != null and summary != ''">#{summary},</if>
+            <if test="recordingUrl != null and recordingUrl != ''">#{recordingUrl},</if>
+            <if test="flowData != null and flowData != ''">#{flowData},</if>
+            sysdate()
+        </trim>
+    </insert>
+</mapper>

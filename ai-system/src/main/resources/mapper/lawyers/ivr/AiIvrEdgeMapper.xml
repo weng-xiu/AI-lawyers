@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.ivr.AiIvrEdgeMapper">
+
+    <resultMap type="AiIvrEdge" id="AiIvrEdgeResult">
+        <result property="edgeId"         column="edge_id"         />
+        <result property="flowId"         column="flow_id"         />
+        <result property="sourceNodeId"   column="source_node_id"  />
+        <result property="targetNodeId"   column="target_node_id"  />
+        <result property="edgeLabel"      column="edge_label"      />
+        <result property="conditionExpr"  column="condition_expr"  />
+        <result property="sortOrder"      column="sort_order"      />
+        <result property="createBy"       column="create_by"       />
+        <result property="createTime"     column="create_time"     />
+        <result property="updateBy"       column="update_by"       />
+        <result property="updateTime"     column="update_time"     />
+        <result property="remark"         column="remark"          />
+    </resultMap>
+
+    <sql id="selectAiIvrEdgeVo">
+        select edge_id, flow_id, source_node_id, target_node_id, edge_label, condition_expr, sort_order, create_by, create_time, update_by, update_time, remark from ai_ivr_edge
+    </sql>
+
+    <select id="selectAiIvrEdgeList" parameterType="AiIvrEdge" resultMap="AiIvrEdgeResult">
+        <include refid="selectAiIvrEdgeVo"/>
+        <where>
+            <if test="flowId != null"> and flow_id = #{flowId}</if>
+            <if test="sourceNodeId != null"> and source_node_id = #{sourceNodeId}</if>
+            <if test="targetNodeId != null"> and target_node_id = #{targetNodeId}</if>
+            <if test="edgeLabel != null and edgeLabel != ''"> and edge_label like concat('%', #{edgeLabel}, '%')</if>
+        </where>
+        order by sort_order asc
+    </select>
+
+    <select id="selectAiIvrEdgeByEdgeId" parameterType="Long" resultMap="AiIvrEdgeResult">
+        <include refid="selectAiIvrEdgeVo"/>
+        where edge_id = #{edgeId}
+    </select>
+
+    <select id="selectAiIvrEdgeByFlowId" parameterType="Long" resultMap="AiIvrEdgeResult">
+        <include refid="selectAiIvrEdgeVo"/>
+        where flow_id = #{flowId}
+        order by sort_order asc
+    </select>
+
+    <insert id="insertAiIvrEdge" parameterType="AiIvrEdge" useGeneratedKeys="true" keyProperty="edgeId">
+        insert into ai_ivr_edge
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="flowId != null">flow_id,</if>
+            <if test="sourceNodeId != null">source_node_id,</if>
+            <if test="targetNodeId != null">target_node_id,</if>
+            <if test="edgeLabel != null and edgeLabel != ''">edge_label,</if>
+            <if test="conditionExpr != null">condition_expr,</if>
+            <if test="sortOrder != null">sort_order,</if>
+            <if test="createBy != null and createBy != ''">create_by,</if>
+            <if test="remark != null and remark != ''">remark,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="flowId != null">#{flowId},</if>
+            <if test="sourceNodeId != null">#{sourceNodeId},</if>
+            <if test="targetNodeId != null">#{targetNodeId},</if>
+            <if test="edgeLabel != null and edgeLabel != ''">#{edgeLabel},</if>
+            <if test="conditionExpr != null">#{conditionExpr},</if>
+            <if test="sortOrder != null">#{sortOrder},</if>
+            <if test="createBy != null and createBy != ''">#{createBy},</if>
+            <if test="remark != null and remark != ''">#{remark},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateAiIvrEdge" parameterType="AiIvrEdge">
+        update ai_ivr_edge
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="flowId != null">flow_id = #{flowId},</if>
+            <if test="sourceNodeId != null">source_node_id = #{sourceNodeId},</if>
+            <if test="targetNodeId != null">target_node_id = #{targetNodeId},</if>
+            <if test="edgeLabel != null and edgeLabel != ''">edge_label = #{edgeLabel},</if>
+            <if test="conditionExpr != null">condition_expr = #{conditionExpr},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where edge_id = #{edgeId}
+    </update>
+
+    <delete id="deleteAiIvrEdgeByEdgeId" parameterType="Long">
+        delete from ai_ivr_edge where edge_id = #{edgeId}
+    </delete>
+
+    <delete id="deleteAiIvrEdgeByFlowId" parameterType="Long">
+        delete from ai_ivr_edge where flow_id = #{flowId}
+    </delete>
+
+    <delete id="deleteAiIvrEdgeByEdgeIds" parameterType="String">
+        delete from ai_ivr_edge where edge_id in
+        <foreach item="edgeId" collection="array" open="(" separator="," close=")">
+            #{edgeId}
+        </foreach>
+    </delete>
+</mapper>

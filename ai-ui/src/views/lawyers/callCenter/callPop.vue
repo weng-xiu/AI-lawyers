@@ -194,45 +194,35 @@
 </template>
 
 <script>
+import { getRecord, listRecord } from "@/api/lawyers/callCenter"
+
 export default {
   name: "CallPop",
   data() {
     return {
       activeTab: 'call',
-      callDuration: '00:03:42',
+      callDuration: '00:00:00',
       timer: null,
-      seconds: 222,
-      recommendArticles: [
-        { title: '民法典婚姻家庭编解读：离婚财产分割原则', category: '婚姻家庭', views: '2.3万' },
-        { title: '诉讼离婚流程及证据收集指南', category: '诉讼指南', views: '1.8万' }
-      ],
-      callHistory: [
-        {
-          title: '离婚后房产分割问题咨询',
-          satisfaction: '非常满意',
-          time: '2026-07-10 09:25:30',
-          type: '语音咨询',
-          duration: '15分32秒'
-        },
-        {
-          title: '子女抚养权变更条件咨询',
-          satisfaction: '满意',
-          time: '2026-07-05 14:18:45',
-          type: '图文咨询',
-          duration: '22分10秒'
-        },
-        {
-          title: '婚前财产公证办理流程',
-          satisfaction: '满意',
-          time: '2026-06-28 10:42:15',
-          type: '语音咨询',
-          duration: '8分45秒'
-        }
-      ]
+      seconds: 0,
+      currentRecord: {},
+      callerInfo: {
+        name: '',
+        phone: '',
+        address: '',
+        callCount: 0,
+        totalCallCount: 0,
+        tags: []
+      },
+      recommendArticles: [],
+      callHistory: []
     }
   },
   created() {
     this.startTimer()
+    const recordId = this.$route.query.recordId || this.$route.params.recordId
+    if (recordId) {
+      this.loadCallData(recordId)
+    }
   },
   beforeDestroy() {
     this.clearTimer()
@@ -258,6 +248,54 @@ export default {
     },
     padZero(num) {
       return num.toString().padStart(2, '0')
+    },
+    loadCallData(recordId) {
+      getRecord(recordId).then(res => {
+        const data = res.data || {}
+        this.currentRecord = data
+        this.callerInfo = {
+          name: data.callerName || '',
+          phone: data.callerNumber || '',
+          address: data.callerAddress || '',
+          callCount: data.monthCallCount || 0,
+          totalCallCount: data.totalCallCount || 0,
+          tags: data.tags || []
+        }
+        if (data.callerNumber) {
+          this.loadCallHistory(data.callerNumber)
+        }
+      }).catch(() => {})
+    },
+    loadCallHistory(callerNumber) {
+      listRecord({ callerNumber: callerNumber, pageNum: 1, pageSize: 10 }).then(res => {
+        const rows = res.rows || []
+        this.callHistory = rows.map(item => ({
+          title: item.content || item.summary || '通话记录',
+          satisfaction: this.getSatisfactionText(item.satisfaction),
+          time: item.callTime || item.createTime || '',
+          type: this.getServiceType(item.category),
+          duration: this.formatDuration(item.duration || 0)
+        }))
+      }).catch(() => {
+        this.callHistory = []
+      })
+    },
+    getSatisfactionText(val) {
+      if (val >= 4) return '非常满意'
+      if (val >= 3) return '满意'
+      if (val >= 2) return '一般'
+      return '不满意'
+    },
+    getServiceType(category) {
+      const map = { '1': '语音咨询', '2': '图文咨询', '3': '视频咨询' }
+      return map[category] || '其他咨询'
+    },
+    formatDuration(seconds) {
+      seconds = parseInt(seconds) || 0
+      if (seconds <= 0) return '0秒'
+      const m = Math.floor(seconds / 60)
+      const s = seconds % 60
+      return m + '分' + s + '秒'
     }
   }
 }

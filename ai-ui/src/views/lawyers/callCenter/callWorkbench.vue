@@ -3,16 +3,16 @@
     <!-- 欢迎横幅 -->
     <div class="wb-welcome-banner">
       <div class="wb-welcome-left">
-        <h2>欢迎回来，张律师</h2>
+        <h2>欢迎回来，{{ userName || '律师' }}</h2>
         <p>{{ currentDate }}</p>
       </div>
       <div class="wb-welcome-right">
         <div class="wb-welcome-stat">
-          <span class="wb-welcome-num">23</span>
+          <span class="wb-welcome-num">{{ todayServed }}</span>
           <span class="wb-welcome-label">今日已服务群众</span>
         </div>
         <div class="wb-welcome-stat">
-          <span class="wb-welcome-num">98.5%</span>
+          <span class="wb-welcome-num">{{ satisfactionRate }}</span>
           <span class="wb-welcome-label">满意度</span>
         </div>
       </div>
@@ -118,29 +118,31 @@
 </template>
 
 <script>
+import { listRecord, getCallStatistics, getCallStatisticsByAgent, getOnlineAgents } from "@/api/lawyers/callCenter"
+import { listNotice } from "@/api/system/notice"
+
 export default {
   name: "CallWorkbench",
   data() {
     return {
       todayFilter: 'today',
       currentDate: '',
+      userName: '',
+      todayServed: 0,
+      satisfactionRate: '0%',
       personalStats: [
-        { title: '总通话数', value: '156 次', trend: '+12%', trendType: 'up', icon: 'el-icon-phone', type: 'blue' },
-        { title: '通话时长', value: '4小时32分', trend: '+8%', trendType: 'up', icon: 'el-icon-time', type: 'green' },
-        { title: '服务满意度', value: '98.5%', trend: '+2.1%', trendType: 'up', icon: 'el-icon-star-on', type: 'orange' },
-        { title: '在线时长', value: '6小时15分', trend: '+5%', trendType: 'up', icon: 'el-icon-user', type: 'purple' }
+        { title: '总通话数', value: '0 次', trend: '0%', trendType: 'up', icon: 'el-icon-phone', type: 'blue' },
+        { title: '通话时长', value: '0分', trend: '0%', trendType: 'up', icon: 'el-icon-time', type: 'green' },
+        { title: '服务满意度', value: '0%', trend: '0%', trendType: 'up', icon: 'el-icon-star-on', type: 'orange' },
+        { title: '在线时长', value: '0分', trend: '0%', trendType: 'up', icon: 'el-icon-user', type: 'purple' }
       ],
       teamStats: [
-        { value: '1,234', label: '团队总通话' },
-        { value: '3分42秒', label: '平均通话时长' },
-        { value: '96.8%', label: '团队满意度' },
-        { value: '7小时', label: '平均在线时长' }
+        { value: '0', label: '团队总通话' },
+        { value: '0分', label: '平均通话时长' },
+        { value: '0%', label: '团队满意度' },
+        { value: '0分', label: '平均在线时长' }
       ],
-      noticeList: [
-        { date: '07-16', title: '关于2026年7月排班调整的通知' },
-        { date: '07-15', title: '知识库更新：民法典婚姻家庭编修订要点' },
-        { date: '07-14', title: '系统维护公告：7月20日凌晨2:00-4:00' }
-      ],
+      noticeList: [],
       quickList: [
         { name: '语音咨询', icon: 'el-icon-phone', type: 'blue', path: '/lawyers/callCenter/callPanel' },
         { name: '图文咨询', icon: 'el-icon-chat-dot-round', type: 'green', path: '' },
@@ -151,17 +153,12 @@ export default {
         { name: '知识检索', icon: 'el-icon-search', type: 'pink', path: '' },
         { name: '回访任务', icon: 'el-icon-back', type: 'purple2', path: '' }
       ],
-      recentRecords: [
-        { callerNumber: '138****2761', serviceType: '语音咨询', summary: '劳动者因工伤后用人单位拒绝申请工伤认定，咨询如何自行申请及所需材料', duration: '8分32秒', satisfaction: '满意' },
-        { callerNumber: '136****0084', serviceType: '图文咨询', summary: '离婚后财产分割问题，婚前购买的房屋婚后共同还贷，咨询离婚时如何分割', duration: '12分15秒', satisfaction: '满意' },
-        { callerNumber: '189****5523', serviceType: '语音咨询', summary: '公司未签订劳动合同，工作半年后被辞退，咨询经济补偿金计算', duration: '6分40秒', satisfaction: '满意' },
-        { callerNumber: '135****8890', serviceType: '语音咨询', summary: '继承纠纷咨询，父母去世后房产继承分配问题', duration: '15分20秒', satisfaction: '非常满意' },
-        { callerNumber: '187****3341', serviceType: '视频咨询', summary: '交通事故责任认定不服，咨询复核程序和时限', duration: '10分05秒', satisfaction: '满意' }
-      ]
+      recentRecords: []
     }
   },
   created() {
     this.initDate()
+    this.loadData()
   },
   methods: {
     initDate() {
@@ -172,6 +169,98 @@ export default {
       const d = now.getDate()
       const w = weekDays[now.getDay()]
       this.currentDate = `${y}年${m}月${d}日 星期${w}`
+      try {
+        this.userName = this.$store.getters.name || ''
+      } catch (e) {
+        this.userName = ''
+      }
+    },
+    loadData() {
+      this.loadPersonalStats()
+      this.loadTeamStats()
+      this.loadNoticeList()
+      this.loadRecentRecords()
+    },
+    loadPersonalStats() {
+      getCallStatistics().then(res => {
+        const data = res.data || {}
+        const totalCalls = data.totalCalls || 0
+        const totalDuration = data.totalDuration || 0
+        const satisfaction = data.satisfaction || 0
+        const onlineDuration = data.onlineDuration || 0
+        this.todayServed = data.todayCalls || totalCalls
+        this.satisfactionRate = satisfaction ? satisfaction.toFixed(1) + '%' : '0%'
+        this.personalStats = [
+          { title: '总通话数', value: totalCalls + ' 次', trend: data.callTrend || '0%', trendType: (data.callTrend || '').startsWith('-') ? 'down' : 'up', icon: 'el-icon-phone', type: 'blue' },
+          { title: '通话时长', value: this.formatDuration(totalDuration), trend: data.durationTrend || '0%', trendType: (data.durationTrend || '').startsWith('-') ? 'down' : 'up', icon: 'el-icon-time', type: 'green' },
+          { title: '服务满意度', value: satisfaction ? satisfaction.toFixed(1) + '%' : '0%', trend: data.satisfactionTrend || '0%', trendType: (data.satisfactionTrend || '').startsWith('-') ? 'down' : 'up', icon: 'el-icon-star-on', type: 'orange' },
+          { title: '在线时长', value: this.formatDuration(onlineDuration), trend: data.onlineTrend || '0%', trendType: (data.onlineTrend || '').startsWith('-') ? 'down' : 'up', icon: 'el-icon-user', type: 'purple' }
+        ]
+      }).catch(() => {})
+    },
+    loadTeamStats() {
+      getOnlineAgents().then(res => {
+        const agents = res.data || res.rows || []
+        const agentCount = Array.isArray(agents) ? agents.length : 0
+        getCallStatisticsByAgent().then(statRes => {
+          const statData = statRes.data || {}
+          const teamTotal = statData.totalCalls || 0
+          const avgDuration = statData.avgDuration || 0
+          const teamSatisfaction = statData.avgSatisfaction || 0
+          const avgOnline = statData.avgOnlineDuration || 0
+          this.teamStats = [
+            { value: teamTotal.toLocaleString(), label: '团队总通话' },
+            { value: this.formatDuration(avgDuration), label: '平均通话时长' },
+            { value: teamSatisfaction ? teamSatisfaction.toFixed(1) + '%' : '0%', label: '团队满意度' },
+            { value: this.formatDuration(avgOnline), label: '平均在线时长' }
+          ]
+        }).catch(() => {})
+      }).catch(() => {})
+    },
+    loadNoticeList() {
+      listNotice({ pageNum: 1, pageSize: 5 }).then(res => {
+        const rows = res.rows || []
+        this.noticeList = rows.map(item => ({
+          date: item.createTime ? item.createTime.substring(5, 10) : '',
+          title: item.noticeTitle || ''
+        }))
+      }).catch(() => {
+        this.noticeList = []
+      })
+    },
+    loadRecentRecords() {
+      listRecord({ pageNum: 1, pageSize: 5 }).then(res => {
+        const rows = res.rows || []
+        this.recentRecords = rows.map(item => ({
+          callerNumber: item.callerNumber || '',
+          serviceType: this.getServiceType(item.category),
+          summary: item.content || item.summary || '',
+          duration: this.formatDuration(item.duration || 0),
+          satisfaction: this.getSatisfactionText(item.satisfaction)
+        }))
+      }).catch(() => {
+        this.recentRecords = []
+      })
+    },
+    getServiceType(category) {
+      const map = { '1': '语音咨询', '2': '图文咨询', '3': '视频咨询' }
+      return map[category] || '其他咨询'
+    },
+    getSatisfactionText(val) {
+      if (val >= 4) return '非常满意'
+      if (val >= 3) return '满意'
+      if (val >= 2) return '一般'
+      return '不满意'
+    },
+    formatDuration(seconds) {
+      if (!seconds) return '0分'
+      seconds = parseInt(seconds) || 0
+      if (seconds < 60) return seconds + '秒'
+      const h = Math.floor(seconds / 3600)
+      const m = Math.floor((seconds % 3600) / 60)
+      const s = seconds % 60
+      if (h > 0) return h + '小时' + m + '分' + (s > 0 ? s + '秒' : '')
+      return m + '分' + (s > 0 ? s + '秒' : '')
     },
     handleQuickClick(path) {
       if (path) {

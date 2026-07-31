@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.ivr.AiIvrNodeMapper">
+
+    <resultMap type="AiIvrNode" id="AiIvrNodeResult">
+        <result property="nodeId"        column="node_id"        />
+        <result property="flowId"        column="flow_id"        />
+        <result property="nodeType"      column="node_type"      />
+        <result property="nodeName"      column="node_name"      />
+        <result property="nodeConfig"    column="node_config"    />
+        <result property="positionX"     column="position_x"     />
+        <result property="positionY"     column="position_y"     />
+        <result property="sortOrder"     column="sort_order"     />
+        <result property="createBy"      column="create_by"      />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"      column="update_by"      />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"        column="remark"         />
+    </resultMap>
+
+    <sql id="selectAiIvrNodeVo">
+        select node_id, flow_id, node_type, node_name, node_config, position_x, position_y, sort_order, create_by, create_time, update_by, update_time, remark from ai_ivr_node
+    </sql>
+
+    <select id="selectAiIvrNodeList" parameterType="AiIvrNode" resultMap="AiIvrNodeResult">
+        <include refid="selectAiIvrNodeVo"/>
+        <where>
+            <if test="flowId != null"> and flow_id = #{flowId}</if>
+            <if test="nodeType != null and nodeType != ''"> and node_type = #{nodeType}</if>
+            <if test="nodeName != null and nodeName != ''"> and node_name like concat('%', #{nodeName}, '%')</if>
+        </where>
+        order by sort_order asc
+    </select>
+
+    <select id="selectAiIvrNodeByNodeId" parameterType="Long" resultMap="AiIvrNodeResult">
+        <include refid="selectAiIvrNodeVo"/>
+        where node_id = #{nodeId}
+    </select>
+
+    <select id="selectAiIvrNodeByFlowId" parameterType="Long" resultMap="AiIvrNodeResult">
+        <include refid="selectAiIvrNodeVo"/>
+        where flow_id = #{flowId}
+        order by sort_order asc
+    </select>
+
+    <insert id="insertAiIvrNode" parameterType="AiIvrNode" useGeneratedKeys="true" keyProperty="nodeId">
+        insert into ai_ivr_node
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="flowId != null">flow_id,</if>
+            <if test="nodeType != null and nodeType != ''">node_type,</if>
+            <if test="nodeName != null and nodeName != ''">node_name,</if>
+            <if test="nodeConfig != null">node_config,</if>
+            <if test="positionX != null">position_x,</if>
+            <if test="positionY != null">position_y,</if>
+            <if test="sortOrder != null">sort_order,</if>
+            <if test="createBy != null and createBy != ''">create_by,</if>
+            <if test="remark != null and remark != ''">remark,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="flowId != null">#{flowId},</if>
+            <if test="nodeType != null and nodeType != ''">#{nodeType},</if>
+            <if test="nodeName != null and nodeName != ''">#{nodeName},</if>
+            <if test="nodeConfig != null">#{nodeConfig},</if>
+            <if test="positionX != null">#{positionX},</if>
+            <if test="positionY != null">#{positionY},</if>
+            <if test="sortOrder != null">#{sortOrder},</if>
+            <if test="createBy != null and createBy != ''">#{createBy},</if>
+            <if test="remark != null and remark != ''">#{remark},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateAiIvrNode" parameterType="AiIvrNode">
+        update ai_ivr_node
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="flowId != null">flow_id = #{flowId},</if>
+            <if test="nodeType != null and nodeType != ''">node_type = #{nodeType},</if>
+            <if test="nodeName != null and nodeName != ''">node_name = #{nodeName},</if>
+            <if test="nodeConfig != null">node_config = #{nodeConfig},</if>
+            <if test="positionX != null">position_x = #{positionX},</if>
+            <if test="positionY != null">position_y = #{positionY},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where node_id = #{nodeId}
+    </update>
+
+    <delete id="deleteAiIvrNodeByNodeId" parameterType="Long">
+        delete from ai_ivr_node where node_id = #{nodeId}
+    </delete>
+
+    <delete id="deleteAiIvrNodeByFlowId" parameterType="Long">
+        delete from ai_ivr_node where flow_id = #{flowId}
+    </delete>
+
+    <delete id="deleteAiIvrNodeByNodeIds" parameterType="String">
+        delete from ai_ivr_node where node_id in
+        <foreach item="nodeId" collection="array" open="(" separator="," close=")">
+            #{nodeId}
+        </foreach>
+    </delete>
+</mapper>

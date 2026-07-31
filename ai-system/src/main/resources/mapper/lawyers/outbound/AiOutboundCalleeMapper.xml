@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.outbound.AiOutboundCalleeMapper">
+
+    <resultMap type="AiOutboundCallee" id="AiOutboundCalleeResult">
+        <result property="calleeId"        column="callee_id"        />
+        <result property="taskId"          column="task_id"          />
+        <result property="calleeNumber"    column="callee_number"    />
+        <result property="calleeName"      column="callee_name"      />
+        <result property="calleeGender"    column="callee_gender"    />
+        <result property="calleeAge"       column="callee_age"       />
+        <result property="calleeAddress"   column="callee_address"   />
+        <result property="calleeParams"    column="callee_params"    />
+        <result property="callStatus"      column="call_status"      />
+        <result property="callTime"        column="call_time"        />
+        <result property="callDuration"    column="call_duration"    />
+        <result property="recordId"        column="record_id"        />
+        <result property="agentId"         column="agent_id"         />
+        <result property="retryTimes"      column="retry_times"      />
+        <result property="lastRetryTime"   column="last_retry_time"  />
+        <result property="failReason"      column="fail_reason"      />
+        <result property="createBy"        column="create_by"        />
+        <result property="createTime"      column="create_time"      />
+        <result property="updateBy"        column="update_by"        />
+        <result property="updateTime"      column="update_time"      />
+        <result property="remark"          column="remark"           />
+    </resultMap>
+
+    <sql id="selectAiOutboundCalleeVo">
+        select callee_id, task_id, callee_number, callee_name, callee_gender, callee_age, callee_address,
+               callee_params, call_status, call_time, call_duration, record_id, agent_id, retry_times,
+               last_retry_time, fail_reason, create_by, create_time, update_by, update_time, remark
+        from ai_outbound_callee
+    </sql>
+
+    <select id="selectAiOutboundCalleeList" parameterType="AiOutboundCallee" resultMap="AiOutboundCalleeResult">
+        <include refid="selectAiOutboundCalleeVo"/>
+        <where>
+            <if test="taskId != null"> and task_id = #{taskId}</if>
+            <if test="callStatus != null and callStatus != ''"> and call_status = #{callStatus}</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectAiOutboundCalleeByCalleeId" parameterType="Long" resultMap="AiOutboundCalleeResult">
+        <include refid="selectAiOutboundCalleeVo"/>
+        where callee_id = #{calleeId}
+    </select>
+
+    <select id="selectAiOutboundCalleeByTaskId" parameterType="Long" resultMap="AiOutboundCalleeResult">
+        <include refid="selectAiOutboundCalleeVo"/>
+        where task_id = #{taskId}
+        order by callee_id asc
+    </select>
+
+    <select id="selectPendingCallees" resultMap="AiOutboundCalleeResult">
+        <include refid="selectAiOutboundCalleeVo"/>
+        where task_id = #{taskId} and call_status = '0'
+        limit #{limit}
+    </select>
+
+    <insert id="insertAiOutboundCallee" parameterType="AiOutboundCallee" useGeneratedKeys="true" keyProperty="calleeId">
+        insert into ai_outbound_callee
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="taskId != null">task_id,</if>
+            <if test="calleeNumber != null and calleeNumber != ''">callee_number,</if>
+            <if test="calleeName != null and calleeName != ''">callee_name,</if>
+            <if test="calleeGender != null and calleeGender != ''">callee_gender,</if>
+            <if test="calleeAge != null">callee_age,</if>
+            <if test="calleeAddress != null and calleeAddress != ''">callee_address,</if>
+            <if test="calleeParams != null and calleeParams != ''">callee_params,</if>
+            <if test="callStatus != null and callStatus != ''">call_status,</if>
+            <if test="callTime != null">call_time,</if>
+            <if test="callDuration != null">call_duration,</if>
+            <if test="recordId != null">record_id,</if>
+            <if test="agentId != null">agent_id,</if>
+            <if test="retryTimes != null">retry_times,</if>
+            <if test="lastRetryTime != null">last_retry_time,</if>
+            <if test="failReason != null and failReason != ''">fail_reason,</if>
+            <if test="createBy != null and createBy != ''">create_by,</if>
+            <if test="remark != null and remark != ''">remark,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="taskId != null">#{taskId},</if>
+            <if test="calleeNumber != null and calleeNumber != ''">#{calleeNumber},</if>
+            <if test="calleeName != null and calleeName != ''">#{calleeName},</if>
+            <if test="calleeGender != null and calleeGender != ''">#{calleeGender},</if>
+            <if test="calleeAge != null">#{calleeAge},</if>
+            <if test="calleeAddress != null and calleeAddress != ''">#{calleeAddress},</if>
+            <if test="calleeParams != null and calleeParams != ''">#{calleeParams},</if>
+            <if test="callStatus != null and callStatus != ''">#{callStatus},</if>
+            <if test="callTime != null">#{callTime},</if>
+            <if test="callDuration != null">#{callDuration},</if>
+            <if test="recordId != null">#{recordId},</if>
+            <if test="agentId != null">#{agentId},</if>
+            <if test="retryTimes != null">#{retryTimes},</if>
+            <if test="lastRetryTime != null">#{lastRetryTime},</if>
+            <if test="failReason != null and failReason != ''">#{failReason},</if>
+            <if test="createBy != null and createBy != ''">#{createBy},</if>
+            <if test="remark != null and remark != ''">#{remark},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <insert id="batchInsertCallees" parameterType="java.util.List">
+        insert into ai_outbound_callee (task_id, callee_number, callee_name, callee_gender, callee_age, callee_address,
+            callee_params, call_status, retry_times, create_by, create_time, remark)
+        values
+        <foreach item="item" collection="list" separator=",">
+            (#{item.taskId}, #{item.calleeNumber}, #{item.calleeName}, #{item.calleeGender}, #{item.calleeAge},
+             #{item.calleeAddress}, #{item.calleeParams}, #{item.callStatus}, #{item.retryTimes},
+             #{item.createBy}, sysdate(), #{item.remark})
+        </foreach>
+    </insert>
+
+    <update id="updateAiOutboundCallee" parameterType="AiOutboundCallee">
+        update ai_outbound_callee
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="taskId != null">task_id = #{taskId},</if>
+            <if test="calleeNumber != null and calleeNumber != ''">callee_number = #{calleeNumber},</if>
+            <if test="calleeName != null and calleeName != ''">callee_name = #{calleeName},</if>
+            <if test="calleeGender != null and calleeGender != ''">callee_gender = #{calleeGender},</if>
+            <if test="calleeAge != null">callee_age = #{calleeAge},</if>
+            <if test="calleeAddress != null and calleeAddress != ''">callee_address = #{calleeAddress},</if>
+            <if test="calleeParams != null and calleeParams != ''">callee_params = #{calleeParams},</if>
+            <if test="callStatus != null and callStatus != ''">call_status = #{callStatus},</if>
+            <if test="callTime != null">call_time = #{callTime},</if>
+            <if test="callDuration != null">call_duration = #{callDuration},</if>
+            <if test="recordId != null">record_id = #{recordId},</if>
+            <if test="agentId != null">agent_id = #{agentId},</if>
+            <if test="retryTimes != null">retry_times = #{retryTimes},</if>
+            <if test="lastRetryTime != null">last_retry_time = #{lastRetryTime},</if>
+            <if test="failReason != null">fail_reason = #{failReason},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where callee_id = #{calleeId}
+    </update>
+
+    <update id="updateCalleeStatus" parameterType="AiOutboundCallee">
+        update ai_outbound_callee
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="callStatus != null and callStatus != ''">call_status = #{callStatus},</if>
+            <if test="callTime != null">call_time = #{callTime},</if>
+            <if test="callDuration != null">call_duration = #{callDuration},</if>
+            <if test="recordId != null">record_id = #{recordId},</if>
+            <if test="agentId != null">agent_id = #{agentId},</if>
+            <if test="retryTimes != null">retry_times = #{retryTimes},</if>
+            <if test="failReason != null">fail_reason = #{failReason},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            update_time = sysdate()
+        </trim>
+        where callee_id = #{calleeId}
+    </update>
+
+    <delete id="deleteAiOutboundCalleeByCalleeId" parameterType="Long">
+        delete from ai_outbound_callee where callee_id = #{calleeId}
+    </delete>
+
+    <delete id="deleteAiOutboundCalleeByTaskId" parameterType="Long">
+        delete from ai_outbound_callee where task_id = #{taskId}
+    </delete>
+
+    <delete id="deleteAiOutboundCalleeByCalleeIds" parameterType="String">
+        delete from ai_outbound_callee where callee_id in
+        <foreach item="calleeId" collection="array" open="(" separator="," close=")">
+            #{calleeId}
+        </foreach>
+    </delete>
+
+    <select id="countByTaskIdAndStatus" resultType="int">
+        select count(1) from ai_outbound_callee
+        where task_id = #{taskId}
+        <if test="callStatus != null and callStatus != ''"> and call_status = #{callStatus}</if>
+    </select>
+</mapper>

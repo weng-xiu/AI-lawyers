@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.ivr.AiIvrIntentionMapper">
+
+    <resultMap type="AiIvrIntention" id="AiIvrIntentionResult">
+        <result property="intentionId"        column="intention_id"        />
+        <result property="intentionName"      column="intention_name"      />
+        <result property="intentionCode"      column="intention_code"      />
+        <result property="description"        column="description"         />
+        <result property="category"           column="category"            />
+        <result property="regexPattern"       column="regex_pattern"       />
+        <result property="promptTemplate"     column="prompt_template"     />
+        <result property="exampleUtterances"  column="example_utterances"  />
+        <result property="modelId"            column="model_id"            />
+        <result property="priority"           column="priority"            />
+        <result property="status"             column="status"              />
+        <result property="createBy"           column="create_by"           />
+        <result property="createTime"         column="create_time"         />
+        <result property="updateBy"           column="update_by"           />
+        <result property="updateTime"         column="update_time"         />
+        <result property="remark"             column="remark"              />
+    </resultMap>
+
+    <sql id="selectAiIvrIntentionVo">
+        select intention_id, intention_name, intention_code, description, category, regex_pattern, prompt_template, example_utterances, model_id, priority, status, create_by, create_time, update_by, update_time, remark from ai_ivr_intention
+    </sql>
+
+    <select id="selectAiIvrIntentionList" parameterType="AiIvrIntention" resultMap="AiIvrIntentionResult">
+        <include refid="selectAiIvrIntentionVo"/>
+        <where>
+            <if test="intentionName != null and intentionName != ''"> and intention_name like concat('%', #{intentionName}, '%')</if>
+            <if test="intentionCode != null and intentionCode != ''"> and intention_code = #{intentionCode}</if>
+            <if test="category != null and category != ''"> and category = #{category}</if>
+            <if test="modelId != null"> and model_id = #{modelId}</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+        </where>
+        order by priority asc, create_time desc
+    </select>
+
+    <select id="selectAiIvrIntentionByIntentionId" parameterType="Long" resultMap="AiIvrIntentionResult">
+        <include refid="selectAiIvrIntentionVo"/>
+        where intention_id = #{intentionId}
+    </select>
+
+    <select id="selectAiIvrIntentionByCode" parameterType="String" resultMap="AiIvrIntentionResult">
+        <include refid="selectAiIvrIntentionVo"/>
+        where intention_code = #{intentionCode}
+    </select>
+
+    <select id="selectActiveIntentions" resultMap="AiIvrIntentionResult">
+        <include refid="selectAiIvrIntentionVo"/>
+        where status = '0'
+        order by priority asc
+    </select>
+
+    <insert id="insertAiIvrIntention" parameterType="AiIvrIntention" useGeneratedKeys="true" keyProperty="intentionId">
+        insert into ai_ivr_intention
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="intentionName != null and intentionName != ''">intention_name,</if>
+            <if test="intentionCode != null and intentionCode != ''">intention_code,</if>
+            <if test="description != null">description,</if>
+            <if test="category != null and category != ''">category,</if>
+            <if test="regexPattern != null">regex_pattern,</if>
+            <if test="promptTemplate != null">prompt_template,</if>
+            <if test="exampleUtterances != null">example_utterances,</if>
+            <if test="modelId != null">model_id,</if>
+            <if test="priority != null">priority,</if>
+            <if test="status != null">status,</if>
+            <if test="createBy != null and createBy != ''">create_by,</if>
+            <if test="remark != null and remark != ''">remark,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="intentionName != null and intentionName != ''">#{intentionName},</if>
+            <if test="intentionCode != null and intentionCode != ''">#{intentionCode},</if>
+            <if test="description != null">#{description},</if>
+            <if test="category != null and category != ''">#{category},</if>
+            <if test="regexPattern != null">#{regexPattern},</if>
+            <if test="promptTemplate != null">#{promptTemplate},</if>
+            <if test="exampleUtterances != null">#{exampleUtterances},</if>
+            <if test="modelId != null">#{modelId},</if>
+            <if test="priority != null">#{priority},</if>
+            <if test="status != null">#{status},</if>
+            <if test="createBy != null and createBy != ''">#{createBy},</if>
+            <if test="remark != null and remark != ''">#{remark},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateAiIvrIntention" parameterType="AiIvrIntention">
+        update ai_ivr_intention
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="intentionName != null and intentionName != ''">intention_name = #{intentionName},</if>
+            <if test="intentionCode != null and intentionCode != ''">intention_code = #{intentionCode},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="category != null and category != ''">category = #{category},</if>
+            <if test="regexPattern != null">regex_pattern = #{regexPattern},</if>
+            <if test="promptTemplate != null">prompt_template = #{promptTemplate},</if>
+            <if test="exampleUtterances != null">example_utterances = #{exampleUtterances},</if>
+            <if test="modelId != null">model_id = #{modelId},</if>
+            <if test="priority != null">priority = #{priority},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where intention_id = #{intentionId}
+    </update>
+
+    <delete id="deleteAiIvrIntentionByIntentionId" parameterType="Long">
+        delete from ai_ivr_intention where intention_id = #{intentionId}
+    </delete>
+
+    <delete id="deleteAiIvrIntentionByIntentionIds" parameterType="String">
+        delete from ai_ivr_intention where intention_id in
+        <foreach item="intentionId" collection="array" open="(" separator="," close=")">
+            #{intentionId}
+        </foreach>
+    </delete>
+</mapper>

@@ -160,14 +160,16 @@
 </template>
 
 <script>
+import { getOnlineAgents, getCallStatistics, listRecord, getCallStatisticsByDate } from "@/api/lawyers/callCenter"
+
 export default {
   name: "CallPanel",
   data() {
     return {
       currentStatus: 'idle',
-      waitingTime: '00:03:42',
-      satisfaction: 97.8,
-      avgWaitTime: '1分28秒',
+      waitingTime: '00:00:00',
+      satisfaction: 0,
+      avgWaitTime: '0秒',
       statusButtons: [
         { key: 'idle', label: '置闲', type: 'green' },
         { key: 'busy', label: '置忙', type: 'orange' },
@@ -186,38 +188,20 @@ export default {
         { label: '话后整理', icon: 'el-icon-document', type: 'yellow' },
         { label: '挂机', icon: 'el-icon-bangzhu', type: 'gray' }
       ],
-      queueList: [
-        { phone: '138****2761', type: '民商事法律咨询', waitTime: '2分35秒' },
-        { phone: '136****0084', type: '劳动纠纷咨询', waitTime: '1分48秒' },
-        { phone: '189****5523', type: '婚姻家庭咨询', waitTime: '0分42秒' }
-      ],
+      queueList: [],
       todayStats: [
-        { label: '已接通', value: '45', type: 'green' },
-        { label: '未接', value: '2', type: 'red' },
-        { label: '外呼', value: '8', type: 'blue' },
-        { label: '平均时长', value: '3:42', type: 'orange' }
+        { label: '已接通', value: '0', type: 'green' },
+        { label: '未接', value: '0', type: 'red' },
+        { label: '外呼', value: '0', type: 'blue' },
+        { label: '平均时长', value: '0:00', type: 'orange' }
       ],
-      hourlyData: [
-        { hour: '8点', height: 30, highlight: false },
-        { hour: '9点', height: 55, highlight: false },
-        { hour: '10点', height: 75, highlight: false },
-        { hour: '11点', height: 95, highlight: true },
-        { hour: '12点', height: 40, highlight: false },
-        { hour: '13点', height: 35, highlight: false },
-        { hour: '14点', height: 65, highlight: false },
-        { hour: '15点', height: 80, highlight: false },
-        { hour: '16点', height: 70, highlight: false },
-        { hour: '17点', height: 50, highlight: false }
-      ],
-      skillGroups: [
-        { name: '民商事法律咨询', online: 12, total: 15, type: 'blue', isMain: true },
-        { name: '劳动纠纷', online: 5, total: 10, type: 'orange', isMain: false },
-        { name: '婚姻家庭', online: 8, total: 8, type: 'purple', isMain: false }
-      ]
+      hourlyData: [],
+      skillGroups: []
     }
   },
   created() {
     this.startTimer()
+    this.loadPanelData()
   },
   beforeDestroy() {
     if (this.timer) {
@@ -226,7 +210,7 @@ export default {
   },
   methods: {
     startTimer() {
-      let seconds = 222
+      let seconds = 0
       this.timer = setInterval(() => {
         seconds++
         const h = Math.floor(seconds / 3600)
@@ -237,6 +221,105 @@ export default {
     },
     padZero(num) {
       return num.toString().padStart(2, '0')
+    },
+    loadPanelData() {
+      this.loadSkillGroups()
+      this.loadTodayStats()
+      this.loadQueueList()
+      this.loadHourlyData()
+    },
+    loadSkillGroups() {
+      getOnlineAgents().then(res => {
+        const agents = res.data || res.rows || []
+        if (!Array.isArray(agents)) {
+          this.skillGroups = []
+          return
+        }
+        const groupMap = {}
+        agents.forEach(agent => {
+          const group = agent.skillGroup || agent.groupName || '默认技能组'
+          if (!groupMap[group]) {
+            groupMap[group] = { online: 0, total: 0 }
+          }
+          groupMap[group].total++
+          if (agent.status === '1' || agent.status === 'online' || agent.online) {
+            groupMap[group].online++
+          }
+        })
+        const types = ['blue', 'orange', 'purple']
+        this.skillGroups = Object.keys(groupMap).map((name, idx) => ({
+          name,
+          online: groupMap[name].online,
+          total: groupMap[name].total,
+          type: types[idx % types.length],
+          isMain: idx === 0
+        }))
+      }).catch(() => {
+        this.skillGroups = []
+      })
+    },
+    loadTodayStats() {
+      getCallStatistics().then(res => {
+        const data = res.data || {}
+        const completed = data.completedCalls || data.totalCalls || 0
+        const missed = data.missedCalls || 0
+        const outbound = data.outboundCalls || 0
+        const avgDuration = data.avgDuration || 0
+        this.satisfaction = data.satisfaction || 0
+        this.todayStats = [
+          { label: '已接通', value: String(completed), type: 'green' },
+          { label: '未接', value: String(missed), type: 'red' },
+          { label: '外呼', value: String(outbound), type: 'blue' },
+          { label: '平均时长', value: this.formatAvgDuration(avgDuration), type: 'orange' }
+        ]
+      }).catch(() => {})
+    },
+    loadQueueList() {
+      listRecord({ status: '0', pageNum: 1, pageSize: 10 }).then(res => {
+        const rows = res.rows || []
+        this.queueList = rows.map(item => ({
+          phone: item.callerNumber || '',
+          type: item.categoryName || item.category || '',
+          waitTime: this.formatWaitTime(item.waitDuration || item.duration || 0)
+        }))
+      }).catch(() => {
+        this.queueList = []
+      })
+    },
+    loadHourlyData() {
+      getCallStatisticsByDate(1).then(res => {
+        const data = res.data || []
+        if (Array.isArray(data) && data.length > 0) {
+          const maxVal = Math.max(...data.map(d => d.count || d.callCount || 0), 1)
+          this.hourlyData = data.map(d => ({
+            hour: (d.hour || d.hourOfDay || '') + '点',
+            height: Math.round(((d.count || d.callCount || 0) / maxVal) * 100),
+            highlight: (d.count || d.callCount || 0) === maxVal
+          }))
+        } else {
+          this.hourlyData = this.getDefaultHourlyData()
+        }
+      }).catch(() => {
+        this.hourlyData = this.getDefaultHourlyData()
+      })
+    },
+    getDefaultHourlyData() {
+      const hours = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
+      return hours.map(h => ({ hour: h + '点', height: 0, highlight: false }))
+    },
+    formatAvgDuration(seconds) {
+      seconds = parseInt(seconds) || 0
+      if (seconds <= 0) return '0:00'
+      const m = Math.floor(seconds / 60)
+      const s = seconds % 60
+      return m + ':' + this.padZero(s)
+    },
+    formatWaitTime(seconds) {
+      seconds = parseInt(seconds) || 0
+      if (seconds < 60) return seconds + '秒'
+      const m = Math.floor(seconds / 60)
+      const s = seconds % 60
+      return m + '分' + (s > 0 ? s + '秒' : '')
     }
   }
 }
