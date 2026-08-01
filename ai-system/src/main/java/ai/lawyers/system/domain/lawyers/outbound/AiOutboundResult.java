@@ -2,8 +2,9 @@ package ai.lawyers.system.domain.lawyers.outbound;
 
 import java.util.Date;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import ai.lawyers.common.core.domain.BaseEntity;
 
-public class AiOutboundResult
+public class AiOutboundResult extends BaseEntity
 {
     private static final long serialVersionUID = 1L;
 
@@ -37,9 +38,6 @@ public class AiOutboundResult
     private String summary;
     private String recordingUrl;
     private String flowData;
-
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private Date createTime;
 
     public void setResultId(Long resultId) { this.resultId = resultId; }
     public Long getResultId() { return resultId; }
@@ -106,7 +104,4 @@ public class AiOutboundResult
 
     public void setFlowData(String flowData) { this.flowData = flowData; }
     public String getFlowData() { return flowData; }
-
-    public void setCreateTime(Date createTime) { this.createTime = createTime; }
-    public Date getCreateTime() { return createTime; }
 }

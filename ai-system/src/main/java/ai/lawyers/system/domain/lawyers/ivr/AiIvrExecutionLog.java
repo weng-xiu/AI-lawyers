@@ -2,8 +2,9 @@ package ai.lawyers.system.domain.lawyers.ivr;
 
 import java.util.Date;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import ai.lawyers.common.core.domain.BaseEntity;
 
-public class AiIvrExecutionLog
+public class AiIvrExecutionLog extends BaseEntity
 {
     private static final long serialVersionUID = 1L;
 
@@ -25,9 +26,6 @@ public class AiIvrExecutionLog
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date endTime;
-
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private Date createTime;
 
     public void setExecId(Long execId) { this.execId = execId; }
     public Long getExecId() { return execId; }
@@ -70,7 +68,4 @@ public class AiIvrExecutionLog
 
     public void setEndTime(Date endTime) { this.endTime = endTime; }
     public Date getEndTime() { return endTime; }
-
-    public void setCreateTime(Date createTime) { this.createTime = createTime; }
-    public Date getCreateTime() { return createTime; }
 }

@@ -3,8 +3,9 @@ package ai.lawyers.system.domain.lawyers.ivr;
 import java.math.BigDecimal;
 import java.util.Date;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import ai.lawyers.common.core.domain.BaseEntity;
 
-public class AiIvrIntentionLog
+public class AiIvrIntentionLog extends BaseEntity
 {
     private static final long serialVersionUID = 1L;
 
@@ -19,9 +20,6 @@ public class AiIvrIntentionLog
     private BigDecimal confidence;
     private String matchMethod;
     private String allResults;
-
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private Date createTime;
 
     public void setLogId(Long logId) { this.logId = logId; }
     public Long getLogId() { return logId; }
@@ -55,7 +53,4 @@ public class AiIvrIntentionLog
 
     public void setAllResults(String allResults) { this.allResults = allResults; }
     public String getAllResults() { return allResults; }
-
-    public void setCreateTime(Date createTime) { this.createTime = createTime; }
-    public Date getCreateTime() { return createTime; }
 }
