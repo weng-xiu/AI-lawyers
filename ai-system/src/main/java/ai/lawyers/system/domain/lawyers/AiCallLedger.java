@@ -18,6 +18,12 @@ public class AiCallLedger extends BaseEntity
     @Excel(name = "台账编号")
     private String ledgerNo;
 
+    @Excel(name = "关联来电记录ID", cellType = ColumnType.NUMERIC)
+    private Long recordId;
+
+    @Excel(name = "关联工单ID", cellType = ColumnType.NUMERIC)
+    private Long ticketId;
+
     @Excel(name = "咨询人姓名")
     private String callerName;
 
@@ -111,6 +117,26 @@ public class AiCallLedger extends BaseEntity
     public String getLedgerNo()
     {
         return ledgerNo;
+    }
+
+    public void setRecordId(Long recordId)
+    {
+        this.recordId = recordId;
+    }
+
+    public Long getRecordId()
+    {
+        return recordId;
+    }
+
+    public void setTicketId(Long ticketId)
+    {
+        this.ticketId = ticketId;
+    }
+
+    public Long getTicketId()
+    {
+        return ticketId;
     }
 
     public void setCallerName(String callerName)
@@ -368,6 +394,8 @@ public class AiCallLedger extends BaseEntity
         return new ToStringBuilder(this, ToStringStyle.MULTI_LINE_STYLE)
             .append("ledgerId", getLedgerId())
             .append("ledgerNo", getLedgerNo())
+            .append("recordId", getRecordId())
+            .append("ticketId", getTicketId())
             .append("callerName", getCallerName())
             .append("callerPhone", getCallerPhone())
             .append("callerIdCard", getCallerIdCard())

@@ -1,6 +1,7 @@
 package ai.lawyers.web.controller.lawyers;
 
 import java.util.List;
+import java.util.Map;
 import javax.servlet.http.HttpServletResponse;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -86,5 +87,36 @@ public class AiCallLedgerController extends BaseController
     {
         String ledgerNo = aiCallLedgerService.generateLedgerNo();
         return success(ledgerNo);
+    }
+
+    /** 台账模板列表（6 类常用咨询登记模板） */
+    @PreAuthorize("@ss.hasPermi('lawyers:call:ledger:list')")
+    @GetMapping("/templates")
+    public AjaxResult templates()
+    {
+        return success(aiCallLedgerService.selectLedgerTemplates());
+    }
+
+    /** 根据来电记录ID自动填充台账字段 */
+    @PreAuthorize("@ss.hasPermi('lawyers:call:ledger:add')")
+    @GetMapping("/autoFill/{recordId}")
+    public AjaxResult autoFill(@PathVariable("recordId") Long recordId)
+    {
+        return success(aiCallLedgerService.autoFillByRecordId(recordId));
+    }
+
+    /** 将台账转工单：由台账生成工单并回写 ticketId */
+    @PreAuthorize("@ss.hasPermi('lawyers:call:ledger:edit')")
+    @Log(title = "台账转工单", businessType = BusinessType.OTHER)
+    @PostMapping("/transferTicket/{ledgerId}")
+    public AjaxResult transferTicket(@PathVariable("ledgerId") Long ledgerId)
+    {
+        Long ticketId = aiCallLedgerService.transferToTicket(ledgerId, getUsername());
+        if (ticketId != null) {
+            Map<String, Object> data = new java.util.HashMap<>();
+            data.put("ticketId", ticketId);
+            return success(data);
+        }
+        return error("台账转工单失败，未找到对应台账记录");
     }
 }

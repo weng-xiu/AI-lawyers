@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiMissedCallMapper">
+
+    <resultMap type="AiMissedCall" id="AiMissedCallResult">
+        <result property="missedCallId"   column="missed_call_id"   />
+        <result property="callerNumber"   column="caller_number"    />
+        <result property="callerName"     column="caller_name"      />
+        <result property="callTime"       column="call_time"        />
+        <result property="status"         column="status"           />
+        <result property="callbackTime"   column="callback_time"    />
+        <result property="callbackBy"     column="callback_by"      />
+        <result property="recordId"       column="record_id"        />
+        <result property="voiceContent"   column="voice_content"    />
+        <result property="voiceDuration"  column="voice_duration"   />
+        <result property="noticeStatus"   column="notice_status"    />
+        <result property="noticeChannel"  column="notice_channel"   />
+        <result property="createBy"       column="create_by"        />
+        <result property="createTime"     column="create_time"      />
+        <result property="updateBy"       column="update_by"        />
+        <result property="updateTime"     column="update_time"      />
+        <result property="remark"         column="remark"           />
+    </resultMap>
+
+    <sql id="selectAiMissedCallVo">
+        select missed_call_id, caller_number, caller_name, call_time, status, callback_time, callback_by,
+               record_id, voice_content, voice_duration, notice_status, notice_channel,
+               create_by, create_time, update_by, update_time, remark
+        from ai_missed_call
+    </sql>
+
+    <select id="selectAiMissedCallList" parameterType="AiMissedCall" resultMap="AiMissedCallResult">
+        <include refid="selectAiMissedCallVo"/>
+        <where>
+            <if test="callerNumber != null and callerNumber != ''"> and caller_number like concat('%', #{callerNumber}, '%')</if>
+            <if test="callerName != null and callerName != ''"> and caller_name like concat('%', #{callerName}, '%')</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+            <if test="noticeStatus != null and noticeStatus != ''"> and notice_status = #{noticeStatus}</if>
+            <if test="params.beginTime != null and params.beginTime != ''"> and date(call_time) &gt;= #{params.beginTime}</if>
+            <if test="params.endTime != null and params.endTime != ''"> and date(call_time) &lt;= #{params.endTime}</if>
+        </where>
+        order by call_time desc
+    </select>
+
+    <select id="selectAiMissedCallByMissedCallId" parameterType="Long" resultMap="AiMissedCallResult">
+        <include refid="selectAiMissedCallVo"/>
+        where missed_call_id = #{missedCallId}
+    </select>
+
+    <select id="selectMissedCallStats" resultType="map">
+        select count(*) as totalCount,
+               sum(case when date(call_time) = curdate() then 1 else 0 end) as todayMissed,
+               sum(case when yearweek(call_time, 1) = yearweek(curdate(), 1) then 1 else 0 end) as weekMissed,
+               sum(case when status = '1' then 1 else 0 end) as callbacked
+        from ai_missed_call
+    </select>
+
+    <insert id="insertAiMissedCall" parameterType="AiMissedCall" useGeneratedKeys="true" keyProperty="missedCallId">
+        insert into ai_missed_call
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="callerNumber != null and callerNumber != ''">caller_number,</if>
+            <if test="callerName != null and callerName != ''">caller_name,</if>
+            <if test="callTime != null">call_time,</if>
+            <if test="status != null and status != ''">status,</if>
+            <if test="callbackTime != null">callback_time,</if>
+            <if test="callbackBy != null and callbackBy != ''">callback_by,</if>
+            <if test="recordId != null">record_id,</if>
+            <if test="voiceContent != null">voice_content,</if>
+            <if test="voiceDuration != null">voice_duration,</if>
+            <if test="noticeStatus != null and noticeStatus != ''">notice_status,</if>
+            <if test="noticeChannel != null and noticeChannel != ''">notice_channel,</if>
+            <if test="createBy != null and createBy != ''">create_by,</if>
+            <if test="remark != null and remark != ''">remark,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="callerNumber != null and callerNumber != ''">#{callerNumber},</if>
+            <if test="callerName != null and callerName != ''">#{callerName},</if>
+            <if test="callTime != null">#{callTime},</if>
+            <if test="status != null and status != ''">#{status},</if>
+            <if test="callbackTime != null">#{callbackTime},</if>
+            <if test="callbackBy != null and callbackBy != ''">#{callbackBy},</if>
+            <if test="recordId != null">#{recordId},</if>
+            <if test="voiceContent != null">#{voiceContent},</if>
+            <if test="voiceDuration != null">#{voiceDuration},</if>
+            <if test="noticeStatus != null and noticeStatus != ''">#{noticeStatus},</if>
+            <if test="noticeChannel != null and noticeChannel != ''">#{noticeChannel},</if>
+            <if test="createBy != null and createBy != ''">#{createBy},</if>
+            <if test="remark != null and remark != ''">#{remark},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateAiMissedCall" parameterType="AiMissedCall">
+        update ai_missed_call
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="callerNumber != null and callerNumber != ''">caller_number = #{callerNumber},</if>
+            <if test="callerName != null and callerName != ''">caller_name = #{callerName},</if>
+            <if test="callTime != null">call_time = #{callTime},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="callbackTime != null">callback_time = #{callbackTime},</if>
+            <if test="callbackBy != null and callbackBy != ''">callback_by = #{callbackBy},</if>
+            <if test="recordId != null">record_id = #{recordId},</if>
+            <if test="voiceContent != null">voice_content = #{voiceContent},</if>
+            <if test="voiceDuration != null">voice_duration = #{voiceDuration},</if>
+            <if test="noticeStatus != null and noticeStatus != ''">notice_status = #{noticeStatus},</if>
+            <if test="noticeChannel != null and noticeChannel != ''">notice_channel = #{noticeChannel},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where missed_call_id = #{missedCallId}
+    </update>
+
+    <delete id="deleteAiMissedCallByMissedCallId" parameterType="Long">
+        delete from ai_missed_call where missed_call_id = #{missedCallId}
+    </delete>
+
+    <delete id="deleteAiMissedCallByMissedCallIds" parameterType="String">
+        delete from ai_missed_call where missed_call_id in
+        <foreach item="missedCallId" collection="array" open="(" separator="," close=")">
+            #{missedCallId}
+        </foreach>
+    </delete>
+</mapper>

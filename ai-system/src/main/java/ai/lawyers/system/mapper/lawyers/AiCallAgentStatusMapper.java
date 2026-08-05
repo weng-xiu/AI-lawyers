@@ -3,7 +3,7 @@ package ai.lawyers.system.mapper.lawyers;
 import java.util.List;
 import ai.lawyers.system.domain.lawyers.AiCallAgentStatus;
 
-public interface AiCallAgentStatusMapper 
+public interface AiCallAgentStatusMapper
 {
     public AiCallAgentStatus selectAiCallAgentStatusByAgentId(Long agentId);
 
@@ -20,4 +20,6 @@ public interface AiCallAgentStatusMapper
     public int deleteAiCallAgentStatusByAgentIds(Long[] agentIds);
 
     public List<AiCallAgentStatus> selectOnlineAgents();
+
+    public List<java.util.Map<String, Object>> selectTodayRecordsByAgent(Long agentId);
 }

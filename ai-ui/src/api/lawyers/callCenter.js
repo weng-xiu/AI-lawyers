@@ -70,6 +70,109 @@ export function getOnlineAgents() {
   })
 }
 
+export function getCurrentAgent(agentId) {
+  return request({
+    url: '/lawyers/call/agent/current/' + agentId,
+    method: 'get'
+  })
+}
+
+export function updateCallMode(data) {
+  return request({
+    url: '/lawyers/call/agent/callMode',
+    method: 'post',
+    data: data
+  })
+}
+
+// ==================== CTI 通话控制 ====================
+export function makeCall(data) {
+  return request({
+    url: '/lawyers/call/agent/makeCall',
+    method: 'post',
+    data: data
+  })
+}
+
+export function holdCall(data) {
+  return request({
+    url: '/lawyers/call/agent/hold',
+    method: 'post',
+    data: data
+  })
+}
+
+export function resumeCall(data) {
+  return request({
+    url: '/lawyers/call/agent/resume',
+    method: 'post',
+    data: data
+  })
+}
+
+export function transferCall(data) {
+  return request({
+    url: '/lawyers/call/agent/transfer',
+    method: 'post',
+    data: data
+  })
+}
+
+export function consultCall(data) {
+  return request({
+    url: '/lawyers/call/agent/consult',
+    method: 'post',
+    data: data
+  })
+}
+
+export function threeWayCall(data) {
+  return request({
+    url: '/lawyers/call/agent/threeWay',
+    method: 'post',
+    data: data
+  })
+}
+
+export function afterWork(data) {
+  return request({
+    url: '/lawyers/call/agent/afterWork',
+    method: 'post',
+    data: data
+  })
+}
+
+export function hangupCall(data) {
+  return request({
+    url: '/lawyers/call/agent/hangup',
+    method: 'post',
+    data: data
+  })
+}
+
+export function robotTakeover(data) {
+  return request({
+    url: '/lawyers/call/agent/robotTakeover',
+    method: 'post',
+    data: data
+  })
+}
+
+export function ivrTransfer(data) {
+  return request({
+    url: '/lawyers/call/agent/ivrTransfer',
+    method: 'post',
+    data: data
+  })
+}
+
+export function getTodayRecords(agentId) {
+  return request({
+    url: '/lawyers/call/agent/todayRecords/' + agentId,
+    method: 'get'
+  })
+}
+
 // ==================== 来电记录 ====================
 export function listRecord(query) {
   return request({
@@ -311,5 +414,26 @@ export function generateLedgerNo() {
   return request({
     url: '/lawyers/call/ledger/generateNo',
     method: 'get'
+  })
+}
+
+export function getLedgerTemplates() {
+  return request({
+    url: '/lawyers/call/ledger/templates',
+    method: 'get'
+  })
+}
+
+export function autoFillLedger(recordId) {
+  return request({
+    url: '/lawyers/call/ledger/autoFill/' + recordId,
+    method: 'get'
+  })
+}
+
+export function transferLedgerToTicket(ledgerId) {
+  return request({
+    url: '/lawyers/call/ledger/transferTicket/' + ledgerId,
+    method: 'post'
   })
 }

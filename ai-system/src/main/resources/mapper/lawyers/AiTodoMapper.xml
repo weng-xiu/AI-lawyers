@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiTodoMapper">
+
+    <resultMap type="AiTodo" id="AiTodoResult">
+        <result property="todoId"       column="todo_id"       />
+        <result property="todoTitle"    column="todo_title"    />
+        <result property="todoContent"  column="todo_content"  />
+        <result property="status"       column="status"        />
+        <result property="priority"     column="priority"      />
+        <result property="dueDate"      column="due_date"      />
+        <result property="userId"       column="user_id"       />
+        <result property="createBy"     column="create_by"     />
+        <result property="createTime"   column="create_time"   />
+        <result property="updateBy"     column="update_by"     />
+        <result property="updateTime"   column="update_time"   />
+        <result property="remark"       column="remark"        />
+    </resultMap>
+
+    <sql id="selectAiTodoVo">
+        select todo_id, todo_title, todo_content, status, priority, due_date, user_id,
+               create_by, create_time, update_by, update_time, remark
+        from ai_todo
+    </sql>
+
+    <select id="selectAiTodoList" parameterType="AiTodo" resultMap="AiTodoResult">
+        <include refid="selectAiTodoVo"/>
+        <where>
+            <if test="todoTitle != null and todoTitle != ''"> and todo_title like concat('%', #{todoTitle}, '%')</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+            <if test="priority != null and priority != ''"> and priority = #{priority}</if>
+            <if test="userId != null"> and user_id = #{userId}</if>
+        </where>
+        order by field(priority,'1','2','3'), due_date asc, create_time desc
+    </select>
+
+    <select id="selectAiTodoByTodoId" parameterType="Long" resultMap="AiTodoResult">
+        <include refid="selectAiTodoVo"/>
+        where todo_id = #{todoId}
+    </select>
+
+    <select id="selectAiTodoListByUserId" parameterType="Long" resultMap="AiTodoResult">
+        <include refid="selectAiTodoVo"/>
+        where user_id = #{userId}
+        order by field(status,'0','2','3','1'), field(priority,'1','2','3'), due_date asc, create_time desc
+    </select>
+
+    <insert id="insertAiTodo" parameterType="AiTodo" useGeneratedKeys="true" keyProperty="todoId">
+        insert into ai_todo
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="todoTitle != null and todoTitle != ''">todo_title,</if>
+            <if test="todoContent != null">todo_content,</if>
+            <if test="status != null">status,</if>
+            <if test="priority != null">priority,</if>
+            <if test="dueDate != null">due_date,</if>
+            <if test="userId != null">user_id,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="todoTitle != null and todoTitle != ''">#{todoTitle},</if>
+            <if test="todoContent != null">#{todoContent},</if>
+            <if test="status != null">#{status},</if>
+            <if test="priority != null">#{priority},</if>
+            <if test="dueDate != null">#{dueDate},</if>
+            <if test="userId != null">#{userId},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateAiTodo" parameterType="AiTodo">
+        update ai_todo
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="todoTitle != null and todoTitle != ''">todo_title = #{todoTitle},</if>
+            <if test="todoContent != null">todo_content = #{todoContent},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="priority != null">priority = #{priority},</if>
+            <if test="dueDate != null">due_date = #{dueDate},</if>
+            <if test="userId != null">user_id = #{userId},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where todo_id = #{todoId}
+    </update>
+
+    <delete id="deleteAiTodoByTodoId" parameterType="Long">
+        delete from ai_todo where todo_id = #{todoId}
+    </delete>
+
+    <delete id="deleteAiTodoByTodoIds" parameterType="String">
+        delete from ai_todo where todo_id in
+        <foreach item="todoId" collection="array" open="(" separator="," close=")">
+            #{todoId}
+        </foreach>
+    </delete>
+</mapper>

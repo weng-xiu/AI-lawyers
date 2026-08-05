@@ -12,6 +12,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="loginTime"      column="login_time"      />
         <result property="logoutTime"     column="logout_time"     />
         <result property="lastLoginIp"    column="last_login_ip"   />
+        <result property="callMode"       column="call_mode"       />
+        <result property="currentCallId"  column="current_call_id" />
+        <result property="currentCallPhone" column="current_call_phone" />
+        <result property="callStartTime"  column="call_start_time" />
+        <result property="callStatus"     column="call_status"     />
         <result property="createBy"       column="create_by"       />
         <result property="createTime"     column="create_time"     />
         <result property="updateBy"       column="update_by"       />
@@ -20,7 +25,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectAiCallAgentStatusVo">
-        select agent_id, user_id, agent_name, status, login_time, logout_time, last_login_ip, create_by, create_time, update_by, update_time, remark 
+        select agent_id, user_id, agent_name, status, login_time, logout_time, last_login_ip, call_mode, current_call_id, current_call_phone, call_start_time, call_status, create_by, create_time, update_by, update_time, remark
         from ai_call_agent_status
     </sql>
     
@@ -48,6 +53,21 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where status in ('1', '2')
         order by agent_id
     </select>
+
+    <select id="selectTodayRecordsByAgent" parameterType="Long" resultType="java.util.Map">
+        select r.record_id as recordId, r.caller_number as callerNumber, r.caller_name as callerName,
+               r.call_time as callTime, r.end_time as endTime, r.duration as duration,
+               r.status as status, r.content as content, r.answer as answer,
+               r.category_id as categoryId, c.category_name as categoryName,
+               r.agent_id as agentId, a.agent_name as agentName
+        from ai_call_record r
+        left join ai_call_agent_status a on r.agent_id = a.agent_id
+        left join ai_consultation_category c on r.category_id = c.category_id
+        where r.agent_id = #{agentId}
+          and date(r.call_time) = curdate()
+        order by r.call_time desc
+        limit 100
+    </select>
         
     <insert id="insertAiCallAgentStatus" parameterType="AiCallAgentStatus">
         insert into ai_call_agent_status
@@ -58,6 +78,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="loginTime != null">login_time,</if>
             <if test="logoutTime != null">logout_time,</if>
             <if test="lastLoginIp != null">last_login_ip,</if>
+            <if test="callMode != null">call_mode,</if>
+            <if test="currentCallId != null">current_call_id,</if>
+            <if test="currentCallPhone != null">current_call_phone,</if>
+            <if test="callStartTime != null">call_start_time,</if>
+            <if test="callStatus != null">call_status,</if>
             <if test="createBy != null">create_by,</if>
             <if test="remark != null">remark,</if>
             create_time
@@ -69,6 +94,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="loginTime != null">#{loginTime},</if>
             <if test="logoutTime != null">#{logoutTime},</if>
             <if test="lastLoginIp != null">#{lastLoginIp},</if>
+            <if test="callMode != null">#{callMode},</if>
+            <if test="currentCallId != null">#{currentCallId},</if>
+            <if test="currentCallPhone != null">#{currentCallPhone},</if>
+            <if test="callStartTime != null">#{callStartTime},</if>
+            <if test="callStatus != null">#{callStatus},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="remark != null">#{remark},</if>
             sysdate()
@@ -84,6 +114,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="loginTime != null">login_time = #{loginTime},</if>
             <if test="logoutTime != null">logout_time = #{logoutTime},</if>
             <if test="lastLoginIp != null">last_login_ip = #{lastLoginIp},</if>
+            <if test="callMode != null">call_mode = #{callMode},</if>
+            <if test="currentCallId != null">current_call_id = #{currentCallId},</if>
+            <if test="currentCallPhone != null">current_call_phone = #{currentCallPhone},</if>
+            <if test="callStartTime != null">call_start_time = #{callStartTime},</if>
+            <if test="callStatus != null">call_status = #{callStatus},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="remark != null">remark = #{remark},</if>
             update_time = sysdate()

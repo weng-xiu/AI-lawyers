@@ -1,5 +1,49 @@
 <template>
   <div class="app-container">
+    <!-- 4 渠道统计卡 -->
+    <el-row :gutter="16" class="cm-stats">
+      <el-col :xs="12" :sm="6">
+        <div class="cm-stat-card cm-stat-voice">
+          <div class="cm-stat-icon"><i class="el-icon-phone"></i></div>
+          <div class="cm-stat-body">
+            <div class="cm-stat-label">今日语音咨询</div>
+            <div class="cm-stat-value">{{ channelStats.todayVoice || 0 }}</div>
+            <div class="cm-stat-sub">累计 {{ channelStats.voiceTotal || 0 }}</div>
+          </div>
+        </div>
+      </el-col>
+      <el-col :xs="12" :sm="6">
+        <div class="cm-stat-card cm-stat-img">
+          <div class="cm-stat-icon"><i class="el-icon-chat-dot-square"></i></div>
+          <div class="cm-stat-body">
+            <div class="cm-stat-label">今日图文咨询</div>
+            <div class="cm-stat-value">{{ channelStats.todayImageText || 0 }}</div>
+            <div class="cm-stat-sub">累计 {{ channelStats.imageTextTotal || 0 }}</div>
+          </div>
+        </div>
+      </el-col>
+      <el-col :xs="12" :sm="6">
+        <div class="cm-stat-card cm-stat-video">
+          <div class="cm-stat-icon"><i class="el-icon-video-camera"></i></div>
+          <div class="cm-stat-body">
+            <div class="cm-stat-label">今日视频咨询</div>
+            <div class="cm-stat-value">{{ channelStats.todayVideo || 0 }}</div>
+            <div class="cm-stat-sub">累计 {{ channelStats.videoTotal || 0 }}</div>
+          </div>
+        </div>
+      </el-col>
+      <el-col :xs="12" :sm="6">
+        <div class="cm-stat-card cm-stat-total">
+          <div class="cm-stat-icon"><i class="el-icon-data-line"></i></div>
+          <div class="cm-stat-body">
+            <div class="cm-stat-label">今日总咨询</div>
+            <div class="cm-stat-value">{{ channelStats.todayTotal || 0 }}</div>
+            <div class="cm-stat-sub">累计 {{ channelStats.totalCount || 0 }}</div>
+          </div>
+        </div>
+      </el-col>
+    </el-row>
+
     <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
       <el-form-item label="用户ID" prop="userId">
         <el-input
@@ -18,6 +62,13 @@
             :label="item.categoryName"
             :value="item.categoryId"
           />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="咨询渠道" prop="consultationChannel">
+        <el-select v-model="queryParams.consultationChannel" placeholder="请选择渠道" clearable style="width: 140px">
+          <el-option label="语音" value="1" />
+          <el-option label="图文" value="2" />
+          <el-option label="视频" value="3" />
         </el-select>
       </el-form-item>
       <el-form-item label="状态" prop="status">
@@ -149,6 +200,11 @@
       <el-table-column label="咨询ID" align="center" prop="consultationId" />
       <el-table-column label="用户ID" align="center" prop="userId" />
       <el-table-column label="咨询分类" align="center" prop="categoryName" />
+      <el-table-column label="咨询渠道" align="center" prop="consultationChannel" width="90">
+        <template slot-scope="scope">
+          <el-tag size="mini" :type="channelTagType(scope.row.consultationChannel)">{{ channelText(scope.row.consultationChannel) }}</el-tag>
+        </template>
+      </el-table-column>
       <el-table-column label="咨询问题" align="center" prop="question" :show-overflow-tooltip="true" />
       <el-table-column label="AI回答" align="center" prop="answer" :show-overflow-tooltip="true" />
       <el-table-column label="状态" align="center" prop="status">
@@ -212,6 +268,13 @@
             />
           </el-select>
         </el-form-item>
+        <el-form-item label="咨询渠道" prop="consultationChannel">
+          <el-radio-group v-model="form.consultationChannel">
+            <el-radio label="1">语音</el-radio>
+            <el-radio label="2">图文</el-radio>
+            <el-radio label="3">视频</el-radio>
+          </el-radio-group>
+        </el-form-item>
         <el-form-item label="咨询问题" prop="question">
           <el-input v-model="form.question" type="textarea" placeholder="请输入咨询问题" />
         </el-form-item>
@@ -243,6 +306,9 @@
         <el-descriptions-item label="咨询ID">{{ detailForm.consultationId }}</el-descriptions-item>
         <el-descriptions-item label="用户ID">{{ detailForm.userId }}</el-descriptions-item>
         <el-descriptions-item label="咨询分类">{{ detailForm.categoryName }}</el-descriptions-item>
+        <el-descriptions-item label="咨询渠道">
+          <el-tag size="mini" :type="channelTagType(detailForm.consultationChannel)">{{ channelText(detailForm.consultationChannel) }}</el-tag>
+        </el-descriptions-item>
         <el-descriptions-item label="咨询问题">{{ detailForm.question }}</el-descriptions-item>
         <el-descriptions-item label="AI回答">{{ detailForm.answer }}</el-descriptions-item>
         <el-descriptions-item label="状态">
@@ -389,7 +455,7 @@
 </template>
 
 <script>
-import { listConsultation, getConsultation, delConsultation, addConsultation, updateConsultation, exportConsultation, getConsultationStatistics, getConsultationByCategory, getConsultationByDate } from "@/api/lawyers/consultation"
+import { listConsultation, getConsultation, delConsultation, addConsultation, updateConsultation, exportConsultation, getConsultationStatistics, getConsultationByCategory, getConsultationByDate, getConsultationChannelStats } from "@/api/lawyers/consultation"
 import { getValidCategories } from "@/api/lawyers/category"
 import * as echarts from 'echarts'
 
@@ -414,6 +480,8 @@ export default {
       consultationList: [],
       // 咨询分类选项
       categoryOptions: [],
+      // 渠道统计数据
+      channelStats: {},
       // 弹出层标题
       title: "",
       // 是否显示弹出层
@@ -435,6 +503,7 @@ export default {
         userId: undefined,
         categoryId: undefined,
         status: undefined,
+        consultationChannel: undefined,
         questionKeyword: undefined,
         answerKeyword: undefined,
         minRating: undefined,
@@ -472,6 +541,7 @@ export default {
   created() {
     this.getList()
     this.getCategoryOptions()
+    this.loadChannelStats()
     // 初始化评分范围
     this.queryParams.ratingRange = [0, 5]
   },
@@ -509,6 +579,22 @@ export default {
         this.categoryOptions = response.data
       })
     },
+    /** 加载渠道统计 */
+    loadChannelStats() {
+      getConsultationChannelStats().then(response => {
+        this.channelStats = response.data || {}
+      })
+    },
+    /** 渠道文本 */
+    channelText(channel) {
+      const map = { '1': '语音', '2': '图文', '3': '视频' }
+      return map[channel] || '图文'
+    },
+    /** 渠道标签类型 */
+    channelTagType(channel) {
+      const map = { '1': 'success', '2': 'primary', '3': 'warning' }
+      return map[channel] || 'info'
+    },
     // 取消按钮
     cancel() {
       this.open = false
@@ -520,6 +606,7 @@ export default {
         consultationId: undefined,
         userId: undefined,
         categoryId: undefined,
+        consultationChannel: "2",
         question: undefined,
         answer: undefined,
         status: "0",
@@ -691,12 +778,14 @@ export default {
               this.$modal.msgSuccess("修改成功")
               this.open = false
               this.getList()
+              this.loadChannelStats()
             })
           } else {
             addConsultation(this.form).then(response => {
               this.$modal.msgSuccess("新增成功")
               this.open = false
               this.getList()
+              this.loadChannelStats()
             })
           }
         }
@@ -709,6 +798,7 @@ export default {
         return delConsultation(consultationIds)
       }).then(() => {
         this.getList()
+        this.loadChannelStats()
         this.$modal.msgSuccess("删除成功")
       }).catch(() => {})
     },
@@ -741,3 +831,42 @@ export default {
   }
 }
 </script>
+
+<style lang="scss" scoped>
+.cm-stats {
+  margin-bottom: 16px;
+}
+.cm-stat-card {
+  display: flex;
+  align-items: center;
+  padding: 18px 20px;
+  border-radius: 8px;
+  color: #fff;
+  min-height: 92px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  .cm-stat-icon {
+    font-size: 32px;
+    margin-right: 14px;
+    opacity: 0.9;
+  }
+  .cm-stat-label {
+    font-size: 13px;
+    opacity: 0.9;
+  }
+  .cm-stat-value {
+    font-size: 26px;
+    font-weight: 600;
+    line-height: 1.2;
+    margin-top: 4px;
+  }
+  .cm-stat-sub {
+    font-size: 12px;
+    opacity: 0.85;
+    margin-top: 4px;
+  }
+}
+.cm-stat-voice { background: linear-gradient(135deg, #67c23a, #95d475); }
+.cm-stat-img { background: linear-gradient(135deg, #409eff, #66b1ff); }
+.cm-stat-video { background: linear-gradient(135deg, #e6a23c, #f3b55c); }
+.cm-stat-total { background: linear-gradient(135deg, #909399, #b1b3b8); }
+</style>

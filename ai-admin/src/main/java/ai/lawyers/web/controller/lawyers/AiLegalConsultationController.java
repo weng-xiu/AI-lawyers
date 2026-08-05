@@ -153,4 +153,14 @@ public class AiLegalConsultationController extends BaseController
         java.util.List<java.util.Map<String, Object>> data = aiLegalConsultationService.getConsultationByDate(days);
         return success(data);
     }
+
+    /**
+     * 咨询管理中心：今日语音/图文/视频/总咨询 渠道统计
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:consultation:list')")
+    @GetMapping("/stats")
+    public AjaxResult getChannelStats()
+    {
+        return success(aiLegalConsultationService.getConsultationChannelStats());
+    }
 }

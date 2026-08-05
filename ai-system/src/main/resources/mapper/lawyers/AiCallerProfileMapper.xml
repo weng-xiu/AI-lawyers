@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiCallerProfileMapper">
+
+    <resultMap type="AiCallerProfile" id="AiCallerProfileResult">
+        <result property="profileId"          column="profile_id"          />
+        <result property="callerNumber"       column="caller_number"       />
+        <result property="callerName"         column="caller_name"         />
+        <result property="callerGender"       column="caller_gender"       />
+        <result property="callerAge"          column="caller_age"          />
+        <result property="callerIdCard"       column="caller_id_card"      />
+        <result property="callerAddress"      column="caller_address"      />
+        <result property="customerLevel"      column="customer_level"      />
+        <result property="tags"               column="tags"                />
+        <result property="intentPrediction"   column="intent_prediction"   />
+        <result property="intentConfidence"   column="intent_confidence"   />
+        <result property="consultPreference"  column="consult_preference"  />
+        <result property="highFreqProblem"    column="high_freq_problem"   />
+        <result property="freqMentionCount"   column="freq_mention_count"  />
+        <result property="riskLevel"          column="risk_level"          />
+        <result property="emotionStatus"      column="emotion_status"      />
+        <result property="emotionWarning"     column="emotion_warning"     />
+        <result property="lastCallTime"       column="last_call_time"      />
+        <result property="createBy"           column="create_by"           />
+        <result property="createTime"         column="create_time"         />
+        <result property="updateBy"           column="update_by"           />
+        <result property="updateTime"         column="update_time"         />
+        <result property="remark"             column="remark"              />
+    </resultMap>
+
+    <sql id="selectAiCallerProfileVo">
+        select profile_id, caller_number, caller_name, caller_gender, caller_age, caller_id_card, caller_address,
+               customer_level, tags, intent_prediction, intent_confidence, consult_preference, high_freq_problem,
+               freq_mention_count, risk_level, emotion_status, emotion_warning, last_call_time,
+               create_by, create_time, update_by, update_time, remark
+        from ai_caller_profile
+    </sql>
+
+    <select id="selectAiCallerProfileList" parameterType="AiCallerProfile" resultMap="AiCallerProfileResult">
+        <include refid="selectAiCallerProfileVo"/>
+        <where>
+            <if test="callerNumber != null and callerNumber != ''"> and caller_number like concat('%', #{callerNumber}, '%')</if>
+            <if test="callerName != null and callerName != ''"> and caller_name like concat('%', #{callerName}, '%')</if>
+            <if test="customerLevel != null and customerLevel != ''"> and customer_level = #{customerLevel}</if>
+            <if test="riskLevel != null and riskLevel != ''"> and risk_level = #{riskLevel}</if>
+        </where>
+        order by last_call_time desc
+    </select>
+
+    <select id="selectAiCallerProfileByProfileId" parameterType="Long" resultMap="AiCallerProfileResult">
+        <include refid="selectAiCallerProfileVo"/>
+        where profile_id = #{profileId}
+    </select>
+
+    <select id="selectAiCallerProfileByCallerNumber" parameterType="String" resultMap="AiCallerProfileResult">
+        <include refid="selectAiCallerProfileVo"/>
+        where caller_number = #{callerNumber}
+    </select>
+
+    <insert id="insertAiCallerProfile" parameterType="AiCallerProfile" useGeneratedKeys="true" keyProperty="profileId">
+        insert into ai_caller_profile
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="callerNumber != null and callerNumber != ''">caller_number,</if>
+            <if test="callerName != null">caller_name,</if>
+            <if test="callerGender != null">caller_gender,</if>
+            <if test="callerAge != null">caller_age,</if>
+            <if test="callerIdCard != null">caller_id_card,</if>
+            <if test="callerAddress != null">caller_address,</if>
+            <if test="customerLevel != null">customer_level,</if>
+            <if test="tags != null">tags,</if>
+            <if test="intentPrediction != null">intent_prediction,</if>
+            <if test="intentConfidence != null">intent_confidence,</if>
+            <if test="consultPreference != null">consult_preference,</if>
+            <if test="highFreqProblem != null">high_freq_problem,</if>
+            <if test="freqMentionCount != null">freq_mention_count,</if>
+            <if test="riskLevel != null">risk_level,</if>
+            <if test="emotionStatus != null">emotion_status,</if>
+            <if test="emotionWarning != null">emotion_warning,</if>
+            <if test="lastCallTime != null">last_call_time,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="callerNumber != null and callerNumber != ''">#{callerNumber},</if>
+            <if test="callerName != null">#{callerName},</if>
+            <if test="callerGender != null">#{callerGender},</if>
+            <if test="callerAge != null">#{callerAge},</if>
+            <if test="callerIdCard != null">#{callerIdCard},</if>
+            <if test="callerAddress != null">#{callerAddress},</if>
+            <if test="customerLevel != null">#{customerLevel},</if>
+            <if test="tags != null">#{tags},</if>
+            <if test="intentPrediction != null">#{intentPrediction},</if>
+            <if test="intentConfidence != null">#{intentConfidence},</if>
+            <if test="consultPreference != null">#{consultPreference},</if>
+            <if test="highFreqProblem != null">#{highFreqProblem},</if>
+            <if test="freqMentionCount != null">#{freqMentionCount},</if>
+            <if test="riskLevel != null">#{riskLevel},</if>
+            <if test="emotionStatus != null">#{emotionStatus},</if>
+            <if test="emotionWarning != null">#{emotionWarning},</if>
+            <if test="lastCallTime != null">#{lastCallTime},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateAiCallerProfile" parameterType="AiCallerProfile">
+        update ai_caller_profile
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="callerNumber != null and callerNumber != ''">caller_number = #{callerNumber},</if>
+            <if test="callerName != null">caller_name = #{callerName},</if>
+            <if test="callerGender != null">caller_gender = #{callerGender},</if>
+            <if test="callerAge != null">caller_age = #{callerAge},</if>
+            <if test="callerIdCard != null">caller_id_card = #{callerIdCard},</if>
+            <if test="callerAddress != null">caller_address = #{callerAddress},</if>
+            <if test="customerLevel != null">customer_level = #{customerLevel},</if>
+            <if test="tags != null">tags = #{tags},</if>
+            <if test="intentPrediction != null">intent_prediction = #{intentPrediction},</if>
+            <if test="intentConfidence != null">intent_confidence = #{intentConfidence},</if>
+            <if test="consultPreference != null">consult_preference = #{consultPreference},</if>
+            <if test="highFreqProblem != null">high_freq_problem = #{highFreqProblem},</if>
+            <if test="freqMentionCount != null">freq_mention_count = #{freqMentionCount},</if>
+            <if test="riskLevel != null">risk_level = #{riskLevel},</if>
+            <if test="emotionStatus != null">emotion_status = #{emotionStatus},</if>
+            <if test="emotionWarning != null">emotion_warning = #{emotionWarning},</if>
+            <if test="lastCallTime != null">last_call_time = #{lastCallTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where profile_id = #{profileId}
+    </update>
+
+    <delete id="deleteAiCallerProfileByProfileId" parameterType="Long">
+        delete from ai_caller_profile where profile_id = #{profileId}
+    </delete>
+
+    <delete id="deleteAiCallerProfileByProfileIds" parameterType="String">
+        delete from ai_caller_profile where profile_id in
+        <foreach item="profileId" collection="array" open="(" separator="," close=")">
+            #{profileId}
+        </foreach>
+    </delete>
+</mapper>

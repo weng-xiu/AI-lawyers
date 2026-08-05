@@ -91,9 +91,16 @@ public interface IAiLegalConsultationService
     
     /**
      * 获取按日期统计的咨询数据
-     * 
+     *
      * @param days 统计天数
      * @return 日期统计数据
      */
     public java.util.List<java.util.Map<String, Object>> getConsultationByDate(Integer days);
+
+    /**
+     * 咨询渠道统计：今日语音/图文/视频/总数 + 各渠道累计
+     *
+     * @return 渠道统计数据
+     */
+    public java.util.Map<String, Object> getConsultationChannelStats();
 }

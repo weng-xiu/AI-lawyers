@@ -218,7 +218,7 @@ public class AiLegalConsultationServiceImpl implements IAiLegalConsultationServi
     
     /**
      * 获取按日期统计的咨询数据
-     * 
+     *
      * @param days 统计天数
      * @return 日期统计数据
      */
@@ -229,5 +229,16 @@ public class AiLegalConsultationServiceImpl implements IAiLegalConsultationServi
             days = 7; // 默认统计7天
         }
         return aiLegalConsultationMapper.countConsultationsByDate(days);
+    }
+
+    /**
+     * 咨询渠道统计：今日语音/图文/视频/总数 + 各渠道累计
+     *
+     * @return 渠道统计数据
+     */
+    @Override
+    public java.util.Map<String, Object> getConsultationChannelStats()
+    {
+        return aiLegalConsultationMapper.selectConsultationChannelStats();
     }
 }

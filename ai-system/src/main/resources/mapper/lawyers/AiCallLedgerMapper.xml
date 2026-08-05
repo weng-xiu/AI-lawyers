@@ -7,6 +7,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <resultMap type="AiCallLedger" id="AiCallLedgerResult">
         <result property="ledgerId"        column="ledger_id"        />
         <result property="ledgerNo"        column="ledger_no"        />
+        <result property="recordId"        column="record_id"        />
+        <result property="ticketId"        column="ticket_id"        />
         <result property="callerName"      column="caller_name"      />
         <result property="callerPhone"     column="caller_phone"     />
         <result property="callerIdCard"    column="caller_id_card"   />
@@ -40,7 +42,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectAiCallLedgerVo">
-        select ledger_id, ledger_no, caller_name, caller_phone, caller_id_card,
+        select ledger_id, ledger_no, record_id, ticket_id, caller_name, caller_phone, caller_id_card,
                caller_gender, caller_age, caller_job, caller_company, caller_address,
                category_id, category_name, sub_category, service_type, source_channel,
                lawyer_id, lawyer_name, consult_content, involve_amount, lawyer_answer,
@@ -48,17 +50,20 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                visit_opinion, create_by, create_time, update_by, update_time, remark, del_flag
         from ai_call_ledger
     </sql>
-    
+
     <select id="selectAiCallLedgerList" parameterType="AiCallLedger" resultMap="AiCallLedgerResult">
         <include refid="selectAiCallLedgerVo"/>
-        <where>  
+        <where>
             del_flag = '0'
             <if test="callerName != null and callerName != ''"> and caller_name like concat('%', #{callerName}, '%')</if>
             <if test="callerPhone != null and callerPhone != ''"> and caller_phone like concat('%', #{callerPhone}, '%')</if>
+            <if test="lawyerName != null and lawyerName != ''"> and lawyer_name like concat('%', #{lawyerName}, '%')</if>
             <if test="categoryId != null"> and category_id = #{categoryId}</if>
             <if test="categoryName != null and categoryName != ''"> and category_name like concat('%', #{categoryName}, '%')</if>
             <if test="serviceType != null and serviceType != ''"> and service_type = #{serviceType}</if>
             <if test="satisfaction != null and satisfaction != ''"> and satisfaction = #{satisfaction}</if>
+            <if test="recordId != null"> and record_id = #{recordId}</if>
+            <if test="ticketId != null"> and ticket_id = #{ticketId}</if>
             <if test="params.beginTime != null and params.beginTime != ''"> and date_format(create_time,'%y%m%d') &gt;= date_format(#{params.beginTime},'%y%m%d')</if>
             <if test="params.endTime != null and params.endTime != ''"> and date_format(create_time,'%y%m%d') &lt;= date_format(#{params.endTime},'%y%m%d')</if>
         </where>
@@ -75,10 +80,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where ledger_no = #{ledgerNo} and del_flag = '0'
     </select>
         
-    <insert id="insertAiCallLedger" parameterType="AiCallLedger">
+    <insert id="insertAiCallLedger" parameterType="AiCallLedger" useGeneratedKeys="true" keyProperty="ledgerId">
         insert into ai_call_ledger
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="ledgerNo != null and ledgerNo != ''">ledger_no,</if>
+            <if test="recordId != null">record_id,</if>
+            <if test="ticketId != null">ticket_id,</if>
             <if test="callerName != null">caller_name,</if>
             <if test="callerPhone != null">caller_phone,</if>
             <if test="callerIdCard != null">caller_id_card,</if>
@@ -110,6 +117,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
          </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="ledgerNo != null and ledgerNo != ''">#{ledgerNo},</if>
+            <if test="recordId != null">#{recordId},</if>
+            <if test="ticketId != null">#{ticketId},</if>
             <if test="callerName != null">#{callerName},</if>
             <if test="callerPhone != null">#{callerPhone},</if>
             <if test="callerIdCard != null">#{callerIdCard},</if>
@@ -145,6 +154,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         update ai_call_ledger
         <trim prefix="SET" suffixOverrides=",">
             <if test="ledgerNo != null and ledgerNo != ''">ledger_no = #{ledgerNo},</if>
+            <if test="recordId != null">record_id = #{recordId},</if>
+            <if test="ticketId != null">ticket_id = #{ticketId},</if>
             <if test="callerName != null">caller_name = #{callerName},</if>
             <if test="callerPhone != null">caller_phone = #{callerPhone},</if>
             <if test="callerIdCard != null">caller_id_card = #{callerIdCard},</if>
@@ -182,9 +193,20 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </delete>
 
     <delete id="deleteAiCallLedgerByLedgerIds" parameterType="String">
-        update ai_call_ledger set del_flag = '2' where ledger_id in 
+        update ai_call_ledger set del_flag = '2' where ledger_id in
         <foreach item="ledgerId" collection="array" open="(" separator="," close=")">
             #{ledgerId}
         </foreach>
     </delete>
+
+    <select id="selectTodaySatisfactionStats" resultType="map">
+        select count(*) as todayLedgerCount,
+               ifnull(avg(case when satisfaction = '1' then 100
+                                when satisfaction = '2' then 80
+                                when satisfaction = '3' then 60
+                                when satisfaction = '4' then 20
+                                else null end), 0) as avgSatisfaction
+        from ai_call_ledger
+        where del_flag = '0' and date(create_time) = curdate()
+    </select>
 </mapper>

@@ -65,7 +65,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by t.create_time desc
     </select>
         
-    <insert id="insertAiCallTicket" parameterType="AiCallTicket">
+    <insert id="insertAiCallTicket" parameterType="AiCallTicket" useGeneratedKeys="true" keyProperty="ticketId">
         insert into ai_call_ticket
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="ticketNo != null and ticketNo != ''">ticket_no,</if>

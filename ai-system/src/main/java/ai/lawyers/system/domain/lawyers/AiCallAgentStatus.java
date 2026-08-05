@@ -34,7 +34,23 @@ public class AiCallAgentStatus extends BaseEntity
     @Excel(name = "最后登录IP")
     private String lastLoginIp;
 
-    public void setAgentId(Long agentId) 
+    @Excel(name = "应答模式", readConverterExp = "0=自动应答,1=手动应答")
+    private String callMode;
+
+    @Excel(name = "当前通话ID", cellType = ColumnType.NUMERIC)
+    private Long currentCallId;
+
+    @Excel(name = "当前通话号码")
+    private String currentCallPhone;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Excel(name = "当前通话开始时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    private Date callStartTime;
+
+    @Excel(name = "通话状态", readConverterExp = "0=空闲,1=通话中,2=保持,3=咨询中,4=三方,5=话后整理")
+    private String callStatus;
+
+    public void setAgentId(Long agentId)
     {
         this.agentId = agentId;
     }
@@ -93,9 +109,54 @@ public class AiCallAgentStatus extends BaseEntity
         this.lastLoginIp = lastLoginIp;
     }
 
-    public String getLastLoginIp() 
+    public String getLastLoginIp()
     {
         return lastLoginIp;
+    }
+    public void setCallMode(String callMode)
+    {
+        this.callMode = callMode;
+    }
+
+    public String getCallMode()
+    {
+        return callMode;
+    }
+    public void setCurrentCallId(Long currentCallId)
+    {
+        this.currentCallId = currentCallId;
+    }
+
+    public Long getCurrentCallId()
+    {
+        return currentCallId;
+    }
+    public void setCurrentCallPhone(String currentCallPhone)
+    {
+        this.currentCallPhone = currentCallPhone;
+    }
+
+    public String getCurrentCallPhone()
+    {
+        return currentCallPhone;
+    }
+    public void setCallStartTime(Date callStartTime)
+    {
+        this.callStartTime = callStartTime;
+    }
+
+    public Date getCallStartTime()
+    {
+        return callStartTime;
+    }
+    public void setCallStatus(String callStatus)
+    {
+        this.callStatus = callStatus;
+    }
+
+    public String getCallStatus()
+    {
+        return callStatus;
     }
 
     @Override
@@ -108,6 +169,11 @@ public class AiCallAgentStatus extends BaseEntity
             .append("loginTime", getLoginTime())
             .append("logoutTime", getLogoutTime())
             .append("lastLoginIp", getLastLoginIp())
+            .append("callMode", getCallMode())
+            .append("currentCallId", getCurrentCallId())
+            .append("currentCallPhone", getCurrentCallPhone())
+            .append("callStartTime", getCallStartTime())
+            .append("callStatus", getCallStatus())
             .append("createBy", getCreateBy())
             .append("createTime", getCreateTime())
             .append("updateBy", getUpdateBy())

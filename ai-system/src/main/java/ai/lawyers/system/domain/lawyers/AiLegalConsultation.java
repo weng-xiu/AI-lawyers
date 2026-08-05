@@ -45,6 +45,10 @@ public class AiLegalConsultation extends BaseEntity
     @Excel(name = "状态", readConverterExp = "0=处理中,1=已完成,2=失败")
     private String status;
 
+    /** 咨询渠道（1语音 2图文 3视频） */
+    @Excel(name = "咨询渠道", readConverterExp = "1=语音,2=图文,3=视频")
+    private String consultationChannel;
+
     /** 附件路径 */
     @Excel(name = "附件路径")
     private String attachmentPath;
@@ -144,6 +148,16 @@ public class AiLegalConsultation extends BaseEntity
         this.status = status;
     }
 
+    public String getConsultationChannel()
+    {
+        return consultationChannel;
+    }
+
+    public void setConsultationChannel(String consultationChannel)
+    {
+        this.consultationChannel = consultationChannel;
+    }
+
     public String getAttachmentPath()
     {
         return attachmentPath;
@@ -234,6 +248,7 @@ public class AiLegalConsultation extends BaseEntity
             .append("answer", getAnswer())
             .append("confidence", getConfidence())
             .append("status", getStatus())
+            .append("consultationChannel", getConsultationChannel())
             .append("attachmentPath", getAttachmentPath())
             .append("rating", getRating())
             .append("feedback", getFeedback())

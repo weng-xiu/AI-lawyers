@@ -26,4 +26,16 @@ public interface AiCallRecordMapper
     public List<java.util.Map<String, Object>> getCallStatisticsByCategory();
 
     public List<java.util.Map<String, Object>> getCallStatisticsByDate(Integer days);
+
+    /** 工作台：今日通话统计（todayCalls、todayServiceDuration） */
+    public java.util.Map<String, Object> selectTodayCallStats();
+
+    /** 工作台：最近通话记录 */
+    public List<AiCallRecord> selectRecentCalls(Integer limit);
+
+    /** 来电弹屏：来电人通话统计（callCount、monthCallCount、lastCallTime） */
+    public java.util.Map<String, Object> selectCallerCallStats(String callerNumber);
+
+    /** 来电弹屏：按号码查询历史通话 */
+    public List<AiCallRecord> selectAiCallRecordByCallerNumber(@org.apache.ibatis.annotations.Param("callerNumber") String callerNumber, @org.apache.ibatis.annotations.Param("limit") Integer limit);
 }

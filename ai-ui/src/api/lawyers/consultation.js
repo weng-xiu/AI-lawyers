@@ -84,3 +84,11 @@ export function getConsultationByDate(days) {
     params: { days }
   })
 }
+
+// 咨询管理中心：渠道统计（今日语音/图文/视频/总咨询）
+export function getConsultationChannelStats() {
+  return request({
+    url: '/lawyers/consultation/stats',
+    method: 'get'
+  })
+}

@@ -11,6 +11,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="answer"           column="answer"            />
         <result property="categoryId"       column="category_id"       />
         <result property="status"           column="status"            />
+        <result property="consultationChannel" column="consultation_channel" />
         <result property="createBy"         column="create_by"         />
         <result property="createTime"       column="create_time"       />
         <result property="updateBy"         column="update_by"         />
@@ -19,7 +20,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectAiLegalConsultationVo">
-        select consultation_id, user_id, question, answer, category_id, status, create_by, create_time, update_by, update_time, remark 
+        select consultation_id, user_id, question, answer, category_id, status, consultation_channel, create_by, create_time, update_by, update_time, remark 
         from ai_legal_consultation
     </sql>
     
@@ -30,6 +31,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="question != null  and question != ''"> and question like concat('%', #{question}, '%')</if>
             <if test="categoryId != null "> and category_id = #{categoryId}</if>
             <if test="status != null  and status != ''"> and status = #{status}</if>
+            <if test="consultationChannel != null and consultationChannel != ''"> and consultation_channel = #{consultationChannel}</if>
             <if test="params.beginTime != null and params.beginTime != ''"><!-- 开始时间检索 -->
                 and date_format(create_time,'%Y%m%d') &gt;= date_format(#{params.beginTime},'%Y%m%d')
             </if>
@@ -58,6 +60,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="answer != null and answer != ''">answer,</if>
             <if test="categoryId != null">category_id,</if>
             <if test="status != null">status,</if>
+            <if test="consultationChannel != null and consultationChannel != ''">consultation_channel,</if>
             <if test="createBy != null">create_by,</if>
             <if test="remark != null">remark,</if>
             create_time
@@ -68,6 +71,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="answer != null and answer != ''">#{answer},</if>
             <if test="categoryId != null">#{categoryId},</if>
             <if test="status != null">#{status},</if>
+            <if test="consultationChannel != null and consultationChannel != ''">#{consultationChannel},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="remark != null">#{remark},</if>
             sysdate()
@@ -82,12 +86,25 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="answer != null and answer != ''">answer = #{answer},</if>
             <if test="categoryId != null">category_id = #{categoryId},</if>
             <if test="status != null">status = #{status},</if>
+            <if test="consultationChannel != null and consultationChannel != ''">consultation_channel = #{consultationChannel},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="remark != null">remark = #{remark},</if>
             update_time = sysdate()
         </trim>
         where consultation_id = #{consultationId}
     </update>
+
+    <select id="selectConsultationChannelStats" resultType="map">
+        select count(*) as totalCount,
+               sum(case when consultation_channel = '1' and date(create_time) = curdate() then 1 else 0 end) as todayVoice,
+               sum(case when consultation_channel = '2' and date(create_time) = curdate() then 1 else 0 end) as todayImageText,
+               sum(case when consultation_channel = '3' and date(create_time) = curdate() then 1 else 0 end) as todayVideo,
+               sum(case when date(create_time) = curdate() then 1 else 0 end) as todayTotal,
+               sum(case when consultation_channel = '1' then 1 else 0 end) as voiceTotal,
+               sum(case when consultation_channel = '2' then 1 else 0 end) as imageTextTotal,
+               sum(case when consultation_channel = '3' then 1 else 0 end) as videoTotal
+        from ai_legal_consultation
+    </select>
 
     <delete id="deleteAiLegalConsultationById" parameterType="Long">
         delete from ai_legal_consultation where consultation_id = #{consultationId}

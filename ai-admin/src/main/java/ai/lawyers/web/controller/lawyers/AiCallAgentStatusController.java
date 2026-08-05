@@ -130,4 +130,169 @@ public class AiCallAgentStatusController extends BaseController
         List<AiCallAgentStatus> list = aiCallAgentStatusService.selectOnlineAgents();
         return success(list);
     }
+
+    @PreAuthorize("@ss.hasPermi('lawyers:call:agent:status')")
+    @Log(title = "坐席当前状态", businessType = BusinessType.OTHER)
+    @GetMapping("/current/{agentId}")
+    public AjaxResult getCurrentAgent(@PathVariable("agentId") Long agentId)
+    {
+        return success(aiCallAgentStatusService.selectAiCallAgentStatusByAgentId(agentId));
+    }
+
+    @PreAuthorize("@ss.hasPermi('lawyers:call:agent:status')")
+    @Log(title = "切换应答模式", businessType = BusinessType.UPDATE)
+    @PostMapping("/callMode")
+    public AjaxResult updateCallMode(@RequestBody java.util.Map<String, Object> params)
+    {
+        Long agentId = Long.valueOf(params.get("agentId").toString());
+        String callMode = params.get("callMode").toString();
+        int result = aiCallAgentStatusService.updateCallMode(agentId, callMode);
+        if (result > 0) {
+            return success("应答模式切换成功");
+        }
+        return error("应答模式切换失败");
+    }
+
+    @PreAuthorize("@ss.hasPermi('lawyers:call:agent:status')")
+    @Log(title = "外呼", businessType = BusinessType.OTHER)
+    @PostMapping("/makeCall")
+    public AjaxResult makeCall(@RequestBody java.util.Map<String, Object> params)
+    {
+        Long agentId = Long.valueOf(params.get("agentId").toString());
+        String phone = params.get("phone").toString();
+        AiCallAgentStatus agent = aiCallAgentStatusService.makeCall(agentId, phone);
+        if (agent != null) {
+            return success(agent);
+        }
+        return error("外呼失败，坐席不存在");
+    }
+
+    @PreAuthorize("@ss.hasPermi('lawyers:call:agent:status')")
+    @Log(title = "通话保持", businessType = BusinessType.OTHER)
+    @PostMapping("/hold")
+    public AjaxResult holdCall(@RequestBody java.util.Map<String, Object> params)
+    {
+        Long agentId = Long.valueOf(params.get("agentId").toString());
+        int result = aiCallAgentStatusService.holdCall(agentId);
+        if (result > 0) {
+            return success("通话已保持");
+        }
+        return error("通话保持失败，当前无通话或状态异常");
+    }
+
+    @PreAuthorize("@ss.hasPermi('lawyers:call:agent:status')")
+    @Log(title = "通话恢复", businessType = BusinessType.OTHER)
+    @PostMapping("/resume")
+    public AjaxResult resumeCall(@RequestBody java.util.Map<String, Object> params)
+    {
+        Long agentId = Long.valueOf(params.get("agentId").toString());
+        int result = aiCallAgentStatusService.resumeCall(agentId);
+        if (result > 0) {
+            return success("通话已恢复");
+        }
+        return error("通话恢复失败，当前未处于保持状态");
+    }
+
+    @PreAuthorize("@ss.hasPermi('lawyers:call:agent:status')")
+    @Log(title = "通话转接", businessType = BusinessType.OTHER)
+    @PostMapping("/transfer")
+    public AjaxResult transferCall(@RequestBody java.util.Map<String, Object> params)
+    {
+        Long agentId = Long.valueOf(params.get("agentId").toString());
+        Long toAgentId = Long.valueOf(params.get("toAgentId").toString());
+        String remark = params.get("remark") != null ? params.get("remark").toString() : "";
+        int result = aiCallAgentStatusService.transferCall(agentId, toAgentId, remark);
+        if (result > 0) {
+            return success("通话已转接");
+        }
+        return error("通话转接失败，当前无通话");
+    }
+
+    @PreAuthorize("@ss.hasPermi('lawyers:call:agent:status')")
+    @Log(title = "咨询", businessType = BusinessType.OTHER)
+    @PostMapping("/consult")
+    public AjaxResult consultCall(@RequestBody java.util.Map<String, Object> params)
+    {
+        Long agentId = Long.valueOf(params.get("agentId").toString());
+        Long toAgentId = Long.valueOf(params.get("toAgentId").toString());
+        int result = aiCallAgentStatusService.consultCall(agentId, toAgentId);
+        if (result > 0) {
+            return success("咨询已发起");
+        }
+        return error("咨询失败，当前无通话或状态异常");
+    }
+
+    @PreAuthorize("@ss.hasPermi('lawyers:call:agent:status')")
+    @Log(title = "三方通话", businessType = BusinessType.OTHER)
+    @PostMapping("/threeWay")
+    public AjaxResult threeWayCall(@RequestBody java.util.Map<String, Object> params)
+    {
+        Long agentId = Long.valueOf(params.get("agentId").toString());
+        Long toAgentId = Long.valueOf(params.get("toAgentId").toString());
+        int result = aiCallAgentStatusService.threeWayCall(agentId, toAgentId);
+        if (result > 0) {
+            return success("三方通话已建立");
+        }
+        return error("三方通话失败，当前无通话或状态异常");
+    }
+
+    @PreAuthorize("@ss.hasPermi('lawyers:call:agent:status')")
+    @Log(title = "话后整理", businessType = BusinessType.OTHER)
+    @PostMapping("/afterWork")
+    public AjaxResult afterWork(@RequestBody java.util.Map<String, Object> params)
+    {
+        Long agentId = Long.valueOf(params.get("agentId").toString());
+        int result = aiCallAgentStatusService.afterWork(agentId);
+        if (result > 0) {
+            return success("已进入话后整理");
+        }
+        return error("话后整理失败");
+    }
+
+    @PreAuthorize("@ss.hasPermi('lawyers:call:agent:status')")
+    @Log(title = "挂机", businessType = BusinessType.OTHER)
+    @PostMapping("/hangup")
+    public AjaxResult hangup(@RequestBody java.util.Map<String, Object> params)
+    {
+        Long agentId = Long.valueOf(params.get("agentId").toString());
+        int result = aiCallAgentStatusService.hangup(agentId);
+        if (result > 0) {
+            return success("通话已挂断");
+        }
+        return error("挂机失败");
+    }
+
+    @PreAuthorize("@ss.hasPermi('lawyers:call:agent:status')")
+    @Log(title = "机器人接管", businessType = BusinessType.OTHER)
+    @PostMapping("/robotTakeover")
+    public AjaxResult robotTakeover(@RequestBody java.util.Map<String, Object> params)
+    {
+        Long agentId = Long.valueOf(params.get("agentId").toString());
+        int result = aiCallAgentStatusService.robotTakeover(agentId);
+        if (result > 0) {
+            return success("已转交机器人接管");
+        }
+        return error("机器人接管失败，当前无通话");
+    }
+
+    @PreAuthorize("@ss.hasPermi('lawyers:call:agent:status')")
+    @Log(title = "IVR转接", businessType = BusinessType.OTHER)
+    @PostMapping("/ivrTransfer")
+    public AjaxResult ivrTransfer(@RequestBody java.util.Map<String, Object> params)
+    {
+        Long agentId = Long.valueOf(params.get("agentId").toString());
+        String ivrNodeId = params.get("ivrNodeId") != null ? params.get("ivrNodeId").toString() : "";
+        int result = aiCallAgentStatusService.ivrTransfer(agentId, ivrNodeId);
+        if (result > 0) {
+            return success("已转接至IVR");
+        }
+        return error("IVR转接失败，当前无通话");
+    }
+
+    @PreAuthorize("@ss.hasPermi('lawyers:call:agent:list')")
+    @GetMapping("/todayRecords/{agentId}")
+    public AjaxResult getTodayRecords(@PathVariable("agentId") Long agentId)
+    {
+        return success(aiCallAgentStatusService.selectTodayRecordsByAgentId(agentId));
+    }
 }

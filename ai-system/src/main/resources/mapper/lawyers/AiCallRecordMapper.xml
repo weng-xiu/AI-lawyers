@@ -97,6 +97,36 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         group by date(call_time)
         order by date
     </select>
+
+    <select id="selectTodayCallStats" resultType="map">
+        select count(*) as todayCalls,
+               ifnull(sum(duration), 0) as todayServiceDuration
+        from ai_call_record
+        where date(call_time) = curdate()
+    </select>
+
+    <select id="selectRecentCalls" parameterType="Integer" resultMap="AiCallRecordResult">
+        <include refid="selectAiCallRecordVo"/>
+        order by cr.call_time desc
+        limit #{limit}
+    </select>
+
+    <select id="selectCallerCallStats" parameterType="String" resultType="map">
+        select count(*) as callCount,
+               sum(case when date_format(call_time,'%Y%m') = date_format(now(),'%Y%m') then 1 else 0 end) as monthCallCount,
+               max(call_time) as lastCallTime
+        from ai_call_record
+        where caller_number = #{callerNumber}
+    </select>
+
+    <select id="selectAiCallRecordByCallerNumber" resultMap="AiCallRecordResult">
+        <include refid="selectAiCallRecordVo"/>
+        where cr.caller_number = #{callerNumber}
+        order by cr.call_time desc
+        <if test="limit != null">
+            limit #{limit}
+        </if>
+    </select>
         
     <insert id="insertAiCallRecord" parameterType="AiCallRecord">
         insert into ai_call_record

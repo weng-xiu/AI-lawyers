@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiChatSessionMapper">
+
+    <resultMap type="AiChatSession" id="AiChatSessionResult">
+        <result property="sessionId"       column="session_id"         />
+        <result property="sessionNo"       column="session_no"         />
+        <result property="customerName"    column="customer_name"      />
+        <result property="customerPhone"   column="customer_phone"     />
+        <result property="customerAvatar"  column="customer_avatar"    />
+        <result property="userId"          column="user_id"            />
+        <result property="assignee"        column="assignee"           />
+        <result property="channel"         column="channel"            />
+        <result property="status"          column="status"             />
+        <result property="lastMessage"     column="last_message"       />
+        <result property="lastMessageTime" column="last_message_time"  />
+        <result property="unreadCount"     column="unread_count"       />
+        <result property="createBy"        column="create_by"          />
+        <result property="createTime"      column="create_time"        />
+        <result property="updateBy"        column="update_by"          />
+        <result property="updateTime"      column="update_time"        />
+        <result property="remark"          column="remark"             />
+    </resultMap>
+
+    <sql id="selectAiChatSessionVo">
+        select session_id, session_no, customer_name, customer_phone, customer_avatar, user_id, assignee,
+               channel, status, last_message, last_message_time, unread_count, create_by, create_time, update_by, update_time, remark
+        from ai_chat_session
+    </sql>
+
+    <select id="selectAiChatSessionList" parameterType="AiChatSession" resultMap="AiChatSessionResult">
+        <include refid="selectAiChatSessionVo"/>
+        <where>
+            <if test="sessionNo != null and sessionNo != ''"> and session_no like concat('%', #{sessionNo}, '%')</if>
+            <if test="customerName != null and customerName != ''"> and customer_name like concat('%', #{customerName}, '%')</if>
+            <if test="customerPhone != null and customerPhone != ''"> and customer_phone like concat('%', #{customerPhone}, '%')</if>
+            <if test="assignee != null and assignee != ''"> and assignee like concat('%', #{assignee}, '%')</if>
+            <if test="channel != null and channel != ''"> and channel = #{channel}</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+            <if test="params.beginTime != null and params.beginTime != ''"> and date(create_time) &gt;= #{params.beginTime}</if>
+            <if test="params.endTime != null and params.endTime != ''"> and date(create_time) &lt;= #{params.endTime}</if>
+        </where>
+        order by last_message_time desc
+    </select>
+
+    <select id="selectAiChatSessionBySessionId" parameterType="Long" resultMap="AiChatSessionResult">
+        <include refid="selectAiChatSessionVo"/>
+        where session_id = #{sessionId}
+    </select>
+
+    <select id="selectChatSessionStats" resultType="map">
+        select count(*) as totalCount,
+               sum(case when status = '0' then 1 else 0 end) as activeCount,
+               sum(case when status = '1' then 1 else 0 end) as endedCount,
+               sum(case when status = '2' then 1 else 0 end) as transferredCount,
+               sum(case when date(create_time) = curdate() then 1 else 0 end) as todayCount
+        from ai_chat_session
+    </select>
+
+    <insert id="insertAiChatSession" parameterType="AiChatSession" useGeneratedKeys="true" keyProperty="sessionId">
+        insert into ai_chat_session
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="sessionNo != null and sessionNo != ''">session_no,</if>
+            <if test="customerName != null and customerName != ''">customer_name,</if>
+            <if test="customerPhone != null and customerPhone != ''">customer_phone,</if>
+            <if test="customerAvatar != null and customerAvatar != ''">customer_avatar,</if>
+            <if test="userId != null">user_id,</if>
+            <if test="assignee != null and assignee != ''">assignee,</if>
+            <if test="channel != null and channel != ''">channel,</if>
+            <if test="status != null and status != ''">status,</if>
+            <if test="lastMessage != null">last_message,</if>
+            <if test="lastMessageTime != null">last_message_time,</if>
+            <if test="unreadCount != null">unread_count,</if>
+            <if test="createBy != null and createBy != ''">create_by,</if>
+            <if test="remark != null and remark != ''">remark,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="sessionNo != null and sessionNo != ''">#{sessionNo},</if>
+            <if test="customerName != null and customerName != ''">#{customerName},</if>
+            <if test="customerPhone != null and customerPhone != ''">#{customerPhone},</if>
+            <if test="customerAvatar != null and customerAvatar != ''">#{customerAvatar},</if>
+            <if test="userId != null">#{userId},</if>
+            <if test="assignee != null and assignee != ''">#{assignee},</if>
+            <if test="channel != null and channel != ''">#{channel},</if>
+            <if test="status != null and status != ''">#{status},</if>
+            <if test="lastMessage != null">#{lastMessage},</if>
+            <if test="lastMessageTime != null">#{lastMessageTime},</if>
+            <if test="unreadCount != null">#{unreadCount},</if>
+            <if test="createBy != null and createBy != ''">#{createBy},</if>
+            <if test="remark != null and remark != ''">#{remark},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateAiChatSession" parameterType="AiChatSession">
+        update ai_chat_session
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="sessionNo != null and sessionNo != ''">session_no = #{sessionNo},</if>
+            <if test="customerName != null and customerName != ''">customer_name = #{customerName},</if>
+            <if test="customerPhone != null and customerPhone != ''">customer_phone = #{customerPhone},</if>
+            <if test="customerAvatar != null and customerAvatar != ''">customer_avatar = #{customerAvatar},</if>
+            <if test="userId != null">user_id = #{userId},</if>
+            <if test="assignee != null and assignee != ''">assignee = #{assignee},</if>
+            <if test="channel != null and channel != ''">channel = #{channel},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="lastMessage != null">last_message = #{lastMessage},</if>
+            <if test="lastMessageTime != null">last_message_time = #{lastMessageTime},</if>
+            <if test="unreadCount != null">unread_count = #{unreadCount},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where session_id = #{sessionId}
+    </update>
+
+    <delete id="deleteAiChatSessionBySessionId" parameterType="Long">
+        delete from ai_chat_session where session_id = #{sessionId}
+    </delete>
+
+    <delete id="deleteAiChatSessionBySessionIds" parameterType="String">
+        delete from ai_chat_session where session_id in
+        <foreach item="sessionId" collection="array" open="(" separator="," close=")">
+            #{sessionId}
+        </foreach>
+    </delete>
+</mapper>
