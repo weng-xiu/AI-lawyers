@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.trunk.AiTrunkMetricMapper">
+
+    <resultMap type="AiTrunkMetric" id="AiTrunkMetricResult">
+        <result property="metricId"        column="metric_id"         />
+        <result property="trunkId"         column="trunk_id"          />
+        <result property="trunkCode"       column="trunk_code"        />
+        <result property="carrier"         column="carrier"           />
+        <result property="statTime"        column="stat_time"         />
+        <result property="statDimension"   column="stat_dimension"    />
+        <result property="totalCalls"      column="total_calls"       />
+        <result property="connectedCalls"  column="connected_calls"   />
+        <result property="failedCalls"     column="failed_calls"      />
+        <result property="connectRate"     column="connect_rate"      />
+        <result property="asr"             column="asr"               />
+        <result property="acd"             column="acd"               />
+        <result property="totalDuration"   column="total_duration"    />
+        <result property="avgRingDuration" column="avg_ring_duration" />
+        <result property="maxConcurrent"   column="max_concurrent"    />
+        <result property="avgMos"          column="avg_mos"           />
+        <result property="avgPacketLoss"   column="avg_packet_loss"   />
+        <result property="createTime"      column="create_time"       />
+    </resultMap>
+
+    <sql id="selectAiTrunkMetricVo">
+        select metric_id, trunk_id, trunk_code, carrier, stat_time, stat_dimension,
+               total_calls, connected_calls, failed_calls, connect_rate, asr, acd,
+               total_duration, avg_ring_duration, max_concurrent, avg_mos, avg_packet_loss, create_time
+        from ai_trunk_metric
+    </sql>
+
+    <select id="selectAiTrunkMetricList" parameterType="AiTrunkMetric" resultMap="AiTrunkMetricResult">
+        <include refid="selectAiTrunkMetricVo"/>
+        <where>
+            <if test="trunkId != null"> and trunk_id = #{trunkId}</if>
+            <if test="trunkCode != null and trunkCode != ''"> and trunk_code = #{trunkCode}</if>
+            <if test="carrier != null and carrier != ''"> and carrier = #{carrier}</if>
+            <if test="statDimension != null and statDimension != ''"> and stat_dimension = #{statDimension}</if>
+            <if test="params.beginTime != null and params.beginTime != ''">
+                and stat_time &gt;= #{params.beginTime}
+            </if>
+            <if test="params.endTime != null and params.endTime != ''">
+                and stat_time &lt;= #{params.endTime}
+            </if>
+        </where>
+        order by stat_time desc
+    </select>
+
+    <select id="selectRecentByTrunk" resultMap="AiTrunkMetricResult">
+        <include refid="selectAiTrunkMetricVo"/>
+        where trunk_id = #{trunkId}
+          and stat_dimension = #{dimension}
+        order by stat_time desc
+        limit #{limit}
+    </select>
+
+    <select id="selectByTimeRange" resultMap="AiTrunkMetricResult">
+        <include refid="selectAiTrunkMetricVo"/>
+        where stat_time &gt;= #{beginTime}
+          and stat_time &lt; #{endTime}
+          and stat_dimension = #{dimension}
+        order by trunk_id asc, stat_time asc
+    </select>
+
+    <insert id="insertAiTrunkMetric" parameterType="AiTrunkMetric" useGeneratedKeys="true" keyProperty="metricId">
+        insert into ai_trunk_metric (trunk_id, trunk_code, carrier, stat_time, stat_dimension,
+            total_calls, connected_calls, failed_calls, connect_rate, asr, acd,
+            total_duration, avg_ring_duration, max_concurrent, avg_mos, avg_packet_loss, create_time)
+        values (#{trunkId}, #{trunkCode}, #{carrier}, #{statTime}, #{statDimension},
+            #{totalCalls}, #{connectedCalls}, #{failedCalls}, #{connectRate}, #{asr}, #{acd},
+            #{totalDuration}, #{avgRingDuration}, #{maxConcurrent}, #{avgMos}, #{avgPacketLoss}, sysdate())
+    </insert>
+
+    <insert id="saveOrUpdate" parameterType="AiTrunkMetric">
+        insert into ai_trunk_metric (trunk_id, trunk_code, carrier, stat_time, stat_dimension,
+            total_calls, connected_calls, failed_calls, connect_rate, asr, acd,
+            total_duration, avg_ring_duration, max_concurrent, avg_mos, avg_packet_loss, create_time)
+        values (#{trunkId}, #{trunkCode}, #{carrier}, #{statTime}, #{statDimension},
+            #{totalCalls}, #{connectedCalls}, #{failedCalls}, #{connectRate}, #{asr}, #{acd},
+            #{totalDuration}, #{avgRingDuration}, #{maxConcurrent}, #{avgMos}, #{avgPacketLoss}, sysdate())
+        on duplicate key update
+            total_calls       = values(total_calls),
+            connected_calls   = values(connected_calls),
+            failed_calls      = values(failed_calls),
+            connect_rate      = values(connect_rate),
+            asr               = values(asr),
+            acd               = values(acd),
+            total_duration    = values(total_duration),
+            avg_ring_duration = values(avg_ring_duration),
+            max_concurrent    = values(max_concurrent),
+            avg_mos           = values(avg_mos),
+            avg_packet_loss   = values(avg_packet_loss)
+    </insert>
+
+    <delete id="deleteBefore">
+        delete from ai_trunk_metric where stat_time &lt; #{beforeTime}
+    </delete>
+</mapper>

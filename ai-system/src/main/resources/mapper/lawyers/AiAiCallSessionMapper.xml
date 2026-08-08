@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiAiCallSessionMapper">
+
+    <resultMap type="AiAiCallSession" id="AiAiCallSessionResult">
+        <result property="sessionId"      column="session_id"      />
+        <result property="recordId"       column="record_id"       />
+        <result property="agentId"        column="agent_id"        />
+        <result property="callerPhone"    column="caller_phone"    />
+        <result property="callerName"     column="caller_name"     />
+        <result property="sessionStatus"  column="session_status"  />
+        <result property="intentCategory" column="intent_category" />
+        <result property="recommendLaws"  column="recommend_laws"  />
+        <result property="recommendScripts" column="recommend_scripts" />
+        <result property="callSummary"    column="call_summary"    />
+        <result property="startTime"      column="start_time"      />
+        <result property="endTime"        column="end_time"        />
+        <result property="createBy"       column="create_by"       />
+        <result property="createTime"     column="create_time"     />
+        <result property="updateBy"       column="update_by"       />
+        <result property="updateTime"     column="update_time"     />
+        <result property="remark"         column="remark"          />
+    </resultMap>
+
+    <sql id="selectAiAiCallSessionVo">
+        select session_id, record_id, agent_id, caller_phone, caller_name, session_status,
+               intent_category, recommend_laws, recommend_scripts, call_summary,
+               start_time, end_time, create_by, create_time, update_by, update_time, remark
+        from ai_ai_call_session
+    </sql>
+
+    <select id="selectAiAiCallSessionList" parameterType="AiAiCallSession" resultMap="AiAiCallSessionResult">
+        <include refid="selectAiAiCallSessionVo"/>
+        <where>
+            <if test="recordId != null"> and record_id = #{recordId}</if>
+            <if test="agentId != null"> and agent_id = #{agentId}</if>
+            <if test="callerPhone != null and callerPhone != ''"> and caller_phone like concat('%', #{callerPhone}, '%')</if>
+            <if test="sessionStatus != null and sessionStatus != ''"> and session_status = #{sessionStatus}</if>
+        </where>
+        order by start_time desc
+    </select>
+
+    <select id="selectAiAiCallSessionBySessionId" parameterType="Long" resultMap="AiAiCallSessionResult">
+        <include refid="selectAiAiCallSessionVo"/>
+        where session_id = #{sessionId}
+    </select>
+
+    <select id="selectAiAiCallSessionByRecordId" parameterType="Long" resultMap="AiAiCallSessionResult">
+        <include refid="selectAiAiCallSessionVo"/>
+        where record_id = #{recordId}
+        order by start_time desc
+        limit 1
+    </select>
+
+    <insert id="insertAiAiCallSession" parameterType="AiAiCallSession">
+        insert into ai_ai_call_session
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="recordId != null">record_id,</if>
+            <if test="agentId != null">agent_id,</if>
+            <if test="callerPhone != null and callerPhone != ''">caller_phone,</if>
+            <if test="callerName != null and callerName != ''">caller_name,</if>
+            <if test="sessionStatus != null and sessionStatus != ''">session_status,</if>
+            <if test="intentCategory != null and intentCategory != ''">intent_category,</if>
+            <if test="recommendLaws != null">recommend_laws,</if>
+            <if test="recommendScripts != null">recommend_scripts,</if>
+            <if test="callSummary != null">call_summary,</if>
+            <if test="startTime != null">start_time,</if>
+            <if test="endTime != null">end_time,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="recordId != null">#{recordId},</if>
+            <if test="agentId != null">#{agentId},</if>
+            <if test="callerPhone != null and callerPhone != ''">#{callerPhone},</if>
+            <if test="callerName != null and callerName != ''">#{callerName},</if>
+            <if test="sessionStatus != null and sessionStatus != ''">#{sessionStatus},</if>
+            <if test="intentCategory != null and intentCategory != ''">#{intentCategory},</if>
+            <if test="recommendLaws != null">#{recommendLaws},</if>
+            <if test="recommendScripts != null">#{recommendScripts},</if>
+            <if test="callSummary != null">#{callSummary},</if>
+            <if test="startTime != null">#{startTime},</if>
+            <if test="endTime != null">#{endTime},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate()
+         </trim>
+    </insert>
+
+    <update id="updateAiAiCallSession" parameterType="AiAiCallSession">
+        update ai_ai_call_session
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="agentId != null">agent_id = #{agentId},</if>
+            <if test="callerPhone != null and callerPhone != ''">caller_phone = #{callerPhone},</if>
+            <if test="callerName != null and callerName != ''">caller_name = #{callerName},</if>
+            <if test="sessionStatus != null and sessionStatus != ''">session_status = #{sessionStatus},</if>
+            <if test="intentCategory != null and intentCategory != ''">intent_category = #{intentCategory},</if>
+            <if test="recommendLaws != null">recommend_laws = #{recommendLaws},</if>
+            <if test="recommendScripts != null">recommend_scripts = #{recommendScripts},</if>
+            <if test="callSummary != null">call_summary = #{callSummary},</if>
+            <if test="startTime != null">start_time = #{startTime},</if>
+            <if test="endTime != null">end_time = #{endTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where session_id = #{sessionId}
+    </update>
+
+    <delete id="deleteAiAiCallSessionBySessionId" parameterType="Long">
+        delete from ai_ai_call_session where session_id = #{sessionId}
+    </delete>
+
+    <delete id="deleteAiAiCallSessionBySessionIds" parameterType="String">
+        delete from ai_ai_call_session where session_id in
+        <foreach item="sessionId" collection="array" open="(" separator="," close=")">
+            #{sessionId}
+        </foreach>
+    </delete>
+</mapper>

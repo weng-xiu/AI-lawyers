@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.trunk.AiNumberSegmentMapper">
+
+    <resultMap type="AiNumberSegment" id="AiNumberSegmentResult">
+        <result property="segmentId"     column="segment_id"     />
+        <result property="segmentPrefix" column="segment_prefix" />
+        <result property="carrier"       column="carrier"        />
+        <result property="numberType"    column="number_type"    />
+        <result property="province"      column="province"       />
+        <result property="city"          column="city"           />
+        <result property="matchLength"   column="match_length"   />
+        <result property="enableFlag"    column="enable_flag"    />
+        <result property="createBy"      column="create_by"      />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"      column="update_by"      />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"        column="remark"         />
+    </resultMap>
+
+    <sql id="selectAiNumberSegmentVo">
+        select segment_id, segment_prefix, carrier, number_type, province, city,
+               match_length, enable_flag, create_by, create_time, update_by, update_time, remark
+        from ai_number_segment
+    </sql>
+
+    <select id="selectAiNumberSegmentList" parameterType="AiNumberSegment" resultMap="AiNumberSegmentResult">
+        <include refid="selectAiNumberSegmentVo"/>
+        <where>
+            <if test="segmentPrefix != null and segmentPrefix != ''"> and segment_prefix like concat(#{segmentPrefix}, '%')</if>
+            <if test="carrier != null and carrier != ''"> and carrier = #{carrier}</if>
+            <if test="numberType != null and numberType != ''"> and number_type = #{numberType}</if>
+            <if test="province != null and province != ''"> and province like concat('%', #{province}, '%')</if>
+            <if test="enableFlag != null and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
+        </where>
+        order by match_length desc, segment_prefix asc
+    </select>
+
+    <select id="selectAiNumberSegmentBySegmentId" parameterType="Long" resultMap="AiNumberSegmentResult">
+        <include refid="selectAiNumberSegmentVo"/>
+        where segment_id = #{segmentId}
+    </select>
+
+    <!-- 最长前缀优先：按 match_length 倒序返回，选路引擎据此构建匹配字典 -->
+    <select id="selectAllEnabled" resultMap="AiNumberSegmentResult">
+        <include refid="selectAiNumberSegmentVo"/>
+        where enable_flag = '1'
+        order by match_length desc, segment_prefix asc
+    </select>
+
+    <insert id="insertAiNumberSegment" parameterType="AiNumberSegment" useGeneratedKeys="true" keyProperty="segmentId">
+        insert into ai_number_segment
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="segmentPrefix != null and segmentPrefix != ''">segment_prefix,</if>
+            <if test="carrier != null and carrier != ''">carrier,</if>
+            <if test="numberType != null and numberType != ''">number_type,</if>
+            <if test="province != null">province,</if>
+            <if test="city != null">city,</if>
+            <if test="matchLength != null">match_length,</if>
+            <if test="enableFlag != null">enable_flag,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="segmentPrefix != null and segmentPrefix != ''">#{segmentPrefix},</if>
+            <if test="carrier != null and carrier != ''">#{carrier},</if>
+            <if test="numberType != null and numberType != ''">#{numberType},</if>
+            <if test="province != null">#{province},</if>
+            <if test="city != null">#{city},</if>
+            <if test="matchLength != null">#{matchLength},</if>
+            <if test="enableFlag != null">#{enableFlag},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateAiNumberSegment" parameterType="AiNumberSegment">
+        update ai_number_segment
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="segmentPrefix != null and segmentPrefix != ''">segment_prefix = #{segmentPrefix},</if>
+            <if test="carrier != null and carrier != ''">carrier = #{carrier},</if>
+            <if test="numberType != null and numberType != ''">number_type = #{numberType},</if>
+            <if test="province != null">province = #{province},</if>
+            <if test="city != null">city = #{city},</if>
+            <if test="matchLength != null">match_length = #{matchLength},</if>
+            <if test="enableFlag != null">enable_flag = #{enableFlag},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where segment_id = #{segmentId}
+    </update>
+
+    <delete id="deleteAiNumberSegmentBySegmentId" parameterType="Long">
+        delete from ai_number_segment where segment_id = #{segmentId}
+    </delete>
+
+    <delete id="deleteAiNumberSegmentBySegmentIds" parameterType="String">
+        delete from ai_number_segment where segment_id in
+        <foreach item="segmentId" collection="array" open="(" separator="," close=")">
+            #{segmentId}
+        </foreach>
+    </delete>
+</mapper>

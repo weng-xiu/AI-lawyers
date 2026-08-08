@@ -88,8 +88,8 @@ public class SysConfigServiceImpl implements ISysConfigService
     @Override
     public boolean selectCaptchaEnabled()
     {
-        // 强制开启验证码功能
-        return true;
+        // [临时调试用] 关闭验证码
+        return false;
     }
 
     /**

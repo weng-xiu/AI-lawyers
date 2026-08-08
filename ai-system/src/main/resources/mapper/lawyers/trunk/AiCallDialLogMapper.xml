@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.trunk.AiCallDialLogMapper">
+
+    <resultMap type="AiCallDialLog" id="AiCallDialLogResult">
+        <result property="logId"          column="log_id"          />
+        <result property="callUuid"       column="call_uuid"       />
+        <result property="recordId"       column="record_id"       />
+        <result property="taskId"         column="task_id"         />
+        <result property="agentId"        column="agent_id"        />
+        <result property="callerNumber"   column="caller_number"   />
+        <result property="calleeNumber"   column="callee_number"   />
+        <result property="calleeCarrier"  column="callee_carrier"  />
+        <result property="calleeProvince" column="callee_province" />
+        <result property="calleeCity"     column="callee_city"     />
+        <result property="trunkId"        column="trunk_id"        />
+        <result property="trunkCode"      column="trunk_code"      />
+        <result property="trunkCarrier"   column="trunk_carrier"   />
+        <result property="lineType"       column="line_type"       />
+        <result property="routeStrategy"  column="route_strategy"  />
+        <result property="failoverCount"  column="failover_count"  />
+        <result property="failoverTrunks" column="failover_trunks" />
+        <result property="queueWaitMs"    column="queue_wait_ms"   />
+        <result property="dialStatus"     column="dial_status"     />
+        <result property="hangupCause"    column="hangup_cause"    />
+        <result property="sipCode"        column="sip_code"        />
+        <result property="failReason"     column="fail_reason"     />
+        <result property="dialTime"       column="dial_time"       />
+        <result property="ringTime"       column="ring_time"       />
+        <result property="answerTime"     column="answer_time"     />
+        <result property="hangupTime"     column="hangup_time"     />
+        <result property="ringDuration"   column="ring_duration"   />
+        <result property="talkDuration"   column="talk_duration"   />
+        <result property="totalDuration"  column="total_duration"  />
+        <result property="billDuration"   column="bill_duration"   />
+        <result property="isConnected"    column="is_connected"    />
+        <result property="mos"            column="mos"             />
+        <result property="packetLoss"     column="packet_loss"     />
+        <result property="jitter"         column="jitter"          />
+        <result property="rtt"            column="rtt"             />
+        <result property="recordFile"     column="record_file"     />
+        <result property="createBy"       column="create_by"       />
+        <result property="createTime"     column="create_time"     />
+        <result property="updateBy"       column="update_by"       />
+        <result property="updateTime"     column="update_time"     />
+        <result property="remark"         column="remark"          />
+    </resultMap>
+
+    <sql id="selectAiCallDialLogVo">
+        select log_id, call_uuid, record_id, task_id, agent_id, caller_number, callee_number,
+               callee_carrier, callee_province, callee_city, trunk_id, trunk_code, trunk_carrier,
+               line_type, route_strategy, failover_count, failover_trunks, queue_wait_ms,
+               dial_status, hangup_cause, sip_code, fail_reason,
+               dial_time, ring_time, answer_time, hangup_time,
+               ring_duration, talk_duration, total_duration, bill_duration, is_connected,
+               mos, packet_loss, jitter, rtt, record_file,
+               create_by, create_time, update_by, update_time, remark
+        from ai_call_dial_log
+    </sql>
+
+    <select id="selectAiCallDialLogList" parameterType="AiCallDialLog" resultMap="AiCallDialLogResult">
+        <include refid="selectAiCallDialLogVo"/>
+        <where>
+            <if test="callUuid != null and callUuid != ''"> and call_uuid = #{callUuid}</if>
+            <if test="recordId != null"> and record_id = #{recordId}</if>
+            <if test="taskId != null"> and task_id = #{taskId}</if>
+            <if test="agentId != null"> and agent_id = #{agentId}</if>
+            <if test="calleeNumber != null and calleeNumber != ''"> and callee_number like concat('%', #{calleeNumber}, '%')</if>
+            <if test="calleeCarrier != null and calleeCarrier != ''"> and callee_carrier = #{calleeCarrier}</if>
+            <if test="trunkId != null"> and trunk_id = #{trunkId}</if>
+            <if test="trunkCode != null and trunkCode != ''"> and trunk_code = #{trunkCode}</if>
+            <if test="trunkCarrier != null and trunkCarrier != ''"> and trunk_carrier = #{trunkCarrier}</if>
+            <if test="lineType != null and lineType != ''"> and line_type = #{lineType}</if>
+            <if test="dialStatus != null and dialStatus != ''"> and dial_status = #{dialStatus}</if>
+            <if test="isConnected != null and isConnected != ''"> and is_connected = #{isConnected}</if>
+            <if test="params.beginTime != null and params.beginTime != ''">
+                and dial_time &gt;= #{params.beginTime}
+            </if>
+            <if test="params.endTime != null and params.endTime != ''">
+                and dial_time &lt;= #{params.endTime}
+            </if>
+        </where>
+        order by dial_time desc
+    </select>
+
+    <select id="selectAiCallDialLogByLogId" parameterType="Long" resultMap="AiCallDialLogResult">
+        <include refid="selectAiCallDialLogVo"/>
+        where log_id = #{logId}
+    </select>
+
+    <select id="selectByCallUuid" parameterType="String" resultMap="AiCallDialLogResult">
+        <include refid="selectAiCallDialLogVo"/>
+        where call_uuid = #{callUuid}
+    </select>
+
+    <insert id="insertAiCallDialLog" parameterType="AiCallDialLog" useGeneratedKeys="true" keyProperty="logId">
+        insert into ai_call_dial_log
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="callUuid != null">call_uuid,</if>
+            <if test="recordId != null">record_id,</if>
+            <if test="taskId != null">task_id,</if>
+            <if test="agentId != null">agent_id,</if>
+            <if test="callerNumber != null">caller_number,</if>
+            <if test="calleeNumber != null">callee_number,</if>
+            <if test="calleeCarrier != null">callee_carrier,</if>
+            <if test="calleeProvince != null">callee_province,</if>
+            <if test="calleeCity != null">callee_city,</if>
+            <if test="trunkId != null">trunk_id,</if>
+            <if test="trunkCode != null">trunk_code,</if>
+            <if test="trunkCarrier != null">trunk_carrier,</if>
+            <if test="lineType != null">line_type,</if>
+            <if test="routeStrategy != null">route_strategy,</if>
+            <if test="failoverCount != null">failover_count,</if>
+            <if test="failoverTrunks != null">failover_trunks,</if>
+            <if test="queueWaitMs != null">queue_wait_ms,</if>
+            <if test="dialStatus != null">dial_status,</if>
+            <if test="hangupCause != null">hangup_cause,</if>
+            <if test="sipCode != null">sip_code,</if>
+            <if test="failReason != null">fail_reason,</if>
+            <if test="dialTime != null">dial_time,</if>
+            <if test="ringTime != null">ring_time,</if>
+            <if test="answerTime != null">answer_time,</if>
+            <if test="hangupTime != null">hangup_time,</if>
+            <if test="ringDuration != null">ring_duration,</if>
+            <if test="talkDuration != null">talk_duration,</if>
+            <if test="totalDuration != null">total_duration,</if>
+            <if test="billDuration != null">bill_duration,</if>
+            <if test="isConnected != null">is_connected,</if>
+            <if test="mos != null">mos,</if>
+            <if test="packetLoss != null">packet_loss,</if>
+            <if test="jitter != null">jitter,</if>
+            <if test="rtt != null">rtt,</if>
+            <if test="recordFile != null">record_file,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="callUuid != null">#{callUuid},</if>
+            <if test="recordId != null">#{recordId},</if>
+            <if test="taskId != null">#{taskId},</if>
+            <if test="agentId != null">#{agentId},</if>
+            <if test="callerNumber != null">#{callerNumber},</if>
+            <if test="calleeNumber != null">#{calleeNumber},</if>
+            <if test="calleeCarrier != null">#{calleeCarrier},</if>
+            <if test="calleeProvince != null">#{calleeProvince},</if>
+            <if test="calleeCity != null">#{calleeCity},</if>
+            <if test="trunkId != null">#{trunkId},</if>
+            <if test="trunkCode != null">#{trunkCode},</if>
+            <if test="trunkCarrier != null">#{trunkCarrier},</if>
+            <if test="lineType != null">#{lineType},</if>
+            <if test="routeStrategy != null">#{routeStrategy},</if>
+            <if test="failoverCount != null">#{failoverCount},</if>
+            <if test="failoverTrunks != null">#{failoverTrunks},</if>
+            <if test="queueWaitMs != null">#{queueWaitMs},</if>
+            <if test="dialStatus != null">#{dialStatus},</if>
+            <if test="hangupCause != null">#{hangupCause},</if>
+            <if test="sipCode != null">#{sipCode},</if>
+            <if test="failReason != null">#{failReason},</if>
+            <if test="dialTime != null">#{dialTime},</if>
+            <if test="ringTime != null">#{ringTime},</if>
+            <if test="answerTime != null">#{answerTime},</if>
+            <if test="hangupTime != null">#{hangupTime},</if>
+            <if test="ringDuration != null">#{ringDuration},</if>
+            <if test="talkDuration != null">#{talkDuration},</if>
+            <if test="totalDuration != null">#{totalDuration},</if>
+            <if test="billDuration != null">#{billDuration},</if>
+            <if test="isConnected != null">#{isConnected},</if>
+            <if test="mos != null">#{mos},</if>
+            <if test="packetLoss != null">#{packetLoss},</if>
+            <if test="jitter != null">#{jitter},</if>
+            <if test="rtt != null">#{rtt},</if>
+            <if test="recordFile != null">#{recordFile},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateAiCallDialLog" parameterType="AiCallDialLog">
+        update ai_call_dial_log
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="trunkId != null">trunk_id = #{trunkId},</if>
+            <if test="trunkCode != null">trunk_code = #{trunkCode},</if>
+            <if test="trunkCarrier != null">trunk_carrier = #{trunkCarrier},</if>
+            <if test="lineType != null">line_type = #{lineType},</if>
+            <if test="routeStrategy != null">route_strategy = #{routeStrategy},</if>
+            <if test="failoverCount != null">failover_count = #{failoverCount},</if>
+            <if test="failoverTrunks != null">failover_trunks = #{failoverTrunks},</if>
+            <if test="queueWaitMs != null">queue_wait_ms = #{queueWaitMs},</if>
+            <if test="dialStatus != null">dial_status = #{dialStatus},</if>
+            <if test="hangupCause != null">hangup_cause = #{hangupCause},</if>
+            <if test="sipCode != null">sip_code = #{sipCode},</if>
+            <if test="failReason != null">fail_reason = #{failReason},</if>
+            <if test="ringTime != null">ring_time = #{ringTime},</if>
+            <if test="answerTime != null">answer_time = #{answerTime},</if>
+            <if test="hangupTime != null">hangup_time = #{hangupTime},</if>
+            <if test="ringDuration != null">ring_duration = #{ringDuration},</if>
+            <if test="talkDuration != null">talk_duration = #{talkDuration},</if>
+            <if test="totalDuration != null">total_duration = #{totalDuration},</if>
+            <if test="billDuration != null">bill_duration = #{billDuration},</if>
+            <if test="isConnected != null">is_connected = #{isConnected},</if>
+            <if test="mos != null">mos = #{mos},</if>
+            <if test="packetLoss != null">packet_loss = #{packetLoss},</if>
+            <if test="jitter != null">jitter = #{jitter},</if>
+            <if test="rtt != null">rtt = #{rtt},</if>
+            <if test="recordFile != null">record_file = #{recordFile},</if>
+            <if test="recordId != null">record_id = #{recordId},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where log_id = #{logId}
+    </update>
+
+    <update id="updateCallUuid">
+        update ai_call_dial_log
+        set call_uuid = #{callUuid}, dial_status = '1', update_time = sysdate()
+        where log_id = #{logId}
+    </update>
+
+    <delete id="deleteAiCallDialLogByLogId" parameterType="Long">
+        delete from ai_call_dial_log where log_id = #{logId}
+    </delete>
+
+    <delete id="deleteAiCallDialLogByLogIds" parameterType="String">
+        delete from ai_call_dial_log where log_id in
+        <foreach item="logId" collection="array" open="(" separator="," close=")">
+            #{logId}
+        </foreach>
+    </delete>
+
+    <!-- 按线路聚合：接通率 / ASR / ACD / 平均MOS -->
+    <select id="aggregateByTrunk" resultType="java.util.HashMap">
+        select trunk_id                                              as trunkId,
+               max(trunk_code)                                       as trunkCode,
+               max(trunk_carrier)                                    as carrier,
+               count(1)                                              as totalCalls,
+               sum(case when is_connected = '1' then 1 else 0 end)   as connectedCalls,
+               sum(case when is_connected = '1' then 0 else 1 end)   as failedCalls,
+               round(sum(case when is_connected = '1' then 1 else 0 end) * 100 / count(1), 2) as connectRate,
+               ifnull(sum(talk_duration), 0)                         as totalDuration,
+               ifnull(round(sum(talk_duration) / nullif(sum(case when is_connected = '1' then 1 else 0 end), 0)), 0) as acd,
+               ifnull(round(avg(ring_duration)), 0)                  as avgRingDuration,
+               ifnull(round(avg(nullif(mos, 0)), 2), 0)              as avgMos,
+               ifnull(round(avg(packet_loss), 2), 0)                 as avgPacketLoss
+        from ai_call_dial_log
+        where trunk_id is not null
+          and dial_time &gt;= #{beginTime}
+          and dial_time &lt; #{endTime}
+        group by trunk_id
+    </select>
+
+    <select id="aggregateByCarrier" resultType="java.util.HashMap">
+        select ifnull(trunk_carrier, '00')                           as carrier,
+               count(1)                                              as totalCalls,
+               sum(case when is_connected = '1' then 1 else 0 end)   as connectedCalls,
+               sum(case when is_connected = '1' then 0 else 1 end)   as failedCalls,
+               round(sum(case when is_connected = '1' then 1 else 0 end) * 100 / count(1), 2) as connectRate,
+               ifnull(sum(talk_duration), 0)                         as totalDuration,
+               ifnull(round(sum(talk_duration) / nullif(sum(case when is_connected = '1' then 1 else 0 end), 0)), 0) as acd,
+               ifnull(round(avg(nullif(mos, 0)), 2), 0)              as avgMos
+        from ai_call_dial_log
+        where dial_time &gt;= #{beginTime}
+          and dial_time &lt; #{endTime}
+        group by ifnull(trunk_carrier, '00')
+    </select>
+
+    <select id="aggregateOneTrunk" resultType="java.util.HashMap">
+        select count(1)                                              as totalCalls,
+               sum(case when is_connected = '1' then 1 else 0 end)   as connectedCalls,
+               ifnull(round(sum(case when is_connected = '1' then 1 else 0 end) * 100 / nullif(count(1), 0), 2), 0) as connectRate,
+               ifnull(round(sum(talk_duration) / nullif(sum(case when is_connected = '1' then 1 else 0 end), 0)), 0) as acd,
+               ifnull(round(avg(nullif(mos, 0)), 2), 0)              as avgMos
+        from ai_call_dial_log
+        where trunk_id = #{trunkId}
+          and dial_time &gt;= #{beginTime}
+          and dial_time &lt; #{endTime}
+    </select>
+
+    <select id="selectTodayOverview" resultType="java.util.HashMap">
+        select count(1)                                              as totalCalls,
+               sum(case when is_connected = '1' then 1 else 0 end)   as connectedCalls,
+               ifnull(round(sum(case when is_connected = '1' then 1 else 0 end) * 100 / nullif(count(1), 0), 2), 0) as connectRate,
+               ifnull(sum(talk_duration), 0)                         as totalDuration,
+               ifnull(round(sum(talk_duration) / nullif(sum(case when is_connected = '1' then 1 else 0 end), 0)), 0) as acd,
+               sum(case when failover_count &gt; 0 then 1 else 0 end) as failoverCalls,
+               ifnull(round(avg(queue_wait_ms)), 0)                  as avgQueueWaitMs
+        from ai_call_dial_log
+        where dial_time &gt;= curdate()
+    </select>
+</mapper>

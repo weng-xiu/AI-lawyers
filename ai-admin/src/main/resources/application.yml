@@ -131,3 +131,69 @@ xss:
   excludes: /system/notice
   # 匹配链接
   urlPatterns: /system/*,/monitor/*,/tool/*
+
+# ============================================================
+# 运营商线路对接与外呼调度配置
+# ============================================================
+call:
+  # ---------- 呼叫调度 ----------
+  dispatch:
+    # 全局最大并发呼叫数（应小于所有线路 max_concurrent 之和）
+    maxGlobalConcurrent: 200
+    # 是否启用排队机制
+    queueEnabled: true
+    # 排队队列容量，超出后拒绝新呼叫并告警
+    queueCapacity: 2000
+    # 排队最长等待时间(ms)，超时丢弃
+    queueTimeoutMs: 60000
+    # 调度线程轮询间隔(ms)
+    scanIntervalMs: 200
+
+  # ---------- 线路监控与告警 ----------
+  monitor:
+    # 监控定时任务总开关
+    enabled: true
+    # 健康探测间隔(ms)
+    healthCheckIntervalMs: 30000
+    # 熔断恢复探测间隔(ms)
+    circuitRecoverIntervalMs: 30000
+    # 熔断冷却时长(秒)，冷却结束后半开探测
+    circuitCooldownSeconds: 120
+    # 质量指标聚合 cron（每分钟第5秒统计上一分钟）
+    metricCron: 5 * * * * ?
+    # 质量告警评估间隔(ms)
+    alarmIntervalMs: 120000
+    # 同线路同类型告警抑制窗口(分钟)
+    alarmSuppressMinutes: 10
+    # 接通率告警最小样本量，低于该值不告警避免误报
+    minSampleForAlarm: 20
+    # 并发使用率告警阈值(%)
+    concurrentPercentThreshold: 90
+    # MOS 语音质量告警阈值
+    mosThreshold: 3.0
+
+  # ---------- 语音网关 / CTI 中间件 ----------
+  gateway:
+    # FreeSWITCH ESL
+    freeswitch:
+      eslPort: 8021
+      eslPassword: ClueCon
+      timeout: 5000
+      context: default
+    # Asterisk AMI
+    asterisk:
+      amiPort: 5038
+      amiUser: admin
+      amiPassword: amp111
+      timeout: 5000
+      context: from-internal
+    # 通用 HTTP OpenAPI 网关（云 CTI / SBC 北向接口）
+    http:
+      originatePath: /call/originate
+      hangupPath: /call/hangup
+      transferPath: /call/transfer
+      statusPath: /trunk/status
+      timeout: 5000
+    # 模拟网关（无真实网关时兜底，successRate 可用于验证故障切换）
+    simulator:
+      successRate: 100

@@ -94,6 +94,9 @@
             <span>{{ profileData.emotionWarning }}</span>
           </div>
         </el-card>
+
+        <!-- 独立 AI 律师辅助面板（与人工接听链路分离，仅以 currentRecordId 关联） -->
+        <ai-assist-panel v-if="connected" :record-id="currentRecordId" />
       </el-col>
 
       <!-- 右侧：5 标签页 -->
@@ -226,10 +229,12 @@
 
 <script>
 import { getCallerProfile, getCallerHistory, getCallerTickets, getCallerTrack, updateCallerProfile } from "@/api/lawyers/callPopup"
-import { autoFillLedger, addLedger, transferCall, holdCall } from "@/api/lawyers/callCenter"
+import { autoFillLedger, addLedger, transferCall, holdCall, makeCall } from "@/api/lawyers/callCenter"
+import AiAssistPanel from "./AiAssistPanel.vue"
 
 export default {
   name: "CallPopup",
+  components: { AiAssistPanel },
   data() {
     return {
       connected: false,
@@ -243,7 +248,9 @@ export default {
       ticketList: [],
       trackList: [],
       editOpen: false,
-      profileForm: {}
+      profileForm: {},
+      // 人工通话记录ID，仅作为人工链路与AI辅助链路的关联桥梁，不驱动人工状态
+      currentRecordId: null
     }
   },
   computed: {
@@ -316,6 +323,14 @@ export default {
       this.connected = true
       this.startTimer()
       this.$message.success('已接听来电')
+      // 人工接听：建立人工通话记录（后端会异步触发独立的 AI 辅助会话）
+      const agentId = this.$store.getters.id || 1
+      makeCall({ agentId, callerNumber: this.profileData.callerNumber, callDirection: '0' }).then(res => {
+        const data = res.data || res
+        // currentRecordId 仅作为人工链路与AI辅助链路的关联桥梁
+        this.currentRecordId = data.recordId || (data.data && data.data.recordId) || data
+        if (data.sessionId) this.currentRecordId = data.recordId
+      }).catch(() => {})
     },
     startTimer() {
       this.timer = setInterval(() => { this.seconds++; this.callDuration = this.formatTime(this.seconds) }, 1000)

@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.trunk.AiTrunkAlarmMapper">
+
+    <resultMap type="AiTrunkAlarm" id="AiTrunkAlarmResult">
+        <result property="alarmId"        column="alarm_id"        />
+        <result property="trunkId"        column="trunk_id"        />
+        <result property="trunkCode"      column="trunk_code"      />
+        <result property="carrier"        column="carrier"         />
+        <result property="alarmType"      column="alarm_type"      />
+        <result property="alarmLevel"     column="alarm_level"     />
+        <result property="alarmTitle"     column="alarm_title"     />
+        <result property="alarmContent"   column="alarm_content"   />
+        <result property="metricValue"    column="metric_value"    />
+        <result property="thresholdValue" column="threshold_value" />
+        <result property="alarmStatus"    column="alarm_status"    />
+        <result property="alarmTime"      column="alarm_time"      />
+        <result property="recoverTime"    column="recover_time"    />
+        <result property="handleBy"       column="handle_by"       />
+        <result property="handleTime"     column="handle_time"     />
+        <result property="handleRemark"   column="handle_remark"   />
+        <result property="createTime"     column="create_time"     />
+    </resultMap>
+
+    <sql id="selectAiTrunkAlarmVo">
+        select alarm_id, trunk_id, trunk_code, carrier, alarm_type, alarm_level, alarm_title,
+               alarm_content, metric_value, threshold_value, alarm_status, alarm_time,
+               recover_time, handle_by, handle_time, handle_remark, create_time
+        from ai_trunk_alarm
+    </sql>
+
+    <select id="selectAiTrunkAlarmList" parameterType="AiTrunkAlarm" resultMap="AiTrunkAlarmResult">
+        <include refid="selectAiTrunkAlarmVo"/>
+        <where>
+            <if test="trunkId != null"> and trunk_id = #{trunkId}</if>
+            <if test="trunkCode != null and trunkCode != ''"> and trunk_code like concat('%', #{trunkCode}, '%')</if>
+            <if test="carrier != null and carrier != ''"> and carrier = #{carrier}</if>
+            <if test="alarmType != null and alarmType != ''"> and alarm_type = #{alarmType}</if>
+            <if test="alarmLevel != null and alarmLevel != ''"> and alarm_level = #{alarmLevel}</if>
+            <if test="alarmStatus != null and alarmStatus != ''"> and alarm_status = #{alarmStatus}</if>
+            <if test="params.beginTime != null and params.beginTime != ''">
+                and alarm_time &gt;= #{params.beginTime}
+            </if>
+            <if test="params.endTime != null and params.endTime != ''">
+                and alarm_time &lt;= #{params.endTime}
+            </if>
+        </where>
+        order by alarm_time desc
+    </select>
+
+    <select id="selectAiTrunkAlarmByAlarmId" parameterType="Long" resultMap="AiTrunkAlarmResult">
+        <include refid="selectAiTrunkAlarmVo"/>
+        where alarm_id = #{alarmId}
+    </select>
+
+    <select id="selectActiveAlarms" resultMap="AiTrunkAlarmResult">
+        <include refid="selectAiTrunkAlarmVo"/>
+        where alarm_status = '0'
+        order by alarm_level desc, alarm_time desc
+        limit 200
+    </select>
+
+    <select id="selectActiveSameAlarm" resultMap="AiTrunkAlarmResult">
+        <include refid="selectAiTrunkAlarmVo"/>
+        where trunk_id = #{trunkId}
+          and alarm_type = #{alarmType}
+          and alarm_status in ('0','1')
+          and alarm_time &gt;= #{since}
+        order by alarm_time desc
+        limit 1
+    </select>
+
+    <insert id="insertAiTrunkAlarm" parameterType="AiTrunkAlarm" useGeneratedKeys="true" keyProperty="alarmId">
+        insert into ai_trunk_alarm
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="trunkId != null">trunk_id,</if>
+            <if test="trunkCode != null">trunk_code,</if>
+            <if test="carrier != null">carrier,</if>
+            <if test="alarmType != null">alarm_type,</if>
+            <if test="alarmLevel != null">alarm_level,</if>
+            <if test="alarmTitle != null">alarm_title,</if>
+            <if test="alarmContent != null">alarm_content,</if>
+            <if test="metricValue != null">metric_value,</if>
+            <if test="thresholdValue != null">threshold_value,</if>
+            <if test="alarmStatus != null">alarm_status,</if>
+            <if test="alarmTime != null">alarm_time,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="trunkId != null">#{trunkId},</if>
+            <if test="trunkCode != null">#{trunkCode},</if>
+            <if test="carrier != null">#{carrier},</if>
+            <if test="alarmType != null">#{alarmType},</if>
+            <if test="alarmLevel != null">#{alarmLevel},</if>
+            <if test="alarmTitle != null">#{alarmTitle},</if>
+            <if test="alarmContent != null">#{alarmContent},</if>
+            <if test="metricValue != null">#{metricValue},</if>
+            <if test="thresholdValue != null">#{thresholdValue},</if>
+            <if test="alarmStatus != null">#{alarmStatus},</if>
+            <if test="alarmTime != null">#{alarmTime},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateAiTrunkAlarm" parameterType="AiTrunkAlarm">
+        update ai_trunk_alarm
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="alarmStatus != null">alarm_status = #{alarmStatus},</if>
+            <if test="recoverTime != null">recover_time = #{recoverTime},</if>
+            <if test="handleBy != null">handle_by = #{handleBy},</if>
+            <if test="handleTime != null">handle_time = #{handleTime},</if>
+            <if test="handleRemark != null">handle_remark = #{handleRemark},</if>
+        </trim>
+        where alarm_id = #{alarmId}
+    </update>
+
+    <update id="recoverAlarms">
+        update ai_trunk_alarm
+        set alarm_status = '2', recover_time = sysdate()
+        where trunk_id = #{trunkId}
+          and alarm_status in ('0','1')
+          <if test="alarmType != null and alarmType != ''"> and alarm_type = #{alarmType}</if>
+    </update>
+
+    <delete id="deleteAiTrunkAlarmByAlarmIds" parameterType="String">
+        delete from ai_trunk_alarm where alarm_id in
+        <foreach item="alarmId" collection="array" open="(" separator="," close=")">
+            #{alarmId}
+        </foreach>
+    </delete>
+</mapper>

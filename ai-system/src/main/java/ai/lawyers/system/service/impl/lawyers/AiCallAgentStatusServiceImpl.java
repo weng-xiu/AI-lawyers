@@ -2,22 +2,47 @@ package ai.lawyers.system.service.impl.lawyers;
 
 import java.util.Date;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import ai.lawyers.system.domain.lawyers.AiCallAgentStatus;
 import ai.lawyers.system.domain.lawyers.AiCallRecord;
 import ai.lawyers.system.mapper.lawyers.AiCallAgentStatusMapper;
+import ai.lawyers.system.domain.lawyers.trunk.DialRequest;
+import ai.lawyers.system.domain.lawyers.trunk.DialResult;
+import ai.lawyers.system.service.lawyers.IAiAiCallSessionService;
 import ai.lawyers.system.service.lawyers.IAiCallAgentStatusService;
 import ai.lawyers.system.service.lawyers.IAiCallRecordService;
+import ai.lawyers.system.service.lawyers.trunk.ICallDispatchService;
 
 @Service
 public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
 {
+    private static final Logger log = LoggerFactory.getLogger(AiCallAgentStatusServiceImpl.class);
+
     @Autowired
     private AiCallAgentStatusMapper aiCallAgentStatusMapper;
 
     @Autowired
     private IAiCallRecordService aiCallRecordService;
+
+    /**
+     * AI律师辅助会话服务（独立链路）。
+     * 此处仅为"人工接听"提供一个解耦的异步触发入口：
+     * 人工接听建立通话后，异步启动 AI 辅助会话，二者状态管理互不影响。
+     */
+    @Autowired
+    private IAiAiCallSessionService aiAiCallSessionService;
+
+    /**
+     * 运营商线路外呼调度器（新建链路）。
+     * 人工坐席点击外呼时，将通话交由该调度器完成号码归属识别、线路选择、
+     * 并发控制、排队与故障切换，最终下发到对应运营商 SIP/PSTN 网关。
+     */
+    @Autowired
+    private ICallDispatchService callDispatchService;
 
     @Override
     public AiCallAgentStatus selectAiCallAgentStatusByAgentId(Long agentId)
@@ -135,14 +160,81 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
         record.setCreateBy(agent.getAgentName());
         aiCallRecordService.insertAiCallRecord(record);
 
-        // 更新座席当前通话状态
+        // 更新座席当前通话状态（人工链路状态机，独立维护）
         agent.setCallStatus("1");
         agent.setCurrentCallId(record.getRecordId());
         agent.setCurrentCallPhone(phone);
         agent.setCallStartTime(new Date());
         agent.setStatus("2");
         aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+
+        // 解耦触发：人工接听后异步启动 AI 辅助会话（独立链路，不影响人工状态机）
+        triggerAiAssistAsync(record.getRecordId(), agentId, phone, agent.getAgentName());
+
+        // 经运营商线路调度器下发外呼（号码归属识别 → 选路 → 并发控制 → 故障切换）
+        dispatchOutbound(record, agent);
+
         return agent;
+    }
+
+    /**
+     * 将人工外呼交由运营商线路调度器下发。
+     * 调度器基于被叫号码前缀识别归属运营商，自动选择对应 SIP/PSTN 线路，
+     * 并完成并发控制、排队与故障自动切换。下发结果仅影响人工链路状态机，
+     * 不会反向阻塞或破坏 AI 辅助会话链路。
+     */
+    @Async
+    public void dispatchOutbound(AiCallRecord record, AiCallAgentStatus agent)
+    {
+        try
+        {
+            DialRequest req = new DialRequest();
+            req.setCalleeNumber(agent.getCurrentCallPhone());
+            req.setAgentId(agent.getAgentId());
+            req.setRecordId(record.getRecordId());
+            req.setCallerNumber(record.getCallerNumber());
+            DialResult result = callDispatchService.dialWithQueue(req);
+            if (result == null || !result.isSuccess())
+            {
+                // 无可用线路或下发失败：回滚人工链路状态机，避免座席"假忙"
+                agent.setCallStatus("0");
+                agent.setCurrentCallId(null);
+                agent.setCurrentCallPhone(null);
+                agent.setCallStartTime(null);
+                agent.setStatus("1");
+                aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+                log.warn("[makeCall] 运营商线路下发失败，已回滚座席状态 recordId={} reason={}",
+                        record.getRecordId(), result == null ? "null" : result.getMessage());
+            }
+        }
+        catch (Exception e)
+        {
+            log.error("[makeCall] 运营商线路下发异常 recordId={}", record.getRecordId(), e);
+            agent.setCallStatus("0");
+            agent.setCurrentCallId(null);
+            agent.setCurrentCallPhone(null);
+            agent.setCallStartTime(null);
+            agent.setStatus("1");
+            aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+        }
+    }
+
+    /**
+     * 独立触发 AI 辅助会话（异步，失败不影响人工通话）。
+     * 这是人工链路与 AI 辅助链路之间唯一的"触发边界"，通过异步解耦，
+     * AI 辅助会话后续的状态流转完全在 AiAiCallSessionServiceImpl 内部独立管理。
+     */
+    @Async
+    public void triggerAiAssistAsync(Long recordId, Long agentId, String phone, String agentName)
+    {
+        try
+        {
+            aiAiCallSessionService.startAssistSession(recordId, agentId, phone, agentName);
+        }
+        catch (Exception ignored)
+        {
+            // AI辅助启动失败绝不影响人工通话
+        }
     }
 
     @Override

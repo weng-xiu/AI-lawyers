@@ -1,0 +1,313 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.trunk.AiCallTrunkMapper">
+
+    <resultMap type="AiCallTrunk" id="AiCallTrunkResult">
+        <result property="trunkId"            column="trunk_id"            />
+        <result property="trunkCode"          column="trunk_code"          />
+        <result property="trunkName"          column="trunk_name"          />
+        <result property="carrier"            column="carrier"             />
+        <result property="lineType"           column="line_type"           />
+        <result property="vendor"             column="vendor"              />
+        <result property="protocol"           column="protocol"            />
+        <result property="gatewayHost"        column="gateway_host"        />
+        <result property="gatewayPort"        column="gateway_port"        />
+        <result property="transport"          column="transport"           />
+        <result property="apiBaseUrl"         column="api_base_url"        />
+        <result property="authUser"           column="auth_user"           />
+        <result property="authPassword"       column="auth_password"       />
+        <result property="realm"              column="realm"               />
+        <result property="callerPrefix"       column="caller_prefix"       />
+        <result property="callerDisplay"      column="caller_display"      />
+        <result property="stripDigits"        column="strip_digits"        />
+        <result property="addPrefix"          column="add_prefix"          />
+        <result property="maxConcurrent"      column="max_concurrent"      />
+        <result property="currentConcurrent"  column="current_concurrent"  />
+        <result property="cpsLimit"           column="cps_limit"           />
+        <result property="priority"           column="priority"            />
+        <result property="weight"             column="weight"              />
+        <result property="isBackup"           column="is_backup"           />
+        <result property="healthStatus"       column="health_status"       />
+        <result property="enableFlag"         column="enable_flag"         />
+        <result property="lastCheckTime"      column="last_check_time"     />
+        <result property="lastSuccessTime"    column="last_success_time"   />
+        <result property="lastFailTime"       column="last_fail_time"      />
+        <result property="failCount"          column="fail_count"          />
+        <result property="circuitOpenTime"    column="circuit_open_time"   />
+        <result property="connectRate"        column="connect_rate"        />
+        <result property="asr"                column="asr"                 />
+        <result property="acd"                column="acd"                 />
+        <result property="mos"                column="mos"                 />
+        <result property="totalCalls"         column="total_calls"         />
+        <result property="successCalls"       column="success_calls"       />
+        <result property="totalDuration"      column="total_duration"      />
+        <result property="alarmConnectRate"   column="alarm_connect_rate"  />
+        <result property="alarmFailTimes"     column="alarm_fail_times"    />
+        <result property="delFlag"            column="del_flag"            />
+        <result property="createBy"           column="create_by"           />
+        <result property="createTime"         column="create_time"         />
+        <result property="updateBy"           column="update_by"           />
+        <result property="updateTime"         column="update_time"         />
+        <result property="remark"             column="remark"              />
+    </resultMap>
+
+    <sql id="selectAiCallTrunkVo">
+        select trunk_id, trunk_code, trunk_name, carrier, line_type, vendor, protocol,
+               gateway_host, gateway_port, transport, api_base_url, auth_user, auth_password, realm,
+               caller_prefix, caller_display, strip_digits, add_prefix,
+               max_concurrent, current_concurrent, cps_limit, priority, weight, is_backup,
+               health_status, enable_flag, last_check_time, last_success_time, last_fail_time,
+               fail_count, circuit_open_time, connect_rate, asr, acd, mos,
+               total_calls, success_calls, total_duration, alarm_connect_rate, alarm_fail_times,
+               del_flag, create_by, create_time, update_by, update_time, remark
+        from ai_call_trunk
+    </sql>
+
+    <select id="selectAiCallTrunkList" parameterType="AiCallTrunk" resultMap="AiCallTrunkResult">
+        <include refid="selectAiCallTrunkVo"/>
+        <where>
+            del_flag = '0'
+            <if test="trunkCode != null and trunkCode != ''"> and trunk_code like concat('%', #{trunkCode}, '%')</if>
+            <if test="trunkName != null and trunkName != ''"> and trunk_name like concat('%', #{trunkName}, '%')</if>
+            <if test="carrier != null and carrier != ''"> and carrier = #{carrier}</if>
+            <if test="lineType != null and lineType != ''"> and line_type = #{lineType}</if>
+            <if test="vendor != null and vendor != ''"> and vendor = #{vendor}</if>
+            <if test="healthStatus != null and healthStatus != ''"> and health_status = #{healthStatus}</if>
+            <if test="enableFlag != null and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
+        </where>
+        order by priority asc, weight desc, trunk_id asc
+    </select>
+
+    <select id="selectAiCallTrunkByTrunkId" parameterType="Long" resultMap="AiCallTrunkResult">
+        <include refid="selectAiCallTrunkVo"/>
+        where trunk_id = #{trunkId} and del_flag = '0'
+    </select>
+
+    <select id="selectAiCallTrunkByCode" parameterType="String" resultMap="AiCallTrunkResult">
+        <include refid="selectAiCallTrunkVo"/>
+        where trunk_code = #{trunkCode} and del_flag = '0'
+    </select>
+
+    <!-- 选路核心查询：指定运营商的可用线路 + 兜底线路(carrier='00')，健康状态 0/1/2 可选路 -->
+    <select id="selectAvailableTrunks" resultMap="AiCallTrunkResult">
+        <include refid="selectAiCallTrunkVo"/>
+        where del_flag = '0'
+          and enable_flag = '1'
+          and health_status in ('0','1','2')
+          and current_concurrent &lt; max_concurrent
+          <if test="carrier != null and carrier != ''">
+            and (carrier = #{carrier} or carrier = '00')
+          </if>
+        order by
+          <if test="carrier != null and carrier != ''">
+            case when carrier = #{carrier} then 0 else 1 end asc,
+          </if>
+          is_backup asc,
+          priority asc,
+          health_status asc,
+          weight desc,
+          current_concurrent asc
+    </select>
+
+    <select id="selectAllEnabledTrunks" resultMap="AiCallTrunkResult">
+        <include refid="selectAiCallTrunkVo"/>
+        where del_flag = '0' and enable_flag = '1'
+        order by carrier asc, priority asc
+    </select>
+
+    <insert id="insertAiCallTrunk" parameterType="AiCallTrunk" useGeneratedKeys="true" keyProperty="trunkId">
+        insert into ai_call_trunk
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="trunkCode != null and trunkCode != ''">trunk_code,</if>
+            <if test="trunkName != null and trunkName != ''">trunk_name,</if>
+            <if test="carrier != null and carrier != ''">carrier,</if>
+            <if test="lineType != null and lineType != ''">line_type,</if>
+            <if test="vendor != null">vendor,</if>
+            <if test="protocol != null">protocol,</if>
+            <if test="gatewayHost != null">gateway_host,</if>
+            <if test="gatewayPort != null">gateway_port,</if>
+            <if test="transport != null">transport,</if>
+            <if test="apiBaseUrl != null">api_base_url,</if>
+            <if test="authUser != null">auth_user,</if>
+            <if test="authPassword != null">auth_password,</if>
+            <if test="realm != null">realm,</if>
+            <if test="callerPrefix != null">caller_prefix,</if>
+            <if test="callerDisplay != null">caller_display,</if>
+            <if test="stripDigits != null">strip_digits,</if>
+            <if test="addPrefix != null">add_prefix,</if>
+            <if test="maxConcurrent != null">max_concurrent,</if>
+            <if test="cpsLimit != null">cps_limit,</if>
+            <if test="priority != null">priority,</if>
+            <if test="weight != null">weight,</if>
+            <if test="isBackup != null">is_backup,</if>
+            <if test="healthStatus != null">health_status,</if>
+            <if test="enableFlag != null">enable_flag,</if>
+            <if test="alarmConnectRate != null">alarm_connect_rate,</if>
+            <if test="alarmFailTimes != null">alarm_fail_times,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="trunkCode != null and trunkCode != ''">#{trunkCode},</if>
+            <if test="trunkName != null and trunkName != ''">#{trunkName},</if>
+            <if test="carrier != null and carrier != ''">#{carrier},</if>
+            <if test="lineType != null and lineType != ''">#{lineType},</if>
+            <if test="vendor != null">#{vendor},</if>
+            <if test="protocol != null">#{protocol},</if>
+            <if test="gatewayHost != null">#{gatewayHost},</if>
+            <if test="gatewayPort != null">#{gatewayPort},</if>
+            <if test="transport != null">#{transport},</if>
+            <if test="apiBaseUrl != null">#{apiBaseUrl},</if>
+            <if test="authUser != null">#{authUser},</if>
+            <if test="authPassword != null">#{authPassword},</if>
+            <if test="realm != null">#{realm},</if>
+            <if test="callerPrefix != null">#{callerPrefix},</if>
+            <if test="callerDisplay != null">#{callerDisplay},</if>
+            <if test="stripDigits != null">#{stripDigits},</if>
+            <if test="addPrefix != null">#{addPrefix},</if>
+            <if test="maxConcurrent != null">#{maxConcurrent},</if>
+            <if test="cpsLimit != null">#{cpsLimit},</if>
+            <if test="priority != null">#{priority},</if>
+            <if test="weight != null">#{weight},</if>
+            <if test="isBackup != null">#{isBackup},</if>
+            <if test="healthStatus != null">#{healthStatus},</if>
+            <if test="enableFlag != null">#{enableFlag},</if>
+            <if test="alarmConnectRate != null">#{alarmConnectRate},</if>
+            <if test="alarmFailTimes != null">#{alarmFailTimes},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateAiCallTrunk" parameterType="AiCallTrunk">
+        update ai_call_trunk
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="trunkCode != null and trunkCode != ''">trunk_code = #{trunkCode},</if>
+            <if test="trunkName != null and trunkName != ''">trunk_name = #{trunkName},</if>
+            <if test="carrier != null and carrier != ''">carrier = #{carrier},</if>
+            <if test="lineType != null and lineType != ''">line_type = #{lineType},</if>
+            <if test="vendor != null">vendor = #{vendor},</if>
+            <if test="protocol != null">protocol = #{protocol},</if>
+            <if test="gatewayHost != null">gateway_host = #{gatewayHost},</if>
+            <if test="gatewayPort != null">gateway_port = #{gatewayPort},</if>
+            <if test="transport != null">transport = #{transport},</if>
+            <if test="apiBaseUrl != null">api_base_url = #{apiBaseUrl},</if>
+            <if test="authUser != null">auth_user = #{authUser},</if>
+            <if test="authPassword != null and authPassword != ''">auth_password = #{authPassword},</if>
+            <if test="realm != null">realm = #{realm},</if>
+            <if test="callerPrefix != null">caller_prefix = #{callerPrefix},</if>
+            <if test="callerDisplay != null">caller_display = #{callerDisplay},</if>
+            <if test="stripDigits != null">strip_digits = #{stripDigits},</if>
+            <if test="addPrefix != null">add_prefix = #{addPrefix},</if>
+            <if test="maxConcurrent != null">max_concurrent = #{maxConcurrent},</if>
+            <if test="cpsLimit != null">cps_limit = #{cpsLimit},</if>
+            <if test="priority != null">priority = #{priority},</if>
+            <if test="weight != null">weight = #{weight},</if>
+            <if test="isBackup != null">is_backup = #{isBackup},</if>
+            <if test="healthStatus != null">health_status = #{healthStatus},</if>
+            <if test="enableFlag != null">enable_flag = #{enableFlag},</if>
+            <if test="lastCheckTime != null">last_check_time = #{lastCheckTime},</if>
+            <if test="failCount != null">fail_count = #{failCount},</if>
+            <if test="circuitOpenTime != null">circuit_open_time = #{circuitOpenTime},</if>
+            <if test="alarmConnectRate != null">alarm_connect_rate = #{alarmConnectRate},</if>
+            <if test="alarmFailTimes != null">alarm_fail_times = #{alarmFailTimes},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where trunk_id = #{trunkId}
+    </update>
+
+    <!-- 原子占位：并发未满才 +1，返回受影响行数 1 表示占用成功 -->
+    <update id="tryAcquireConcurrent">
+        update ai_call_trunk
+        set current_concurrent = current_concurrent + 1
+        where trunk_id = #{trunkId}
+          and enable_flag = '1'
+          and del_flag = '0'
+          and current_concurrent &lt; max_concurrent
+    </update>
+
+    <update id="releaseConcurrent">
+        update ai_call_trunk
+        set current_concurrent = case when current_concurrent > 0 then current_concurrent - 1 else 0 end
+        where trunk_id = #{trunkId}
+    </update>
+
+    <update id="resetAllConcurrent">
+        update ai_call_trunk set current_concurrent = 0
+    </update>
+
+    <update id="updateHealthStatus">
+        update ai_call_trunk
+        set health_status = #{healthStatus},
+            <if test="failCount != null">fail_count = #{failCount},</if>
+            last_check_time = sysdate(),
+            circuit_open_time = case when #{healthStatus} = '4' then sysdate() else circuit_open_time end,
+            update_time = sysdate()
+        where trunk_id = #{trunkId}
+    </update>
+
+    <update id="markCallSuccess">
+        update ai_call_trunk
+        set total_calls = total_calls + 1,
+            success_calls = success_calls + 1,
+            total_duration = total_duration + ifnull(#{duration}, 0),
+            fail_count = 0,
+            last_success_time = sysdate(),
+            health_status = case when health_status in ('0','3','4') then '1' else health_status end,
+            update_time = sysdate()
+        where trunk_id = #{trunkId}
+    </update>
+
+    <update id="markCallFail">
+        update ai_call_trunk
+        set total_calls = total_calls + 1,
+            fail_count = fail_count + 1,
+            last_fail_time = sysdate(),
+            update_time = sysdate()
+        where trunk_id = #{trunkId}
+    </update>
+
+    <update id="updateQualityMetric" parameterType="AiCallTrunk">
+        update ai_call_trunk
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="connectRate != null">connect_rate = #{connectRate},</if>
+            <if test="asr != null">asr = #{asr},</if>
+            <if test="acd != null">acd = #{acd},</if>
+            <if test="mos != null">mos = #{mos},</if>
+            update_time = sysdate()
+        </trim>
+        where trunk_id = #{trunkId}
+    </update>
+
+    <update id="deleteAiCallTrunkByTrunkId" parameterType="Long">
+        update ai_call_trunk set del_flag = '2' where trunk_id = #{trunkId}
+    </update>
+
+    <update id="deleteAiCallTrunkByTrunkIds" parameterType="String">
+        update ai_call_trunk set del_flag = '2' where trunk_id in
+        <foreach item="trunkId" collection="array" open="(" separator="," close=")">
+            #{trunkId}
+        </foreach>
+    </update>
+
+    <select id="selectCarrierOverview" resultType="java.util.HashMap">
+        select carrier                                  as carrier,
+               count(1)                                 as trunkTotal,
+               sum(case when health_status = '1' then 1 else 0 end) as normalCount,
+               sum(case when health_status = '2' then 1 else 0 end) as degradedCount,
+               sum(case when health_status in ('3','4') then 1 else 0 end) as faultCount,
+               sum(max_concurrent)                      as maxConcurrent,
+               sum(current_concurrent)                  as currentConcurrent,
+               round(avg(connect_rate), 2)              as avgConnectRate,
+               round(avg(mos), 2)                       as avgMos
+        from ai_call_trunk
+        where del_flag = '0' and enable_flag = '1'
+        group by carrier
+    </select>
+</mapper>
