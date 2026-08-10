@@ -260,6 +260,18 @@ export default {
     this.loadStats()
     this.getList()
     this.loadTrend()
+    // 从工单跳转携带的号码，自动打开新增回访弹窗并预填
+    const { phone, ticketNo } = this.$route.query
+    if (phone) {
+      this.queryParams.callerNumber = phone
+      this.$nextTick(() => {
+        this.reset()
+        this.form.callerNumber = phone
+        if (ticketNo) this.form.remark = '关联工单：' + ticketNo
+        this.open = true
+        this.title = '新增回访记录'
+      })
+    }
   },
   methods: {
     loadStats() {

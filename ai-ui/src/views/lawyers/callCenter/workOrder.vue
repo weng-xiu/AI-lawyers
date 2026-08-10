@@ -253,6 +253,55 @@
         <el-button size="small" icon="el-icon-close" @click="drawerVisible = false">关闭</el-button>
       </div>
     </el-drawer>
+
+    <el-dialog :title="isEdit ? '编辑工单' : '新增工单'" :visible.sync="formOpen" width="640px" append-to-body>
+      <el-form ref="ticketForm" :model="form" :rules="rules" label-width="100px" size="small">
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="工单编号" prop="ticketNo">
+              <el-input v-model="form.ticketNo" placeholder="系统自动生成" disabled />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="优先级" prop="priority">
+              <el-radio-group v-model="form.priority">
+                <el-radio :label="1">紧急</el-radio>
+                <el-radio :label="2">普通</el-radio>
+                <el-radio :label="3">低</el-radio>
+              </el-radio-group>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="工单标题" prop="title">
+          <el-input v-model="form.title" placeholder="请输入工单标题" maxlength="100" />
+        </el-form-item>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="来电号码" prop="callerNumber">
+              <el-input v-model="form.callerNumber" placeholder="请输入来电号码" maxlength="20" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="来电人" prop="callerName">
+              <el-input v-model="form.callerName" placeholder="请输入来电人" maxlength="50" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="工单内容" prop="content">
+          <el-input v-model="form.content" type="textarea" :rows="4" placeholder="请输入工单内容" maxlength="500" show-word-limit />
+        </el-form-item>
+        <el-form-item label="处理人姓名" prop="assignUserName">
+          <el-input v-model="form.assignUserName" placeholder="请输入处理人姓名" maxlength="50" />
+        </el-form-item>
+        <el-form-item label="备注" prop="remark">
+          <el-input v-model="form.remark" type="textarea" :rows="2" placeholder="请输入备注" maxlength="500" />
+        </el-form-item>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button size="small" @click="formOpen = false">取 消</el-button>
+        <el-button type="primary" size="small" @click="submitForm">确 定</el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -287,7 +336,14 @@ export default {
         status: undefined
       },
       orderList: [],
-      timelineList: []
+      timelineList: [],
+      formOpen: false,
+      isEdit: false,
+      form: {},
+      rules: {
+        title: [{ required: true, message: '工单标题不能为空', trigger: 'blur' }],
+        content: [{ required: true, message: '工单内容不能为空', trigger: 'blur' }]
+      }
     }
   },
   created() {
@@ -376,14 +432,52 @@ export default {
       this.getList()
     },
     handleBatchProcess() {
-      this.$message.success(`批量处理 ${this.selectedIds.length} 条工单`)
+      const ids = this.selectedIds
+      if (!ids || ids.length === 0) {
+        this.$message.warning('请先选择要处理的工单')
+        return
+      }
+      this.$confirm('是否确认批量完成选中的 ' + ids.length + ' 条工单？', '警告', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        this.loading = true
+        Promise.all(ids.map(id => completeTicket({ ticketId: id }))).then(() => {
+          this.$message.success('批量处理成功')
+          this.getList()
+          this.calcStatData()
+        }).finally(() => { this.loading = false })
+      }).catch(() => {})
     },
     handleExport() {
-      this.$message.success(`导出 ${this.selectedIds.length} 条工单`)
+      const params = { ...this.queryParams }
+      delete params.pageNum
+      delete params.pageSize
+      this.download('lawyers/call/ticket/export', { ...params }, `workOrder_${new Date().getTime()}.xlsx`)
+    },
+    resetForm() {
+      this.form = {
+        ticketId: undefined,
+        ticketNo: undefined,
+        title: undefined,
+        callerNumber: undefined,
+        callerName: undefined,
+        priority: 2,
+        content: undefined,
+        assignUserName: undefined,
+        remark: undefined
+      }
+      this.$nextTick(() => {
+        this.$refs.ticketForm && this.$refs.ticketForm.clearValidate()
+      })
     },
     handleAdd() {
+      this.resetForm()
+      this.isEdit = false
       generateTicketNo().then(response => {
-        this.$message.info('新增工单，编号：' + response.data)
+        this.form.ticketNo = response.data
+        this.formOpen = true
       }).catch(() => {})
     },
     handleView(row) {
@@ -394,7 +488,27 @@ export default {
       }).catch(() => {})
     },
     handleEdit(row) {
-      this.$message.info(`编辑工单：${row.ticketNo}`)
+      this.resetForm()
+      this.isEdit = true
+      getTicket(row.ticketId).then(response => {
+        this.form = Object.assign({}, this.form, response.data)
+        if (this.form.priority === undefined || this.form.priority === null) {
+          this.form.priority = 2
+        }
+        this.formOpen = true
+      }).catch(() => {})
+    },
+    submitForm() {
+      this.$refs.ticketForm.validate(valid => {
+        if (!valid) return
+        const save = this.isEdit ? updateTicket(this.form) : addTicket(this.form)
+        save.then(() => {
+          this.$message.success(this.isEdit ? '修改成功' : '新增成功')
+          this.formOpen = false
+          this.getList()
+          this.calcStatData()
+        }).catch(() => {})
+      })
     },
     handleDelete(row) {
       this.$confirm('是否确认删除工单编号为"' + row.ticketNo + '"的数据项？', '警告', {
@@ -410,10 +524,43 @@ export default {
       }).catch(() => {})
     },
     handleTransfer() {
-      this.$message.info('转派工单功能')
+      this.$prompt('请输入转派处理人姓名', '工单转派', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        inputPattern: /\S+/,
+        inputErrorMessage: '处理人姓名不能为空'
+      }).then(({ value }) => {
+        const name = (value || '').trim()
+        processTicket({
+          ticketId: this.currentOrder.ticketId,
+          processContent: '工单转派给：' + name,
+          assignUserName: name,
+          assignUserId: null
+        }).then(() => {
+          this.$message.success('工单已转派给：' + name)
+          this.drawerVisible = false
+          this.getList()
+          this.calcStatData()
+        }).catch(() => {})
+      }).catch(() => {})
     },
     handleReturn() {
-      this.$message.info('退回工单功能')
+      this.$confirm('是否确认将该工单退回待处理？', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        updateTicket({
+          ticketId: this.currentOrder.ticketId,
+          status: '0',
+          processContent: '工单退回待处理'
+        }).then(() => {
+          this.$message.success('工单已退回')
+          this.drawerVisible = false
+          this.getList()
+          this.calcStatData()
+        }).catch(() => {})
+      }).catch(() => {})
     },
     handleArchive() {
       archiveTicket({ ticketId: this.currentOrder.ticketId }).then(() => {
@@ -424,7 +571,13 @@ export default {
       }).catch(() => {})
     },
     handleVisit() {
-      this.$message.info('回访功能')
+      this.$router.push({
+        path: '/business/callback',
+        query: {
+          phone: this.currentOrder.callerNumber,
+          ticketNo: this.currentOrder.ticketNo
+        }
+      })
     }
   }
 }

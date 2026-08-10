@@ -287,11 +287,38 @@
         <el-button @click="statisticsOpen = false">关 闭</el-button>
       </div>
     </el-dialog>
+
+    <!-- 由通话记录生成工单 -->
+    <el-dialog :title="'生成工单 - ' + (ticketForm.callerNumber || '')" :visible.sync="ticketOpen" width="560px" append-to-body>
+      <el-form ref="ticketForm" :model="ticketForm" :rules="ticketRules" label-width="90px">
+        <el-form-item label="工单标题" prop="title">
+          <el-input v-model="ticketForm.title" placeholder="请输入工单标题" />
+        </el-form-item>
+        <el-form-item label="优先级" prop="priority">
+          <el-radio-group v-model="ticketForm.priority">
+            <el-radio label="1">紧急</el-radio>
+            <el-radio label="2">普通</el-radio>
+            <el-radio label="3">低</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="工单内容" prop="content">
+          <el-input v-model="ticketForm.content" type="textarea" :rows="4" placeholder="请输入工单内容" />
+        </el-form-item>
+        <el-form-item label="关联来电">
+          <el-tag size="small" type="info">记录ID: {{ ticketForm.recordId }}</el-tag>
+          <span style="margin-left:8px;color:#909399;font-size:12px;">{{ ticketForm.callerName || '未知来电人' }}</span>
+        </el-form-item>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button type="primary" @click="submitTicket">确 定</el-button>
+        <el-button @click="ticketOpen = false">取 消</el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import { listRecord, getRecord, addRecord, updateRecord, delRecord, getCallStatistics, getCallStatisticsByCategory, getCallStatisticsByDate } from "@/api/lawyers/callCenter"
+import { listRecord, getRecord, addRecord, updateRecord, delRecord, getCallStatistics, getCallStatisticsByCategory, getCallStatisticsByDate, addTicket, generateTicketNo } from "@/api/lawyers/callCenter"
 import * as echarts from 'echarts'
 
 export default {
@@ -309,6 +336,12 @@ export default {
       open: false,
       detailOpen: false,
       statisticsOpen: false,
+      ticketOpen: false,
+      ticketForm: { recordId: null, title: '', content: '', priority: '2', callerNumber: '', callerName: '' },
+      ticketRules: {
+        title: [{ required: true, message: '请输入工单标题', trigger: 'blur' }],
+        content: [{ required: true, message: '请输入工单内容', trigger: 'blur' }]
+      },
       dateRange: [],
       queryParams: {
         pageNum: 1,
@@ -418,7 +451,34 @@ export default {
       })
     },
     handleCreateTicket(row) {
-      this.$modal.msgSuccess("请在工单管理模块创建工单")
+      getRecord(row.recordId).then(res => {
+        const d = res.data || {}
+        this.ticketForm = {
+          recordId: d.recordId,
+          title: (d.consultationCategory || '法律咨询') + '工单 - ' + (d.callerNumber || ''),
+          content: d.consultationContent || d.content || '',
+          priority: '2',
+          callerNumber: d.callerNumber || '',
+          callerName: d.callerName || ''
+        }
+        this.ticketOpen = true
+        this.$nextTick(() => { this.$refs.ticketForm && this.$refs.ticketForm.clearValidate() })
+      })
+    },
+    submitTicket() {
+      this.$refs.ticketForm.validate(valid => {
+        if (!valid) return
+        const data = Object.assign({}, this.ticketForm)
+        generateTicketNo().then(res => {
+          data.ticketNo = (res && res.data) ? res.data : ('GD' + Date.now())
+          data.status = '0'
+          return addTicket(data)
+        }).then(() => {
+          this.$modal.msgSuccess('工单创建成功')
+          this.ticketOpen = false
+          this.$router.push('/business/workOrder')
+        }).catch(() => {})
+      })
     },
     handleStatistics() {
       this.statisticsOpen = true
