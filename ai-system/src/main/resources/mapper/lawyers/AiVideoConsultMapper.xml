@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiVideoConsultMapper">
+
+    <resultMap type="AiVideoConsult" id="AiVideoConsultResult">
+        <result property="consultId"       column="consult_id"       />
+        <result property="consultNo"       column="consult_no"       />
+        <result property="customerName"    column="customer_name"    />
+        <result property="customerPhone"   column="customer_phone"   />
+        <result property="agentId"         column="agent_id"         />
+        <result property="agentName"       column="agent_name"       />
+        <result property="roomNo"          column="room_no"          />
+        <result property="startTime"       column="start_time"       />
+        <result property="endTime"         column="end_time"         />
+        <result property="duration"        column="duration"         />
+        <result property="status"          column="status"           />
+        <result property="satisfaction"    column="satisfaction"     />
+        <result property="recordingUrl"    column="recording_url"    />
+        <result property="identityVerify"  column="identity_verify"  />
+        <result property="createBy"        column="create_by"        />
+        <result property="createTime"      column="create_time"      />
+        <result property="updateBy"        column="update_by"        />
+        <result property="updateTime"      column="update_time"      />
+        <result property="remark"          column="remark"           />
+    </resultMap>
+
+    <sql id="selectAiVideoConsultVo">
+        select consult_id, consult_no, customer_name, customer_phone, agent_id, agent_name,
+               room_no, start_time, end_time, duration, status, satisfaction, recording_url,
+               identity_verify, create_by, create_time, update_by, update_time, remark
+        from ai_video_consult
+    </sql>
+
+    <select id="selectAiVideoConsultList" parameterType="AiVideoConsult" resultMap="AiVideoConsultResult">
+        <include refid="selectAiVideoConsultVo"/>
+        <where>
+            <if test="consultNo != null and consultNo != ''"> and consult_no like concat('%', #{consultNo}, '%')</if>
+            <if test="customerName != null and customerName != ''"> and customer_name like concat('%', #{customerName}, '%')</if>
+            <if test="customerPhone != null and customerPhone != ''"> and customer_phone like concat('%', #{customerPhone}, '%')</if>
+            <if test="agentName != null and agentName != ''"> and agent_name like concat('%', #{agentName}, '%')</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+            <if test="params.beginTime != null and params.beginTime != ''"> and date(start_time) &gt;= #{params.beginTime}</if>
+            <if test="params.endTime != null and params.endTime != ''"> and date(start_time) &lt;= #{params.endTime}</if>
+        </where>
+        order by start_time desc
+    </select>
+
+    <select id="selectAiVideoConsultByConsultId" parameterType="Long" resultMap="AiVideoConsultResult">
+        <include refid="selectAiVideoConsultVo"/> where consult_id = #{consultId}
+    </select>
+
+    <insert id="insertAiVideoConsult" parameterType="AiVideoConsult" useGeneratedKeys="true" keyProperty="consultId">
+        insert into ai_video_consult
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="consultNo != null and consultNo != ''">consult_no,</if>
+            <if test="customerName != null and customerName != ''">customer_name,</if>
+            <if test="customerPhone != null and customerPhone != ''">customer_phone,</if>
+            <if test="agentId != null">agent_id,</if>
+            <if test="agentName != null and agentName != ''">agent_name,</if>
+            <if test="roomNo != null and roomNo != ''">room_no,</if>
+            <if test="startTime != null">start_time,</if>
+            <if test="endTime != null">end_time,</if>
+            <if test="duration != null">duration,</if>
+            <if test="status != null and status != ''">status,</if>
+            <if test="satisfaction != null">satisfaction,</if>
+            <if test="recordingUrl != null and recordingUrl != ''">recording_url,</if>
+            <if test="identityVerify != null and identityVerify != ''">identity_verify,</if>
+            <if test="createBy != null and createBy != ''">create_by,</if>
+            <if test="remark != null and remark != ''">remark,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="consultNo != null and consultNo != ''">#{consultNo},</if>
+            <if test="customerName != null and customerName != ''">#{customerName},</if>
+            <if test="customerPhone != null and customerPhone != ''">#{customerPhone},</if>
+            <if test="agentId != null">#{agentId},</if>
+            <if test="agentName != null and agentName != ''">#{agentName},</if>
+            <if test="roomNo != null and roomNo != ''">#{roomNo},</if>
+            <if test="startTime != null">#{startTime},</if>
+            <if test="endTime != null">#{endTime},</if>
+            <if test="duration != null">#{duration},</if>
+            <if test="status != null and status != ''">#{status},</if>
+            <if test="satisfaction != null">#{satisfaction},</if>
+            <if test="recordingUrl != null and recordingUrl != ''">#{recordingUrl},</if>
+            <if test="identityVerify != null and identityVerify != ''">#{identityVerify},</if>
+            <if test="createBy != null and createBy != ''">#{createBy},</if>
+            <if test="remark != null and remark != ''">#{remark},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateAiVideoConsult" parameterType="AiVideoConsult">
+        update ai_video_consult
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="consultNo != null and consultNo != ''">consult_no = #{consultNo},</if>
+            <if test="customerName != null">customer_name = #{customerName},</if>
+            <if test="customerPhone != null">customer_phone = #{customerPhone},</if>
+            <if test="agentId != null">agent_id = #{agentId},</if>
+            <if test="agentName != null">agent_name = #{agentName},</if>
+            <if test="roomNo != null">room_no = #{roomNo},</if>
+            <if test="startTime != null">start_time = #{startTime},</if>
+            <if test="endTime != null">end_time = #{endTime},</if>
+            <if test="duration != null">duration = #{duration},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="satisfaction != null">satisfaction = #{satisfaction},</if>
+            <if test="recordingUrl != null">recording_url = #{recordingUrl},</if>
+            <if test="identityVerify != null">identity_verify = #{identityVerify},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where consult_id = #{consultId}
+    </update>
+
+    <delete id="deleteAiVideoConsultByConsultId" parameterType="Long">
+        delete from ai_video_consult where consult_id = #{consultId}
+    </delete>
+
+    <delete id="deleteAiVideoConsultByConsultIds" parameterType="String">
+        delete from ai_video_consult where consult_id in
+        <foreach item="consultId" collection="array" open="(" separator="," close=")">
+            #{consultId}
+        </foreach>
+    </delete>
+</mapper>

@@ -248,6 +248,14 @@ export function getCallStatisticsByDate(days) {
   })
 }
 
+// ==================== 工作台首页 ====================
+export function getWorkbenchSummary() {
+  return request({
+    url: '/lawyers/call/record/workbench',
+    method: 'get'
+  })
+}
+
 // ==================== 工单管理 ====================
 export function listTicket(query) {
   return request({

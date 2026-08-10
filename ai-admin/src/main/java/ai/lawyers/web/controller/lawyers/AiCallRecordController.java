@@ -119,4 +119,11 @@ public class AiCallRecordController extends BaseController
         List<java.util.Map<String, Object>> data = aiCallRecordService.getCallStatisticsByDate(days);
         return success(data);
     }
+
+    /** 工作台首页汇总 */
+    @GetMapping("/workbench")
+    public AjaxResult getWorkbenchSummary()
+    {
+        return success(aiCallRecordService.getWorkbenchSummary());
+    }
 }

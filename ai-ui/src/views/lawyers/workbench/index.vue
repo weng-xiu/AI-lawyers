@@ -210,9 +210,9 @@ export default {
       noticeDetail: {},
       quickList: [
         { name: '话务面板', icon: 'el-icon-phone', type: 'blue', path: '/lawyers/callCenter/callPanel' },
-        { name: '咨询台账', icon: 'el-icon-document', type: 'teal', path: '/lawyers/callCenter/callLedger' },
-        { name: '工单管理', icon: 'el-icon-edit', type: 'blue2', path: '/lawyers/callCenter/callTicket' },
-        { name: '来电记录', icon: 'el-icon-phone-outline', type: 'green', path: '/lawyers/callCenter/callRecord' }
+        { name: '图文服务', icon: 'el-icon-chat-dot-square', type: 'teal', path: '/lawyers/chat' },
+        { name: '咨询台账', icon: 'el-icon-document', type: 'blue2', path: '/lawyers/callCenter/callLedger' },
+        { name: '工单管理', icon: 'el-icon-edit', type: 'green', path: '/lawyers/callCenter/callTicket' }
       ]
     }
   },

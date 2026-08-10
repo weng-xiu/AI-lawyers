@@ -86,7 +86,7 @@
                   <div class="cp-ai-label">来电意图预测</div>
                   <div class="cp-ai-value">离婚诉讼咨询</div>
                   <div class="cp-ai-confidence">
-                    <el-progress :percentage="87" :show-text="false" stroke-width="4" color="#8b5cf6" />
+                    <el-progress :percentage="87" :show-text="false" :stroke-width="4" color="#8b5cf6" />
                     <span>置信度 87%</span>
                   </div>
                 </div>

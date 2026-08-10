@@ -26,4 +26,7 @@ public interface IAiCallRecordService
     public List<java.util.Map<String, Object>> getCallStatisticsByCategory();
 
     public List<java.util.Map<String, Object>> getCallStatisticsByDate(Integer days);
+
+    /** 工作台汇总：今日统计 + 团队概况 + 最近通话 */
+    public java.util.Map<String, Object> getWorkbenchSummary();
 }

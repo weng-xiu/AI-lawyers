@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiRiskWarningRuleMapper">
+
+    <resultMap type="AiRiskWarningRule" id="AiRiskWarningRuleResult">
+        <result property="ruleId"      column="rule_id"      />
+        <result property="ruleName"    column="rule_name"    />
+        <result property="ruleType"    column="rule_type"    />
+        <result property="ruleLevel"   column="rule_level"   />
+        <result property="keywords"    column="keywords"     />
+        <result property="isEnabled"   column="is_enabled"   />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"  column="create_time"  />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"  column="update_time"  />
+        <result property="remark"      column="remark"       />
+    </resultMap>
+
+    <sql id="selectAiRiskWarningRuleVo">
+        select rule_id, rule_name, rule_type, rule_level, keywords, is_enabled,
+               create_by, create_time, update_by, update_time, remark
+        from ai_risk_warning_rule
+    </sql>
+
+    <select id="selectAiRiskWarningRuleList" parameterType="AiRiskWarningRule" resultMap="AiRiskWarningRuleResult">
+        <include refid="selectAiRiskWarningRuleVo"/>
+        <where>
+            <if test="ruleName != null and ruleName != ''"> and rule_name like concat('%', #{ruleName}, '%')</if>
+            <if test="ruleType != null and ruleType != ''"> and rule_type = #{ruleType}</if>
+            <if test="ruleLevel != null and ruleLevel != ''"> and rule_level = #{ruleLevel}</if>
+            <if test="isEnabled != null and isEnabled != ''"> and is_enabled = #{isEnabled}</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectAiRiskWarningRuleByRuleId" parameterType="Long" resultMap="AiRiskWarningRuleResult">
+        <include refid="selectAiRiskWarningRuleVo"/>
+        where rule_id = #{ruleId}
+    </select>
+
+    <insert id="insertAiRiskWarningRule" parameterType="AiRiskWarningRule" useGeneratedKeys="true" keyProperty="ruleId">
+        insert into ai_risk_warning_rule
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="ruleName != null and ruleName != ''">rule_name,</if>
+            <if test="ruleType != null">rule_type,</if>
+            <if test="ruleLevel != null">rule_level,</if>
+            <if test="keywords != null">keywords,</if>
+            <if test="isEnabled != null">is_enabled,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="ruleName != null and ruleName != ''">#{ruleName},</if>
+            <if test="ruleType != null">#{ruleType},</if>
+            <if test="ruleLevel != null">#{ruleLevel},</if>
+            <if test="keywords != null">#{keywords},</if>
+            <if test="isEnabled != null">#{isEnabled},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateAiRiskWarningRule" parameterType="AiRiskWarningRule">
+        update ai_risk_warning_rule
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="ruleName != null and ruleName != ''">rule_name = #{ruleName},</if>
+            <if test="ruleType != null">rule_type = #{ruleType},</if>
+            <if test="ruleLevel != null">rule_level = #{ruleLevel},</if>
+            <if test="keywords != null">keywords = #{keywords},</if>
+            <if test="isEnabled != null">is_enabled = #{isEnabled},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where rule_id = #{ruleId}
+    </update>
+
+    <delete id="deleteAiRiskWarningRuleByRuleId" parameterType="Long">
+        delete from ai_risk_warning_rule where rule_id = #{ruleId}
+    </delete>
+
+    <delete id="deleteAiRiskWarningRuleByRuleIds" parameterType="String">
+        delete from ai_risk_warning_rule where rule_id in
+        <foreach item="ruleId" collection="array" open="(" separator="," close=")">
+            #{ruleId}
+        </foreach>
+    </delete>
+</mapper>

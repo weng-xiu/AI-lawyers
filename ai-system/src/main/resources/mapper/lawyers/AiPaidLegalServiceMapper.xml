@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiPaidLegalServiceMapper">
+    
+    <resultMap type="AiPaidLegalService" id="AiPaidLegalServiceResult">
+        <result property="paidId"         column="paid_id"          />
+        <result property="serviceNo"      column="service_no"       />
+        <result property="customerName"   column="customer_name"    />
+        <result property="customerPhone"  column="customer_phone"   />
+        <result property="serviceType"    column="service_type"     />
+        <result property="amount"         column="amount"           />
+        <result property="paymentStatus"  column="payment_status"   />
+        <result property="serviceStatus"  column="service_status"   />
+        <result property="handlerName"    column="handler_name"     />
+        <result property="createBy"       column="create_by"        />
+        <result property="createTime"     column="create_time"      />
+        <result property="updateBy"       column="update_by"        />
+        <result property="updateTime"     column="update_time"      />
+        <result property="remark"         column="remark"           />
+    </resultMap>
+
+    <sql id="selectAiPaidLegalServiceVo">
+        select paid_id, service_no, customer_name, customer_phone, service_type, amount, payment_status, service_status, handler_name, create_by, create_time, update_by, update_time, remark 
+        from ai_paid_legal_service
+    </sql>
+    
+    <select id="selectAiPaidLegalServiceList" parameterType="AiPaidLegalService" resultMap="AiPaidLegalServiceResult">
+        <include refid="selectAiPaidLegalServiceVo"/>
+        <where>
+            <if test="serviceNo != null  and serviceNo != ''"> and service_no like concat('%', #{serviceNo}, '%')</if>
+            <if test="customerName != null  and customerName != ''"> and customer_name like concat('%', #{customerName}, '%')</if>
+            <if test="customerPhone != null  and customerPhone != ''"> and customer_phone like concat('%', #{customerPhone}, '%')</if>
+            <if test="serviceType != null  and serviceType != ''"> and service_type = #{serviceType}</if>
+            <if test="paymentStatus != null  and paymentStatus != ''"> and payment_status = #{paymentStatus}</if>
+            <if test="serviceStatus != null  and serviceStatus != ''"> and service_status = #{serviceStatus}</if>
+            <if test="params.beginTime != null and params.beginTime != ''"><!-- 开始时间检索 -->
+                and date_format(create_time,'%Y%m%d') &gt;= date_format(#{params.beginTime},'%Y%m%d')
+            </if>
+            <if test="params.endTime != null and params.endTime != ''"><!-- 结束时间检索 -->
+                and date_format(create_time,'%Y%m%d') &lt;= date_format(#{params.endTime},'%Y%m%d')
+            </if>
+        </where>
+    </select>
+    
+    <select id="selectAiPaidLegalServiceById" parameterType="Long" resultMap="AiPaidLegalServiceResult">
+        <include refid="selectAiPaidLegalServiceVo"/>
+        where paid_id = #{paidId}
+    </select>
+        
+    <insert id="insertAiPaidLegalService" parameterType="AiPaidLegalService" useGeneratedKeys="true" keyProperty="paidId">
+        insert into ai_paid_legal_service
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="serviceNo != null and serviceNo != ''">service_no,</if>
+            <if test="customerName != null and customerName != ''">customer_name,</if>
+            <if test="customerPhone != null and customerPhone != ''">customer_phone,</if>
+            <if test="serviceType != null and serviceType != ''">service_type,</if>
+            <if test="amount != null">amount,</if>
+            <if test="paymentStatus != null">payment_status,</if>
+            <if test="serviceStatus != null">service_status,</if>
+            <if test="handlerName != null">handler_name,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="serviceNo != null and serviceNo != ''">#{serviceNo},</if>
+            <if test="customerName != null and customerName != ''">#{customerName},</if>
+            <if test="customerPhone != null and customerPhone != ''">#{customerPhone},</if>
+            <if test="serviceType != null and serviceType != ''">#{serviceType},</if>
+            <if test="amount != null">#{amount},</if>
+            <if test="paymentStatus != null">#{paymentStatus},</if>
+            <if test="serviceStatus != null">#{serviceStatus},</if>
+            <if test="handlerName != null">#{handlerName},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate()
+         </trim>
+    </insert>
+
+    <update id="updateAiPaidLegalService" parameterType="AiPaidLegalService">
+        update ai_paid_legal_service
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="serviceNo != null and serviceNo != ''">service_no = #{serviceNo},</if>
+            <if test="customerName != null and customerName != ''">customer_name = #{customerName},</if>
+            <if test="customerPhone != null and customerPhone != ''">customer_phone = #{customerPhone},</if>
+            <if test="serviceType != null and serviceType != ''">service_type = #{serviceType},</if>
+            <if test="amount != null">amount = #{amount},</if>
+            <if test="paymentStatus != null">payment_status = #{paymentStatus},</if>
+            <if test="serviceStatus != null">service_status = #{serviceStatus},</if>
+            <if test="handlerName != null">handler_name = #{handlerName},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where paid_id = #{paidId}
+    </update>
+
+    <delete id="deleteAiPaidLegalServiceById" parameterType="Long">
+        delete from ai_paid_legal_service where paid_id = #{paidId}
+    </delete>
+
+    <delete id="deleteAiPaidLegalServiceByIds" parameterType="String">
+        delete from ai_paid_legal_service where paid_id in 
+        <foreach item="paidId" collection="array" open="(" separator="," close=")">
+            #{paidId}
+        </foreach>
+    </delete>
+</mapper>

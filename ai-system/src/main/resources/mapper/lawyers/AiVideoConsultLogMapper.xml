@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiVideoConsultLogMapper">
+
+    <resultMap type="AiVideoConsultLog" id="AiVideoConsultLogResult">
+        <result property="logId"         column="log_id"         />
+        <result property="consultId"     column="consult_id"     />
+        <result property="eventType"     column="event_type"     />
+        <result property="eventContent"  column="event_content"  />
+        <result property="eventTime"     column="event_time"     />
+        <result property="createTime"    column="create_time"    />
+    </resultMap>
+
+    <sql id="selectAiVideoConsultLogVo">
+        select log_id, consult_id, event_type, event_content, event_time, create_time
+        from ai_video_consult_log
+    </sql>
+
+    <select id="selectAiVideoConsultLogList" parameterType="AiVideoConsultLog" resultMap="AiVideoConsultLogResult">
+        <include refid="selectAiVideoConsultLogVo"/>
+        <where>
+            <if test="consultId != null"> and consult_id = #{consultId}</if>
+            <if test="eventType != null and eventType != ''"> and event_type = #{eventType}</if>
+        </where>
+        order by event_time asc
+    </select>
+
+    <select id="selectAiVideoConsultLogByLogId" parameterType="Long" resultMap="AiVideoConsultLogResult">
+        <include refid="selectAiVideoConsultLogVo"/> where log_id = #{logId}
+    </select>
+
+    <insert id="insertAiVideoConsultLog" parameterType="AiVideoConsultLog">
+        insert into ai_video_consult_log
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="consultId != null">consult_id,</if>
+            <if test="eventType != null and eventType != ''">event_type,</if>
+            <if test="eventContent != null and eventContent != ''">event_content,</if>
+            <if test="eventTime != null">event_time,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="consultId != null">#{consultId},</if>
+            <if test="eventType != null and eventType != ''">#{eventType},</if>
+            <if test="eventContent != null and eventContent != ''">#{eventContent},</if>
+            <if test="eventTime != null">#{eventTime},</if>
+            sysdate()
+        </trim>
+    </insert>
+</mapper>

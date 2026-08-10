@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiRiskWarningMapper">
+
+    <resultMap type="AiRiskWarning" id="AiRiskWarningResult">
+        <result property="warningId"      column="warning_id"      />
+        <result property="warningType"    column="warning_type"    />
+        <result property="warningLevel"   column="warning_level"   />
+        <result property="sourceType"     column="source_type"     />
+        <result property="sourceId"       column="source_id"       />
+        <result property="content"        column="content"         />
+        <result property="customerName"   column="customer_name"   />
+        <result property="status"         column="status"          />
+        <result property="handlerName"    column="handler_name"    />
+        <result property="handleResult"   column="handle_result"   />
+        <result property="handleTime"     column="handle_time"     />
+        <result property="triggerTime"    column="trigger_time"    />
+        <result property="createTime"     column="create_time"     />
+        <result property="remark"         column="remark"          />
+    </resultMap>
+
+    <sql id="selectAiRiskWarningVo">
+        select warning_id, warning_type, warning_level, source_type, source_id, content,
+               customer_name, status, handler_name, handle_result, handle_time, trigger_time,
+               create_time, remark
+        from ai_risk_warning
+    </sql>
+
+    <select id="selectAiRiskWarningList" parameterType="AiRiskWarning" resultMap="AiRiskWarningResult">
+        <include refid="selectAiRiskWarningVo"/>
+        <where>
+            <if test="warningType != null and warningType != ''"> and warning_type = #{warningType}</if>
+            <if test="warningLevel != null and warningLevel != ''"> and warning_level = #{warningLevel}</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+            <if test="customerName != null and customerName != ''"> and customer_name like concat('%', #{customerName}, '%')</if>
+            <if test="params.beginTime != null and params.beginTime != ''">
+                and trigger_time &gt;= #{params.beginTime}
+            </if>
+            <if test="params.endTime != null and params.endTime != ''">
+                and trigger_time &lt;= #{params.endTime}
+            </if>
+        </where>
+        order by trigger_time desc, create_time desc
+    </select>
+
+    <select id="selectAiRiskWarningByWarningId" parameterType="Long" resultMap="AiRiskWarningResult">
+        <include refid="selectAiRiskWarningVo"/>
+        where warning_id = #{warningId}
+    </select>
+
+    <insert id="insertAiRiskWarning" parameterType="AiRiskWarning" useGeneratedKeys="true" keyProperty="warningId">
+        insert into ai_risk_warning
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="warningType != null and warningType != ''">warning_type,</if>
+            <if test="warningLevel != null">warning_level,</if>
+            <if test="sourceType != null">source_type,</if>
+            <if test="sourceId != null">source_id,</if>
+            <if test="content != null">content,</if>
+            <if test="customerName != null">customer_name,</if>
+            <if test="status != null">status,</if>
+            <if test="handlerName != null">handler_name,</if>
+            <if test="handleResult != null">handle_result,</if>
+            <if test="handleTime != null">handle_time,</if>
+            <if test="triggerTime != null">trigger_time,</if>
+            <if test="remark != null">remark,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="warningType != null and warningType != ''">#{warningType},</if>
+            <if test="warningLevel != null">#{warningLevel},</if>
+            <if test="sourceType != null">#{sourceType},</if>
+            <if test="sourceId != null">#{sourceId},</if>
+            <if test="content != null">#{content},</if>
+            <if test="customerName != null">#{customerName},</if>
+            <if test="status != null">#{status},</if>
+            <if test="handlerName != null">#{handlerName},</if>
+            <if test="handleResult != null">#{handleResult},</if>
+            <if test="handleTime != null">#{handleTime},</if>
+            <if test="triggerTime != null">#{triggerTime},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateAiRiskWarning" parameterType="AiRiskWarning">
+        update ai_risk_warning
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="warningType != null and warningType != ''">warning_type = #{warningType},</if>
+            <if test="warningLevel != null">warning_level = #{warningLevel},</if>
+            <if test="sourceType != null">source_type = #{sourceType},</if>
+            <if test="sourceId != null">source_id = #{sourceId},</if>
+            <if test="content != null">content = #{content},</if>
+            <if test="customerName != null">customer_name = #{customerName},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="handlerName != null">handler_name = #{handlerName},</if>
+            <if test="handleResult != null">handle_result = #{handleResult},</if>
+            <if test="handleTime != null">handle_time = #{handleTime},</if>
+            <if test="triggerTime != null">trigger_time = #{triggerTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where warning_id = #{warningId}
+    </update>
+
+    <delete id="deleteAiRiskWarningByWarningId" parameterType="Long">
+        delete from ai_risk_warning where warning_id = #{warningId}
+    </delete>
+
+    <delete id="deleteAiRiskWarningByWarningIds" parameterType="String">
+        delete from ai_risk_warning where warning_id in
+        <foreach item="warningId" collection="array" open="(" separator="," close=")">
+            #{warningId}
+        </foreach>
+    </delete>
+</mapper>

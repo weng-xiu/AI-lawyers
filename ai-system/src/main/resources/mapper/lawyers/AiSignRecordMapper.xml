@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiSignRecordMapper">
+    
+    <resultMap type="AiSignRecord" id="AiSignRecordResult">
+        <result property="signId"    column="sign_id"    />
+        <result property="businessNo"    column="business_no"    />
+        <result property="signTemplate"    column="sign_template"    />
+        <result property="signParty"    column="sign_party"    />
+        <result property="signPartyPhone"    column="sign_party_phone"    />
+        <result property="signStatus"    column="sign_status"    />
+        <result property="signTime"    column="sign_time"    />
+        <result property="eSignId"    column="e_sign_id"    />
+        <result property="certificateNo"    column="certificate_no"    />
+        <result property="signFileUrl"    column="sign_file_url"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectAiSignRecordVo">
+        select sign_id, business_no, sign_template, sign_party, sign_party_phone, sign_status, sign_time, e_sign_id, certificate_no, sign_file_url, create_by, create_time, update_by, update_time, remark from ai_sign_record
+    </sql>
+
+    <select id="selectAiSignRecordList" parameterType="AiSignRecord" resultMap="AiSignRecordResult">
+        <include refid="selectAiSignRecordVo"/>
+        <where>  
+            <if test="businessNo != null  and businessNo != ''"> and business_no like concat('%', #{businessNo}, '%')</if>
+            <if test="signTemplate != null  and signTemplate != ''"> and sign_template like concat('%', #{signTemplate}, '%')</if>
+            <if test="signParty != null  and signParty != ''"> and sign_party like concat('%', #{signParty}, '%')</if>
+            <if test="signPartyPhone != null  and signPartyPhone != ''"> and sign_party_phone like concat('%', #{signPartyPhone}, '%')</if>
+            <if test="signStatus != null  and signStatus != ''"> and sign_status = #{signStatus}</if>
+            <if test="params.beginSignTime != null and params.beginSignTime != '' and params.endSignTime != null and params.endSignTime != ''">
+                and sign_time between #{params.beginSignTime} and #{params.endSignTime}
+            </if>
+        </where>
+        order by create_time desc
+    </select>
+    
+    <select id="selectAiSignRecordBySignId" parameterType="Long" resultMap="AiSignRecordResult">
+        <include refid="selectAiSignRecordVo"/>
+        where sign_id = #{signId}
+    </select>
+        
+    <insert id="insertAiSignRecord" parameterType="AiSignRecord" useGeneratedKeys="true" keyProperty="signId">
+        insert into ai_sign_record
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="businessNo != null and businessNo != ''">business_no,</if>
+            <if test="signTemplate != null and signTemplate != ''">sign_template,</if>
+            <if test="signParty != null and signParty != ''">sign_party,</if>
+            <if test="signPartyPhone != null and signPartyPhone != ''">sign_party_phone,</if>
+            <if test="signStatus != null">sign_status,</if>
+            <if test="signTime != null">sign_time,</if>
+            <if test="eSignId != null">e_sign_id,</if>
+            <if test="certificateNo != null">certificate_no,</if>
+            <if test="signFileUrl != null">sign_file_url,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="remark != null">remark,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="businessNo != null and businessNo != ''">#{businessNo},</if>
+            <if test="signTemplate != null and signTemplate != ''">#{signTemplate},</if>
+            <if test="signParty != null and signParty != ''">#{signParty},</if>
+            <if test="signPartyPhone != null and signPartyPhone != ''">#{signPartyPhone},</if>
+            <if test="signStatus != null">#{signStatus},</if>
+            <if test="signTime != null">#{signTime},</if>
+            <if test="eSignId != null">#{eSignId},</if>
+            <if test="certificateNo != null">#{certificateNo},</if>
+            <if test="signFileUrl != null">#{signFileUrl},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateAiSignRecord" parameterType="AiSignRecord">
+        update ai_sign_record
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="businessNo != null and businessNo != ''">business_no = #{businessNo},</if>
+            <if test="signTemplate != null and signTemplate != ''">sign_template = #{signTemplate},</if>
+            <if test="signParty != null and signParty != ''">sign_party = #{signParty},</if>
+            <if test="signPartyPhone != null and signPartyPhone != ''">sign_party_phone = #{signPartyPhone},</if>
+            <if test="signStatus != null">sign_status = #{signStatus},</if>
+            <if test="signTime != null">sign_time = #{signTime},</if>
+            <if test="eSignId != null">e_sign_id = #{eSignId},</if>
+            <if test="certificateNo != null">certificate_no = #{certificateNo},</if>
+            <if test="signFileUrl != null">sign_file_url = #{signFileUrl},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where sign_id = #{signId}
+    </update>
+
+    <delete id="deleteAiSignRecordBySignId" parameterType="Long">
+        delete from ai_sign_record where sign_id = #{signId}
+    </delete>
+
+    <delete id="deleteAiSignRecordBySignIds" parameterType="String">
+        delete from ai_sign_record where sign_id in 
+        <foreach item="signId" collection="array" open="(" separator="," close=")">
+            #{signId}
+        </foreach>
+    </delete>
+</mapper>
