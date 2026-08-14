@@ -194,24 +194,55 @@
       </div>
     </el-dialog>
 
-    <el-dialog title="来电详情" :visible.sync="detailOpen" width="700px" append-to-body>
-      <el-descriptions :column="1" border>
+    <el-dialog title="来电详情" :visible.sync="detailOpen" width="780px" append-to-body>
+      <el-descriptions :column="2" border size="small">
         <el-descriptions-item label="记录ID">{{ detailForm.recordId }}</el-descriptions-item>
+        <el-descriptions-item label="来电状态">
+          <el-tag size="mini" :type="getStatusType(detailForm.status)">{{ getStatusLabel(detailForm.status) }}</el-tag>
+        </el-descriptions-item>
         <el-descriptions-item label="来电号码">{{ detailForm.callerNumber }}</el-descriptions-item>
         <el-descriptions-item label="来电姓名">{{ detailForm.callerName }}</el-descriptions-item>
-        <el-descriptions-item label="坐席ID">{{ detailForm.agentId }}</el-descriptions-item>
         <el-descriptions-item label="坐席名称">{{ detailForm.agentName }}</el-descriptions-item>
-        <el-descriptions-item label="咨询分类">{{ detailForm.consultationCategory }}</el-descriptions-item>
-        <el-descriptions-item label="咨询内容">{{ detailForm.consultationContent }}</el-descriptions-item>
-        <el-descriptions-item label="来电状态">
-          <el-tag :type="getStatusType(detailForm.status)">{{ getStatusLabel(detailForm.status) }}</el-tag>
-        </el-descriptions-item>
         <el-descriptions-item label="通话时长">{{ detailForm.callDuration }}秒</el-descriptions-item>
+        <el-descriptions-item label="咨询分类" :span="2">{{ detailForm.consultationCategory }}</el-descriptions-item>
+        <el-descriptions-item label="咨询内容" :span="2">{{ detailForm.consultationContent }}</el-descriptions-item>
         <el-descriptions-item label="来电时间">{{ parseTime(detailForm.callTime) }}</el-descriptions-item>
         <el-descriptions-item label="创建时间">{{ parseTime(detailForm.createTime) }}</el-descriptions-item>
-        <el-descriptions-item label="备注">{{ detailForm.remark }}</el-descriptions-item>
+        <el-descriptions-item label="备注" :span="2">{{ detailForm.remark }}</el-descriptions-item>
       </el-descriptions>
+
+      <!-- 关联工单 -->
+      <div class="detail-section">
+        <div class="detail-section-title"><i class="el-icon-tickets"></i> 关联工单</div>
+        <el-table :data="detailTickets" size="mini" v-loading="detailLoading" empty-text="暂无关联工单">
+          <el-table-column label="工单号" prop="ticketNo" width="160" />
+          <el-table-column label="标题" prop="title" show-overflow-tooltip />
+          <el-table-column label="处理人" prop="assignUserName" width="100" align="center" />
+          <el-table-column label="状态" width="90" align="center">
+            <template slot-scope="scope">
+              <el-tag size="mini" :type="ticketStatusType(scope.row.status)">{{ ticketStatusLabel(scope.row.status) }}</el-tag>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+
+      <!-- 转接记录 -->
+      <div class="detail-section">
+        <div class="detail-section-title"><i class="el-icon-share"></i> 转接记录</div>
+        <el-timeline v-if="detailTransfers.length" style="padding-left:10px;">
+          <el-timeline-item v-for="t in detailTransfers" :key="t.transferId"
+            :timestamp="parseTime(t.transferTime)" placement="top" size="normal">
+            <span style="font-weight:600;">{{ t.fromAgentName }}</span>
+            <i class="el-icon-right" style="margin:0 6px;color:#909399;"></i>
+            <span style="font-weight:600;color:#409EFF;">{{ t.toAgentName }}</span>
+            <span style="color:#909399;margin-left:8px;">{{ t.reason || '转接' }}</span>
+          </el-timeline-item>
+        </el-timeline>
+        <el-empty v-else description="暂无转接记录" :image-size="50" />
+      </div>
+
       <div slot="footer" class="dialog-footer">
+        <el-button type="primary" size="small" @click="handleCreateTicket(detailForm)" v-hasPermi="['lawyers:call:ticket:add']"><i class="el-icon-plus"></i> 生成工单</el-button>
         <el-button @click="detailOpen = false">关 闭</el-button>
       </div>
     </el-dialog>
@@ -318,7 +349,7 @@
 </template>
 
 <script>
-import { listRecord, getRecord, addRecord, updateRecord, delRecord, getCallStatistics, getCallStatisticsByCategory, getCallStatisticsByDate, addTicket, generateTicketNo } from "@/api/lawyers/callCenter"
+import { listRecord, getRecord, addRecord, updateRecord, delRecord, getCallStatistics, getCallStatisticsByCategory, getCallStatisticsByDate, addTicket, generateTicketNo, listTicket, getTransfersByRecordId } from "@/api/lawyers/callCenter"
 import * as echarts from 'echarts'
 
 export default {
@@ -335,6 +366,9 @@ export default {
       title: "",
       open: false,
       detailOpen: false,
+      detailLoading: false,
+      detailTickets: [],
+      detailTransfers: [],
       statisticsOpen: false,
       ticketOpen: false,
       ticketForm: { recordId: null, title: '', content: '', priority: '2', callerNumber: '', callerName: '' },
@@ -448,7 +482,27 @@ export default {
       getRecord(recordId).then(response => {
         this.detailForm = response.data
         this.detailOpen = true
+        this.detailTickets = []
+        this.detailTransfers = []
+        this.loadDetailRelations(recordId)
       })
+    },
+    loadDetailRelations(recordId) {
+      this.detailLoading = true
+      // 关联工单
+      listTicket({ recordId: recordId, pageNum: 1, pageSize: 10 }).then(res => {
+        this.detailTickets = res.rows || []
+      }).catch(() => {}).finally(() => { this.detailLoading = false })
+      // 转接记录
+      getTransfersByRecordId(recordId).then(res => {
+        this.detailTransfers = res.data || []
+      }).catch(() => {})
+    },
+    ticketStatusLabel(s) {
+      return { '0': '待处理', '1': '处理中', '2': '已完成', '3': '已归档' }[s] || '-'
+    },
+    ticketStatusType(s) {
+      return { '0': 'warning', '1': 'primary', '2': 'success', '3': 'info' }[s] || 'info'
     },
     handleCreateTicket(row) {
       getRecord(row.recordId).then(res => {
@@ -569,4 +623,16 @@ export default {
 
 <style lang="scss" scoped>
 @import '~@/assets/styles/call-center-light.scss';
+.detail-section {
+  margin-top: 16px;
+  .detail-section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #303133;
+    margin-bottom: 10px;
+    padding-left: 8px;
+    border-left: 3px solid #409EFF;
+    i { margin-right: 4px; color: #409EFF; }
+  }
+}
 </style>

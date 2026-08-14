@@ -29,7 +29,7 @@
 }
 
 .mb8 {
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .ml5 {
@@ -81,20 +81,51 @@
   margin-top: 6vh !important;
 }
 
+.el-dialog__header {
+  padding: 20px 24px 12px;
+}
+
+.el-dialog__body {
+  padding: 20px 24px;
+}
+
+.el-dialog__footer {
+  padding: 12px 24px 20px;
+}
+
+.el-form-item {
+  margin-bottom: 22px;
+}
+
+.el-form--inline .el-form-item {
+  margin-right: 16px;
+}
+
 .el-dialog__wrapper.scrollbar .el-dialog .el-dialog__body {
   overflow: auto;
   overflow-x: hidden;
   max-height: 70vh;
-  padding: 10px 20px 0;
+  padding: 20px 24px 0;
 }
 
 .el-table {
+  th > .cell,
+  td > .cell {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  td {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
   .el-table__header-wrapper, .el-table__fixed-header-wrapper {
     th {
       word-break: break-word;
       background-color: #f8f8f9;
       color: #515a6e;
-      height: 40px;
+      height: 48px;
       font-size: 13px;
     }
   }
@@ -119,7 +150,7 @@
 .pagination-container {
   display: flex;
   justify-content: flex-end;
-  margin-top: 20px;
+  margin-top: 24px;
 }
 
 /* tree border */
@@ -140,8 +171,8 @@
 }
 
 .el-table .fixed-width .el-button--mini {
-  padding-left: 0;
-  padding-right: 0;
+  padding-left: 6px;
+  padding-right: 6px;
   width: inherit;
 }
 
@@ -185,12 +216,12 @@
 }
 
 .el-card__header {
-  padding: 14px 15px 7px;
-  min-height: 40px;
+  padding: 16px 24px 12px;
+  min-height: 44px;
 }
 
 .el-card__body {
-  padding: 15px 20px 20px 20px;
+  padding: 20px 24px 24px;
 }
 
 .card-box {

@@ -105,8 +105,8 @@ public class AiIvrFlowController extends BaseController
     @PreAuthorize("@ss.hasPermi('lawyers:ivr:flow:edit')")
     @Log(title = "IVR流程设计保存", businessType = BusinessType.UPDATE)
     @PostMapping("/design")
-    public AjaxResult saveDesign(@RequestBody AiIvrFlow aiIvrFlow)
+    public AjaxResult saveDesign(@RequestBody IvrFlowDesignRequest request)
     {
-        return toAjax(aiIvrFlowService.saveFlowDesign(aiIvrFlow.getFlowId(), aiIvrFlow.getFlowData()));
+        return toAjax(aiIvrFlowService.saveFlowDesign(request.getFlowId(), request.getFlowData(), request.getNodes(), request.getEdges()));
     }
 }

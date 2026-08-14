@@ -225,7 +225,7 @@ export default {
       this.title = "添加IVR流程"
     },
     handleDesign(row) {
-      this.$message.info("流程设计器功能：请在独立页面进行IVR流程图设计")
+      this.$router.push({ path: '/lawyers/ivr/flow/design/index', query: { flowId: row.flowId } })
     },
     handleUpdate(row) {
       this.reset()

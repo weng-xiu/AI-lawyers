@@ -161,6 +161,20 @@ export const dynamicRoutes = [
         meta: { title: '修改生成配置', activeMenu: '/tool/gen' }
       }
     ]
+  },
+  {
+    path: '/lawyers/ivr/flow/design',
+    component: Layout,
+    hidden: true,
+    permissions: ['lawyers:ivr:flow:edit'],
+    children: [
+      {
+        path: 'index',
+        component: () => import('@/views/lawyers/ivr/flow/designer'),
+        name: 'IvrFlowDesign',
+        meta: { title: 'IVR流程图设计', activeMenu: '/ivrFlow/flow', noCache: true }
+      }
+    ]
   }
 ]
 

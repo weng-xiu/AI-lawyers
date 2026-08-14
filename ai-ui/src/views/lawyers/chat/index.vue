@@ -330,7 +330,7 @@ export default {
   flex-direction: column;
 }
 .chat-left-header {
-  padding: 16px 20px 12px;
+  padding: 18px 24px 16px;
   display: flex;
   align-items: center;
   border-bottom: 1px solid #f1f5f9;
@@ -338,7 +338,7 @@ export default {
   .clh-badge { margin-left: 8px; }
 }
 .chat-left-search {
-  padding: 10px 12px;
+  padding: 12px 16px;
 }
 .chat-left-list {
   flex: 1;
@@ -348,19 +348,19 @@ export default {
 .chat-session-item {
   display: flex;
   align-items: center;
-  padding: 12px 16px;
+  padding: 14px 18px;
   cursor: pointer;
   transition: background 0.15s;
   &:hover { background: #f8fafc; }
   &.chat-session-active { background: #eff6ff; }
-  .csi-avatar { position: relative; margin-right: 10px; }
+  .csi-avatar { position: relative; margin-right: 12px; }
   .csi-dot {
     width: 10px; height: 10px; border-radius: 50%;
     background: #ef4444; position: absolute; top: 0; right: 0;
     border: 2px solid #fff;
   }
   .csi-body { flex: 1; min-width: 0; }
-  .csi-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .csi-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
   .csi-name { font-size: 14px; font-weight: 500; color: #1e293b; }
   .csi-time { font-size: 11px; color: #94a3b8; }
   .csi-bottom { display: flex; align-items: center; }
@@ -368,7 +368,7 @@ export default {
   .csi-unread { margin-left: 4px; }
 }
 .chat-left-stats {
-  padding: 10px 16px;
+  padding: 12px 18px;
   border-top: 1px solid #f1f5f9;
   display: flex;
   justify-content: space-between;
@@ -394,19 +394,19 @@ export default {
   p { font-size: 14px; }
 }
 .chat-center-header {
-  padding: 12px 20px;
+  padding: 16px 24px;
   background: #fff;
   border-bottom: 1px solid #e2e8f0;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  .cch-left { display: flex; align-items: center; gap: 10px; }
+  .cch-left { display: flex; align-items: center; gap: 12px; }
   .cch-name { font-size: 15px; font-weight: 600; color: #1e293b; }
 }
 .chat-message-area {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 20px;
+  padding: 20px 24px;
   background: #f8fafc;
 }
 .chat-empty-msg {
@@ -417,7 +417,7 @@ export default {
 }
 .chat-msg-item {
   display: flex;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
   align-items: flex-start;
   .cmi-avatar { flex-shrink: 0; }
   &.chat-msg-right {
@@ -444,15 +444,15 @@ export default {
   display: flex;
   flex-direction: column;
   max-width: 60%;
-  padding: 10px 14px;
-  margin: 0 8px;
+  padding: 12px 16px;
+  margin: 0 10px;
   .cmi-bubble-1 {
     background: #fff;
     color: #334155;
     border-radius: 4px 12px 12px 12px;
   }
   .cmi-text { line-height: 1.6; word-break: break-word; font-size: 14px; }
-  .cmi-time { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+  .cmi-time { font-size: 11px; color: #94a3b8; margin-top: 6px; }
 }
 .cmi-bubble-1, .cmi-bubble-2 {
   background: #fff;
@@ -468,8 +468,8 @@ export default {
 .cmi-file {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px;
+  gap: 10px;
+  padding: 10px;
   background: #f8fafc;
   border-radius: 6px;
   i { font-size: 20px; color: #3b82f6; }
@@ -480,35 +480,35 @@ export default {
 .chat-input-area {
   background: #fff;
   border-top: 1px solid #e2e8f0;
-  padding: 8px 12px;
-  .cia-toolbar { margin-bottom: 4px; }
+  padding: 12px 16px;
+  .cia-toolbar { margin-bottom: 8px; }
   ::v-deep .el-textarea__inner { border: none; box-shadow: none; padding: 4px 0; }
   .cia-send-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: 6px;
+    margin-top: 10px;
     .cia-tip { font-size: 12px; color: #94a3b8; }
   }
 }
 
 /* 右侧客户资料 */
 .chat-right-panel {
-  width: 240px;
-  min-width: 240px;
+  width: 256px;
+  min-width: 256px;
   background: #fff;
   border-left: 1px solid #e2e8f0;
   overflow-y: auto;
 }
 .crp-section {
-  padding: 16px;
+  padding: 20px;
   border-bottom: 1px solid #f1f5f9;
-  .crp-title { font-size: 14px; font-weight: 600; color: #1e293b; margin-bottom: 12px; }
+  .crp-title { font-size: 14px; font-weight: 600; color: #1e293b; margin-bottom: 16px; }
   .crp-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 6px 0;
+    padding: 8px 0;
     label { font-size: 12px; color: #64748b; }
     span { font-size: 13px; color: #334155; }
   }

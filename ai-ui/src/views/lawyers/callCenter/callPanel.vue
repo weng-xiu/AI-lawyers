@@ -829,9 +829,9 @@ export default {
 <style lang="scss" scoped>
 .call-panel {
   background: #f1f5f9;
-  min-height: 100vh;
-  margin: -20px;
-  padding: 20px;
+  min-height: calc(100vh - 84px);
+  margin: 0;
+  padding: 24px;
 }
 
 // 状态条
@@ -839,17 +839,17 @@ export default {
   background: #fff;
   border-radius: 10px;
   border: 1px solid #e2e8f0;
-  padding: 14px 20px;
+  padding: 16px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 
 .status-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .status-dot {
@@ -872,11 +872,11 @@ export default {
 
 .status-center {
   display: flex;
-  gap: 10px;
+  gap: 12px;
 }
 
 .status-btn {
-  padding: 8px 20px;
+  padding: 10px 22px;
   border-radius: 8px;
   border: none;
   font-size: 13px;
@@ -916,7 +916,7 @@ export default {
 .status-right {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
 }
 
 .signin-time {
@@ -925,7 +925,7 @@ export default {
 }
 
 .signout-btn {
-  padding: 8px 18px;
+  padding: 10px 20px;
   border-radius: 8px;
   border: none;
   background: #fef2f2;
@@ -945,9 +945,9 @@ export default {
 .waiting-banner {
   background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
   border-radius: 10px;
-  padding: 28px 32px;
+  padding: 32px 36px;
   color: #fff;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
   position: relative;
   overflow: hidden;
 }
@@ -978,11 +978,11 @@ export default {
   position: relative;
   z-index: 1;
   text-align: center;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
 }
 
 .banner-title {
-  margin: 0 0 10px 0;
+  margin: 0 0 12px 0;
   font-size: 26px;
   font-weight: 700;
 }
@@ -998,7 +998,7 @@ export default {
   z-index: 1;
   display: flex;
   justify-content: center;
-  gap: 12px;
+  gap: 16px;
   flex-wrap: wrap;
 }
 
@@ -1006,8 +1006,8 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 12px 18px;
+  gap: 8px;
+  padding: 14px 20px;
   border-radius: 10px;
   border: none;
   background: rgba(255, 255, 255, 0.12);
@@ -1015,7 +1015,7 @@ export default {
   font-size: 12px;
   cursor: pointer;
   transition: all 0.2s;
-  min-width: 70px;
+  min-width: 80px;
   i {
     font-size: 20px;
   }
@@ -1035,8 +1035,8 @@ export default {
   background: #fff;
   border-radius: 10px;
   border: 1px solid #e2e8f0;
-  padding: 12px 16px;
-  margin-bottom: 16px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
 }
 
 .current-call-panel {
@@ -1044,12 +1044,12 @@ export default {
     display: flex;
     flex-wrap: wrap;
     gap: 24px;
-    padding: 10px 4px 16px;
+    padding: 16px 4px 20px;
   }
   .call-info-item {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
   }
   .info-label {
     font-size: 12px;
@@ -1061,7 +1061,7 @@ export default {
     color: #1e293b;
   }
   .call-actions {
-    padding: 8px 4px 4px;
+    padding: 12px 4px 8px;
     border-top: 1px solid #f1f5f9;
   }
 }
@@ -1069,8 +1069,8 @@ export default {
 // 信息区域
 .info-section {
   display: flex;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 24px;
+  margin-bottom: 24px;
 }
 
 .agent-state-panel {
@@ -1078,7 +1078,7 @@ export default {
   background: #fff;
   border-radius: 10px;
   border: 1px solid #e2e8f0;
-  padding: 18px 20px;
+  padding: 20px 24px;
 }
 
 .queue-info {
@@ -1086,21 +1086,21 @@ export default {
   background: #fff;
   border-radius: 10px;
   border: 1px solid #e2e8f0;
-  padding: 18px 20px;
+  padding: 20px 24px;
 }
 
 .today-stats {
   background: #fff;
   border-radius: 10px;
   border: 1px solid #e2e8f0;
-  padding: 18px 20px;
+  padding: 20px 24px;
 }
 
 .card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .card-title {
@@ -1124,7 +1124,7 @@ export default {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 0;
+    padding: 10px 0;
     border-bottom: 1px dashed #f1f5f9;
     &:last-child { border-bottom: none; }
   }
@@ -1141,13 +1141,13 @@ export default {
 
 .quick-action-btns {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
 // 排队列表
 .queue-list {
-  margin-bottom: 14px;
+  margin-bottom: 16px;
   max-height: 240px;
   overflow-y: auto;
 }
@@ -1155,7 +1155,7 @@ export default {
 .queue-item {
   display: flex;
   align-items: center;
-  padding: 12px 0;
+  padding: 14px 0;
   border-bottom: 1px solid #f1f5f9;
   &:last-child {
     border-bottom: none;
@@ -1172,7 +1172,7 @@ export default {
   color: #fff;
   font-size: 14px;
   font-weight: 600;
-  margin-right: 14px;
+  margin-right: 16px;
   flex-shrink: 0;
 }
 
@@ -1212,7 +1212,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 12px;
+  padding-top: 16px;
   border-top: 1px solid #f1f5f9;
 }
 
@@ -1231,13 +1231,13 @@ export default {
 .stats-cards {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  margin-bottom: 20px;
+  gap: 16px;
+  margin-bottom: 24px;
 }
 
 .stat-card {
   border-radius: 8px;
-  padding: 14px 10px;
+  padding: 18px 16px;
   text-align: center;
 }
 
@@ -1277,13 +1277,13 @@ export default {
 }
 
 // 小时话务分布图
-.hourly-chart { margin-bottom: 20px; }
+.hourly-chart { margin-bottom: 24px; }
 
 .chart-title {
   font-size: 13px;
   font-weight: 600;
   color: #475569;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .chart-bars {
@@ -1317,7 +1317,7 @@ export default {
 
 // 满意度
 .satisfaction {
-  padding-top: 16px;
+  padding-top: 20px;
   border-top: 1px solid #f1f5f9;
 }
 
@@ -1325,7 +1325,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 16px;
 }
 
 .sat-title {
@@ -1360,13 +1360,13 @@ export default {
   background: #fff;
   border-radius: 10px;
   border: 1px solid #e2e8f0;
-  padding: 18px 20px;
+  padding: 20px 24px;
 }
 
-.skill-list { margin-top: 4px; }
+.skill-list { margin-top: 8px; }
 
 .skill-item {
-  padding: 12px 0;
+  padding: 14px 0;
   &:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
 }
 
@@ -1374,7 +1374,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .skill-name {
@@ -1389,7 +1389,7 @@ export default {
 .main-skill-tag {
   background: #eff6ff;
   color: #3b82f6;
-  padding: 2px 8px;
+  padding: 3px 10px;
   border-radius: 4px;
   font-size: 11px;
   font-weight: 600;
