@@ -1,5 +1,6 @@
 package ai.lawyers.web.controller.lawyers.outbound;
 
+import java.util.Map;
 import java.util.List;
 import javax.servlet.http.HttpServletResponse;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import ai.lawyers.common.annotation.Log;
+import ai.lawyers.common.annotation.Anonymous;
 import ai.lawyers.common.core.controller.BaseController;
 import ai.lawyers.common.core.domain.AjaxResult;
 import ai.lawyers.common.core.page.TableDataInfo;
@@ -20,6 +22,7 @@ import ai.lawyers.common.enums.BusinessType;
 import ai.lawyers.common.utils.poi.ExcelUtil;
 import ai.lawyers.system.domain.lawyers.outbound.AiOutboundTask;
 import ai.lawyers.system.service.lawyers.outbound.IAiOutboundTaskService;
+import ai.lawyers.system.service.lawyers.outbound.IOutboundExecutionService;
 
 @RestController
 @RequestMapping("/lawyers/outbound/task")
@@ -27,6 +30,9 @@ public class AiOutboundTaskController extends BaseController
 {
     @Autowired
     private IAiOutboundTaskService aiOutboundTaskService;
+
+    @Autowired
+    private IOutboundExecutionService outboundExecutionService;
 
     @PreAuthorize("@ss.hasPermi('lawyers:outbound:task:list')")
     @GetMapping("/list")
@@ -109,5 +115,38 @@ public class AiOutboundTaskController extends BaseController
     public AjaxResult stopTask(@PathVariable Long taskId)
     {
         return toAjax(aiOutboundTaskService.stopTask(taskId));
+    }
+
+    /**
+     * 立即执行外呼任务（执行一批号码，最大并发数为任务配置）。
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:outbound:task:start')")
+    @Log(title = "外呼任务执行", businessType = BusinessType.OTHER)
+    @PostMapping("/execute/{taskId}")
+    public AjaxResult executeTask(@PathVariable Long taskId)
+    {
+        int processed = outboundExecutionService.executeTask(taskId);
+        return success(processed);
+    }
+
+    /**
+     * 网关事件回调（外呼话单最终化）。
+     * 无需登录鉴权，请在网关侧通过 IP 白名单或签名保证安全。
+     *
+     * 请求体示例：
+     * { "callUuid":"xxx", "event":"ANSWERED" } / { "callUuid":"xxx", "event":"HANGUP", "talkDuration":35 }
+     */
+    @Anonymous
+    @PostMapping("/event")
+    public AjaxResult event(@RequestBody Map<String, Object> param)
+    {
+        Object uuid = param.get("callUuid");
+        Object event = param.get("event");
+        if (uuid == null || event == null)
+        {
+            return AjaxResult.error("callUuid 与 event 不能为空");
+        }
+        outboundExecutionService.onCallEvent(uuid.toString(), event.toString(), param);
+        return success();
     }
 }

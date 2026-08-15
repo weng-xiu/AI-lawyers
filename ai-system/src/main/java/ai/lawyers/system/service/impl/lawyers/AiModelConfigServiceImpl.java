@@ -1,423 +1,481 @@
 package ai.lawyers.system.service.impl.lawyers;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import ai.lawyers.system.mapper.lawyers.AiModelConfigMapper;
-import ai.lawyers.system.domain.lawyers.AiModelConfig;
-import ai.lawyers.system.service.lawyers.IAiModelConfigService;
+
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import ai.lawyers.common.utils.StringUtils;
+import ai.lawyers.system.domain.lawyers.AiModelConfig;
+import ai.lawyers.system.mapper.lawyers.AiModelConfigMapper;
+import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 
 /**
- * AI模型参数配置Service业务层处理
- * 
+ * AI模型参数配置Service业务层处理。
+ *
+ * <p>融入 SmartCall 设计：模型调用统一为 OpenAI 兼容 Chat Completions 协议
+ * （DashScope/DeepSeek/智谱/本地 vLLM/Ollama 均可通过 apiUrl 指向兼容端点），
+ * Claude 走 Anthropic Messages 协议。支持 JSON 输出模式，供意图识别、信息抽取、
+ * 情感分析等 IVR 节点复用。</p>
+ *
  * @author ai-lawyers
  * @date 2025-07-15
  */
 @Service
-public class AiModelConfigServiceImpl implements IAiModelConfigService 
+public class AiModelConfigServiceImpl implements IAiModelConfigService
 {
+    private static final Logger log = LoggerFactory.getLogger(AiModelConfigServiceImpl.class);
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    private static final String DEFAULT_SYSTEM_PROMPT =
+            "你是一名专业的公共法律服务热线AI助手，回答应准确、简洁、符合中国法律法规，"
+                    + "并提示用户涉及重大权益时寻求专业律师帮助。";
+
     @Autowired
     private AiModelConfigMapper aiModelConfigMapper;
 
-    /**
-     * 查询AI模型参数配置
-     * 
-     * @param configId AI模型参数配置主键
-     * @return AI模型参数配置
-     */
     @Override
     public AiModelConfig selectAiModelConfigByConfigId(Long configId)
     {
         return aiModelConfigMapper.selectAiModelConfigByConfigId(configId);
     }
 
-    /**
-     * 查询AI模型参数配置列表
-     * 
-     * @param aiModelConfig AI模型参数配置
-     * @return AI模型参数配置
-     */
     @Override
     public List<AiModelConfig> selectAiModelConfigList(AiModelConfig aiModelConfig)
     {
         return aiModelConfigMapper.selectAiModelConfigList(aiModelConfig);
     }
 
-    /**
-     * 新增AI模型参数配置
-     * 
-     * @param aiModelConfig AI模型参数配置
-     * @return 结果
-     */
     @Override
     public int insertAiModelConfig(AiModelConfig aiModelConfig)
     {
-        // 如果设置为默认配置，先将其他配置设为非默认
-        if ("1".equals(aiModelConfig.getIsDefault())) {
+        if ("1".equals(aiModelConfig.getIsDefault()))
+        {
             aiModelConfigMapper.updateDefaultConfig(aiModelConfig.getConfigId());
         }
         return aiModelConfigMapper.insertAiModelConfig(aiModelConfig);
     }
 
-    /**
-     * 修改AI模型参数配置
-     * 
-     * @param aiModelConfig AI模型参数配置
-     * @return 结果
-     */
     @Override
     public int updateAiModelConfig(AiModelConfig aiModelConfig)
     {
-        // 如果设置为默认配置，先将其他配置设为非默认
-        if ("1".equals(aiModelConfig.getIsDefault())) {
+        if ("1".equals(aiModelConfig.getIsDefault()))
+        {
             aiModelConfigMapper.updateDefaultConfig(aiModelConfig.getConfigId());
         }
         return aiModelConfigMapper.updateAiModelConfig(aiModelConfig);
     }
 
-    /**
-     * 批量删除AI模型参数配置
-     * 
-     * @param configIds 需要删除的AI模型参数配置主键
-     * @return 结果
-     */
     @Override
     public int deleteAiModelConfigByConfigIds(Long[] configIds)
     {
         return aiModelConfigMapper.deleteAiModelConfigByConfigIds(configIds);
     }
 
-    /**
-     * 删除AI模型参数配置信息
-     * 
-     * @param configId AI模型参数配置主键
-     * @return 结果
-     */
     @Override
     public int deleteAiModelConfigByConfigId(Long configId)
     {
         return aiModelConfigMapper.deleteAiModelConfigByConfigId(configId);
     }
 
-    /**
-     * 获取默认的AI模型配置
-     * 
-     * @return AI模型参数配置
-     */
     @Override
     public AiModelConfig getDefaultAiModelConfig()
     {
         return aiModelConfigMapper.selectDefaultAiModelConfig();
     }
 
-    /**
-     * 设置默认配置
-     * 
-     * @param configId 配置ID
-     * @return 结果
-     */
     @Override
     public int setDefaultConfig(Long configId)
     {
         return aiModelConfigMapper.updateDefaultConfig(configId);
     }
 
-    /**
-     * 测试AI模型连接
-     * 
-     * @param configId 配置ID
-     * @return 测试结果
-     */
     @Override
     public boolean testAiModelConnection(Long configId)
     {
         AiModelConfig config = selectAiModelConfigByConfigId(configId);
-        if (config == null) {
+        if (config == null)
+        {
             return false;
         }
-        
-        try {
-            // 根据模型类型调用不同的API
-            if ("OpenAI".equals(config.getModelType())) {
-                return testOpenAIConnection(config);
-            } else if ("Claude".equals(config.getModelType())) {
-                return testClaudeConnection(config);
-            } else if ("ChatGLM".equals(config.getModelType())) {
-                return testChatGLMConnection(config);
-            } else {
-                // 默认使用通用测试方法
-                return testGenericConnection(config);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
+        try
+        {
+            String response = chat(config, "你是一个连接测试助手。", "请仅回复：连接成功", false);
+            return StringUtils.isNotEmpty(response);
+        }
+        catch (Exception e)
+        {
+            log.warn("AI模型连接测试失败 configId={} error={}", configId, e.getMessage());
             return false;
         }
     }
-    
-    /**
-     * 调用AI模型API生成回答
-     * 
-     * @param question 用户问题
-     * @param context 上下文信息
-     * @return AI生成的回答
-     */
+
     @Override
     public String callAiModel(String question, String context)
     {
-        // 获取默认配置
         AiModelConfig config = getDefaultAiModelConfig();
-        if (config == null) {
+        if (config == null)
+        {
             return "未找到可用的AI模型配置，请联系管理员配置模型参数。";
         }
-        
-        try {
-            // 根据模型类型调用不同的API
-            if ("OpenAI".equals(config.getModelType()) || "gpt".equals(config.getModelType())) {
-                return callOpenAI(config, question, context);
-            } else if ("Claude".equals(config.getModelType())) {
-                return callClaude(config, question, context);
-            } else if ("ChatGLM".equals(config.getModelType())) {
-                return callChatGLM(config, question, context);
-            } else if ("local".equals(config.getModelType())) {
-                return callLocalModel(config, question, context);
-            } else {
-                // 默认使用通用调用方法
-                return callGenericModel(config, question, context);
+        StringBuilder user = new StringBuilder();
+        if (StringUtils.isNotEmpty(context))
+        {
+            user.append("背景信息：").append(context).append("\n\n");
+        }
+        user.append("用户问题：").append(question);
+        try
+        {
+            return chat(config, DEFAULT_SYSTEM_PROMPT, user.toString(), false);
+        }
+        catch (Exception e)
+        {
+            throw new RuntimeException("调用AI模型失败：" + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public String chat(String systemPrompt, String userMessage)
+    {
+        AiModelConfig config = getDefaultAiModelConfig();
+        if (config == null)
+        {
+            throw new IllegalStateException("未找到可用的AI模型配置，请联系管理员配置模型参数。");
+        }
+        return chat(config, systemPrompt, userMessage, false);
+    }
+
+    @Override
+    public String chatJson(String systemPrompt, String userMessage)
+    {
+        AiModelConfig config = getDefaultAiModelConfig();
+        if (config == null)
+        {
+            throw new IllegalStateException("未找到可用的AI模型配置，请联系管理员配置模型参数。");
+        }
+        return chat(config, systemPrompt, userMessage, true);
+    }
+
+    /**
+     * 真实 HTTP 调用。失败按配置重试，最终抛出异常由上层兜底。
+     */
+    private String chat(AiModelConfig config, String systemPrompt, String userMessage, boolean jsonMode)
+    {
+        String modelType = normalizeModelType(config.getModelType());
+        int attempts = Math.max(1, config.getRetryCount() == null ? 1 : config.getRetryCount() + 1);
+        Exception lastError = null;
+        for (int attempt = 1; attempt <= attempts; attempt++)
+        {
+            try
+            {
+                return "Claude".equalsIgnoreCase(modelType)
+                        ? callClaude(config, systemPrompt, userMessage)
+                        : callOpenAiCompatible(config, modelType, systemPrompt, userMessage, jsonMode);
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-            return "调用AI模型失败：" + e.getMessage();
-        }
-    }
-    
-    /**
-     * 测试OpenAI模型连接
-     */
-    private boolean testOpenAIConnection(AiModelConfig config) {
-        try {
-            // 构建测试请求
-            String testPrompt = "你好，请回复'连接成功'";
-            String response = callOpenAI(config, testPrompt, null);
-            return response != null && !response.isEmpty();
-        } catch (Exception e) {
-            return false;
-        }
-    }
-    
-    /**
-     * 测试Claude模型连接
-     */
-    private boolean testClaudeConnection(AiModelConfig config) {
-        try {
-            // 构建测试请求
-            String testPrompt = "你好，请回复'连接成功'";
-            String response = callClaude(config, testPrompt, null);
-            return response != null && !response.isEmpty();
-        } catch (Exception e) {
-            return false;
-        }
-    }
-    
-    /**
-     * 测试ChatGLM模型连接
-     */
-    private boolean testChatGLMConnection(AiModelConfig config) {
-        try {
-            // 构建测试请求
-            String testPrompt = "你好，请回复'连接成功'";
-            String response = callChatGLM(config, testPrompt, null);
-            return response != null && !response.isEmpty();
-        } catch (Exception e) {
-            return false;
-        }
-    }
-    
-    /**
-     * 测试通用模型连接
-     */
-    private boolean testGenericConnection(AiModelConfig config) {
-        try {
-            // 构建测试请求
-            String testPrompt = "你好，请回复'连接成功'";
-            String response = callGenericModel(config, testPrompt, null);
-            return response != null && !response.isEmpty();
-        } catch (Exception e) {
-            return false;
-        }
-    }
-    
-    /**
-     * 调用OpenAI API
-     */
-    private String callOpenAI(AiModelConfig config, String question, String context) {
-        try {
-            // 构建请求体
-            StringBuilder promptBuilder = new StringBuilder();
-            if (context != null && !context.isEmpty()) {
-                promptBuilder.append("背景信息：").append(context).append("\n\n");
+            catch (Exception e)
+            {
+                lastError = e;
+                log.warn("AI模型调用失败 configId={} attempt={}/{} error={}",
+                        config.getConfigId(), attempt, attempts, e.getMessage());
+                if (attempt < attempts)
+                {
+                    sleepBeforeRetry(attempt);
+                }
             }
-            promptBuilder.append("用户问题：").append(question);
-            
-            // 这里应该使用HTTP客户端调用OpenAI API
-            // 为了简化示例，这里返回模拟结果
-            // 实际实现需要使用RestTemplate或HttpClient调用真实API
-            
-            // 模拟API调用
-            String simulatedResponse = generateLegalResponse(question, context);
-            
-            return simulatedResponse;
-        } catch (Exception e) {
-            throw new RuntimeException("调用OpenAI API失败：" + e.getMessage());
         }
+        throw new RuntimeException("调用AI模型失败：" + lastError.getMessage(), lastError);
     }
-    
-    /**
-     * 调用Claude API
-     */
-    private String callClaude(AiModelConfig config, String question, String context) {
-        try {
-            // 构建请求体
-            StringBuilder promptBuilder = new StringBuilder();
-            if (context != null && !context.isEmpty()) {
-                promptBuilder.append("背景信息：").append(context).append("\n\n");
+
+    private String callOpenAiCompatible(AiModelConfig config, String modelType, String systemPrompt,
+                                        String userMessage, boolean jsonMode) throws Exception
+    {
+        String endpoint = endpointOf(config, "/chat/completions");
+        ObjectNode body = MAPPER.createObjectNode();
+        body.put("model", modelNameOf(config, "gpt-3.5-turbo"));
+        body.put("stream", false);
+        if (config.getMaxTokens() != null)
+        {
+            body.put("max_tokens", config.getMaxTokens());
+        }
+        if (config.getTemperature() != null)
+        {
+            body.put("temperature", config.getTemperature());
+        }
+        if (config.getTopP() != null)
+        {
+            body.put("top_p", config.getTopP());
+        }
+        if (jsonMode)
+        {
+            ObjectNode format = body.putObject("response_format");
+            format.put("type", "json_object");
+        }
+        ArrayNode messages = body.putArray("messages");
+        if (StringUtils.isNotEmpty(systemPrompt))
+        {
+            ObjectNode sys = messages.addObject();
+            sys.put("role", "system");
+            sys.put("content", systemPrompt);
+        }
+        ObjectNode user = messages.addObject();
+        user.put("role", "user");
+        user.put("content", userMessage);
+
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Content-Type", "application/json; charset=UTF-8");
+        if (StringUtils.isNotEmpty(config.getApiKey()))
+        {
+            headers.put("Authorization", "Bearer " + config.getApiKey());
+        }
+
+        JsonNode root = httpPost(endpoint, headers, MAPPER.writeValueAsString(body), config);
+        JsonNode choices = root.path("choices");
+        if (choices.isArray() && choices.size() > 0)
+        {
+            JsonNode content = choices.get(0).path("message").path("content");
+            if (content.isTextual())
+            {
+                return content.asText();
             }
-            promptBuilder.append("用户问题：").append(question);
-            
-            // 这里应该使用HTTP客户端调用Claude API
-            // 为了简化示例，这里返回模拟结果
-            
-            // 模拟API调用
-            String simulatedResponse = generateLegalResponse(question, context);
-            
-            return simulatedResponse;
-        } catch (Exception e) {
-            throw new RuntimeException("调用Claude API失败：" + e.getMessage());
-        }
-    }
-    
-    /**
-     * 调用ChatGLM API
-     */
-    private String callChatGLM(AiModelConfig config, String question, String context) {
-        try {
-            // 构建请求体
-            StringBuilder promptBuilder = new StringBuilder();
-            if (context != null && !context.isEmpty()) {
-                promptBuilder.append("背景信息：").append(context).append("\n\n");
+            if (content.isArray() || content.isObject())
+            {
+                return content.toString();
             }
-            promptBuilder.append("用户问题：").append(question);
-            
-            // 这里应该使用HTTP客户端调用ChatGLM API
-            // 为了简化示例，这里返回模拟结果
-            
-            // 模拟API调用
-            String simulatedResponse = generateLegalResponse(question, context);
-            
-            return simulatedResponse;
-        } catch (Exception e) {
-            throw new RuntimeException("调用ChatGLM API失败：" + e.getMessage());
         }
+        JsonNode outputText = root.path("output").path("text");
+        if (outputText.isTextual())
+        {
+            return outputText.asText();
+        }
+        throw new IllegalStateException("模型响应缺少choices[0].message.content字段");
     }
-    
-    /**
-     * 调用本地模型API
-     */
-    private String callLocalModel(AiModelConfig config, String question, String context) {
-        try {
-            // 构建请求体
-            StringBuilder promptBuilder = new StringBuilder();
-            if (context != null && !context.isEmpty()) {
-                promptBuilder.append("背景信息：").append(context).append("\n\n");
+
+    private String callClaude(AiModelConfig config, String systemPrompt, String userMessage) throws Exception
+    {
+        String endpoint = endpointOf(config, "/messages");
+        ObjectNode body = MAPPER.createObjectNode();
+        body.put("model", modelNameOf(config, "claude-3-5-sonnet-latest"));
+        body.put("max_tokens", config.getMaxTokens() == null ? 1024 : config.getMaxTokens());
+        if (config.getTemperature() != null)
+        {
+            body.put("temperature", config.getTemperature());
+        }
+        if (StringUtils.isNotEmpty(systemPrompt))
+        {
+            body.put("system", systemPrompt);
+        }
+        ArrayNode messages = body.putArray("messages");
+        ObjectNode user = messages.addObject();
+        user.put("role", "user");
+        user.put("content", userMessage);
+
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Content-Type", "application/json; charset=UTF-8");
+        headers.put("x-api-key", config.getApiKey() == null ? "" : config.getApiKey());
+        headers.put("anthropic-version", "2023-06-01");
+
+        JsonNode root = httpPost(endpoint, headers, MAPPER.writeValueAsString(body), config);
+        JsonNode content = root.path("content");
+        if (content.isArray() && content.size() > 0)
+        {
+            StringBuilder sb = new StringBuilder();
+            for (JsonNode item : content)
+            {
+                if (item.path("type").asText("text").equals("text") && item.path("text").isTextual())
+                {
+                    sb.append(item.path("text").asText());
+                }
             }
-            promptBuilder.append("用户问题：").append(question);
-            
-            // 这里应该使用HTTP客户端调用本地模型API
-            // 为了简化示例，这里返回模拟结果
-            
-            // 模拟API调用
-            String simulatedResponse = generateLegalResponse(question, context);
-            
-            return simulatedResponse;
-        } catch (Exception e) {
-            throw new RuntimeException("调用本地模型API失败：" + e.getMessage());
-        }
-    }
-    
-    /**
-     * 调用通用模型API
-     */
-    private String callGenericModel(AiModelConfig config, String question, String context) {
-        try {
-            // 构建请求体
-            StringBuilder promptBuilder = new StringBuilder();
-            if (context != null && !context.isEmpty()) {
-                promptBuilder.append("背景信息：").append(context).append("\n\n");
+            if (sb.length() > 0)
+            {
+                return sb.toString();
             }
-            promptBuilder.append("用户问题：").append(question);
-            
-            // 这里应该使用HTTP客户端调用通用API
-            // 为了简化示例，这里返回模拟结果
-            
-            // 模拟API调用
-            String simulatedResponse = generateLegalResponse(question, context);
-            
-            return simulatedResponse;
-        } catch (Exception e) {
-            throw new RuntimeException("调用通用模型API失败：" + e.getMessage());
+        }
+        throw new IllegalStateException("Claude响应缺少content字段");
+    }
+
+    private JsonNode httpPost(String endpoint, Map<String, String> headers, String payload,
+                              AiModelConfig config) throws Exception
+    {
+        int timeoutMs = (config.getTimeout() == null || config.getTimeout() <= 0
+                ? 60 : config.getTimeout()) * 1000;
+        HttpURLConnection connection = null;
+        try
+        {
+            URL url = new URL(endpoint);
+            connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setConnectTimeout(timeoutMs);
+            connection.setReadTimeout(timeoutMs);
+            connection.setDoOutput(true);
+            connection.setUseCaches(false);
+            for (Map.Entry<String, String> entry : headers.entrySet())
+            {
+                connection.setRequestProperty(entry.getKey(), entry.getValue());
+            }
+            byte[] bytes = payload.getBytes(StandardCharsets.UTF_8);
+            try (OutputStream out = connection.getOutputStream())
+            {
+                out.write(bytes);
+                out.flush();
+            }
+
+            int status = connection.getResponseCode();
+            String responseText = readBody(connection, status >= 200 && status < 300);
+            if (status >= 200 && status < 300)
+            {
+                if (StringUtils.isEmpty(responseText))
+                {
+                    throw new IllegalStateException("模型返回空响应");
+                }
+                return MAPPER.readTree(responseText);
+            }
+            String errorMsg = extractError(responseText);
+            throw new IllegalStateException("HTTP " + status + (StringUtils.isEmpty(errorMsg) ? "" : "：" + errorMsg));
+        }
+        finally
+        {
+            if (connection != null)
+            {
+                connection.disconnect();
+            }
         }
     }
-    
-    /**
-     * 生成法律咨询响应
-     * 
-     * @param question 用户问题
-     * @param context 上下文信息
-     * @return 生成的法律响应
-     */
-    private String generateLegalResponse(String question, String context) {
-        // 根据问题关键词生成更有针对性的回复
-        String lowerQuestion = question.toLowerCase();
-        
-        StringBuilder response = new StringBuilder();
-        response.append("根据您的问题，我提供以下法律建议：\n\n");
-        
-        // 根据问题类型提供不同的建议
-        if (lowerQuestion.contains("离婚") || lowerQuestion.contains("婚姻")) {
-            response.append("关于婚姻家庭问题：\n");
-            response.append("1. 根据《民法典》规定，夫妻感情确已破裂是离婚的法定条件\n");
-            response.append("2. 离婚涉及财产分割、子女抚养等问题，建议协商解决\n");
-            response.append("3. 如无法协商，可向人民法院提起离婚诉讼\n");
-        } 
-        else if (lowerQuestion.contains("合同") || lowerQuestion.contains("违约")) {
-            response.append("关于合同纠纷问题：\n");
-            response.append("1. 根据《民法典》合同编规定，合同当事人应当全面履行合同义务\n");
-            response.append("2. 违约方应当承担继续履行、采取补救措施或者赔偿损失等违约责任\n");
-            response.append("3. 建议保留合同原件、履行凭证等相关证据\n");
+
+    private String readBody(HttpURLConnection connection, boolean successStream) throws Exception
+    {
+        StringBuilder sb = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                successStream ? connection.getInputStream() : connection.getErrorStream(),
+                StandardCharsets.UTF_8)))
+        {
+            String line;
+            while ((line = reader.readLine()) != null)
+            {
+                sb.append(line);
+            }
         }
-        else if (lowerQuestion.contains("劳动") || lowerQuestion.contains("工资") || lowerQuestion.contains("加班")) {
-            response.append("关于劳动纠纷问题：\n");
-            response.append("1. 根据《劳动法》和《劳动合同法》，用人单位应当按时足额支付劳动报酬\n");
-            response.append("2. 加班工资应按照不低于工资的150%（工作日）、200%（休息日）、300%（法定节假日）支付\n");
-            response.append("3. 建议保留劳动合同、工资条、考勤记录等证据\n");
+        return sb.toString();
+    }
+
+    private String extractError(String responseText)
+    {
+        if (StringUtils.isEmpty(responseText))
+        {
+            return "";
         }
-        else if (lowerQuestion.contains("交通") || lowerQuestion.contains("事故")) {
-            response.append("关于交通事故问题：\n");
-            response.append("1. 根据《道路交通安全法》，发生交通事故应当立即停车、保护现场、抢救伤员\n");
-            response.append("2. 交通事故赔偿包括医疗费、误工费、护理费、交通费等\n");
-            response.append("3. 建议及时报警、保留现场照片、维修发票等证据\n");
+        try
+        {
+            JsonNode root = MAPPER.readTree(responseText);
+            JsonNode error = root.path("error");
+            if (error.isTextual())
+            {
+                return error.asText();
+            }
+            if (error.isObject() && error.path("message").isTextual())
+            {
+                return error.path("message").asText();
+            }
+            if (root.path("message").isTextual())
+            {
+                return root.path("message").asText();
+            }
         }
-        else {
-            response.append("1. 首先需要了解具体情况和相关事实\n");
-            response.append("2. 根据相关法律条款和规定进行分析\n");
-            response.append("3. 建议您采取以下措施：收集证据、咨询专业律师、通过合法途径维权\n");
+        catch (Exception ignored)
+        {
+            // 非JSON错误体，直接截取原文
         }
-        
-        response.append("\n重要提示：\n");
-        response.append("- 以上建议仅供参考，不构成正式的法律意见\n");
-        response.append("- 法律问题具有复杂性，建议您咨询专业律师获取针对性建议\n");
-        response.append("- 请注意保留相关证据材料，以备后续维权使用\n");
-        
-        return response.toString();
+        return responseText.length() > 200 ? responseText.substring(0, 200) : responseText;
+    }
+
+    private String endpointOf(AiModelConfig config, String suffix)
+    {
+        if (StringUtils.isNotEmpty(config.getApiUrl()))
+        {
+            String url = config.getApiUrl().trim();
+            if (url.endsWith("/"))
+            {
+                url = url.substring(0, url.length() - 1);
+            }
+            if (url.endsWith("/v1"))
+            {
+                url = url.substring(0, url.length() - 3);
+            }
+            return url + suffix;
+        }
+        String base = defaultEndpoint(config.getModelType());
+        return base + suffix;
+    }
+
+    private String defaultEndpoint(String modelType)
+    {
+        String type = normalizeModelType(modelType);
+        switch (type)
+        {
+            case "OpenAI":
+                return "https://api.openai.com/v1";
+            case "Claude":
+                return "https://api.anthropic.com/v1";
+            case "ChatGLM":
+                return "https://open.bigmodel.cn/api/paas/v4";
+            case "DeepSeek":
+                return "https://api.deepseek.com/v1";
+            case "DashScope":
+                return "https://dashscope.aliyuncs.com/compatible-mode/v1";
+            default:
+                return "http://localhost:11434/v1";
+        }
+    }
+
+    private String normalizeModelType(String modelType)
+    {
+        if (StringUtils.isEmpty(modelType))
+        {
+            return "local";
+        }
+        String type = modelType.trim();
+        if ("gpt".equalsIgnoreCase(type))
+        {
+            return "OpenAI";
+        }
+        if ("qwen".equalsIgnoreCase(type) || "tongyi".equalsIgnoreCase(type))
+        {
+            return "DashScope";
+        }
+        return type;
+    }
+
+    private String modelNameOf(AiModelConfig config, String fallback)
+    {
+        return StringUtils.isNotEmpty(config.getModelName()) ? config.getModelName() : fallback;
+    }
+
+    private void sleepBeforeRetry(int attempt)
+    {
+        try
+        {
+            Thread.sleep(Math.min(2000, attempt * 500L));
+        }
+        catch (InterruptedException e)
+        {
+            Thread.currentThread().interrupt();
+        }
     }
 }

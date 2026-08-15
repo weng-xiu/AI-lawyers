@@ -125,7 +125,7 @@ export default {
       recentRecords: [],
       calendarValue: new Date(),
       quickList: [
-        { name: '话务面板', icon: 'el-icon-phone', type: 'blue', path: '/workbench/callPanel' },
+        { name: '来电弹屏', icon: 'el-icon-phone', type: 'blue', path: '/inbound/callPopup' },
         { name: '图文服务', icon: 'el-icon-chat-dot-square', type: 'teal', path: '/workbench/chat' },
         { name: '咨询台账', icon: 'el-icon-document', type: 'blue2', path: '/business/callLedger' },
         { name: '工单管理', icon: 'el-icon-edit', type: 'green', path: '/business/workOrder' }

@@ -88,11 +88,22 @@ public class AiCallAgentStatusController extends BaseController
         Long agentId = params.get("agentId") != null ? Long.valueOf(params.get("agentId").toString()) : null;
         Long userId = params.get("userId") != null ? Long.valueOf(params.get("userId").toString()) : null;
         String ip = params.get("ip") != null ? params.get("ip").toString() : "";
-        int result = aiCallAgentStatusService.agentLogin(agentId != null ? agentId : userId, ip);
+        int result = aiCallAgentStatusService.agentLogin(agentId, userId, ip);
         if (result > 0) {
             return success("坐席登录成功");
         }
+        if (result == -1) {
+            return error("该工号已绑定其他账号，请使用本人绑定的工号签入");
+        }
         return error("坐席登录失败，坐席不存在");
+    }
+
+    @PreAuthorize("@ss.hasPermi('lawyers:call:agent:login')")
+    @GetMapping("/my")
+    public AjaxResult myAgent()
+    {
+        // 查询当前登录账号绑定的工号
+        return success(aiCallAgentStatusService.selectAiCallAgentStatusByUserId(getUserId()));
     }
 
     @PreAuthorize("@ss.hasPermi('lawyers:call:agent:logout')")
@@ -102,7 +113,7 @@ public class AiCallAgentStatusController extends BaseController
     {
         Long agentId = params.get("agentId") != null ? Long.valueOf(params.get("agentId").toString()) : null;
         Long userId = params.get("userId") != null ? Long.valueOf(params.get("userId").toString()) : null;
-        int result = aiCallAgentStatusService.agentLogout(agentId != null ? agentId : userId);
+        int result = aiCallAgentStatusService.agentLogout(agentId, userId);
         if (result > 0) {
             return success("坐席注销成功");
         }

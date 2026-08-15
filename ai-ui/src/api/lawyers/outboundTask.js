@@ -65,3 +65,10 @@ export function stopTask(taskId) {
     method: 'post'
   })
 }
+
+export function executeTask(taskId) {
+  return request({
+    url: '/lawyers/outbound/task/execute/' + taskId,
+    method: 'post'
+  })
+}

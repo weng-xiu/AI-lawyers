@@ -2,9 +2,10 @@
   <div :class="classObj" class="app-wrapper" :style="{'--current-color': theme}">
     <div v-if="device==='mobile'&&sidebar.opened" class="drawer-bg" @click="handleClickOutside"/>
     <sidebar v-if="!sidebar.hide" class="sidebar-container"/>
-    <div :class="{hasTagsView:needTagsView,sidebarHide:sidebar.hide}" class="main-container">
+      <div :class="{hasTagsView:needTagsView,sidebarHide:sidebar.hide}" class="main-container">
       <div :class="{'fixed-header':fixedHeader}">
         <navbar @setLayout="setLayout"/>
+        <agent-status-bar />
         <tags-view v-if="needTagsView"/>
       </div>
       <app-main/>
@@ -18,11 +19,13 @@ import { AppMain, Navbar, Settings, Sidebar, TagsView } from './components'
 import ResizeMixin from './mixin/ResizeHandler'
 import { mapState } from 'vuex'
 import variables from '@/assets/styles/variables.scss'
+import AgentStatusBar from '@/components/CallCenter/AgentStatusBar'
 
 export default {
   name: 'Layout',
   components: {
     AppMain,
+    AgentStatusBar,
     Navbar,
     Settings,
     Sidebar,

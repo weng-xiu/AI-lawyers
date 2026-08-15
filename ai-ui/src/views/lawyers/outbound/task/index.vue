@@ -61,11 +61,11 @@
     <el-table v-loading="loading" :data="taskList">
       <el-table-column label="任务名称" prop="taskName" :show-overflow-tooltip="true" />
       <el-table-column label="任务编号" prop="taskNo" width="160" />
-      <el-table-column label="呼叫类型" prop="callType" width="100" align="center">
+      <el-table-column label="任务类型" prop="taskType" width="100" align="center">
         <template slot-scope="scope">
-          <el-tag v-if="scope.row.callType === '0'" type="primary">AI外呼</el-tag>
-          <el-tag v-else-if="scope.row.callType === '1'" type="success">人工外呼</el-tag>
-          <el-tag v-else type="warning">混合外呼</el-tag>
+          <el-tag v-if="scope.row.taskType === '1'" type="primary">批量外呼</el-tag>
+          <el-tag v-else-if="scope.row.taskType === '2'" type="success">回访</el-tag>
+          <el-tag v-else type="warning">通知</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="总号码数" prop="totalCount" width="100" align="center" />
@@ -75,9 +75,9 @@
         <template slot-scope="scope">
           <el-tag v-if="scope.row.status === '0'" type="info">待开始</el-tag>
           <el-tag v-else-if="scope.row.status === '1'" type="success">进行中</el-tag>
+          <el-tag v-else-if="scope.row.status === '2'" type="primary">已完成</el-tag>
           <el-tag v-else-if="scope.row.status === '3'" type="warning">已暂停</el-tag>
-          <el-tag v-else-if="scope.row.status === '4'" type="danger">已停止</el-tag>
-          <el-tag v-else type="primary">已完成</el-tag>
+          <el-tag v-else type="danger">已停止</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="创建时间" align="center" prop="createTime" width="160">
@@ -85,7 +85,7 @@
           <span>{{ parseTime(scope.row.createTime) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="320">
+      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="360">
         <template slot-scope="scope">
           <el-button
             size="mini"
@@ -102,6 +102,14 @@
             @click="handleStart(scope.row)"
             v-hasPermi="['lawyers:outbound:task:start']"
           >启动</el-button>
+          <el-button
+            v-if="scope.row.status === '1'"
+            size="mini"
+            type="text"
+            icon="el-icon-video-play"
+            @click="handleExecute(scope.row)"
+            v-hasPermi="['lawyers:outbound:task:start']"
+          >执行</el-button>
           <el-button
             v-if="scope.row.status === '1'"
             size="mini"
@@ -154,15 +162,15 @@
             <el-button slot="append" icon="el-icon-refresh" @click="genTaskNo">生成</el-button>
           </el-input>
         </el-form-item>
-        <el-form-item label="呼叫类型" prop="callType">
-          <el-radio-group v-model="form.callType">
-            <el-radio label="0">AI外呼</el-radio>
-            <el-radio label="1">人工外呼</el-radio>
-            <el-radio label="2">混合外呼</el-radio>
+        <el-form-item label="任务类型" prop="taskType">
+          <el-radio-group v-model="form.taskType">
+            <el-radio label="1">批量外呼</el-radio>
+            <el-radio label="2">回访</el-radio>
+            <el-radio label="3">通知</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="IVR流程" prop="flowId">
-          <el-select v-model="form.flowId" placeholder="请选择IVR流程" clearable style="width: 100%">
+        <el-form-item label="IVR流程" prop="ivrFlowId">
+          <el-select v-model="form.ivrFlowId" placeholder="请选择IVR流程（智能外呼自动进入该流程）" clearable style="width: 100%">
             <el-option
               v-for="item in flowOptions"
               :key="item.flowId"
@@ -171,29 +179,41 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="呼叫时间" prop="callStartTime">
-          <el-time-select
-            v-model="form.callStartTime"
-            :picker-options="{ start: '08:00', step: '00:30', end: '20:00' }"
+        <el-form-item label="主叫号码" prop="callerNumber">
+          <el-input v-model="form.callerNumber" placeholder="如 12348" />
+        </el-form-item>
+        <el-form-item label="呼叫时段" prop="startTime">
+          <el-date-picker
+            v-model="form.startTime"
+            type="datetime"
             placeholder="开始时间"
+            value-format="yyyy-MM-dd HH:mm:ss"
+            style="width: 46%"
           />
-          <span style="margin: 0 10px;">至</span>
-          <el-time-select
-            v-model="form.callEndTime"
-            :picker-options="{ start: '08:00', step: '00:30', end: '20:00' }"
+          <span style="margin: 0 8px;">至</span>
+          <el-date-picker
+            v-model="form.endTime"
+            type="datetime"
             placeholder="结束时间"
+            value-format="yyyy-MM-dd HH:mm:ss"
+            style="width: 46%"
           />
         </el-form-item>
-        <el-form-item label="最大重试次数" prop="maxRetryCount">
-          <el-input-number v-model="form.maxRetryCount" controls-position="right" :min="0" :max="5" />
+        <el-form-item label="最大并发" prop="maxConcurrent">
+          <el-input-number v-model="form.maxConcurrent" controls-position="right" :min="1" :max="100" />
         </el-form-item>
-        <el-form-item label="任务描述" prop="taskDesc">
-          <el-input v-model="form.taskDesc" type="textarea" :rows="3" placeholder="请输入任务描述" />
+        <el-form-item label="最大重试" prop="retryCount">
+          <el-input-number v-model="form.retryCount" controls-position="right" :min="0" :max="5" />
+        </el-form-item>
+        <el-form-item label="重试间隔(分)" prop="retryInterval">
+          <el-input-number v-model="form.retryInterval" controls-position="right" :min="1" :max="1440" />
+        </el-form-item>
+        <el-form-item label="任务说明" prop="description">
+          <el-input v-model="form.description" type="textarea" :rows="3" placeholder="请输入任务说明" />
         </el-form-item>
         <el-form-item label="状态" prop="status">
           <el-radio-group v-model="form.status">
             <el-radio label="0">待开始</el-radio>
-            <el-radio label="4">已停止</el-radio>
           </el-radio-group>
         </el-form-item>
       </el-form>
@@ -206,7 +226,7 @@
 </template>
 
 <script>
-import { listTask, getTask, delTask, addTask, updateTask, generateTaskNo, startTask, pauseTask, stopTask } from "@/api/lawyers/outboundTask"
+import { listTask, getTask, delTask, addTask, updateTask, generateTaskNo, startTask, pauseTask, stopTask, executeTask } from "@/api/lawyers/outboundTask"
 import { getPublishedFlows } from "@/api/lawyers/ivrFlow"
 
 export default {
@@ -232,8 +252,8 @@ export default {
         taskName: [
           { required: true, message: "任务名称不能为空", trigger: "blur" }
         ],
-        callType: [
-          { required: true, message: "呼叫类型不能为空", trigger: "change" }
+        taskType: [
+          { required: true, message: "任务类型不能为空", trigger: "change" }
         ]
       }
     }
@@ -270,12 +290,15 @@ export default {
         taskId: null,
         taskName: null,
         taskNo: null,
-        callType: "0",
-        flowId: null,
-        callStartTime: "09:00",
-        callEndTime: "18:00",
-        maxRetryCount: 1,
-        taskDesc: null,
+        taskType: "1",
+        ivrFlowId: null,
+        callerNumber: "12348",
+        startTime: null,
+        endTime: null,
+        maxConcurrent: 10,
+        retryCount: 1,
+        retryInterval: 30,
+        description: null,
         status: "0"
       }
       this.resetForm("form")
@@ -303,6 +326,14 @@ export default {
       }).then(() => {
         this.getList()
         this.$modal.msgSuccess("启动成功")
+      }).catch(() => {})
+    },
+    handleExecute(row) {
+      this.$modal.confirm('是否立即执行任务"' + row.taskName + '"（将拨出一批号码并生成话单/结果）？').then(function() {
+        return executeTask(row.taskId)
+      }).then(() => {
+        this.getList()
+        this.$modal.msgSuccess("执行完成")
       }).catch(() => {})
     },
     handlePause(row) {

@@ -15,6 +15,8 @@ public interface AiCallAgentStatusMapper
 
     public int updateAiCallAgentStatus(AiCallAgentStatus aiCallAgentStatus);
 
+    public int clearCurrentCall(Long agentId);
+
     public int deleteAiCallAgentStatusByAgentId(Long agentId);
 
     public int deleteAiCallAgentStatusByAgentIds(Long[] agentIds);

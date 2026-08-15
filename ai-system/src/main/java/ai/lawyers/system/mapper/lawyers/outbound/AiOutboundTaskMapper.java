@@ -11,6 +11,8 @@ public interface AiOutboundTaskMapper
 
     public AiOutboundTask selectAiOutboundTaskByTaskNo(String taskNo);
 
+    public List<AiOutboundTask> selectRunningTasks();
+
     public int insertAiOutboundTask(AiOutboundTask aiOutboundTask);
 
     public int updateAiOutboundTask(AiOutboundTask aiOutboundTask);

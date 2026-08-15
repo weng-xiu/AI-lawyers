@@ -95,6 +95,13 @@
             v-hasPermi="['lawyers:ivr:flow:edit']"
           >修改</el-button>
           <el-button
+            size="mini"
+            type="text"
+            icon="el-icon-video-play"
+            @click="handleTest(scope.row)"
+            v-hasPermi="['lawyers:ivr:flow:list']"
+          >测试</el-button>
+          <el-button
             v-if="scope.row.status === '0'"
             size="mini"
             type="text"
@@ -120,6 +127,48 @@
       :limit.sync="queryParams.pageSize"
       @pagination="getList"
     />
+
+    <el-dialog title="IVR流程测试运行" :visible.sync="testOpen" width="760px" append-to-body>
+      <el-form label-width="100px">
+        <el-form-item label="流程">
+          <el-input :value="testFlowName" disabled />
+        </el-form-item>
+        <el-form-item label="模拟输入">
+          <el-input
+            v-model="testInput"
+            type="textarea"
+            :rows="4"
+            placeholder="每行一条输入：菜单节点取首个字符（如 1），意图节点取整段文本（如 我想咨询合同纠纷）"
+          />
+        </el-form-item>
+        <el-form-item label="执行结果">
+          <template v-if="testResult">
+            <el-tag v-if="testResult.success" type="success">执行成功</el-tag>
+            <el-tag v-else type="danger">执行失败：{{ testResult.message }}</el-tag>
+            <el-tag v-if="testResult.matchedIntentionName" style="margin-left: 8px" type="primary">
+              意图：{{ testResult.matchedIntentionName }}（{{ testResult.matchedIntention }}）
+            </el-tag>
+            <el-tag v-if="testResult.categoryName" style="margin-left: 8px" type="warning">
+              分类：{{ testResult.categoryName }}
+            </el-tag>
+            <el-tag v-if="testResult.transferTarget" style="margin-left: 8px" type="danger">
+              转接：{{ testResult.transferTarget }}
+            </el-tag>
+            <el-table :data="testResult.steps || []" size="mini" border style="margin-top: 12px">
+              <el-table-column label="#" type="index" width="45" align="center" />
+              <el-table-column prop="nodeName" label="节点" min-width="120" />
+              <el-table-column prop="nodeType" label="类型" width="110" align="center" />
+              <el-table-column prop="detail" label="执行内容" min-width="280" />
+            </el-table>
+          </template>
+          <el-alert v-else title="尚未执行，点击下方按钮开始测试" type="info" :closable="false" />
+        </el-form-item>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button type="primary" :loading="testLoading" @click="runTest">开始测试</el-button>
+        <el-button @click="testOpen = false">关 闭</el-button>
+      </div>
+    </el-dialog>
 
     <el-dialog :title="title" :visible.sync="open" width="600px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
@@ -155,6 +204,7 @@
 
 <script>
 import { listFlow, getFlow, delFlow, addFlow, updateFlow, publishFlow } from "@/api/lawyers/ivrFlow"
+import { executeFlow } from "@/api/lawyers/ivrEngine"
 
 export default {
   name: "IvrFlow",
@@ -166,6 +216,12 @@ export default {
       flowList: [],
       title: "",
       open: false,
+      testOpen: false,
+      testLoading: false,
+      testInput: "",
+      testResult: null,
+      testFlowId: null,
+      testFlowName: "",
       queryParams: {
         pageNum: 1,
         pageSize: 10,
@@ -226,6 +282,23 @@ export default {
     },
     handleDesign(row) {
       this.$router.push({ path: '/lawyers/ivr/flow/design/index', query: { flowId: row.flowId } })
+    },
+    handleTest(row) {
+      this.testFlowId = row.flowId
+      this.testFlowName = row.flowName
+      this.testInput = ""
+      this.testResult = null
+      this.testOpen = true
+    },
+    runTest() {
+      this.testLoading = true
+      const inputs = (this.testInput || "").split("\n").map(s => s.trim()).filter(s => s !== "")
+      executeFlow({ flowId: this.testFlowId, inputs: inputs }).then(response => {
+        this.testResult = response.data
+        this.testLoading = false
+      }).catch(() => {
+        this.testLoading = false
+      })
     },
     handleUpdate(row) {
       this.reset()

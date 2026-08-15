@@ -237,7 +237,7 @@ export default {
       ],
       noticeList: [],
       quickEntries: [
-        { name: '语音咨询', icon: 'el-icon-phone', color: '#1677FF', bg: '#EDF5FE', path: '/workbench/callPanel' },
+        { name: '来电弹屏', icon: 'el-icon-phone', color: '#1677FF', bg: '#EDF5FE', path: '/inbound/callPopup' },
         { name: '图文服务', icon: 'el-icon-chat-dot-square', color: '#06b6d4', bg: '#ecfeff', path: '/workbench/chat' },
         { name: '视频咨询', icon: 'el-icon-video-camera', color: '#f59e0b', bg: '#fffbeb', path: '/workbench/video' },
         { name: '来电弹屏', icon: 'el-icon-monitor', color: '#7C3AED', bg: '#f5f3ff', path: '/inbound/callPopup' },

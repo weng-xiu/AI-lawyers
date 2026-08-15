@@ -90,4 +90,22 @@ public interface IAiModelConfigService
      * @return AI生成的回答
      */
     public String callAiModel(String question, String context);
+
+    /**
+     * 以系统提示词 + 用户消息的方式调用默认模型（OpenAI/Claude 兼容 Chat Completions）。
+     *
+     * @param systemPrompt 系统提示词（可为空）
+     * @param userMessage  用户消息
+     * @return 模型返回的文本内容
+     */
+    public String chat(String systemPrompt, String userMessage);
+
+    /**
+     * 以 JSON 模式调用默认模型，要求模型返回合法的 JSON 文本。
+     *
+     * @param systemPrompt 系统提示词（可为空）
+     * @param userMessage  用户消息
+     * @return 模型返回的 JSON 文本
+     */
+    public String chatJson(String systemPrompt, String userMessage);
 }

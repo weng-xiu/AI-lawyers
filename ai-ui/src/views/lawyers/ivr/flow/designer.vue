@@ -143,6 +143,45 @@
               <el-form-item label="播报内容">
                 <el-input v-model="selectedNode.config.text" type="textarea" :rows="5" placeholder="请输入TTS播报内容" @input="markDirty" />
               </el-form-item>
+              <el-form-item label="语音引擎">
+                <el-select v-model="selectedNode.config.voiceEngine" placeholder="默认网关播报" clearable @change="markDirty">
+                  <el-option label="通义千问 DashScope" value="dashscope" />
+                  <el-option label="阿里云 NLS" value="ali" />
+                  <el-option label="电信" value="dianxin" />
+                </el-select>
+              </el-form-item>
+              <div class="panel-hint">内容支持 ${变量名} 模板，如 ${lastInput}。选择引擎后保存时由后端合成音频。</div>
+            </template>
+
+            <!-- 语音收声 -->
+            <template v-if="selectedNode.type === 'answer'">
+              <el-form-item label="询问语">
+                <el-input v-model="selectedNode.config.jqrask" type="textarea" :rows="3" placeholder="如：请问您遇到了什么法律问题？" @input="markDirty" />
+              </el-form-item>
+              <el-form-item label="静默提示">
+                <el-switch v-model="selectedNode.config.silencePrompt" @change="markDirty" />
+              </el-form-item>
+              <el-form-item v-if="selectedNode.config.silencePrompt" label="静默秒数">
+                <el-input-number v-model="selectedNode.config.silenceDuration" :min="1" :max="60" @change="markDirty" />
+              </el-form-item>
+              <el-form-item v-if="selectedNode.config.silencePrompt" label="静默提示语">
+                <el-input v-model="selectedNode.config.silenceSay" placeholder="如：我没有听清，请您再说一遍" @input="markDirty" />
+              </el-form-item>
+              <div class="panel-hint">识别结果写入变量 lastInput，可在连线条件中使用。</div>
+            </template>
+
+            <!-- DTMF收号 -->
+            <template v-if="selectedNode.type === 'received'">
+              <el-form-item label="收号语">
+                <el-input v-model="selectedNode.config.jqrask" type="textarea" :rows="3" placeholder="如：请输入您的工单编号，按#号结束" @input="markDirty" />
+              </el-form-item>
+              <el-form-item label="结束按键">
+                <el-input v-model="selectedNode.config.endKey" style="width: 120px" maxlength="1" @input="markDirty" />
+              </el-form-item>
+              <el-form-item label="最大位数">
+                <el-input-number v-model="selectedNode.config.maxDigits" :min="1" :max="32" @change="markDirty" />
+              </el-form-item>
+              <div class="panel-hint">按键结果写入变量 dtmf，可在连线条件中使用。</div>
             </template>
 
             <!-- 按键菜单 -->
@@ -171,6 +210,91 @@
               </el-form-item>
             </template>
 
+            <!-- 情绪分析 -->
+            <template v-if="selectedNode.type === 'sentiment'">
+              <el-form-item label="分析文本">
+                <el-input v-model="selectedNode.config.text" type="textarea" :rows="3" placeholder="如 ${lastInput}" @input="markDirty" />
+              </el-form-item>
+              <div class="panel-hint">结果写入变量 sentiment（positive/negative/neutral），可在连线条件中使用，例如 sentiment == 'negative' 转人工。</div>
+            </template>
+
+            <!-- 信息抽取 -->
+            <template v-if="selectedNode.type === 'extract'">
+              <el-form-item label="原文文本">
+                <el-input v-model="selectedNode.config.text" type="textarea" :rows="2" placeholder="如 ${lastInput}" @input="markDirty" />
+              </el-form-item>
+              <el-form-item label="提取字段">
+                <div v-for="(field, idx) in selectedNode.config.fields" :key="idx" class="menu-option-row">
+                  <el-input v-model="field.name" placeholder="字段名" @input="markDirty" />
+                  <el-input v-model="field.desc" placeholder="字段说明" @input="markDirty" />
+                  <el-button icon="el-icon-delete" size="mini" @click="removeExtractField(idx)"></el-button>
+                </div>
+                <el-button size="mini" icon="el-icon-plus" @click="addExtractField">添加字段</el-button>
+              </el-form-item>
+              <el-form-item label="结果变量">
+                <el-input v-model="selectedNode.config.resultVar" placeholder="extractResult" @input="markDirty" />
+              </el-form-item>
+              <div class="panel-hint">每个字段名会作为一个流程变量写入，供后续节点引用。</div>
+            </template>
+
+            <!-- HTTP服务调用 -->
+            <template v-if="selectedNode.type === 'service'">
+              <el-form-item label="请求地址">
+                <el-input v-model="selectedNode.config.url" placeholder="http://xxx/api?no=${dtmf}" @input="markDirty" />
+              </el-form-item>
+              <el-form-item label="请求方式">
+                <el-select v-model="selectedNode.config.method" style="width: 100%" @change="markDirty">
+                  <el-option v-for="m in ['GET', 'POST', 'PUT', 'DELETE']" :key="m" :label="m" :value="m" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="请求头">
+                <el-input v-model="selectedNode.config.headers" type="textarea" :rows="2" placeholder='{"Content-Type":"application/json"}' @input="markDirty" />
+              </el-form-item>
+              <el-form-item label="请求体">
+                <el-input v-model="selectedNode.config.body" type="textarea" :rows="4" placeholder='{"phone":"${dtmf}"}' @input="markDirty" />
+              </el-form-item>
+              <el-form-item label="取值路径">
+                <el-input v-model="selectedNode.config.result" placeholder="如 data.items[0].name（留空存全部响应）" @input="markDirty" />
+              </el-form-item>
+              <el-form-item label="结果变量">
+                <el-input v-model="selectedNode.config.resultVar" placeholder="serviceResult" @input="markDirty" />
+              </el-form-item>
+              <el-form-item label="超时(ms)">
+                <el-input-number v-model="selectedNode.config.timeoutMs" :min="500" :step="1000" @change="markDirty" />
+              </el-form-item>
+            </template>
+
+            <!-- 脚本执行 -->
+            <template v-if="selectedNode.type === 'script'">
+              <el-form-item label="脚本类型">
+                <el-select v-model="selectedNode.config.scriptType" style="width: 100%" @change="markDirty">
+                  <el-option label="JavaScript" value="js" />
+                  <el-option label="Groovy（暂不支持）" value="groovy" disabled />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="脚本体">
+                <el-input v-model="selectedNode.config.script" type="textarea" :rows="8" placeholder="var result = String(dtmf);\nresult;" @input="markDirty" />
+              </el-form-item>
+              <el-form-item label="结果变量">
+                <el-input v-model="selectedNode.config.resultVar" placeholder="scriptResult" @input="markDirty" />
+              </el-form-item>
+              <div class="panel-hint">脚本可直接读取流程变量（如 dtmf、lastInput），最后一个表达式的值写入结果变量。</div>
+            </template>
+
+            <!-- 子流程 -->
+            <template v-if="selectedNode.type === 'child'">
+              <el-form-item label="子流程ID">
+                <el-input-number v-model="selectedNode.config.flowId" :min="0" placeholder="子流程ID" @change="markDirty" />
+              </el-form-item>
+              <el-form-item label="流程编码">
+                <el-input v-model="selectedNode.config.flowCode" placeholder="与ID二选一" @input="markDirty" />
+              </el-form-item>
+              <el-form-item label="结果变量">
+                <el-input v-model="selectedNode.config.resultVar" placeholder="childResult" @input="markDirty" />
+              </el-form-item>
+              <div class="panel-hint">子流程执行结束后，其流程变量会合并回当前流程，最多嵌套3层。</div>
+            </template>
+
             <!-- 转人工 -->
             <template v-if="selectedNode.type === 'agent'">
               <el-form-item label="技能队列">
@@ -191,6 +315,18 @@
                 <el-input v-model="selectedNode.config.expr" placeholder="如 matchedIntention == 'CONTRACT_DISPUTE'" @input="markDirty" />
               </el-form-item>
               <div class="panel-hint">根据表达式结果走不同连线，各连线可设置条件表达式</div>
+            </template>
+
+            <!-- 变量赋值 -->
+            <template v-if="selectedNode.type === 'variable'">
+              <el-form-item label="变量列表">
+                <div v-for="(item, idx) in selectedNode.config.variables" :key="idx" class="menu-option-row">
+                  <el-input v-model="item.key" placeholder="变量名" @input="markDirty" />
+                  <el-input v-model="item.val" placeholder="值（支持${变量}）" @input="markDirty" />
+                  <el-button icon="el-icon-delete" size="mini" @click="removeVariableItem(idx)"></el-button>
+                </div>
+                <el-button size="mini" icon="el-icon-plus" @click="addVariableItem">添加变量</el-button>
+              </el-form-item>
             </template>
 
             <template v-if="selectedNode.type === 'start'">
@@ -245,30 +381,54 @@ const CANVAS_H = 1600
 const TYPE_META = {
   start: { label: '开始', color: '#67C23A', icon: '▶' },
   say: { label: '语音播报', color: '#409EFF', icon: '♪' },
+  answer: { label: '语音收声', color: '#2D8CF0', icon: '♫' },
+  received: { label: 'DTMF收号', color: '#FF8C00', icon: '#' },
   menu: { label: '按键菜单', color: '#F59E0B', icon: '☰' },
   intention: { label: '意图识别', color: '#8A6DE9', icon: '◎' },
+  sentiment: { label: '情绪分析', color: '#F56C6C', icon: '♡' },
+  extract: { label: '信息抽取', color: '#8A6DE9', icon: 'ƒ' },
+  service: { label: 'HTTP服务', color: '#409EFF', icon: '⇄' },
+  script: { label: '脚本执行', color: '#13C2C2', icon: 'ƒ' },
+  child: { label: '子流程', color: '#722ED1', icon: '⊞' },
   condition: { label: '条件分支', color: '#F56C6C', icon: '◇' },
   agent: { label: '转人工', color: '#13C2C2', icon: '☎' },
   transfer: { label: '转外线', color: '#722ED1', icon: '↗' },
+  variable: { label: '变量赋值', color: '#67C23A', icon: '=' },
   hangup: { label: '挂断', color: '#909399', icon: '■' }
 }
 
-const PALETTE_ORDER = ['start', 'say', 'menu', 'intention', 'condition', 'agent', 'transfer', 'hangup']
+const PALETTE_ORDER = ['start', 'say', 'answer', 'received', 'menu', 'intention', 'sentiment', 'extract', 'service', 'script', 'child', 'condition', 'variable', 'agent', 'transfer', 'hangup']
 
 function defaultConfig(type) {
   switch (type) {
     case 'say':
-      return { text: '' }
+      return { text: '', voiceEngine: '', tts: {}, format: 'wav', sampleRate: 8000 }
+    case 'answer':
+      return { jqrask: '', silencePrompt: false, silenceDuration: 3, silenceSay: '' }
+    case 'received':
+      return { jqrask: '', endKey: '#', maxDigits: 11 }
     case 'menu':
       return { prompt: '', options: [{ key: '1', label: '选项一' }] }
     case 'intention':
       return { intentionCode: '', promptTemplate: '' }
+    case 'sentiment':
+      return { text: '${lastInput}' }
+    case 'extract':
+      return { text: '${lastInput}', fields: [{ name: '', desc: '' }], resultVar: 'extractResult' }
+    case 'service':
+      return { url: '', method: 'GET', headers: '{}', body: '', result: '', resultVar: 'serviceResult', timeoutMs: 10000 }
+    case 'script':
+      return { scriptType: 'js', script: '', resultVar: 'scriptResult' }
+    case 'child':
+      return { flowId: null, flowCode: '', resultVar: 'childResult' }
     case 'agent':
       return { queue: '' }
     case 'transfer':
       return { targetNumber: '' }
     case 'condition':
       return { expr: '' }
+    case 'variable':
+      return { variables: [{ key: '', val: '' }] }
     default:
       return {}
   }
@@ -374,7 +534,7 @@ export default {
           name: n.nodeName,
           x: n.positionX || 0,
           y: n.positionY || 0,
-          config: parseConfig(n.nodeConfig)
+          config: { ...defaultConfig(n.nodeType), ...parseConfig(n.nodeConfig) }
         }))
         this.edges = (edgeRes.data || []).map(e => ({
           id: e.edgeId,
@@ -717,6 +877,30 @@ export default {
     removeMenuOption(idx) {
       if (!this.selectedNode || this.selectedNode.type !== 'menu') return
       this.selectedNode.config.options.splice(idx, 1)
+      this.markDirty()
+    },
+
+    addExtractField() {
+      if (!this.selectedNode || this.selectedNode.type !== 'extract') return
+      this.selectedNode.config.fields.push({ name: '', desc: '' })
+      this.markDirty()
+    },
+
+    removeExtractField(idx) {
+      if (!this.selectedNode || this.selectedNode.type !== 'extract') return
+      this.selectedNode.config.fields.splice(idx, 1)
+      this.markDirty()
+    },
+
+    addVariableItem() {
+      if (!this.selectedNode || this.selectedNode.type !== 'variable') return
+      this.selectedNode.config.variables.push({ key: '', val: '' })
+      this.markDirty()
+    },
+
+    removeVariableItem(idx) {
+      if (!this.selectedNode || this.selectedNode.type !== 'variable') return
+      this.selectedNode.config.variables.splice(idx, 1)
       this.markDirty()
     },
 

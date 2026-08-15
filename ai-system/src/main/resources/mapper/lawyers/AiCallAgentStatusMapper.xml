@@ -126,6 +126,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where agent_id = #{agentId}
     </update>
 
+    <update id="clearCurrentCall" parameterType="Long">
+        update ai_call_agent_status
+        set current_call_id = null,
+            current_call_phone = null,
+            call_start_time = null
+        where agent_id = #{agentId}
+    </update>
+
     <delete id="deleteAiCallAgentStatusByAgentId" parameterType="Long">
         delete from ai_call_agent_status where agent_id = #{agentId}
     </delete>

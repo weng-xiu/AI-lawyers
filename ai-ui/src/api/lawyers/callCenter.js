@@ -16,6 +16,14 @@ export function getAgent(agentId) {
   })
 }
 
+// 查询当前登录账号绑定的坐席工号
+export function getMyAgent() {
+  return request({
+    url: '/lawyers/call/agent/my',
+    method: 'get'
+  })
+}
+
 export function addAgent(data) {
   return request({
     url: '/lawyers/call/agent',

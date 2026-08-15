@@ -1,0 +1,96 @@
+package ai.lawyers.system.service.lawyers.voice;
+
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import ai.lawyers.common.utils.StringUtils;
+
+/**
+ * 语音引擎统一入口：按 {@link VoiceModelEnum} 选择 ASR/TTS 实现，
+ * 未配置或调用失败时降级到本地 Mock 引擎，保证 IVR 流程不中断。
+ */
+@Service
+public class VoiceEngineManager
+{
+    private static final Logger log = LoggerFactory.getLogger(VoiceEngineManager.class);
+
+    private final VoiceProperties properties;
+
+    private final DashScopeTtsEngine dashScopeTtsEngine;
+
+    private final OpenAiCompatibleAsrEngine openAiCompatibleAsrEngine;
+
+    private final MockVoiceEngine mockVoiceEngine;
+
+    public VoiceEngineManager(VoiceProperties properties,
+                              DashScopeTtsEngine dashScopeTtsEngine,
+                              OpenAiCompatibleAsrEngine openAiCompatibleAsrEngine,
+                              MockVoiceEngine mockVoiceEngine)
+    {
+        this.properties = properties;
+        this.dashScopeTtsEngine = dashScopeTtsEngine;
+        this.openAiCompatibleAsrEngine = openAiCompatibleAsrEngine;
+        this.mockVoiceEngine = mockVoiceEngine;
+    }
+
+    public VoiceModelEnum defaultEngine()
+    {
+        return VoiceModelEnum.of(properties.getEngine());
+    }
+
+    public byte[] synthesize(VoiceModelEnum engine, String text, String format, int sampleRate,
+                             Map<String, Object> options)
+    {
+        TtsEngine ttsEngine = resolveTts(engine);
+        try
+        {
+            byte[] result = ttsEngine.synthesize(text, format, sampleRate, options);
+            return result == null ? new byte[0] : result;
+        }
+        catch (Exception e)
+        {
+            log.warn("语音合成失败，降级到Mock引擎 engine={} error={}", engine, e.getMessage());
+            return mockVoiceEngine.synthesize(text, format, sampleRate, options);
+        }
+    }
+
+    public String transcribe(VoiceModelEnum engine, byte[] audio, String format, int sampleRate,
+                             Map<String, Object> options)
+    {
+        AsrEngine asrEngine = resolveAsr(engine);
+        try
+        {
+            String result = asrEngine.transcribe(audio, format, sampleRate, options);
+            return result == null ? "" : result;
+        }
+        catch (Exception e)
+        {
+            log.warn("语音识别失败，降级到Mock引擎 engine={} error={}", engine, e.getMessage());
+            return mockVoiceEngine.transcribe(audio, format, sampleRate, options);
+        }
+    }
+
+    private TtsEngine resolveTts(VoiceModelEnum engine)
+    {
+        if (VoiceModelEnum.DASHSCOPE == engine)
+        {
+            return dashScopeTtsEngine;
+        }
+        // ali/dianxin 预留：接入对应 SDK/HTTP 客户端后在此返回具体实现
+        return mockVoiceEngine;
+    }
+
+    private AsrEngine resolveAsr(VoiceModelEnum engine)
+    {
+        if (engine != null && VoiceModelEnum.MOCK != engine
+                && StringUtils.isNotEmpty(properties.getAsrBaseUrl()))
+        {
+            // 阿里云 NLS / 电信 / DashScope 的 HTTP 网关均可适配为 OpenAI 兼容转写协议
+            return openAiCompatibleAsrEngine;
+        }
+        return mockVoiceEngine;
+    }
+}

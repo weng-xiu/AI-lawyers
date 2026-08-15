@@ -21,9 +21,16 @@ public interface IAiCallAgentStatusService
 
     public List<AiCallAgentStatus> selectOnlineAgents();
 
-    public int agentLogin(Long userId, String ip);
+    /**
+     * 坐席签入：优先按工号(agentId)定位坐席，工号为空时按账号(userId)定位；
+     * 签入成功时将工号与当前账号绑定（写入 user_id）。
+     */
+    public int agentLogin(Long agentId, Long userId, String ip);
 
-    public int agentLogout(Long userId);
+    /**
+     * 坐席签出：优先按工号定位，工号为空时按账号定位。
+     */
+    public int agentLogout(Long agentId, Long userId);
 
     public int updateAgentStatus(Long agentId, String status);
 

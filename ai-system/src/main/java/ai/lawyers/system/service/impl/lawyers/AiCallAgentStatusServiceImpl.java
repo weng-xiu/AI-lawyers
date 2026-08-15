@@ -93,31 +93,55 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
     }
 
     @Override
-    public int agentLogin(Long userId, String ip)
+    public int agentLogin(Long agentId, Long userId, String ip)
     {
-        AiCallAgentStatus agent = aiCallAgentStatusMapper.selectAiCallAgentStatusByUserId(userId);
+        AiCallAgentStatus agent = null;
+        if (agentId != null)
+        {
+            agent = aiCallAgentStatusMapper.selectAiCallAgentStatusByAgentId(agentId);
+        }
+        else if (userId != null)
+        {
+            agent = aiCallAgentStatusMapper.selectAiCallAgentStatusByUserId(userId);
+        }
         if (agent != null) {
+            // 工号已绑定其他账号时禁止签入，避免越权使用他人工号
+            if (userId != null && agent.getUserId() != null && !agent.getUserId().equals(userId))
+            {
+                return -1;
+            }
             agent.setStatus("1");
             agent.setLoginTime(new Date());
             agent.setLogoutTime(null);
             agent.setLastLoginIp(ip);
             agent.setCallStatus("0");
-            return aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+            if (userId != null)
+            {
+                agent.setUserId(userId);
+            }
+            aiCallAgentStatusMapper.clearCurrentCall(agent.getAgentId());
+            return aiCallAgentStatusMapper.updateAiCallAgentStatus(agent) > 0 ? 1 : 0;
         }
         return 0;
     }
 
     @Override
-    public int agentLogout(Long userId)
+    public int agentLogout(Long agentId, Long userId)
     {
-        AiCallAgentStatus agent = aiCallAgentStatusMapper.selectAiCallAgentStatusByUserId(userId);
+        AiCallAgentStatus agent = null;
+        if (agentId != null)
+        {
+            agent = aiCallAgentStatusMapper.selectAiCallAgentStatusByAgentId(agentId);
+        }
+        else if (userId != null)
+        {
+            agent = aiCallAgentStatusMapper.selectAiCallAgentStatusByUserId(userId);
+        }
         if (agent != null) {
             agent.setStatus("0");
             agent.setLogoutTime(new Date());
             agent.setCallStatus("0");
-            agent.setCurrentCallId(null);
-            agent.setCurrentCallPhone(null);
-            agent.setCallStartTime(null);
+            aiCallAgentStatusMapper.clearCurrentCall(agent.getAgentId());
             return aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
         }
         return 0;
@@ -132,9 +156,7 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
             if ("0".equals(status)) {
                 agent.setLogoutTime(new Date());
                 agent.setCallStatus("0");
-                agent.setCurrentCallId(null);
-                agent.setCurrentCallPhone(null);
-                agent.setCallStartTime(null);
+                aiCallAgentStatusMapper.clearCurrentCall(agent.getAgentId());
             } else if ("1".equals(status)) {
                 agent.setLoginTime(new Date());
                 agent.setLogoutTime(null);
@@ -278,13 +300,11 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
         }
         // 重置座席状态
         agent.setCallStatus("0");
-        agent.setCurrentCallId(null);
-        agent.setCurrentCallPhone(null);
-        agent.setCallStartTime(null);
         agent.setStatus("1");
         if (remark != null) {
             agent.setRemark("转接给座席[" + toAgentId + "]：" + remark);
         }
+        aiCallAgentStatusMapper.clearCurrentCall(agentId);
         return aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
     }
 
@@ -344,10 +364,8 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
             }
         }
         agent.setCallStatus("0");
-        agent.setCurrentCallId(null);
-        agent.setCurrentCallPhone(null);
-        agent.setCallStartTime(null);
         agent.setStatus("1");
+        aiCallAgentStatusMapper.clearCurrentCall(agentId);
         return aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
     }
 
@@ -366,10 +384,8 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
             aiCallRecordService.updateAiCallRecord(record);
         }
         agent.setCallStatus("0");
-        agent.setCurrentCallId(null);
-        agent.setCurrentCallPhone(null);
-        agent.setCallStartTime(null);
         agent.setStatus("1");
+        aiCallAgentStatusMapper.clearCurrentCall(agentId);
         return aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
     }
 
@@ -392,10 +408,8 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
             aiCallRecordService.updateAiCallRecord(record);
         }
         agent.setCallStatus("0");
-        agent.setCurrentCallId(null);
-        agent.setCurrentCallPhone(null);
-        agent.setCallStartTime(null);
         agent.setStatus("1");
+        aiCallAgentStatusMapper.clearCurrentCall(agentId);
         return aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
     }
 

@@ -1,12 +1,12 @@
 <template>
   <div class="call-popup">
     <!-- 来电横幅 -->
-    <div class="cp-banner">
+      <div class="cp-banner" :class="direction === 'out' ? 'is-out' : 'is-in'">
       <div class="cp-banner-left">
         <div class="cp-banner-icon"><i class="el-icon-phone"></i></div>
         <div class="cp-banner-title">
-          <div class="cp-banner-main">来电接入</div>
-          <div class="cp-banner-sub"><span class="cp-dot"></span>{{ connected ? '正在通话中' : '等待接听' }}</div>
+          <div class="cp-banner-main">{{ direction === 'out' ? '呼出' : '来电接入' }}</div>
+          <div class="cp-banner-sub"><span class="cp-dot"></span>{{ connected ? callStatusText : (callEnded ? '通话已结束' : '等待接听') }}</div>
         </div>
       </div>
       <div class="cp-banner-center">
@@ -186,19 +186,25 @@
       </el-col>
     </el-row>
 
-    <!-- 4 操作按钮 -->
+    <!-- 通话操作按钮 -->
     <div class="cp-action-bar">
       <el-button type="success" size="medium" class="cp-action-btn cp-btn-green" @click="handleAnswer" :disabled="connected">
         <i class="el-icon-microphone"></i><span>接听</span>
       </el-button>
+      <el-button size="medium" class="cp-action-btn cp-btn-orange" :disabled="!connected || !(callStatus === '1' || callStatus === '2')" @click="handleHold">
+        <i :class="callStatus === '2' ? 'el-icon-video-play' : 'el-icon-video-pause'"></i><span>{{ callStatus === '2' ? '恢复' : '保持' }}</span>
+      </el-button>
+      <el-button size="medium" class="cp-action-btn cp-btn-gray" :disabled="!connected || callStatus !== '1'" @click="handleTransfer">
+        <i class="el-icon-s-promotion"></i><span>转接</span>
+      </el-button>
       <el-button type="primary" size="medium" class="cp-action-btn cp-btn-blue" @click="handleLedger">
         <i class="el-icon-document"></i><span>一键登记台账</span>
       </el-button>
-      <el-button size="medium" class="cp-action-btn cp-btn-gray" @click="handleTransfer">
-        <i class="el-icon-s-promotion"></i><span>转接</span>
+      <el-button size="medium" class="cp-action-btn cp-btn-purple" :disabled="!connected || !(callStatus === '1' || callStatus === '5')" @click="handleAfterWork">
+        <i class="el-icon-edit-outline"></i><span>话后整理</span>
       </el-button>
-      <el-button size="medium" class="cp-action-btn cp-btn-purple" @click="handleHold">
-        <i class="el-icon-video-pause"></i><span>挂起</span>
+      <el-button type="danger" size="medium" class="cp-action-btn cp-btn-red" :disabled="!connected" @click="handleHangup">
+        <i class="el-icon-bangzhu"></i><span>挂机</span>
       </el-button>
     </div>
 
@@ -229,7 +235,7 @@
 
 <script>
 import { getCallerProfile, getCallerHistory, getCallerTickets, getCallerTrack, updateCallerProfile } from "@/api/lawyers/callPopup"
-import { autoFillLedger, addLedger, transferCall, holdCall, makeCall } from "@/api/lawyers/callCenter"
+import { autoFillLedger, addLedger, transferCall, holdCall, resumeCall, hangupCall, afterWork } from "@/api/lawyers/callCenter"
 import AiAssistPanel from "./AiAssistPanel.vue"
 
 export default {
@@ -237,12 +243,16 @@ export default {
   components: { AiAssistPanel },
   data() {
     return {
+      direction: 'in',
+      callStatus: '0',
       connected: false,
+      callEnded: false,
       activeTab: 'base',
       tabLoading: false,
       callDuration: '00:00:00',
       seconds: 0,
       timer: null,
+      pollTimer: null,
       profileData: {},
       historyList: [],
       ticketList: [],
@@ -254,6 +264,13 @@ export default {
     }
   },
   computed: {
+    agentId() {
+      return this.$store.state.agent.agentId
+    },
+    callStatusText() {
+      const map = { '0': '空闲', '1': '通话中', '2': '保持', '3': '咨询中', '4': '三方通话', '5': '话后整理' }
+      return map[this.callStatus] || '空闲'
+    },
     avatarText() {
       const name = this.profileData.callerName
       if (name && name.length > 0) return name.charAt(0)
@@ -272,13 +289,45 @@ export default {
     }
   },
   created() {
+    this.direction = this.$route.query.direction === 'out' ? 'out' : 'in'
+    this.callStatus = this.$route.query.callStatus || '0'
+    // 呼出或已接通（自动应答）时直接进入通话计时
+    this.connected = this.direction === 'out' || this.callStatus !== '0'
+    if (this.connected) {
+      this.startTimer()
+    }
+    this.startSyncTimer()
     const callerNumber = this.$route.query.callerNumber || this.$route.params.callerNumber
     if (callerNumber) {
       this.loadProfile(callerNumber)
     }
   },
-  beforeDestroy() { this.clearTimer() },
+  beforeDestroy() {
+    this.clearTimer()
+    if (this.pollTimer) clearInterval(this.pollTimer)
+  },
   methods: {
+    startSyncTimer() {
+      if (this.pollTimer) clearInterval(this.pollTimer)
+      this.pollTimer = setInterval(() => this.syncFromAgent(), 5000)
+    },
+    syncFromAgent() {
+      if (this.agentId == null) return
+      this.$store.dispatch('agent/refresh').then(agent => {
+        if (!agent) return
+        this.callStatus = agent.callStatus || '0'
+        const active = this.callStatus !== '0'
+        if (active && !this.connected) {
+          this.connected = true
+          this.callEnded = false
+          this.startTimer()
+        } else if (!active && this.connected) {
+          this.connected = false
+          this.callEnded = true
+          this.clearTimer()
+        }
+      }).catch(() => {})
+    },
     loadProfile(callerNumber) {
       getCallerProfile(callerNumber).then(res => {
         const data = res.data || {}
@@ -320,16 +369,18 @@ export default {
       }).catch(() => { this.tabLoading = false })
     },
     handleAnswer() {
-      this.connected = true
-      this.startTimer()
-      this.$message.success('已接听来电')
-      // 人工接听：建立人工通话记录（后端会异步触发独立的 AI 辅助会话）
-      const agentId = this.$store.getters.id || 1
-      makeCall({ agentId, callerNumber: this.profileData.callerNumber, callDirection: '0' }).then(res => {
-        const data = res.data || res
-        // currentRecordId 仅作为人工链路与AI辅助链路的关联桥梁
-        this.currentRecordId = data.recordId || (data.data && data.data.recordId) || data
-        if (data.sessionId) this.currentRecordId = data.recordId
+      // 线路接通由语音网关完成，这里同步坐席状态：已接通则开始计时
+      this.$store.dispatch('agent/refresh').then(agent => {
+        if (agent && agent.callStatus !== '0') {
+          this.connected = true
+          this.callEnded = false
+          this.callStatus = agent.callStatus
+          this.currentRecordId = agent.currentCallId || null
+          this.startTimer()
+          this.$message.success('已接听来电')
+        } else {
+          this.$message.warning('线路尚未接通，请稍候')
+        }
       }).catch(() => {})
     },
     startTimer() {
@@ -341,7 +392,7 @@ export default {
       return [h, m, sec].map(n => String(n).padStart(2, '0')).join(':')
     },
     handleLedger() {
-      const recordId = this.$route.query.recordId
+      const recordId = this.$route.query.recordId || this.currentRecordId
       if (!recordId) { this.$message.warning('无关联来电记录，请手动登记'); return }
       autoFillLedger(recordId).then(res => {
         const data = res.data || {}
@@ -351,17 +402,61 @@ export default {
       }).catch(() => {})
     },
     handleTransfer() {
-      this.$prompt('请输入转接目标号码', '转接来电', {
-        confirmButtonText: '转接', cancelButtonText: '取消'
+      if (this.agentId == null) {
+        this.$message.warning('请先在顶部签入坐席')
+        return
+      }
+      this.$prompt('请输入目标坐席工号', '转接来电', {
+        confirmButtonText: '转接',
+        cancelButtonText: '取消',
+        inputPattern: /^\d+$/,
+        inputErrorMessage: '请输入数字工号'
       }).then(({ value }) => {
-        transferCall({ targetNumber: value, callerNumber: this.profileData.callerNumber }).then(() => {
+        transferCall({ agentId: this.agentId, toAgentId: parseInt(value), remark: '' }).then(() => {
           this.$message.success('转接请求已提交')
+          this.$store.dispatch('agent/refresh').catch(() => {})
         }).catch(() => {})
       }).catch(() => {})
     },
     handleHold() {
-      holdCall({ callerNumber: this.profileData.callerNumber }).then(() => {
-        this.$message.success('已挂起通话')
+      if (this.agentId == null) {
+        this.$message.warning('请先在顶部签入坐席')
+        return
+      }
+      const api = this.callStatus === '2' ? resumeCall : holdCall
+      api({ agentId: this.agentId }).then(() => {
+        this.$message.success(this.callStatus === '2' ? '通话已恢复' : '通话已保持')
+        return this.$store.dispatch('agent/refresh')
+      }).then(agent => {
+        if (agent) this.callStatus = agent.callStatus || this.callStatus
+      }).catch(() => {})
+    },
+    handleAfterWork() {
+      if (this.agentId == null) {
+        this.$message.warning('请先在顶部签入坐席')
+        return
+      }
+      afterWork({ agentId: this.agentId }).then(() => {
+        this.$message.success('已进入话后整理')
+        return this.$store.dispatch('agent/refresh')
+      }).then(agent => {
+        if (agent) this.callStatus = agent.callStatus || this.callStatus
+      }).catch(() => {})
+    },
+    handleHangup() {
+      if (this.agentId == null) {
+        this.$message.warning('请先在顶部签入坐席')
+        return
+      }
+      this.$confirm('确定挂断当前通话吗？', '提示', { type: 'warning' }).then(() => {
+        hangupCall({ agentId: this.agentId }).then(() => {
+          this.connected = false
+          this.callEnded = true
+          this.callStatus = '0'
+          this.clearTimer()
+          this.$message.success('通话已挂断')
+          this.$store.dispatch('agent/refresh').catch(() => {})
+        }).catch(() => {})
       }).catch(() => {})
     },
     handleEditProfile() {
@@ -407,6 +502,7 @@ export default {
   background: linear-gradient(135deg, #16A34A 0%, #16A34A 100%);
   border-radius: 10px; padding: 28px 32px; color: #fff;
   display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; position: relative; overflow: hidden;
+  &.is-out { background: linear-gradient(135deg, #005BAC 0%, #1677FF 100%); }
   &::before { content: ''; position: absolute; right: -40px; top: -40px; width: 200px; height: 200px; border-radius: 50%; background: rgba(255,255,255,0.08); }
   .cp-banner-left { display: flex; align-items: center; gap: 16px; z-index: 1; }
   .cp-banner-icon { width: 52px; height: 52px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 26px; animation: cp-ring 1.5s ease-in-out infinite; }
@@ -452,5 +548,7 @@ export default {
   &.cp-btn-blue { background: linear-gradient(135deg, #1677FF, #005BAC); border: none; color: #fff; &:hover { background: linear-gradient(135deg, #005BAC, #005BAC); } }
   &.cp-btn-gray { background: #F5F8FC; border: 1px solid #e2e8f0; color: #475569; &:hover { background: #e2e8f0; color: #1e293b; } }
   &.cp-btn-purple { background: linear-gradient(135deg, #7C3AED, #7c3aed); border: none; color: #fff; &:hover { background: linear-gradient(135deg, #7c3aed, #6d28d9); } }
+  &.cp-btn-orange { background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: #fff; &:hover { background: linear-gradient(135deg, #d97706, #b45309); } }
+  &.cp-btn-red { background: linear-gradient(135deg, #DC2626, #b91c1c); border: none; color: #fff; &:hover { background: linear-gradient(135deg, #b91c1c, #991b1b); } }
 }
 </style>

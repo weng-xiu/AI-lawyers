@@ -1,6 +1,7 @@
 package ai.lawyers.system.mapper.lawyers.outbound;
 
 import java.util.List;
+import org.apache.ibatis.annotations.Param;
 import ai.lawyers.system.domain.lawyers.outbound.AiOutboundCallee;
 
 public interface AiOutboundCalleeMapper
@@ -11,7 +12,7 @@ public interface AiOutboundCalleeMapper
 
     public List<AiOutboundCallee> selectAiOutboundCalleeByTaskId(Long taskId);
 
-    public List<AiOutboundCallee> selectPendingCallees(Long taskId, int limit);
+    public List<AiOutboundCallee> selectPendingCallees(@Param("taskId") Long taskId, @Param("limit") int limit);
 
     public int insertAiOutboundCallee(AiOutboundCallee aiOutboundCallee);
 
@@ -27,5 +28,5 @@ public interface AiOutboundCalleeMapper
 
     public int deleteAiOutboundCalleeByCalleeIds(Long[] calleeIds);
 
-    public int countByTaskIdAndStatus(Long taskId, String callStatus);
+    public int countByTaskIdAndStatus(@Param("taskId") Long taskId, @Param("callStatus") String callStatus);
 }

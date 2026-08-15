@@ -51,3 +51,4 @@ nbdist/
 !*/build/*.xml
 /aiuser-ui/node_modules/
 /node_modules/
+/third_party/

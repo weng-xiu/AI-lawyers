@@ -61,6 +61,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where task_no = #{taskNo}
     </select>
 
+    <select id="selectRunningTasks" resultMap="AiOutboundTaskResult">
+        <include refid="selectAiOutboundTaskVo"/>
+        where status = '1'
+        order by priority desc, create_time asc
+    </select>
+
     <insert id="insertAiOutboundTask" parameterType="AiOutboundTask" useGeneratedKeys="true" keyProperty="taskId">
         insert into ai_outbound_task
         <trim prefix="(" suffix=")" suffixOverrides=",">

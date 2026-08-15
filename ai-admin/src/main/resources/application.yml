@@ -172,6 +172,19 @@ call:
     # MOS 语音质量告警阈值
     mosThreshold: 3.0
 
+  # ---------- 智能外呼执行引擎 ----------
+  outbound:
+    # 是否启用定时扫描执行（运行中的任务自动拨号）
+    scanEnabled: true
+    # 定时扫描间隔(ms)
+    scanIntervalMs: 15000
+    # 模拟接通：无真实语音网关时，下发成功后直接模拟接通并进入IVR全链路
+    simulateAnswer: true
+    # 模拟接通后的通话时长(秒)，仅模拟模式生效
+    simulateTalkSeconds: 45
+    # 回访类任务或转人工类外呼接通后自动创建工单
+    autoCreateTicket: true
+
   # ---------- 语音网关 / CTI 中间件 ----------
   gateway:
     # FreeSWITCH ESL
