@@ -54,6 +54,14 @@ export function testTrunk(trunkId) {
   })
 }
 
+export function testCallTrunk(trunkId, calleeNumber) {
+  return request({
+    url: '/lawyers/trunk/testCall/' + trunkId,
+    method: 'post',
+    params: { calleeNumber }
+  })
+}
+
 // ==================== 号段路由管理 ====================
 export function listSegment(query) {
   return request({

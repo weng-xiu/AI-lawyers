@@ -6,6 +6,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.UUID;
@@ -166,7 +167,7 @@ public class HttpApiGatewayAdapter implements ICallGatewayAdapter
         long start = System.currentTimeMillis();
         try
         {
-            String resp = get(trunk, statusPath + "?trunkCode=" + trunk.getTrunkCode());
+            String resp = get(trunk, statusPath + "?trunkCode=" + URLEncoder.encode(trunk.getTrunkCode(), "UTF-8"));
             long cost = System.currentTimeMillis() - start;
             JSONObject json = parse(resp);
             if (json != null && isSuccess(json))

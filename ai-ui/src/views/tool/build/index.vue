@@ -404,7 +404,7 @@ export default {
 // home
 .right-scrollbar {
   .el-scrollbar__view {
-    padding: 12px 18px 15px 15px;
+    padding: 16px 24px 20px 20px;
   }
 }
 .left-scrollbar .el-scrollbar__wrap {
@@ -425,7 +425,7 @@ export default {
   }
 }
 .reg-item{
-  padding: 12px 6px;
+  padding: 16px 12px;
   background: #f8f8f8;
   position: relative;
   border-radius: 4px;
@@ -503,7 +503,7 @@ $lighterBlue: #409EFF;
 }
 
 .components-list {
-  padding: 8px;
+  padding: 12px;
   box-sizing: border-box;
   height: 100%;
   .components-item {
@@ -519,7 +519,7 @@ $lighterBlue: #409EFF;
 .components-title{
   font-size: 14px;
   color: #222;
-  margin: 6px 2px;
+  margin: 10px 4px;
   .svg-icon{
     color: #666;
     font-size: 18px;
@@ -527,7 +527,7 @@ $lighterBlue: #409EFF;
 }
 
 .components-body {
-  padding: 8px 10px;
+  padding: 12px 14px;
   background: $selectedColor;
   font-size: 12px;
   cursor: move;
@@ -625,7 +625,7 @@ $lighterBlue: #409EFF;
 }
 
 .center-board-row {
-  padding: 12px 12px 15px 12px;
+  padding: 16px 20px 20px 16px;
   box-sizing: border-box;
   & > .el-form {
     // 69 = 12+15+42
@@ -683,7 +683,7 @@ $lighterBlue: #409EFF;
     border: 1px dashed #ccc;
   }
   .el-form-item{
-    padding: 12px 10px;
+    padding: 16px 14px;
   }
 }
 .drawing-row-item{

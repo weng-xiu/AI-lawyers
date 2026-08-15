@@ -6,6 +6,8 @@ import org.springframework.stereotype.Service;
 import ai.lawyers.common.utils.DateUtils;
 import ai.lawyers.system.domain.lawyers.trunk.AiCallTrunk;
 import ai.lawyers.system.domain.lawyers.trunk.AiNumberSegment;
+import ai.lawyers.system.domain.lawyers.trunk.DialRequest;
+import ai.lawyers.system.domain.lawyers.trunk.DialResult;
 import ai.lawyers.system.mapper.lawyers.trunk.AiCallTrunkMapper;
 import ai.lawyers.system.mapper.lawyers.trunk.AiNumberSegmentMapper;
 import ai.lawyers.system.service.lawyers.trunk.IAiCallTrunkService;
@@ -88,6 +90,39 @@ public class AiCallTrunkServiceImpl implements IAiCallTrunkService
             return GatewayHealth.down("未找到网关适配器 vendor=" + trunk.getVendor());
         }
         return adapter.checkHealth(trunk);
+    }
+
+    @Override
+    public DialResult testCall(Long trunkId, String calleeNumber)
+    {
+        AiCallTrunk trunk = trunkMapper.selectAiCallTrunkByTrunkId(trunkId);
+        if (trunk == null)
+        {
+            return DialResult.fail("TRUNK_NOT_FOUND", "线路不存在");
+        }
+        ICallGatewayAdapter adapter = gatewayFactory.get(trunk);
+        if (adapter == null)
+        {
+            return DialResult.fail("GATEWAY_ADAPTER_NOT_FOUND", "未找到网关适配器 vendor=" + trunk.getVendor());
+        }
+
+        DialRequest request = new DialRequest();
+        request.setCalleeNumber(calleeNumber);
+        request.setCallerNumber(trunk.getCallerDisplay());
+        request.setRingTimeout(30);
+        request.setEnableRecord(false);
+        request.setAnswerAction("PLAYBACK");
+        request.setCreateBy("拨测");
+
+        DialResult result = adapter.originate(trunk, request);
+        if (result == null)
+        {
+            return DialResult.fail("GATEWAY_NO_RESPONSE", "网关适配器未返回结果");
+        }
+        result.setTrunkId(trunk.getTrunkId());
+        result.setTrunkCode(trunk.getTrunkCode());
+        result.setTrunkCarrier(trunk.getCarrier());
+        return result;
     }
 
     // ---------------- 号段管理 ----------------

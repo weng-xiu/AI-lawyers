@@ -10,11 +10,11 @@ $cc-border-light: #ebeef5;
 $cc-text-primary: #303133;
 $cc-text-secondary: #606266;
 $cc-text-muted: #909399;
-$cc-primary: #3a5cb8;
-$cc-primary-light: #4a6dd4;
-$cc-primary-dark: #2a4a9c;
-$cc-success: #52c41a;
-$cc-warning: #e6a23c;
+$cc-primary: #005BAC;
+$cc-primary-light: #1677FF;
+$cc-primary-dark: #003F7D;
+$cc-success: #16A34A;
+$cc-warning: #F59E0B;
 $cc-danger: #f56c6c;
 
 // 话务系统页面容器
@@ -168,7 +168,7 @@ $cc-danger: #f56c6c;
   .el-tag--warning {
     background: #fdf6ec;
     border-color: #faecd8;
-    color: #e6a23c;
+    color: #F59E0B;
   }
   .el-tag--danger {
     background: #fef0f0;

@@ -155,7 +155,7 @@
           <template slot-scope="scope">
             <el-button type="text" size="mini" icon="el-icon-view" @click="handleView(scope.row)">查看</el-button>
             <el-button type="text" size="mini" icon="el-icon-edit" @click="handleEdit(scope.row)">编辑</el-button>
-            <el-button type="text" size="mini" icon="el-icon-delete" style="color: #ef4444" @click="handleDelete(scope.row)">删除</el-button>
+            <el-button type="text" size="mini" icon="el-icon-delete" style="color: #DC2626" @click="handleDelete(scope.row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -586,35 +586,35 @@ export default {
 <style lang="scss" scoped>
 .work-order-page {
   min-height: calc(100vh - 84px);
-  background: #f1f5f9;
-  padding: 16px;
+  background: #F5F8FC;
+  padding: 24px;
 
   .search-card {
     background: #fff;
     border-radius: 8px;
-    margin-bottom: 16px;
+    margin-bottom: 20px;
     border: none;
 
     ::v-deep .el-card__body {
-      padding: 16px 20px;
+      padding: 20px 24px;
     }
 
     .search-btns {
       margin-left: auto;
 
       .el-button + .el-button {
-        margin-left: 8px;
+        margin-left: 12px;
       }
     }
   }
 
   .stat-cards {
-    margin-bottom: 16px;
+    margin-bottom: 20px;
 
     .stat-card {
       background: #fff;
       border-radius: 8px;
-      padding: 20px;
+      padding: 24px;
       display: flex;
       align-items: center;
       cursor: pointer;
@@ -635,7 +635,7 @@ export default {
         justify-content: center;
         font-size: 28px;
         color: #fff;
-        margin-right: 16px;
+        margin-right: 18px;
       }
 
       .stat-info {
@@ -651,7 +651,7 @@ export default {
         .stat-label {
           font-size: 14px;
           color: #64748b;
-          margin-top: 4px;
+          margin-top: 6px;
         }
       }
 
@@ -663,19 +663,19 @@ export default {
 
       &.stat-processing {
         .stat-icon {
-          background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+          background: linear-gradient(135deg, #1677FF 0%, #005BAC 100%);
         }
       }
 
       &.stat-completed {
         .stat-icon {
-          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+          background: linear-gradient(135deg, #16A34A 0%, #16A34A 100%);
         }
       }
 
       &.stat-visited {
         .stat-icon {
-          background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+          background: linear-gradient(135deg, #7C3AED 0%, #7c3aed 100%);
         }
       }
     }
@@ -687,35 +687,35 @@ export default {
     border: none;
 
     ::v-deep .el-card__body {
-      padding: 16px 20px 20px;
+      padding: 20px 24px 24px;
     }
 
     .toolbar {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 16px;
+      margin-bottom: 20px;
 
       .toolbar-left {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 12px;
       }
     }
 
     .order-link {
-      color: #3b82f6;
+      color: #1677FF;
       cursor: pointer;
 
       &:hover {
-        color: #1d4ed8;
+        color: #005BAC;
         text-decoration: underline;
       }
     }
   }
 
   ::v-deep .el-drawer {
-    background: #f1f5f9;
+    background: #F5F8FC;
 
     .el-drawer__body {
       padding: 0;
@@ -727,7 +727,7 @@ export default {
 
   .drawer-header {
     background: #fff;
-    padding: 16px 20px;
+    padding: 20px 24px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -736,7 +736,7 @@ export default {
     .drawer-title {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 14px;
 
       .order-no {
         font-size: 18px;
@@ -748,7 +748,7 @@ export default {
     .close-btn {
       font-size: 20px;
       color: #64748b;
-      padding: 4px;
+      padding: 8px;
 
       &:hover {
         color: #1e293b;
@@ -759,11 +759,11 @@ export default {
   .drawer-tabs {
     flex: 1;
     background: #fff;
-    margin-top: 12px;
+    margin-top: 16px;
 
     ::v-deep .el-tabs__header {
       margin: 0;
-      padding: 0 20px;
+      padding: 0 24px;
       border-bottom: 1px solid #e2e8f0;
     }
 
@@ -774,7 +774,7 @@ export default {
     }
 
     ::v-deep .el-tabs__content {
-      padding: 20px;
+      padding: 24px;
       overflow-y: auto;
       height: calc(100% - 49px);
     }
@@ -792,15 +792,15 @@ export default {
         font-size: 15px;
         font-weight: 600;
         color: #1e293b;
-        margin-bottom: 12px;
-        padding-left: 8px;
-        border-left: 3px solid #3b82f6;
+        margin-bottom: 16px;
+        padding-left: 10px;
+        border-left: 3px solid #1677FF;
       }
     }
   }
 
   .timeline-container {
-    padding: 10px 0;
+    padding: 12px 0;
 
     ::v-deep .el-timeline-item__wrapper {
       padding-left: 24px;
@@ -812,21 +812,21 @@ export default {
     }
 
     .timeline-content {
-      background: #f8fafc;
+      background: #F5F8FC;
       border-radius: 8px;
-      padding: 12px 16px;
+      padding: 16px 20px;
 
       .timeline-title {
         font-size: 14px;
         font-weight: 600;
         color: #1e293b;
-        margin-bottom: 4px;
+        margin-bottom: 6px;
       }
 
       .timeline-user {
         font-size: 12px;
-        color: #3b82f6;
-        margin-bottom: 6px;
+        color: #1677FF;
+        margin-bottom: 8px;
       }
 
       .timeline-desc {
@@ -839,11 +839,11 @@ export default {
 
   .drawer-footer {
     background: #fff;
-    padding: 12px 20px;
+    padding: 16px 24px;
     border-top: 1px solid #e2e8f0;
     display: flex;
     justify-content: flex-end;
-    gap: 8px;
+    gap: 12px;
   }
 }
 </style>

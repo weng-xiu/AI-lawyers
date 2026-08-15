@@ -317,7 +317,7 @@ export default {
 .chat-container {
   display: flex;
   height: calc(100vh - 84px);
-  background: #f1f5f9;
+  background: #F5F8FC;
 }
 
 /* 左侧会话列表面板 */
@@ -333,7 +333,7 @@ export default {
   padding: 18px 24px 16px;
   display: flex;
   align-items: center;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid #F5F8FC;
   .clh-title { font-size: 16px; font-weight: 600; color: #1e293b; }
   .clh-badge { margin-left: 8px; }
 }
@@ -351,12 +351,12 @@ export default {
   padding: 14px 18px;
   cursor: pointer;
   transition: background 0.15s;
-  &:hover { background: #f8fafc; }
-  &.chat-session-active { background: #eff6ff; }
+  &:hover { background: #F5F8FC; }
+  &.chat-session-active { background: #EDF5FE; }
   .csi-avatar { position: relative; margin-right: 12px; }
   .csi-dot {
     width: 10px; height: 10px; border-radius: 50%;
-    background: #ef4444; position: absolute; top: 0; right: 0;
+    background: #DC2626; position: absolute; top: 0; right: 0;
     border: 2px solid #fff;
   }
   .csi-body { flex: 1; min-width: 0; }
@@ -369,7 +369,7 @@ export default {
 }
 .chat-left-stats {
   padding: 12px 18px;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid #F5F8FC;
   display: flex;
   justify-content: space-between;
   font-size: 12px;
@@ -407,7 +407,7 @@ export default {
   flex: 1;
   overflow-y: auto;
   padding: 20px 24px;
-  background: #f8fafc;
+  background: #F5F8FC;
 }
 .chat-empty-msg {
   text-align: center;
@@ -424,7 +424,7 @@ export default {
     justify-content: flex-end;
     .cmi-bubble { align-items: flex-end; }
     .cmi-bubble-2 {
-      background: #dbeafe;
+      background: #D6E9FB;
       color: #1e40af;
       border-radius: 12px 4px 12px 12px;
     }
@@ -432,7 +432,7 @@ export default {
   &.chat-msg-system {
     justify-content: center;
     .cmi-bubble-3 {
-      background: #f1f5f9;
+      background: #F5F8FC;
       color: #64748b;
       font-size: 12px;
       padding: 6px 12px;
@@ -470,10 +470,10 @@ export default {
   align-items: center;
   gap: 10px;
   padding: 10px;
-  background: #f8fafc;
+  background: #F5F8FC;
   border-radius: 6px;
-  i { font-size: 20px; color: #3b82f6; }
-  .cmi-file-name { font-size: 13px; color: #3b82f6; }
+  i { font-size: 20px; color: #1677FF; }
+  .cmi-file-name { font-size: 13px; color: #1677FF; }
 }
 
 /* 底部输入区 */
@@ -502,7 +502,7 @@ export default {
 }
 .crp-section {
   padding: 20px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid #F5F8FC;
   .crp-title { font-size: 14px; font-weight: 600; color: #1e293b; margin-bottom: 16px; }
   .crp-item {
     display: flex;

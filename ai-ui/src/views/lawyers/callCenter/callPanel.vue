@@ -828,7 +828,7 @@ export default {
 
 <style lang="scss" scoped>
 .call-panel {
-  background: #f1f5f9;
+  background: #F5F8FC;
   min-height: calc(100vh - 84px);
   margin: 0;
   padding: 24px;
@@ -860,9 +860,9 @@ export default {
   box-shadow: 0 0 0 4px rgba(148, 163, 184, 0.15);
 }
 
-.dot-1 { background: #10b981; box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15); }
+.dot-1 { background: #16A34A; box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15); }
 .dot-2 { background: #f59e0b; box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.15); }
-.dot-3 { background: #8b5cf6; box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.15); }
+.dot-3 { background: #7C3AED; box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.15); }
 
 .status-text {
   font-size: 14px;
@@ -888,9 +888,9 @@ export default {
 
 .status-btn-green {
   background: #ecfdf5;
-  color: #10b981;
+  color: #16A34A;
   &:hover, &.active {
-    background: #10b981;
+    background: #16A34A;
     color: #fff;
   }
 }
@@ -906,9 +906,9 @@ export default {
 
 .status-btn-purple {
   background: #faf5ff;
-  color: #8b5cf6;
+  color: #7C3AED;
   &:hover, &.active {
-    background: #8b5cf6;
+    background: #7C3AED;
     color: #fff;
   }
 }
@@ -929,21 +929,21 @@ export default {
   border-radius: 8px;
   border: none;
   background: #fef2f2;
-  color: #ef4444;
+  color: #DC2626;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
   &:disabled { opacity: 0.5; cursor: not-allowed; }
   &:hover {
-    background: #ef4444;
+    background: #DC2626;
     color: #fff;
   }
 }
 
 // 等待来电横幅
 .waiting-banner {
-  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+  background: linear-gradient(135deg, #003F7D 0%, #1677FF 100%);
   border-radius: 10px;
   padding: 32px 36px;
   color: #fff;
@@ -1062,7 +1062,7 @@ export default {
   }
   .call-actions {
     padding: 12px 4px 8px;
-    border-top: 1px solid #f1f5f9;
+    border-top: 1px solid #F5F8FC;
   }
 }
 
@@ -1111,7 +1111,7 @@ export default {
 
 .queue-badge {
   background: #fef2f2;
-  color: #ef4444;
+  color: #DC2626;
   padding: 4px 12px;
   border-radius: 12px;
   font-size: 12px;
@@ -1125,7 +1125,7 @@ export default {
     justify-content: space-between;
     align-items: center;
     padding: 10px 0;
-    border-bottom: 1px dashed #f1f5f9;
+    border-bottom: 1px dashed #F5F8FC;
     &:last-child { border-bottom: none; }
   }
   .state-label {
@@ -1156,7 +1156,7 @@ export default {
   display: flex;
   align-items: center;
   padding: 14px 0;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid #F5F8FC;
   &:last-child {
     border-bottom: none;
   }
@@ -1176,9 +1176,9 @@ export default {
   flex-shrink: 0;
 }
 
-.queue-num-1 { background: #ef4444; }
+.queue-num-1 { background: #DC2626; }
 .queue-num-2 { background: #f59e0b; }
-.queue-num-3 { background: #3b82f6; }
+.queue-num-3 { background: #1677FF; }
 
 .queue-info-main { flex: 1; }
 
@@ -1205,7 +1205,7 @@ export default {
 .wait-time {
   font-size: 14px;
   font-weight: 600;
-  color: #ef4444;
+  color: #DC2626;
 }
 
 .queue-footer {
@@ -1213,7 +1213,7 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding-top: 16px;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid #F5F8FC;
 }
 
 .avg-wait-label {
@@ -1243,20 +1243,20 @@ export default {
 
 .stat-card-green {
   background: #ecfdf5;
-  .stat-value { color: #10b981; }
-  .stat-label { color: #059669; }
+  .stat-value { color: #16A34A; }
+  .stat-label { color: #16A34A; }
 }
 
 .stat-card-red {
   background: #fef2f2;
-  .stat-value { color: #ef4444; }
+  .stat-value { color: #DC2626; }
   .stat-label { color: #dc2626; }
 }
 
 .stat-card-blue {
-  background: #eff6ff;
-  .stat-value { color: #3b82f6; }
-  .stat-label { color: #2563eb; }
+  background: #EDF5FE;
+  .stat-value { color: #1677FF; }
+  .stat-label { color: #005BAC; }
 }
 
 .stat-card-orange {
@@ -1303,10 +1303,10 @@ export default {
 
 .bar {
   width: 18px;
-  background: #dbeafe;
+  background: #D6E9FB;
   border-radius: 4px 4px 0 0;
   transition: all 0.3s;
-  &.highlight { background: #3b82f6; }
+  &.highlight { background: #1677FF; }
 }
 
 .bar-label {
@@ -1318,7 +1318,7 @@ export default {
 // 满意度
 .satisfaction {
   padding-top: 20px;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid #F5F8FC;
 }
 
 .satisfaction-header {
@@ -1337,20 +1337,20 @@ export default {
 .sat-value {
   font-size: 16px;
   font-weight: 700;
-  color: #10b981;
+  color: #16A34A;
 }
 
 .sat-progress {
   width: 100%;
   height: 8px;
-  background: #f1f5f9;
+  background: #F5F8FC;
   border-radius: 4px;
   overflow: hidden;
 }
 
 .sat-progress-bar {
   height: 100%;
-  background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+  background: linear-gradient(90deg, #16A34A 0%, #34d399 100%);
   border-radius: 4px;
   transition: width 0.3s;
 }
@@ -1367,7 +1367,7 @@ export default {
 
 .skill-item {
   padding: 14px 0;
-  &:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
+  &:not(:last-child) { border-bottom: 1px solid #F5F8FC; }
 }
 
 .skill-header {
@@ -1387,8 +1387,8 @@ export default {
 }
 
 .main-skill-tag {
-  background: #eff6ff;
-  color: #3b82f6;
+  background: #EDF5FE;
+  color: #1677FF;
   padding: 3px 10px;
   border-radius: 4px;
   font-size: 11px;
@@ -1410,7 +1410,7 @@ export default {
 .skill-progress {
   width: 100%;
   height: 8px;
-  background: #f1f5f9;
+  background: #F5F8FC;
   border-radius: 4px;
   overflow: hidden;
 }
@@ -1421,7 +1421,7 @@ export default {
   transition: width 0.3s;
 }
 
-.skill-bar-blue { background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%); }
+.skill-bar-blue { background: linear-gradient(90deg, #1677FF 0%, #8CC8FF 100%); }
 .skill-bar-orange { background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%); }
-.skill-bar-purple { background: linear-gradient(90deg, #8b5cf6 0%, #a78bfa 100%); }
+.skill-bar-purple { background: linear-gradient(90deg, #7C3AED 0%, #a78bfa 100%); }
 </style>

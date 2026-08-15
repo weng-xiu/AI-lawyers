@@ -86,7 +86,7 @@
                   <div class="cp-ai-label">来电意图预测</div>
                   <div class="cp-ai-value">离婚诉讼咨询</div>
                   <div class="cp-ai-confidence">
-                    <el-progress :percentage="87" :show-text="false" :stroke-width="4" color="#8b5cf6" />
+                    <el-progress :percentage="87" :show-text="false" :stroke-width="4" color="#7C3AED" />
                     <span>置信度 87%</span>
                   </div>
                 </div>
@@ -303,10 +303,10 @@ export default {
 
 <style lang="scss" scoped>
 .call-pop {
-  background: #f1f5f9;
+  background: #F5F8FC;
   min-height: 100vh;
-  margin: -20px;
-  padding: 20px;
+  margin: 0;
+  padding: 24px;
   padding-bottom: 100px;
 }
 
@@ -316,7 +316,7 @@ export default {
 }
 
 .cp-banner {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(135deg, #16A34A 0%, #16A34A 100%);
   border-radius: 10px;
   padding: 28px 36px;
   color: #fff;
@@ -411,7 +411,7 @@ export default {
     font-size: 40px;
     font-weight: 700;
     letter-spacing: 2px;
-    margin-bottom: 8px;
+    margin-bottom: 12px;
   }
 
   .cp-banner-info {
@@ -458,16 +458,16 @@ export default {
 }
 
 .cp-main {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .cp-card {
   border-radius: 10px;
   border: 1px solid #e2e8f0;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 
   &::v-deep .el-card__body {
-    padding: 20px;
+    padding: 24px;
   }
 }
 
@@ -481,23 +481,23 @@ export default {
 }
 
 .cp-edit-btn {
-  color: #3b82f6;
+  color: #1677FF;
 }
 
 .cp-caller-header {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #f1f5f9;
-  margin-bottom: 16px;
+  gap: 16px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #F5F8FC;
+  margin-bottom: 20px;
 }
 
 .cp-avatar {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: linear-gradient(135deg, #1677FF 0%, #005BAC 100%);
   color: #fff;
   display: flex;
   align-items: center;
@@ -513,8 +513,8 @@ export default {
     color: #1e293b;
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 4px;
+    gap: 10px;
+    margin-bottom: 6px;
   }
 
   .cp-caller-phone {
@@ -528,13 +528,13 @@ export default {
 }
 
 .cp-caller-detail {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .cp-detail-item {
   display: flex;
   justify-content: space-between;
-  padding: 8px 0;
+  padding: 10px 0;
   font-size: 13px;
 }
 
@@ -549,7 +549,7 @@ export default {
 
 .cp-caller-tags {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
@@ -561,9 +561,9 @@ export default {
   }
 
   &.cp-tag-blue {
-    background: #dbeafe;
-    border-color: #3b82f6;
-    color: #2563eb;
+    background: #D6E9FB;
+    border-color: #1677FF;
+    color: #005BAC;
   }
 }
 
@@ -572,34 +572,34 @@ export default {
     display: flex;
     align-items: center;
     gap: 8px;
-    color: #8b5cf6;
+    color: #7C3AED;
   }
 }
 
 .cp-ai-badge {
-  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  background: linear-gradient(135deg, #7C3AED 0%, #7c3aed 100%);
   color: #fff;
   font-size: 11px;
-  padding: 2px 6px;
+  padding: 3px 8px;
   border-radius: 4px;
   font-weight: 600;
 }
 
 .cp-ai-grid {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .cp-ai-item {
   background: #faf5ff;
   border-radius: 8px;
-  padding: 14px 12px;
+  padding: 16px 14px;
   text-align: center;
 }
 
 .cp-ai-label {
   font-size: 12px;
-  color: #8b5cf6;
-  margin-bottom: 8px;
+  color: #7C3AED;
+  margin-bottom: 10px;
   font-weight: 500;
 }
 
@@ -607,14 +607,14 @@ export default {
   font-size: 14px;
   font-weight: 600;
   color: #1e293b;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .cp-ai-confidence {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 
   .el-progress {
     width: 100%;
@@ -622,12 +622,12 @@ export default {
 
   span {
     font-size: 11px;
-    color: #8b5cf6;
+    color: #7C3AED;
   }
 }
 
 .cp-ai-pref {
-  color: #3b82f6;
+  color: #1677FF;
 }
 
 .cp-ai-freq {
@@ -643,11 +643,11 @@ export default {
   background: #fef3c7;
   border: 1px solid #fde68a;
   border-radius: 8px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: 12px;
+  margin-bottom: 20px;
   font-size: 13px;
   color: #92400e;
 
@@ -661,27 +661,27 @@ export default {
   font-size: 13px;
   font-weight: 600;
   color: #1e293b;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .cp-article-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .cp-article-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px;
-  background: #f8fafc;
+  gap: 12px;
+  padding: 12px;
+  background: #F5F8FC;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
 
   &:hover {
-    background: #f1f5f9;
+    background: #F5F8FC;
   }
 }
 
@@ -689,8 +689,8 @@ export default {
   width: 36px;
   height: 36px;
   border-radius: 6px;
-  background: #eff6ff;
-  color: #3b82f6;
+  background: #EDF5FE;
+  color: #1677FF;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -740,18 +740,18 @@ export default {
     color: #64748b;
 
     &.is-active {
-      color: #10b981;
+      color: #16A34A;
       font-weight: 600;
     }
   }
 
   &::v-deep .el-tabs__active-bar {
-    background-color: #10b981;
+    background-color: #16A34A;
   }
 }
 
 .cp-history-content {
-  padding-top: 4px;
+  padding-top: 8px;
 }
 
 .cp-call-list {
@@ -764,13 +764,13 @@ export default {
   display: flex;
   gap: 14px;
   padding: 14px 16px;
-  background: #f8fafc;
+  background: #F5F8FC;
   border-radius: 8px;
-  border: 1px solid #f1f5f9;
+  border: 1px solid #F5F8FC;
   transition: all 0.2s;
 
   &:hover {
-    background: #f1f5f9;
+    background: #F5F8FC;
     border-color: #e2e8f0;
   }
 }
@@ -779,8 +779,8 @@ export default {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: #dcfce7;
-  color: #10b981;
+  background: #E7F6EE;
+  color: #16A34A;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -796,8 +796,8 @@ export default {
 .cp-call-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
+  gap: 12px;
+  margin-bottom: 10px;
 }
 
 .cp-call-title {
@@ -845,9 +845,9 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   min-width: 90px;
-  padding: 10px 20px;
+  padding: 12px 20px;
   border-radius: 8px;
   font-size: 13px;
 
@@ -856,27 +856,27 @@ export default {
   }
 
   &.cp-btn-green {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    background: linear-gradient(135deg, #16A34A 0%, #16A34A 100%);
     border: none;
     color: #fff;
 
     &:hover {
-      background: linear-gradient(135deg, #059669 0%, #047857 100%);
+      background: linear-gradient(135deg, #16A34A 0%, #047857 100%);
     }
   }
 
   &.cp-btn-blue {
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    background: linear-gradient(135deg, #1677FF 0%, #005BAC 100%);
     border: none;
     color: #fff;
 
     &:hover {
-      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      background: linear-gradient(135deg, #005BAC 0%, #005BAC 100%);
     }
   }
 
   &.cp-btn-gray {
-    background: #f1f5f9;
+    background: #F5F8FC;
     border: 1px solid #e2e8f0;
     color: #475569;
 
@@ -887,7 +887,7 @@ export default {
   }
 
   &.cp-btn-purple {
-    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    background: linear-gradient(135deg, #7C3AED 0%, #7c3aed 100%);
     border: none;
     color: #fff;
 

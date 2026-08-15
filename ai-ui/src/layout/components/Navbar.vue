@@ -115,7 +115,7 @@ export default {
   height: 56px;
   overflow: hidden;
   position: relative;
-  background: #1e3a8a;
+  background: #003F7D;
   border-bottom: 1px solid #1e40af;
 
   .hamburger-container {
@@ -194,7 +194,7 @@ export default {
           bottom: 10px;
           font-size: 14px;
           font-weight: bold;
-          color: #f1f5f9;
+          color: #F5F8FC;
         }
 
         .el-icon-caret-bottom {

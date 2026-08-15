@@ -113,7 +113,7 @@
               <el-button type="text" size="mini" @click="$router.push('/inbound/callRecord')">全部</el-button>
             </div>
           </div>
-          <el-table :data="pagedCalls" size="small" class="wb-table" :header-cell-style="{background:'#f8fafc',color:'#64748b',fontWeight:600}">
+          <el-table :data="pagedCalls" size="small" class="wb-table" :header-cell-style="{background:'#F5F8FC',color:'#64748b',fontWeight:600}">
             <el-table-column label="来电号码" prop="callerNumber" min-width="120" align="left">
               <template slot-scope="scope">
                 <span class="wb-phone">{{ scope.row.callerNumber }}</span>
@@ -224,27 +224,27 @@ export default {
         { value: '-', label: '满意度' }
       ],
       statCards: [
-        { title: '总通话数', value: '-', trend: '全部', trendUp: true, icon: 'el-icon-phone', color: '#3b82f6', bg: '#eff6ff' },
-        { title: '今日通话', value: '-', trend: '-', trendUp: true, icon: 'el-icon-phone-outline', color: '#10b981', bg: '#ecfdf5' },
+        { title: '总通话数', value: '-', trend: '全部', trendUp: true, icon: 'el-icon-phone', color: '#1677FF', bg: '#EDF5FE' },
+        { title: '今日通话', value: '-', trend: '-', trendUp: true, icon: 'el-icon-phone-outline', color: '#16A34A', bg: '#ecfdf5' },
         { title: '今日服务时长', value: '-', trend: '-', trendUp: true, icon: 'el-icon-time', color: '#f59e0b', bg: '#fffbeb' },
-        { title: '平均满意度', value: '-', trend: '-', trendUp: true, icon: 'el-icon-star-on', color: '#8b5cf6', bg: '#f5f3ff' }
+        { title: '平均满意度', value: '-', trend: '-', trendUp: true, icon: 'el-icon-star-on', color: '#7C3AED', bg: '#f5f3ff' }
       ],
       teamItems: [
-        { value: '-', label: '团队总通话', color: '#3b82f6' },
-        { value: '-', label: '团队成员', color: '#10b981' },
+        { value: '-', label: '团队总通话', color: '#1677FF' },
+        { value: '-', label: '团队成员', color: '#16A34A' },
         { value: '-', label: '团队满意度', color: '#f59e0b' },
-        { value: '-', label: '平均时长', color: '#8b5cf6' }
+        { value: '-', label: '平均时长', color: '#7C3AED' }
       ],
       noticeList: [],
       quickEntries: [
-        { name: '语音咨询', icon: 'el-icon-phone', color: '#3b82f6', bg: '#eff6ff', path: '/workbench/callPanel' },
+        { name: '语音咨询', icon: 'el-icon-phone', color: '#1677FF', bg: '#EDF5FE', path: '/workbench/callPanel' },
         { name: '图文服务', icon: 'el-icon-chat-dot-square', color: '#06b6d4', bg: '#ecfeff', path: '/workbench/chat' },
         { name: '视频咨询', icon: 'el-icon-video-camera', color: '#f59e0b', bg: '#fffbeb', path: '/workbench/video' },
-        { name: '来电弹屏', icon: 'el-icon-monitor', color: '#8b5cf6', bg: '#f5f3ff', path: '/inbound/callPopup' },
+        { name: '来电弹屏', icon: 'el-icon-monitor', color: '#7C3AED', bg: '#f5f3ff', path: '/inbound/callPopup' },
         { name: '台账填写', icon: 'el-icon-document', color: '#0d9488', bg: '#ccfbf1', path: '/business/callLedger' },
         { name: '工单登记', icon: 'el-icon-edit', color: '#6366f1', bg: '#e0e7ff', path: '/business/workOrder' },
         { name: '回访任务', icon: 'el-icon-back', color: '#db2777', bg: '#fce7f3', path: '/business/callback/task' },
-        { name: '风险预警', icon: 'el-icon-warning', color: '#ef4444', bg: '#fef2f2', path: '/resource/riskWarning' }
+        { name: '风险预警', icon: 'el-icon-warning', color: '#DC2626', bg: '#fef2f2', path: '/resource/riskWarning' }
       ],
       allCalls: []
     }
@@ -305,18 +305,18 @@ export default {
 
         const totalCount = total.totalCount || 0
         this.statCards = [
-          { title: '总通话数', value: totalCount.toLocaleString(), trend: '全部记录', trendUp: true, icon: 'el-icon-phone', color: '#3b82f6', bg: '#eff6ff' },
-          { title: '今日通话', value: today.todayCalls || 0, trend: today.todayCalls > 0 ? '+' + today.todayCalls : '今日暂无', trendUp: true, icon: 'el-icon-phone-outline', color: '#10b981', bg: '#ecfdf5' },
+          { title: '总通话数', value: totalCount.toLocaleString(), trend: '全部记录', trendUp: true, icon: 'el-icon-phone', color: '#1677FF', bg: '#EDF5FE' },
+          { title: '今日通话', value: today.todayCalls || 0, trend: today.todayCalls > 0 ? '+' + today.todayCalls : '今日暂无', trendUp: true, icon: 'el-icon-phone-outline', color: '#16A34A', bg: '#ecfdf5' },
           { title: '今日服务时长', value: this.fmtDuration(today.todayServiceDuration || 0), trend: '今日累计', trendUp: true, icon: 'el-icon-time', color: '#f59e0b', bg: '#fffbeb' },
-          { title: '平均满意度', value: total.avgRating ? Number(total.avgRating).toFixed(1) + '分' : '暂无', trend: '综合评分', trendUp: true, icon: 'el-icon-star-on', color: '#8b5cf6', bg: '#f5f3ff' }
+          { title: '平均满意度', value: total.avgRating ? Number(total.avgRating).toFixed(1) + '分' : '暂无', trend: '综合评分', trendUp: true, icon: 'el-icon-star-on', color: '#7C3AED', bg: '#f5f3ff' }
         ]
 
         const teamTotal = teams.reduce((s, t) => s + (t.callCount || 0), 0)
         this.teamItems = [
-          { value: teamTotal.toLocaleString(), label: '团队总通话', color: '#3b82f6' },
-          { value: teams.length, label: '团队成员', color: '#10b981' },
+          { value: teamTotal.toLocaleString(), label: '团队总通话', color: '#1677FF' },
+          { value: teams.length, label: '团队成员', color: '#16A34A' },
           { value: total.avgRating ? Number(total.avgRating).toFixed(1) + '%' : '暂无', label: '团队满意度', color: '#f59e0b' },
-          { value: this.fmtDuration(total.avgDuration || 0), label: '平均时长', color: '#8b5cf6' }
+          { value: this.fmtDuration(total.avgDuration || 0), label: '平均时长', color: '#7C3AED' }
         ]
 
         this.allCalls = (d.recentCalls || []).map(c => ({
@@ -403,23 +403,23 @@ export default {
 
 <style lang="scss" scoped>
 .wb-home {
-  background: #f1f5f9;
+  background: #F5F8FC;
   min-height: calc(100vh - 84px);
-  padding: 18px;
-  margin: -20px;
+  padding: 24px;
+  margin: 0;
 }
-.wb-row { margin-bottom: 16px; }
+.wb-row { margin-bottom: 20px; }
 
 /* 横幅 */
 .wb-banner {
-  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 55%, #3b82f6 100%);
+  background: linear-gradient(135deg, #003F7D 0%, #005BAC 55%, #1677FF 100%);
   border-radius: 16px;
-  padding: 22px 28px;
+  padding: 28px 32px;
   color: #fff;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
   position: relative;
   overflow: hidden;
   box-shadow: 0 8px 24px rgba(37, 99, 235, 0.18);
@@ -441,25 +441,25 @@ export default {
   }
 }
 .wb-banner-left {
-  display: flex; align-items: center; gap: 16px; z-index: 1;
+  display: flex; align-items: center; gap: 20px; z-index: 1;
   .wb-avatar {
     width: 56px; height: 56px; border-radius: 50%;
     background: rgba(255,255,255,0.18);
     display: flex; align-items: center; justify-content: center;
     font-size: 30px; backdrop-filter: blur(4px);
   }
-  .wb-banner-text h2 { margin: 0 0 6px 0; font-size: 22px; font-weight: 700; }
+  .wb-banner-text h2 { margin: 0 0 8px 0; font-size: 22px; font-weight: 700; }
   .wb-banner-text p { margin: 0; font-size: 13px; opacity: .88; display: flex; align-items: center; }
-  .wb-dot { width: 4px; height: 4px; border-radius: 50%; background: #93c5fd; margin: 0 8px; display: inline-block; }
+  .wb-dot { width: 4px; height: 4px; border-radius: 50%; background: #B8D7F5; margin: 0 8px; display: inline-block; }
 }
-.wb-banner-right { display: flex; gap: 40px; z-index: 1; }
+.wb-banner-right { display: flex; gap: 48px; z-index: 1; }
 .wb-bn-item { text-align: center; }
 .wb-bn-val { display: block; font-size: 28px; font-weight: 700; line-height: 1.1; text-shadow: 0 2px 8px rgba(0,0,0,.15); }
-.wb-bn-lbl { display: block; font-size: 12px; opacity: .82; margin-top: 6px; }
+.wb-bn-lbl { display: block; font-size: 12px; opacity: .82; margin-top: 8px; }
 
 /* KPI 卡 */
 .wb-kpi {
-  background: #fff; border-radius: 14px; padding: 18px 20px;
+  background: #fff; border-radius: 14px; padding: 20px 24px;
   position: relative; border: 1px solid #eef2f7;
   transition: all .3s cubic-bezier(.4,0,.2,1);
   overflow: hidden;
@@ -476,32 +476,32 @@ export default {
   display: flex; align-items: center; justify-content: center;
   font-size: 20px;
 }
-.wb-kpi-value { font-size: 28px; font-weight: 700; color: #0f172a; line-height: 1.3; margin: 8px 0 6px; }
+.wb-kpi-value { font-size: 28px; font-weight: 700; color: #0f172a; line-height: 1.3; margin: 10px 0 8px; }
 .wb-kpi-foot {
-  font-size: 12px; color: #94a3b8; display: flex; align-items: center; gap: 4px;
-  i { color: #10b981; }
+  font-size: 12px; color: #94a3b8; display: flex; align-items: center; gap: 6px;
+  i { color: #16A34A; }
 }
 
 /* 面板通用 */
 .wb-panel {
-  background: #fff; border-radius: 14px; padding: 16px 18px;
-  margin-bottom: 16px; border: 1px solid #eef2f7;
+  background: #fff; border-radius: 14px; padding: 20px 24px;
+  margin-bottom: 20px; border: 1px solid #eef2f7;
   box-shadow: 0 1px 3px rgba(15,23,42,.03);
 }
 .wb-panel-hd {
   display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
   .wb-panel-title {
     font-size: 15px; font-weight: 600; color: #0f172a;
-    display: flex; align-items: center; gap: 6px;
-    i { color: #2563eb; font-size: 16px; }
+    display: flex; align-items: center; gap: 8px;
+    i { color: #005BAC; font-size: 16px; }
   }
   .wb-badge {
-    background: #ef4444; color: #fff; font-size: 11px; font-weight: 600;
+    background: #DC2626; color: #fff; font-size: 11px; font-weight: 600;
     min-width: 20px; height: 20px; line-height: 20px; padding: 0 6px;
     border-radius: 10px; text-align: center;
   }
-  .wb-hd-tools { display: flex; align-items: center; gap: 8px; }
+  .wb-hd-tools { display: flex; align-items: center; gap: 12px; }
 }
 
 /* 待办 */
@@ -513,15 +513,15 @@ export default {
 }
 .wb-todo-item {
   display: flex; align-items: stretch;
-  padding: 10px 0; border-bottom: 1px dashed #f1f5f9;
+  padding: 12px 0; border-bottom: 1px dashed #F5F8FC;
   &:last-child { border-bottom: none; }
 }
-.wb-todo-bar { width: 3px; border-radius: 2px; margin-right: 12px; }
-.pri-1 { background: #ef4444; }
+.wb-todo-bar { width: 3px; border-radius: 2px; margin-right: 14px; }
+.pri-1 { background: #DC2626; }
 .pri-2 { background: #f59e0b; }
 .pri-3 { background: #94a3b8; }
 .wb-todo-body { flex: 1; min-width: 0; }
-.wb-todo-title { font-size: 13px; color: #1e293b; font-weight: 500; margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wb-todo-title { font-size: 13px; color: #1e293b; font-weight: 500; margin-bottom: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wb-todo-meta { display: flex; align-items: center; justify-content: space-between; }
 .wb-todo-due { font-size: 11px; color: #94a3b8; display: flex; align-items: center; gap: 3px; }
 
@@ -537,14 +537,14 @@ export default {
     height: 32px; padding: 0; border-radius: 7px;
     display: flex; align-items: center; justify-content: center;
     transition: all .15s;
-    &:hover { background: #eff6ff; }
+    &:hover { background: #EDF5FE; }
   }
 }
 .wb-cal-cell {
   width: 100%; height: 32px; display: flex; flex-direction: column;
   align-items: center; justify-content: center; position: relative;
   font-size: 12px; color: #475569; border-radius: 7px; cursor: pointer;
-  &.is-today { background: #2563eb; color: #fff; font-weight: 600; }
+  &.is-today { background: #005BAC; color: #fff; font-weight: 600; }
   &.has-todo em {
     width: 4px; height: 4px; border-radius: 50%;
     background: #f59e0b; margin-top: 1px; font-style: normal;
@@ -553,13 +553,13 @@ export default {
 }
 
 /* 快捷入口 */
-.wb-quick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.wb-quick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
 .wb-quick-item {
   display: flex; flex-direction: column; align-items: center;
-  padding: 14px 4px; cursor: pointer; border-radius: 12px;
+  padding: 18px 8px; cursor: pointer; border-radius: 12px;
   transition: all .2s;
-  &:hover { background: #f8fafc; transform: translateY(-2px); }
-  span { font-size: 12px; color: #334155; margin-top: 8px; }
+  &:hover { background: #F5F8FC; transform: translateY(-2px); }
+  span { font-size: 12px; color: #334155; margin-top: 10px; }
 }
 .wb-qk-icon {
   width: 46px; height: 46px; border-radius: 13px;
@@ -570,8 +570,8 @@ export default {
 
 /* 表格 */
 .wb-table {
-  ::v-deep th { background: #f8fafc !important; }
-  ::v-deep td { border-color: #f1f5f9 !important; }
+  ::v-deep th { background: #F5F8FC !important; }
+  ::v-deep td { border-color: #F5F8FC !important; }
   .wb-phone { font-weight: 600; color: #1e293b; font-family: 'Consolas', monospace; }
 }
 .wb-table-empty {
@@ -583,12 +583,12 @@ export default {
 /* 公告 */
 .wb-notice-list { min-height: 120px; }
 .wb-notice-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 4px; border-bottom: 1px dashed #f1f5f9;
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 6px; border-bottom: 1px dashed #F5F8FC;
   cursor: pointer; transition: background .15s; border-radius: 6px;
   &:last-child { border-bottom: none; }
-  &:hover { background: #f8fafc; .wb-nc-title { color: #2563eb; } }
-  .wb-nc-bar { width: 3px; align-self: stretch; background: #3b82f6; border-radius: 2px; }
+  &:hover { background: #F5F8FC; .wb-nc-title { color: #005BAC; } }
+  .wb-nc-bar { width: 3px; align-self: stretch; background: #1677FF; border-radius: 2px; }
   .wb-nc-body { flex: 1; min-width: 0; }
   .wb-nc-title { font-size: 13px; color: #1e293b; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color .15s; }
   .wb-nc-date { font-size: 11px; color: #94a3b8; margin-top: 4px; display: flex; align-items: center; gap: 3px; }
@@ -597,18 +597,18 @@ export default {
 /* 团队 */
 .wb-team-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .wb-team-item {
-  text-align: center; padding: 14px 4px;
-  background: #f8fafc; border-radius: 10px;
+  text-align: center; padding: 18px 8px;
+  background: #F5F8FC; border-radius: 10px;
   transition: all .2s;
-  &:hover { background: #f1f5f9; transform: translateY(-2px); }
+  &:hover { background: #F5F8FC; transform: translateY(-2px); }
 }
-.wb-tm-val { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+.wb-tm-val { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
 .wb-tm-lbl { font-size: 12px; color: #64748b; }
 
 /* 公告详情 */
 .wb-notice-detail {
-  h3 { margin: 0 0 10px 0; color: #0f172a; font-size: 17px; }
-  .wb-notice-meta { font-size: 12px; color: #94a3b8; margin-bottom: 16px; display: flex; align-items: center; gap: 4px; }
+  h3 { margin: 0 0 12px 0; color: #0f172a; font-size: 17px; }
+  .wb-notice-meta { font-size: 12px; color: #94a3b8; margin-bottom: 20px; display: flex; align-items: center; gap: 6px; }
   .wb-notice-content { line-height: 1.8; color: #334155; white-space: pre-wrap; font-size: 14px; }
 }
 </style>

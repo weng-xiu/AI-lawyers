@@ -403,7 +403,7 @@ export default {
 .rvt-stat-label { font-size: 13px; opacity: 0.9; }
 .rvt-stat-value { font-size: 26px; font-weight: 600; line-height: 1.2; }
 .rvt-stat-total { background: linear-gradient(135deg, #409eff, #66b1ff); }
-.rvt-stat-pending { background: linear-gradient(135deg, #e6a23c, #f0c78a); }
+.rvt-stat-pending { background: linear-gradient(135deg, #F59E0B, #f0c78a); }
 .rvt-stat-done { background: linear-gradient(135deg, #67c23a, #95d475); }
 .rvt-stat-overdue { background: linear-gradient(135deg, #f56c6c, #f89898); }
 </style>

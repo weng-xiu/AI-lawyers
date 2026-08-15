@@ -88,12 +88,18 @@ public class FreeSwitchGatewayAdapter implements ICallGatewayAdapter
         }
         vars.append(",ai_trunk_code=").append(trunk.getTrunkCode());
 
-        // 被叫腿：走该线路对应的 sofia gateway
-        String aLeg = "sofia/gateway/" + trunk.getTrunkCode() + "/" + callee;
+        boolean mediaEcho = "PORTAUDIO".equalsIgnoreCase(trunk.getProtocol());
+
+        // 被叫腿：PORTAUDIO 走本机声卡回音，否则走该线路对应的 sofia gateway
+        String aLeg = mediaEcho ? "portaudio/auto_answer" : "sofia/gateway/" + trunk.getTrunkCode() + "/" + callee;
 
         // 接通后的动作
         String bLeg;
-        if ("BRIDGE_AGENT".equals(request.getAnswerAction()) && request.getAgentExtension() != null
+        if (mediaEcho)
+        {
+            bLeg = "&echo()";
+        }
+        else if ("BRIDGE_AGENT".equals(request.getAnswerAction()) && request.getAgentExtension() != null
                 && !request.getAgentExtension().isEmpty())
         {
             bLeg = "&bridge(user/" + request.getAgentExtension() + "@" + context + ")";
@@ -111,7 +117,12 @@ public class FreeSwitchGatewayAdapter implements ICallGatewayAdapter
 
         try
         {
-            String response = sendEslCommand(trunk, command);
+            String response = sendEslCommand(trunk, command, "bgapi ");
+            if (!mediaEcho && isInvalidGateway(response) && isLoopbackHost(trunk))
+            {
+                String loopbackCommand = "originate {" + vars + "}loopback/" + callee + "/default " + bLeg;
+                response = sendEslCommand(trunk, loopbackCommand, "bgapi ");
+            }
             if (response != null && response.contains("+OK"))
             {
                 DialResult result = DialResult.ok(callUuid);
@@ -190,6 +201,13 @@ public class FreeSwitchGatewayAdapter implements ICallGatewayAdapter
             }
             if (resp.contains("Invalid Gateway"))
             {
+                if (isLoopbackHost(trunk))
+                {
+                    GatewayHealth h = GatewayHealth.up(cost);
+                    h.setRegisterState("LOOPBACK");
+                    h.setMessage("local loopback mode");
+                    return h;
+                }
                 return GatewayHealth.down("网关未配置: " + trunk.getTrunkCode());
             }
             return GatewayHealth.up(cost);
@@ -204,6 +222,11 @@ public class FreeSwitchGatewayAdapter implements ICallGatewayAdapter
      * 通过 ESL 明文协议发送一条 api 命令并读取响应。
      */
     private String sendEslCommand(AiCallTrunk trunk, String command) throws IOException
+    {
+        return sendEslCommand(trunk, command, "api ");
+    }
+
+    private String sendEslCommand(AiCallTrunk trunk, String command, String prefix) throws IOException
     {
         String host = trunk.getGatewayHost();
         try (Socket socket = new Socket())
@@ -227,7 +250,7 @@ public class FreeSwitchGatewayAdapter implements ICallGatewayAdapter
             }
 
             // 3. 执行命令
-            write(out, "api " + command + "\n\n");
+            write(out, prefix + command + "\n\n");
             return readBlock(reader);
         }
     }
@@ -281,6 +304,18 @@ public class FreeSwitchGatewayAdapter implements ICallGatewayAdapter
             return header + new String(body, 0, Math.max(read, 0));
         }
         return header.toString();
+    }
+
+    private boolean isInvalidGateway(String response)
+    {
+        return response != null
+                && (response.contains("INVALID_GATEWAY") || response.contains("Invalid Gateway"));
+    }
+
+    private boolean isLoopbackHost(AiCallTrunk trunk)
+    {
+        String host = trunk.getGatewayHost();
+        return "127.0.0.1".equals(host) || "localhost".equalsIgnoreCase(host) || "::1".equals(host);
     }
 
     /** 将 FreeSWITCH 挂断原因映射为内部拨号状态 */

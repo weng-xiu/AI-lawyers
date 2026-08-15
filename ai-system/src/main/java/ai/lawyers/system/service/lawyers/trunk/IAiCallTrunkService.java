@@ -3,6 +3,7 @@ package ai.lawyers.system.service.lawyers.trunk;
 import java.util.List;
 import ai.lawyers.system.domain.lawyers.trunk.AiCallTrunk;
 import ai.lawyers.system.domain.lawyers.trunk.AiNumberSegment;
+import ai.lawyers.system.domain.lawyers.trunk.DialResult;
 import ai.lawyers.system.service.lawyers.trunk.gateway.GatewayHealth;
 
 /**
@@ -25,6 +26,8 @@ public interface IAiCallTrunkService
 
     /** 手动测试线路连通性 */
     public GatewayHealth testTrunk(Long trunkId);
+
+    public DialResult testCall(Long trunkId, String calleeNumber);
 
     // ---------------- 号段管理 ----------------
 

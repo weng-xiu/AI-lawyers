@@ -22,6 +22,7 @@ import ai.lawyers.common.utils.SecurityUtils;
 import ai.lawyers.common.utils.poi.ExcelUtil;
 import ai.lawyers.system.domain.lawyers.trunk.AiCallTrunk;
 import ai.lawyers.system.domain.lawyers.trunk.AiNumberSegment;
+import ai.lawyers.system.domain.lawyers.trunk.DialResult;
 import ai.lawyers.system.service.lawyers.trunk.IAiCallTrunkService;
 import ai.lawyers.system.service.lawyers.trunk.ICarrierRouteService;
 import ai.lawyers.system.service.lawyers.trunk.gateway.GatewayHealth;
@@ -109,12 +110,32 @@ public class AiCallTrunkController extends BaseController
     public AjaxResult test(@PathVariable("trunkId") Long trunkId)
     {
         GatewayHealth health = aiCallTrunkService.testTrunk(trunkId);
-        AjaxResult result = health.isReachable() ? AjaxResult.success("线路连通正常")
-                : AjaxResult.error("线路不可达: " + health.getMessage());
+        AjaxResult result = AjaxResult.success(health.isReachable() ? "线路连通正常" : "线路不可达: " + health.getMessage());
         result.put("reachable", health.isReachable());
         result.put("latencyMs", health.getLatencyMs());
         result.put("registerState", health.getRegisterState());
+        result.put("message", health.getMessage());
         return result;
+    }
+
+    @PreAuthorize("@ss.hasPermi('lawyers:trunk:test')")
+    @Log(title = "trunk dial test", businessType = BusinessType.OTHER)
+    @PostMapping("/testCall/{trunkId}")
+    public AjaxResult testCall(@PathVariable("trunkId") Long trunkId, @RequestParam("calleeNumber") String calleeNumber)
+    {
+        if (calleeNumber == null || calleeNumber.trim().isEmpty())
+        {
+            return AjaxResult.error("拨测号码不能为空");
+        }
+        DialResult result = aiCallTrunkService.testCall(trunkId, calleeNumber.trim());
+        AjaxResult ajax = AjaxResult.success(result.isSuccess() ? "拨测已下发" : (result.getMessage() == null ? "拨测失败" : result.getMessage()));
+        ajax.put("success", result.isSuccess());
+        ajax.put("callUuid", result.getCallUuid());
+        ajax.put("dialStatus", result.getDialStatus());
+        ajax.put("trunkCode", result.getTrunkCode());
+        ajax.put("errorCode", result.getErrorCode());
+        ajax.put("message", result.getMessage());
+        return ajax;
     }
 
     // ---------------------------------------------------------------- 号段管理

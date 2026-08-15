@@ -245,7 +245,7 @@ const CANVAS_H = 1600
 const TYPE_META = {
   start: { label: '开始', color: '#67C23A', icon: '▶' },
   say: { label: '语音播报', color: '#409EFF', icon: '♪' },
-  menu: { label: '按键菜单', color: '#E6A23C', icon: '☰' },
+  menu: { label: '按键菜单', color: '#F59E0B', icon: '☰' },
   intention: { label: '意图识别', color: '#8A6DE9', icon: '◎' },
   condition: { label: '条件分支', color: '#F56C6C', icon: '◇' },
   agent: { label: '转人工', color: '#13C2C2', icon: '☎' },
@@ -873,7 +873,7 @@ export default {
 }
 
 .dirty-tip {
-  color: #e6a23c;
+  color: #F59E0B;
   font-size: 12px;
   margin-left: 8px;
 }

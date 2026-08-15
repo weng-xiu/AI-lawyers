@@ -300,7 +300,7 @@ export default {
           series: [
             { name: '非常满意', type: 'line', smooth: true, data: data.map(i => i.verySatisfied || 0), itemStyle: { color: '#67c23a' } },
             { name: '满意', type: 'line', smooth: true, data: data.map(i => i.satisfied || 0), itemStyle: { color: '#409eff' } },
-            { name: '一般', type: 'line', smooth: true, data: data.map(i => i.normal || 0), itemStyle: { color: '#e6a23c' } },
+            { name: '一般', type: 'line', smooth: true, data: data.map(i => i.normal || 0), itemStyle: { color: '#F59E0B' } },
             { name: '不满意', type: 'line', smooth: true, data: data.map(i => i.unsatisfied || 0), itemStyle: { color: '#f56c6c' } }
           ]
         }
@@ -431,7 +431,7 @@ export default {
 }
 .cb-stat-total { background: linear-gradient(135deg, #409eff, #66b1ff); }
 .cb-stat-done { background: linear-gradient(135deg, #67c23a, #95d475); }
-.cb-stat-pending { background: linear-gradient(135deg, #e6a23c, #f3b55c); }
+.cb-stat-pending { background: linear-gradient(135deg, #F59E0B, #f3b55c); }
 .cb-stat-score { background: linear-gradient(135deg, #f56c6c, #f89898); }
 .cb-trend-card { margin-bottom: 16px; }
 .cb-trend-chart { height: 280px; }

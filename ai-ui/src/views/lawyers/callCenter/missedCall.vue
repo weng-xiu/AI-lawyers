@@ -412,22 +412,22 @@ export default {
 
 <style lang="scss" scoped>
 .mc-page {
-  padding: 16px;
+  padding: 24px;
 }
 .mc-stats {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 .mc-stat-card {
   display: flex;
   align-items: center;
-  padding: 18px 20px;
+  padding: 20px 24px;
   border-radius: 8px;
   color: #fff;
   min-height: 84px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
   .mc-stat-icon {
     font-size: 32px;
-    margin-right: 14px;
+    margin-right: 16px;
     opacity: 0.9;
   }
   .mc-stat-label {
@@ -438,29 +438,29 @@ export default {
     font-size: 26px;
     font-weight: 600;
     line-height: 1.2;
-    margin-top: 4px;
+    margin-top: 6px;
   }
 }
 .mc-stat-today { background: linear-gradient(135deg, #f56c6c, #f89898); }
-.mc-stat-week { background: linear-gradient(135deg, #e6a23c, #f3b55c); }
+.mc-stat-week { background: linear-gradient(135deg, #F59E0B, #f3b55c); }
 .mc-stat-cb { background: linear-gradient(135deg, #67c23a, #95d475); }
 .mc-stat-rate { background: linear-gradient(135deg, #409eff, #66b1ff); }
 
 .mc-tabs {
   background: #fff;
-  padding: 0 16px 16px;
+  padding: 0 24px 24px;
   border-radius: 4px;
 }
 
 .mc-voice-list {
-  padding: 8px 4px;
+  padding: 12px 8px;
 }
 .mc-voice-item {
   display: flex;
   padding: 16px;
   border: 1px solid #ebeef5;
   border-radius: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   background: #fafafa;
   &:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
   .mc-voice-avatar {
@@ -470,30 +470,30 @@ export default {
     color: #fff;
     display: flex; align-items: center; justify-content: center;
     font-size: 22px;
-    margin-right: 14px;
+    margin-right: 16px;
     flex-shrink: 0;
   }
   .mc-voice-main { flex: 1; }
   .mc-voice-top {
-    display: flex; align-items: center; gap: 10px;
-    margin-bottom: 6px;
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 8px;
     .mc-voice-name { font-weight: 600; font-size: 14px; color: #303133; }
     .mc-voice-number { color: #909399; font-size: 13px; }
   }
   .mc-voice-content {
     color: #606266;
     font-size: 13px;
-    padding: 8px 12px;
+    padding: 10px 14px;
     background: #fff;
     border-radius: 4px;
-    margin: 6px 0;
+    margin: 8px 0;
     border-left: 3px solid #409eff;
     line-height: 1.6;
   }
   .mc-voice-meta {
     display: flex; align-items: center; gap: 16px;
     color: #909399; font-size: 12px;
-    margin-top: 6px;
+    margin-top: 8px;
   }
 }
 </style>

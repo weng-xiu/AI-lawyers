@@ -213,12 +213,12 @@ export default {
 <style lang="scss" scoped>
 .workbench {
   padding: 24px;
-  background: #f1f5f9;
+  background: #F5F8FC;
   min-height: calc(100vh - 84px);
 }
 
 .wb-banner {
-  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+  background: linear-gradient(135deg, #003F7D 0%, #1677FF 100%);
   border-radius: 12px;
   padding: 28px 32px;
   color: #fff;
@@ -270,10 +270,10 @@ export default {
     .wb-stat-value { font-size: 24px; font-weight: 700; color: #1e293b; line-height: 1.2; }
     .wb-stat-title { font-size: 13px; color: #64748b; margin-top: 6px; }
   }
-  .wb-sicon-blue { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
-  .wb-sicon-green { background: linear-gradient(135deg, #10b981, #059669); }
+  .wb-sicon-blue { background: linear-gradient(135deg, #1677FF, #005BAC); }
+  .wb-sicon-green { background: linear-gradient(135deg, #16A34A, #16A34A); }
   .wb-sicon-orange { background: linear-gradient(135deg, #f59e0b, #d97706); }
-  .wb-sicon-purple { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+  .wb-sicon-purple { background: linear-gradient(135deg, #7C3AED, #7c3aed); }
 }
 
 .wb-card {
@@ -288,7 +288,7 @@ export default {
     font-weight: 600;
     font-size: 15px;
     color: #1e293b;
-    i { color: #3b82f6; margin-right: 6px; }
+    i { color: #1677FF; margin-right: 6px; }
   }
 }
 
@@ -310,14 +310,14 @@ export default {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #ef4444;
+    background: #DC2626;
     margin-top: 2px;
   }
 }
 .wb-cal-today {
-  background: #eff6ff;
+  background: #EDF5FE;
   border-radius: 6px;
-  color: #3b82f6;
+  color: #1677FF;
   font-weight: 700;
 }
 
@@ -334,7 +334,7 @@ export default {
   cursor: pointer;
   border-radius: 8px;
   transition: all 0.2s;
-  &:hover { background: #f8fafc; }
+  &:hover { background: #F5F8FC; }
   .wb-quick-icon {
     width: 48px;
     height: 48px;
@@ -347,14 +347,14 @@ export default {
   }
   span { font-size: 13px; color: #475569; }
 }
-.wb-qicon-blue { background: #eff6ff; color: #3b82f6; }
+.wb-qicon-blue { background: #EDF5FE; color: #1677FF; }
 .wb-qicon-green { background: #f0fdf4; color: #16a34a; }
 .wb-qicon-blue2 { background: #e0e7ff; color: #6366f1; }
 .wb-qicon-teal { background: #ccfbf1; color: #0d9488; }
 
 .wb-record-item {
   padding: 12px 0;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid #F5F8FC;
   &:last-child { border-bottom: none; }
   .wb-record-top { display: flex; justify-content: space-between; align-items: center; }
   .wb-record-phone { font-size: 14px; font-weight: 600; color: #1e293b; }

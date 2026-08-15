@@ -200,15 +200,15 @@ export default {
 </script>
 
 <style scoped>
-.monitor-container { padding: 12px; }
-.overview-row { margin-bottom: 12px; }
-.ov-card { border-radius: 6px; padding: 14px; color: #fff; text-align: center; }
+.monitor-container { padding: 24px; }
+.overview-row { margin-bottom: 16px; }
+.ov-card { border-radius: 6px; padding: 16px; color: #fff; text-align: center; }
 .ov-num { font-size: 24px; font-weight: bold; }
-.ov-label { font-size: 12px; margin-top: 4px; opacity: 0.9; }
+.ov-label { font-size: 12px; margin-top: 6px; opacity: 0.9; }
 .ov-total { background: #409EFF; }
 .ov-success { background: #67C23A; }
 .ov-info { background: #909399; }
-.ov-warn { background: #E6A23C; }
+.ov-warn { background: #F59E0B; }
 .ov-primary { background: #36cfc9; }
 .ov-danger { background: #F56C6C; }
 .panel-card { margin-bottom: 0; }

@@ -694,70 +694,70 @@ export default {
 
 <style lang="scss" scoped>
 .call-ledger {
-  padding: 16px;
-  background-color: #f1f5f9;
+  padding: 24px;
+  background-color: #F5F8FC;
   min-height: calc(100vh - 84px);
 }
 
 .search-card {
   border-radius: 8px;
-  margin-bottom: 16px;
-  ::v-deep .el-card__body { padding: 16px 20px; }
+  margin-bottom: 20px;
+  ::v-deep .el-card__body { padding: 20px 24px; }
 }
 
 .stat-row {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   .stat-card {
     display: flex;
     align-items: center;
-    padding: 20px;
+    padding: 24px;
     background: #fff;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
     .stat-icon {
       width: 48px; height: 48px; border-radius: 10px;
       display: flex; align-items: center; justify-content: center;
-      margin-right: 14px; font-size: 24px; color: #fff;
+      margin-right: 16px; font-size: 24px; color: #fff;
     }
     .stat-info {
       flex: 1;
       .stat-value { font-size: 24px; font-weight: 600; color: #1e293b; line-height: 1.2; }
-      .stat-label { font-size: 13px; color: #64748b; margin-top: 4px; }
+      .stat-label { font-size: 13px; color: #64748b; margin-top: 6px; }
     }
-    &.stat-total .stat-icon { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
-    &.stat-phone .stat-icon { background: linear-gradient(135deg, #3b82f6, #2563eb); }
-    &.stat-site .stat-icon { background: linear-gradient(135deg, #10b981, #059669); }
+    &.stat-total .stat-icon { background: linear-gradient(135deg, #1677FF, #005BAC); }
+    &.stat-phone .stat-icon { background: linear-gradient(135deg, #1677FF, #005BAC); }
+    &.stat-site .stat-icon { background: linear-gradient(135deg, #16A34A, #16A34A); }
     &.stat-online .stat-icon { background: linear-gradient(135deg, #f59e0b, #d97706); }
-    &.stat-video .stat-icon { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+    &.stat-video .stat-icon { background: linear-gradient(135deg, #7C3AED, #7c3aed); }
     &.stat-satisfaction .stat-icon { background: linear-gradient(135deg, #06b6d4, #0891b2); }
   }
 }
 
 .table-card {
   border-radius: 8px;
-  ::v-deep .el-card__body { padding: 16px 20px; }
+  ::v-deep .el-card__body { padding: 20px 24px; }
   .toolbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
+    margin-bottom: 16px;
   }
 }
 
 .template-bar {
-  padding: 12px 0;
-  margin-bottom: 12px;
+  padding: 16px 0;
+  margin-bottom: 16px;
   border-top: 1px dashed #e2e8f0;
   border-bottom: 1px dashed #e2e8f0;
   .template-label {
     font-size: 13px;
     color: #64748b;
-    margin-right: 8px;
+    margin-right: 10px;
     font-weight: 600;
   }
   .tpl-btn {
-    margin: 4px 6px 4px 0;
-    i { margin-right: 4px; }
+    margin: 8px 8px 8px 0;
+    i { margin-right: 6px; }
   }
 }
 
@@ -768,7 +768,7 @@ export default {
 }
 
 .link-blue {
-  color: #3b82f6;
+  color: #1677FF;
   cursor: pointer;
   &:hover { text-decoration: underline; }
 }
@@ -778,13 +778,13 @@ export default {
 .satisfaction-text {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 6px;
   font-size: 12px;
   i { font-size: 12px; }
-  &.satisfaction-1 { color: #10b981; i { color: #10b981; } }
-  &.satisfaction-2 { color: #3b82f6; i { color: #3b82f6; } }
+  &.satisfaction-1 { color: #16A34A; i { color: #16A34A; } }
+  &.satisfaction-2 { color: #1677FF; i { color: #1677FF; } }
   &.satisfaction-3 { color: #f59e0b; i { color: #f59e0b; } }
-  &.satisfaction-4 { color: #ef4444; i { color: #ef4444; } }
+  &.satisfaction-4 { color: #DC2626; i { color: #DC2626; } }
 }
 
 .detail-dialog, .form-dialog {
@@ -800,11 +800,11 @@ export default {
     font-size: 15px;
     font-weight: 600;
     color: #1e293b;
-    margin-bottom: 12px;
-    padding-left: 4px;
+    margin-bottom: 16px;
+    padding-left: 8px;
     .title-bar {
-      width: 4px; height: 16px; background: #3b82f6;
-      border-radius: 2px; margin-right: 10px;
+      width: 4px; height: 16px; background: #1677FF;
+      border-radius: 2px; margin-right: 12px;
     }
   }
   .content-text {
@@ -815,18 +815,18 @@ export default {
 }
 
 .reply-content {
-  padding: 16px;
-  background: #f8fafc;
+  padding: 20px;
+  background: #F5F8FC;
   border-radius: 6px;
   line-height: 1.8;
   color: #334155;
-  border-left: 3px solid #3b82f6;
+  border-left: 3px solid #1677FF;
   white-space: pre-wrap;
 }
 
 .form-tip {
   font-size: 12px;
   color: #94a3b8;
-  margin-left: 8px;
+  margin-left: 10px;
 }
 </style>

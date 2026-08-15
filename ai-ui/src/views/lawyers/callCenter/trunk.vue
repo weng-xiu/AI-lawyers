@@ -72,6 +72,7 @@
           <template slot-scope="scope">
             <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(scope.row)">编辑</el-button>
             <el-button size="mini" type="text" icon="el-icon-camera" @click="handleTest(scope.row)">测试</el-button>
+            <el-button size="mini" type="text" icon="el-icon-phone" @click="handleCallTest(scope.row)">拨测</el-button>
             <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(scope.row)">删除</el-button>
           </template>
         </el-table-column>
@@ -175,12 +176,54 @@
         <span class="result-text">推荐线路：{{ recognizeResult.trunkName || '无可用线路' }}</span>
       </div>
     </el-card>
+
+    <!-- 线路拨测 -->
+    <el-dialog title="线路拨测" :visible.sync="callTestOpen" width="480px" append-to-body>
+      <el-form label-width="90px" size="small">
+        <el-form-item label="线路">
+          <span>{{ callTestForm.trunkName }}</span>
+        </el-form-item>
+        <el-form-item label="拨测号码">
+          <el-input v-model="callTestForm.calleeNumber" placeholder="请输入被叫号码，如 13800138000" clearable />
+        </el-form-item>
+        <div v-if="callTestResult" class="call-test-result">
+          <el-alert
+            :title="callTestResult.success ? '拨测已下发' : '拨测失败'"
+            :type="callTestResult.success ? 'success' : 'error'"
+            :closable="false"
+            show-icon
+          />
+          <p v-if="callTestResult.callUuid">呼叫ID：{{ callTestResult.callUuid }}</p>
+          <p v-if="callTestResult.dialStatus">拨号状态：{{ callTestResult.dialStatus }}</p>
+          <p v-if="callTestResult.message">信息：{{ callTestResult.message }}</p>
+        </div>
+      </el-form>
+      <div slot="footer">
+        <el-button size="small" @click="callTestOpen = false">关闭</el-button>
+        <el-button type="primary" size="small" :loading="callTestLoading" @click="submitCallTest">开始拨测</el-button>
+      </div>
+    </el-dialog>
+
+    <!-- 线路连通性测试结果 -->
+    <el-dialog title="线路连通性测试" :visible.sync="healthOpen" width="480px" append-to-body>
+      <el-form label-width="100px" size="small">
+        <el-form-item label="可达">
+          <el-tag :type="healthResult && healthResult.reachable ? 'success' : 'danger'">{{ healthResult && healthResult.reachable ? '是' : '否' }}</el-tag>
+        </el-form-item>
+        <el-form-item label="延迟"><span>{{ healthResult ? healthResult.latencyMs : '-' }} ms</span></el-form-item>
+        <el-form-item label="注册状态"><span>{{ healthResult ? healthResult.registerState : '-' }}</span></el-form-item>
+        <el-form-item label="说明"><span>{{ healthResult ? healthResult.message : '-' }}</span></el-form-item>
+      </el-form>
+      <div slot="footer">
+        <el-button size="small" @click="healthOpen = false">关闭</el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
 import {
-  listTrunk, addTrunk, updateTrunk, changeTrunkStatus, delTrunk, testTrunk,
+  listTrunk, addTrunk, updateTrunk, changeTrunkStatus, delTrunk, testTrunk, testCallTrunk,
   recognizeNumber, refreshSegment
 } from '@/api/lawyers/trunk'
 
@@ -194,6 +237,12 @@ export default {
       trunkList: [],
       testNumber: '',
       recognizeResult: null,
+      callTestOpen: false,
+      callTestLoading: false,
+      callTestForm: { trunkId: null, trunkName: '', calleeNumber: '' },
+      callTestResult: null,
+      healthOpen: false,
+      healthResult: null,
       queryParams: {
         trunkName: undefined,
         carrier: undefined,
@@ -284,7 +333,26 @@ export default {
     },
     handleTest(row) {
       testTrunk(row.trunkId).then(res => {
-        this.$modal.msgSuccess('测试结果：' + (res.msg || '成功'))
+        this.healthResult = res
+        this.healthOpen = true
+      })
+    },
+    handleCallTest(row) {
+      this.callTestForm = { trunkId: row.trunkId, trunkName: row.trunkName, calleeNumber: '' }
+      this.callTestResult = null
+      this.callTestOpen = true
+    },
+    submitCallTest() {
+      if (!this.callTestForm.calleeNumber) {
+        this.$modal.msgWarning('请输入拨测号码')
+        return
+      }
+      this.callTestLoading = true
+      testCallTrunk(this.callTestForm.trunkId, this.callTestForm.calleeNumber).then(res => {
+        this.callTestResult = res
+        this.callTestLoading = false
+      }).catch(() => {
+        this.callTestLoading = false
       })
     },
     handleDelete(row) {
@@ -330,9 +398,10 @@ export default {
 </script>
 
 <style scoped>
-.trunk-container { padding: 12px; }
-.mb8 { margin-bottom: 8px; }
-.test-card { margin-top: 12px; }
-.recognize-result { margin-top: 12px; display: flex; align-items: center; gap: 10px; }
+.trunk-container { padding: 24px; }
+.test-card { margin-top: 16px; }
+.recognize-result { margin-top: 16px; display: flex; align-items: center; gap: 12px; }
 .result-text { color: #606266; font-size: 13px; }
+.call-test-result { margin-top: 12px; }
+.call-test-result p { margin: 8px 0 0; font-size: 13px; color: #606266; }
 </style>

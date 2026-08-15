@@ -1,41 +1,44 @@
 // base color - 司法蓝政务风格
-$blue:#3a5cb8;
-$light-blue:#4a6dd4;
+$blue:#005BAC;
+$light-blue:#1677FF;
 $red:#f56c6c;
 $pink: #E65D6E;
-$green: #52c41a;
+$green: #16A34A;
 $tiffany: #4AB7BD;
-$yellow:#e6a23c;
-$panGreen: #52c41a;
+$yellow:#F59E0B;
+$panGreen: #16A34A;
 
 // 司法蓝政务主题
-$justice-primary: #3a5cb8;
-$justice-primary-light: #4a6dd4;
-$justice-primary-dark: #2a4a9c;
-$justice-bg: #f0f2f5;
-$justice-bg-card: #ffffff;
-$justice-bg-hover: #f5f7fa;
-$justice-border: #e4e7ed;
-$justice-border-light: #ebeef5;
-$justice-text-primary: #303133;
+$justice-primary: #005BAC;
+$justice-primary-light: #1677FF;
+$justice-primary-dark: #003F7D;
+$justice-gold: #D4A017;
+$justice-bg: #F5F8FC;
+$justice-bg-card: #FFFFFF;
+$justice-bg-hover: #EDF5FE;
+$justice-border: #E4E7ED;
+$justice-border-light: #EAF0F8;
+$justice-text-primary: #1E293B;
 $justice-text-secondary: #606266;
 $justice-text-muted: #909399;
-$justice-success: #52c41a;
-$justice-warning: #e6a23c;
-$justice-danger: #f56c6c;
+$justice-success: #16A34A;
+$justice-warning: #F59E0B;
+$justice-danger: #DC2626;
 
 // 默认菜单主题风格 - 深灰侧栏
-$base-menu-color:#cbd5e1;
-$base-menu-color-active:#ffffff;
-$base-menu-background:#1e293b;
+$base-menu-color:#D9EAF7;
+$base-menu-color-active:#FFFFFF;
+$base-menu-background:#003F7D;
 $base-logo-title-color: #ffffff;
 
 $base-menu-light-color:rgba(0,0,0,.70);
 $base-menu-light-background:#ffffff;
-$base-logo-light-title-color: #001529;
+$base-logo-light-title-color: #005BAC;
 
-$base-sub-menu-background:#151e2d;
-$base-sub-menu-hover:#2d3a4f;
+$base-sub-menu-background:#00336B;
+$base-sub-menu-hover:#004A91;
+
+$logo-background: #005BAC;
 
 // 自定义暗色菜单风格
 /**
@@ -65,6 +68,7 @@ $base-sidebar-width: 200px;
   subMenuBackground: $base-sub-menu-background;
   subMenuHover: $base-sub-menu-hover;
   sideBarWidth: $base-sidebar-width;
+  logoBackground: $logo-background;
   logoTitleColor: $base-logo-title-color;
   logoLightTitleColor: $base-logo-light-title-color
 }

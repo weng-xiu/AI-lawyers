@@ -80,6 +80,8 @@ public class SimulatorGatewayAdapter implements ICallGatewayAdapter
     @Override
     public GatewayHealth checkHealth(AiCallTrunk trunk)
     {
-        return GatewayHealth.up(1L);
+        GatewayHealth health = GatewayHealth.up(1L);
+        health.setMessage("模拟网关（无真实线路），仅用于开发联调");
+        return health;
     }
 }
