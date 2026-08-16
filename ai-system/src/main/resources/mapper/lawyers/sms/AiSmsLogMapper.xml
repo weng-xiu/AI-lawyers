@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.sms.AiSmsLogMapper">
+
+    <resultMap type="AiSmsLog" id="AiSmsLogResult">
+        <result property="logId"          column="log_id"           />
+        <result property="phone"          column="phone"            />
+        <result property="templateId"     column="template_id"      />
+        <result property="configId"       column="config_id"        />
+        <result property="paramsJson"     column="params_json"      />
+        <result property="content"        column="content"          />
+        <result property="sendStatus"     column="send_status"      />
+        <result property="providerMsgId"  column="provider_msg_id"  />
+        <result property="failReason"     column="fail_reason"      />
+        <result property="sessionId"      column="session_id"       />
+        <result property="recordId"       column="record_id"        />
+        <result property="createTime"     column="create_time"      />
+        <result property="templateName"   column="template_name"    />
+    </resultMap>
+
+    <sql id="selectLogVo">
+        select l.log_id, l.phone, l.template_id, l.config_id, l.params_json, l.content, l.send_status,
+               l.provider_msg_id, l.fail_reason, l.session_id, l.record_id, l.create_time,
+               t.template_name
+        from ai_sms_log l
+        left join ai_sms_template t on t.template_id = l.template_id
+    </sql>
+
+    <select id="selectAiSmsLogList" parameterType="AiSmsLog" resultMap="AiSmsLogResult">
+        <include refid="selectLogVo"/>
+        <where>
+            <if test="phone != null and phone != ''"> and l.phone = #{phone}</if>
+            <if test="sendStatus != null and sendStatus != ''"> and l.send_status = #{sendStatus}</if>
+            <if test="sessionId != null and sessionId != ''"> and l.session_id = #{sessionId}</if>
+            <if test="templateId != null"> and l.template_id = #{templateId}</if>
+        </where>
+        order by l.log_id desc
+    </select>
+
+    <select id="selectAiSmsLogByLogId" parameterType="Long" resultMap="AiSmsLogResult">
+        <include refid="selectLogVo"/>
+        where l.log_id = #{logId}
+    </select>
+
+    <insert id="insertAiSmsLog" parameterType="AiSmsLog" useGeneratedKeys="true" keyProperty="logId">
+        insert into ai_sms_log
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="phone != null and phone != ''">phone,</if>
+            <if test="templateId != null">template_id,</if>
+            <if test="configId != null">config_id,</if>
+            <if test="paramsJson != null">params_json,</if>
+            <if test="content != null">content,</if>
+            <if test="sendStatus != null and sendStatus != ''">send_status,</if>
+            <if test="providerMsgId != null">provider_msg_id,</if>
+            <if test="failReason != null">fail_reason,</if>
+            <if test="sessionId != null">session_id,</if>
+            <if test="recordId != null">record_id,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="phone != null and phone != ''">#{phone},</if>
+            <if test="templateId != null">#{templateId},</if>
+            <if test="configId != null">#{configId},</if>
+            <if test="paramsJson != null">#{paramsJson},</if>
+            <if test="content != null">#{content},</if>
+            <if test="sendStatus != null and sendStatus != ''">#{sendStatus},</if>
+            <if test="providerMsgId != null">#{providerMsgId},</if>
+            <if test="failReason != null">#{failReason},</if>
+            <if test="sessionId != null">#{sessionId},</if>
+            <if test="recordId != null">#{recordId},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <delete id="deleteAiSmsLogByLogIds" parameterType="String">
+        delete from ai_sms_log where log_id in
+        <foreach item="logId" collection="array" open="(" separator="," close=")">#{logId}</foreach>
+    </delete>
+
+    <select id="selectTodayCountByPhone" parameterType="String" resultType="int">
+        select count(1) from ai_sms_log
+        where phone = #{phone} and send_status = '1' and create_time >= curdate()
+    </select>
+
+</mapper>

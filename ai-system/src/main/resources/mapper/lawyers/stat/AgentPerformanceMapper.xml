@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.stat.AgentPerformanceMapper">
+
+    <resultMap type="AgentPerformanceVO" id="AgentPerformanceResult">
+        <result property="agentId"          column="agentId"          />
+        <result property="agentName"        column="agentName"        />
+        <result property="status"           column="status"           />
+        <result property="callStatus"       column="callStatus"       />
+        <result property="loginTime"        column="loginTime"        />
+        <result property="logoutTime"       column="logoutTime"       />
+        <result property="signedInMinutes"  column="signedInMinutes"  />
+        <result property="inboundCalls"     column="inboundCalls"     />
+        <result property="outboundCalls"    column="outboundCalls"    />
+        <result property="transferredOut"   column="transferredOut"   />
+        <result property="talkDuration"     column="talkDuration"     />
+        <result property="avgTalkDuration"  column="avgTalkDuration"  />
+        <result property="aiAssistCount"    column="aiAssistCount"    />
+        <result property="avgSatisfaction"  column="avgSatisfaction"  />
+    </resultMap>
+
+    <select id="selectAgentPerformance" resultMap="AgentPerformanceResult">
+        select a.agent_id as agentId,
+               a.agent_name as agentName,
+               a.status,
+               a.call_status as callStatus,
+               a.login_time as loginTime,
+               a.logout_time as logoutTime,
+               timestampdiff(minute, a.login_time, coalesce(a.logout_time, now())) as signedInMinutes,
+               ifnull(cr.inboundCalls, 0) as inboundCalls,
+               ifnull(cr.talkDuration, 0) as talkDuration,
+               ifnull(cr.avgTalkDuration, 0) as avgTalkDuration,
+               ifnull(dl.outboundCalls, 0) as outboundCalls,
+               ifnull(tr.transferredOut, 0) as transferredOut,
+               ifnull(ass.aiAssistCount, 0) as aiAssistCount,
+               ifnull(ob.avgSatisfaction, 0) as avgSatisfaction
+        from ai_call_agent_status a
+        left join (
+            select agent_id,
+                   count(*) as inboundCalls,
+                   ifnull(sum(duration), 0) as talkDuration,
+                   ifnull(round(avg(duration), 0), 0) as avgTalkDuration
+            from ai_call_record
+            <where>
+                <if test="beginTime != null"> and call_time &gt;= #{beginTime}</if>
+                <if test="endTime != null"> and call_time &lt; #{endTime}</if>
+            </where>
+            group by agent_id
+        ) cr on cr.agent_id = a.agent_id
+        left join (
+            select agent_id, count(*) as outboundCalls
+            from ai_call_dial_log
+            <where>
+                <if test="beginTime != null"> and dial_time &gt;= #{beginTime}</if>
+                <if test="endTime != null"> and dial_time &lt; #{endTime}</if>
+            </where>
+            group by agent_id
+        ) dl on dl.agent_id = a.agent_id
+        left join (
+            select from_agent_id as agent_id, count(*) as transferredOut
+            from ai_call_transfer
+            <where>
+                <if test="beginTime != null"> and transfer_time &gt;= #{beginTime}</if>
+                <if test="endTime != null"> and transfer_time &lt; #{endTime}</if>
+            </where>
+            group by from_agent_id
+        ) tr on tr.agent_id = a.agent_id
+        left join (
+            select agent_id, count(*) as aiAssistCount
+            from ai_ai_call_session
+            <where>
+                <if test="beginTime != null"> and start_time &gt;= #{beginTime}</if>
+                <if test="endTime != null"> and start_time &lt; #{endTime}</if>
+            </where>
+            group by agent_id
+        ) ass on ass.agent_id = a.agent_id
+        left join (
+            select agent_id,
+                   round(avg(case when satisfaction = '1' then 100
+                                  when satisfaction = '2' then 80
+                                  when satisfaction = '3' then 60
+                                  when satisfaction = '4' then 20
+                                  else null end), 0) as avgSatisfaction
+            from ai_outbound_result
+            <where>
+                <if test="beginTime != null"> and start_time &gt;= #{beginTime}</if>
+                <if test="endTime != null"> and start_time &lt; #{endTime}</if>
+            </where>
+            group by agent_id
+        ) ob on ob.agent_id = a.agent_id
+        <where>
+            <if test="agentName != null and agentName != ''">
+                and a.agent_name like concat('%', #{agentName}, '%')
+            </if>
+        </where>
+        order by inboundCalls desc, a.agent_id asc
+    </select>
+
+</mapper>

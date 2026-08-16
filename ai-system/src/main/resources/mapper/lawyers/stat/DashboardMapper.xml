@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.stat.DashboardMapper">
+
+    <select id="selectCallSummary" resultType="map">
+        select count(*) as totalCalls,
+               ifnull(sum(case when status = '1' then 1 else 0 end), 0) as answeredCalls,
+               ifnull(sum(case when status = '3' then 1 else 0 end), 0) as missedCalls,
+               ifnull(sum(case when status = '2' then 1 else 0 end), 0) as transferredCalls,
+               ifnull(round(avg(case when status = '1' then duration end), 0), 0) as avgDuration
+        from ai_call_record
+        where call_time &gt;= #{beginTime} and call_time &lt; #{endTime}
+    </select>
+
+    <select id="selectCallTrend" resultType="map">
+        select date_format(call_time, '%Y-%m-%d %H:00') as timeLabel,
+               count(*) as totalCalls,
+               ifnull(sum(case when status = '1' then 1 else 0 end), 0) as answeredCalls,
+               ifnull(sum(case when status = '3' then 1 else 0 end), 0) as missedCalls,
+               ifnull(sum(case when status = '2' then 1 else 0 end), 0) as transferredCalls
+        from ai_call_record
+        where call_time &gt;= #{beginTime} and call_time &lt; #{endTime}
+        group by date_format(call_time, '%Y-%m-%d %H:00')
+        order by timeLabel
+    </select>
+
+    <select id="selectCategoryPie" resultType="map">
+        select ifnull(c.category_name, '未分类') as name, count(*) as value
+        from ai_call_record cr
+        left join ai_consultation_category c on cr.category_id = c.category_id
+        where cr.call_time &gt;= #{beginTime} and cr.call_time &lt; #{endTime}
+        group by c.category_id, c.category_name
+        order by value desc
+    </select>
+
+    <select id="selectAiRatio" resultType="map">
+        select count(distinct session_id) as totalSessions,
+               count(distinct case when handoff = '1' then session_id end) as handoffSessions
+        from ai_agent_message
+        where create_time &gt;= #{beginTime} and create_time &lt; #{endTime}
+    </select>
+
+    <select id="selectAgentLoad" resultType="map">
+        select a.agent_id as agentId,
+               a.agent_name as agentName,
+               a.status,
+               a.call_status as callStatus,
+               ifnull(cr.todayCalls, 0) as todayCalls,
+               ifnull(cr.talkDuration, 0) as talkDuration,
+               ifnull(cr.avgDuration, 0) as avgDuration
+        from ai_call_agent_status a
+        left join (
+            select agent_id,
+                   count(*) as todayCalls,
+                   ifnull(sum(duration), 0) as talkDuration,
+                   ifnull(round(avg(duration), 0), 0) as avgDuration
+            from ai_call_record
+            where date(call_time) = curdate()
+            group by agent_id
+        ) cr on cr.agent_id = a.agent_id
+        where a.status != '0'
+        order by todayCalls desc, a.agent_id asc
+    </select>
+
+    <select id="selectQueueNow" resultType="map">
+        select q.queue_id as queueId,
+               q.caller_number as callerNumber,
+               q.enqueue_time as enqueueTime,
+               q.wait_duration as waitDuration,
+               q.priority,
+               q.group_id as groupId,
+               ifnull(g.group_name, '-') as groupName
+        from ai_call_queue q
+        left join ai_skill_group g on g.group_id = q.group_id
+        where q.queue_status = '0'
+        order by q.priority desc, q.enqueue_time asc
+    </select>
+
+    <select id="selectOutboundProgress" resultType="map">
+        select task_id as taskId,
+               task_name as taskName,
+               status,
+               total_count as totalCount,
+               completed_count as completedCount,
+               answered_count as answeredCount,
+               failed_count as failedCount,
+               no_answer_count as noAnswerCount
+        from ai_outbound_task
+        order by task_id desc
+        limit 20
+    </select>
+
+    <select id="selectAgentStatusSummary" resultType="map">
+        select count(*) as totalAgents,
+               ifnull(sum(case when status = '1' then 1 else 0 end), 0) as onlineAgents,
+               ifnull(sum(case when status = '2' then 1 else 0 end), 0) as busyAgents
+        from ai_call_agent_status
+    </select>
+
+    <select id="selectSatisfactionSummary" resultType="map">
+        select ifnull(round(avg(case when satisfaction = '1' then 100
+                                      when satisfaction = '2' then 80
+                                      when satisfaction = '3' then 60
+                                      when satisfaction = '4' then 20
+                                      else null end), 0), 0) as avgSatisfaction
+        from ai_call_ledger
+        where del_flag = '0' and create_time &gt;= #{beginTime} and create_time &lt; #{endTime}
+    </select>
+
+</mapper>

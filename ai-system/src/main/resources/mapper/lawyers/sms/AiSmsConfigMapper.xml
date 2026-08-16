@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.sms.AiSmsConfigMapper">
+
+    <resultMap type="AiSmsConfig" id="AiSmsConfigResult">
+        <result property="configId"         column="config_id"          />
+        <result property="configName"       column="config_name"        />
+        <result property="provider"         column="provider"           />
+        <result property="accessKeyId"      column="access_key_id"      />
+        <result property="accessKeySecret"  column="access_key_secret"  />
+        <result property="signName"         column="sign_name"          />
+        <result property="regionId"         column="region_id"          />
+        <result property="sdkAppId"         column="sdk_app_id"         />
+        <result property="dailyLimit"       column="daily_limit"        />
+        <result property="status"           column="status"             />
+        <result property="createBy"         column="create_by"          />
+        <result property="createTime"       column="create_time"        />
+        <result property="updateBy"         column="update_by"          />
+        <result property="updateTime"       column="update_time"        />
+        <result property="remark"           column="remark"             />
+    </resultMap>
+
+    <sql id="selectConfigVo">
+        select config_id, config_name, provider, access_key_id, access_key_secret, sign_name,
+               region_id, sdk_app_id, daily_limit, status, create_by, create_time, update_by,
+               update_time, remark
+        from ai_sms_config
+    </sql>
+
+    <select id="selectAiSmsConfigList" parameterType="AiSmsConfig" resultMap="AiSmsConfigResult">
+        <include refid="selectConfigVo"/>
+        <where>
+            <if test="configName != null and configName != ''"> and config_name like concat('%', #{configName}, '%')</if>
+            <if test="provider != null and provider != ''"> and provider = #{provider}</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+        </where>
+        order by config_id asc
+    </select>
+
+    <select id="selectAiSmsConfigByConfigId" parameterType="Long" resultMap="AiSmsConfigResult">
+        <include refid="selectConfigVo"/>
+        where config_id = #{configId}
+    </select>
+
+    <insert id="insertAiSmsConfig" parameterType="AiSmsConfig" useGeneratedKeys="true" keyProperty="configId">
+        insert into ai_sms_config
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="configName != null and configName != ''">config_name,</if>
+            <if test="provider != null and provider != ''">provider,</if>
+            <if test="accessKeyId != null">access_key_id,</if>
+            <if test="accessKeySecret != null">access_key_secret,</if>
+            <if test="signName != null">sign_name,</if>
+            <if test="regionId != null">region_id,</if>
+            <if test="sdkAppId != null">sdk_app_id,</if>
+            <if test="dailyLimit != null">daily_limit,</if>
+            <if test="status != null and status != ''">status,</if>
+            <if test="createBy != null and createBy != ''">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="configName != null and configName != ''">#{configName},</if>
+            <if test="provider != null and provider != ''">#{provider},</if>
+            <if test="accessKeyId != null">#{accessKeyId},</if>
+            <if test="accessKeySecret != null">#{accessKeySecret},</if>
+            <if test="signName != null">#{signName},</if>
+            <if test="regionId != null">#{regionId},</if>
+            <if test="sdkAppId != null">#{sdkAppId},</if>
+            <if test="dailyLimit != null">#{dailyLimit},</if>
+            <if test="status != null and status != ''">#{status},</if>
+            <if test="createBy != null and createBy != ''">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateAiSmsConfig" parameterType="AiSmsConfig">
+        update ai_sms_config
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="configName != null and configName != ''">config_name = #{configName},</if>
+            <if test="provider != null and provider != ''">provider = #{provider},</if>
+            <if test="accessKeyId != null">access_key_id = #{accessKeyId},</if>
+            <if test="accessKeySecret != null">access_key_secret = #{accessKeySecret},</if>
+            <if test="signName != null">sign_name = #{signName},</if>
+            <if test="regionId != null">region_id = #{regionId},</if>
+            <if test="sdkAppId != null">sdk_app_id = #{sdkAppId},</if>
+            <if test="dailyLimit != null">daily_limit = #{dailyLimit},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where config_id = #{configId}
+    </update>
+
+    <delete id="deleteAiSmsConfigByConfigIds" parameterType="String">
+        delete from ai_sms_config where config_id in
+        <foreach item="configId" collection="array" open="(" separator="," close=")">#{configId}</foreach>
+    </delete>
+
+</mapper>

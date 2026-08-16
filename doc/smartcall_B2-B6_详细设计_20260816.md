@@ -1,4 +1,4 @@
-# SmartCall 深度融合 B2–B6 详细设计方案
+# SmartCall 深度融合 B1–B6 详细设计方案
 
 **文档日期**：2026-08-16
 **配套文档**：smartcall_需求分析与融合方案_20260801.md
@@ -28,6 +28,78 @@
 2. B1 的 `agentChat` 转人工结果（`agentHandoff`、`agentCategoryId`）作为 B5 分配的输入，形成闭环。
 3. 无 PBX 环境可验证的（B5/B6/B4）走"在线调试 + 模拟"；强依赖 PBX 的（B2 真媒体流、B3 AMI 事件）提供 Mock 降级。
 4. Java 8 + Spring Boot 2.5 + Vue2 + Element UI，不引入 Spring WebFlux/Reactor（B2 流式用 javax.WebSocket + 阻塞队列实现，避免 reactive 栈）。
+
+---
+
+## B1 智能体对话节点（agentChat，已完成）
+
+### B1.1 目标
+让 IVR 新增 `agentChat` 节点，调用知识库智能体进行多轮法律问答，支持上下文记忆、智能体选择、负面情绪/关键词自动转人工；输出 `agentHandoff`、`agentCategoryId` 供 B5 智能队列分配，形成「AI 接待 → 智能转人工」闭环。
+
+### B1.2 数据表（2 张）
+
+**`ai_agent_config`（智能体配置）**
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| agent_id | bigint PK | 智能体ID |
+| agent_name | varchar(100) | 名称（如"12348法律咨询助手"） |
+| provider | varchar(30) | 平台：local/maxkb/dify/fastgpt/coze |
+| api_url | varchar(500) | 外部平台对话接口地址 |
+| api_key | varchar(500) | 外部平台密钥（加密存储） |
+| app_id | varchar(100) | 平台应用/知识库ID |
+| category_id | bigint | 默认关联咨询分类（转人工时映射技能组） |
+| system_prompt | text | 角色设定提示词（local 模式） |
+| model_id | bigint | 关联大模型配置（空则用默认模型） |
+| knowledge_ids | varchar(500) | 限定知识库ID（逗号分隔，空则全库检索） |
+| enable_context | char(1) | 多轮上下文开关 0/1 |
+| context_rounds | int | 上下文保留轮数（默认5） |
+| handoff_keywords | varchar(500) | 转人工关键词（命中即转人工） |
+| welcome | varchar(500) | 首轮欢迎语 |
+| status | char(1) | 状态（0停用 1启用） |
+
+**`ai_agent_message`（对话消息，审计/回溯）**
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| message_id | bigint PK | |
+| session_id | varchar(64) | IVR sessionId |
+| agent_id | bigint | 智能体ID |
+| flow_id / node_id / record_id | bigint | 关联流程/节点/通话（可空） |
+| caller_number | varchar(20) | 主叫号码 |
+| role | varchar(20) | 角色（user/assistant） |
+| content | text | 消息内容 |
+| handoff | char(1) | 本轮是否触发转人工（0/1，仅assistant） |
+| reason | varchar(200) | 转人工原因 |
+| knowledge_refs | varchar(500) | 命中知识库ID（逗号分隔） |
+| turn_no | int | 会话内轮次自增 |
+| create_time | datetime | |
+
+### B1.3 代码结构
+```
+ai-system/.../domain/lawyers/agent/       AiAgentConfig / AgentChatResult / AiAgentMessage
+ai-system/.../mapper/lawyers/agent/       AiAgentConfigMapper(+xml) / AiAgentMessageMapper(+xml)
+ai-system/.../service/lawyers/agent/      IAiAgentConfigService / IAgentChatService
+ai-system/.../service/impl/lawyers/agent/ AiAgentConfigServiceImpl / AgentChatServiceImpl
+ai-admin/.../controller/lawyers/agent/    AiAgentConfigController
+IVR 引擎 IvrEngineServiceImpl              agentChat 节点 case + executeAgentChat
+ai-ui/src/api/lawyers/agent.js            views/lawyers/agent/config.vue
+设计器 designer.vue                        agentChat 节点属性（选择智能体/最大轮数/转人工开关）
+```
+
+### B1.4 核心实现要点
+- `IAgentChatService.chat(agentId, sessionId, userMessage, recordId, flowId, nodeId, callerNumber)` 返回 `AgentChatResult{reply, handoff, reason, categoryId, knowledgeRefs, turnNo}`。
+- 提供方路由：`local`（本地 RAG，默认）/ `maxkb` / `dify` 等；无外部平台凭证时回退 `local`，保证无凭证环境可启动可测试。
+- `LocalRagChatProvider`：从 `ai_legal_knowledge` 检索 Top-K 片段（关键词/LIKE，无向量库亦可）拼入 Prompt，再调 `AiModelConfigService.chatJson`；`knowledge_ids` 为空则全库检索，否则限定范围。
+- 上下文：按 `callerNumber + sessionId` 维护消息轮次，存 Redis（TTL 30min）并同步写 `ai_agent_message` 双写留痕；`context_rounds` 控制保留轮数。
+- 转人工判定：命中 `handoff_keywords`（人工/律师/投诉/信访/起诉/报警…）或 LLM 判定需人工时返回 `handoff=true`，并携带 `categoryId`（取智能体 `category_id` 或意图映射结果）。
+- IVR `executeAgentChat`：读取 `agentId / maxRounds / knowledgeIds / enableTransfer`；循环调用 `chat`，每轮回答交由后续 say/TTS 节点播报；`handoff=true` 或达到 `maxRounds` 时走 transfer/agent 分支，并把 `agentHandoff`、`agentCategoryId` 写入流程变量供 B5 消费。
+
+### B1.5 验收标准
+1. 配置 local 智能体，IVR 测试输入法律问题能基于知识库多轮回答；
+2. 输入"人工/找律师/投诉"等命中转人工分支，`agentHandoff=true` 且 `agentCategoryId` 正确；
+3. 对话消息落库 `ai_agent_message`，role/turn_no/handoff/reason 正确；
+4. 外部平台（maxkb/dify）未配置时自动降级 local，流程不报错；
+5. 与 B5 联动：agentChat→agent 节点按 `agentCategoryId` 自动分配到对应技能组坐席；
+6. 设计器可配置 agentChat 节点（选择智能体/最大轮数/转人工开关）并回显。
 
 ---
 

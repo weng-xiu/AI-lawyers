@@ -29,7 +29,7 @@ export function getUserHistory(query) {
 // 获取咨询详情
 export function getConsultationDetail(consultationId) {
   return request({
-    url: '/lawyers/userConsultation/detail/' + consultationId,
+    url: '/lawyers/userConsultation/info/' + consultationId,
     method: 'get'
   })
 }
@@ -47,22 +47,6 @@ export function submitEvaluation(data) {
 export function getQuestionCategories() {
   return request({
     url: '/lawyers/userConsultation/categories',
-    method: 'get'
-  })
-}
-
-// 获取热门问题
-export function getHotQuestions() {
-  return request({
-    url: '/lawyers/userConsultation/hotQuestions',
-    method: 'get'
-  })
-}
-
-// 获取常见问题
-export function getFaq() {
-  return request({
-    url: '/lawyers/userConsultation/faq',
     method: 'get'
   })
 }

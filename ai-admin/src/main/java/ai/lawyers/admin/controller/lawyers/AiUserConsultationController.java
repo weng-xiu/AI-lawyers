@@ -32,7 +32,7 @@ import ai.lawyers.common.utils.poi.ExcelUtil;
  * @date 2023-11-19
  */
 @RestController
-@RequestMapping("/aiuser/consultation")
+@RequestMapping("/lawyers/userConsultation")
 public class AiUserConsultationController extends BaseController
 {
     @Autowired

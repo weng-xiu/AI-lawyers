@@ -54,8 +54,10 @@ import ai.lawyers.system.service.lawyers.ivr.IAiIvrEdgeService;
 import ai.lawyers.system.service.lawyers.ivr.IAiIvrExecutionLogService;
 import ai.lawyers.system.service.lawyers.ivr.IAiIvrFlowService;
 import ai.lawyers.system.service.lawyers.ivr.IAiIvrNodeService;
+import ai.lawyers.system.domain.lawyers.sms.SmsResult;
 import ai.lawyers.system.service.lawyers.ivr.engine.IIvrEngineService;
 import ai.lawyers.system.service.lawyers.ivr.engine.IntentionRecognitionService;
+import ai.lawyers.system.service.lawyers.sms.ISmsService;
 import ai.lawyers.system.service.lawyers.voice.VoiceEngineManager;
 import ai.lawyers.system.service.lawyers.voice.VoiceModelEnum;
 
@@ -97,6 +99,7 @@ public class IvrEngineServiceImpl implements IIvrEngineService
     private static final String NODE_TRANSFER = "transfer";
     private static final String NODE_HANGUP = "hangup";
     private static final String NODE_VARIABLE = "variable";
+    private static final String NODE_SMS = "sms";
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final SpelExpressionParser SPEL_PARSER = new SpelExpressionParser();
@@ -135,6 +138,9 @@ public class IvrEngineServiceImpl implements IIvrEngineService
 
     @Autowired
     private ai.lawyers.system.service.lawyers.skill.IAgentDispatchService agentDispatchService;
+
+    @Autowired
+    private ISmsService smsService;
 
     @Override
     public IvrExecuteResult executeFlow(IvrExecuteRequest request)
@@ -414,6 +420,10 @@ public class IvrEngineServiceImpl implements IIvrEngineService
                     current = nextNode(current, nodeMap, edges, variables, null);
                     break;
 
+                case NODE_SMS:
+                    current = executeSms(current, nodeMap, edges, variables, request, sessionId, step, result);
+                    break;
+
                 case NODE_EXTRACT:
                     current = executeExtract(current, nodeMap, edges, variables, step, result);
                     break;
@@ -619,6 +629,82 @@ public class IvrEngineServiceImpl implements IIvrEngineService
             detail += " [转人工" + (StringUtils.isNotEmpty(reason) ? "：" + reason : "") + "]";
         }
         step.setDetail(detail);
+        result.getSteps().add(step);
+        return nextNode(current, nodeMap, edges, variables, null);
+    }
+
+    /**
+     * B6 短信通知节点：给来电者发送短信（排队告知 / 工单编号 / 文书链接等）。
+     *
+     * <p>节点配置支持：templateId（短信模板ID）、phoneVar（收件号码变量，默认 callerNumber，
+     * 若流程变量取不到则视为字面号码）、params（模板变量，支持 ${表达式} 渲染）。
+     * 短信失败不阻断流程，写入 smsStatus/smsError 后沿下一节点继续。</p>
+     */
+    private AiIvrNode executeSms(AiIvrNode current, Map<Long, AiIvrNode> nodeMap,
+                                 List<AiIvrEdge> edges, Map<String, Object> variables,
+                                 IvrExecuteRequest request, String sessionId,
+                                 IvrNodeStep step, IvrExecuteResult result)
+    {
+        JsonNode json = config(current);
+        long templateId = json.path("templateId").asLong(0L);
+        String phoneVar = json.path("phoneVar").asText("callerNumber");
+
+        Object phoneObj = variables.get(phoneVar);
+        String phone = phoneObj == null ? phoneVar : String.valueOf(phoneObj);
+        if (StringUtils.isEmpty(phone))
+        {
+            phone = request.getCallerNumber();
+        }
+
+        Map<String, String> params = new LinkedHashMap<>();
+        JsonNode paramsNode = json.path("params");
+        if (paramsNode.isTextual() && StringUtils.isNotEmpty(paramsNode.asText()))
+        {
+            try
+            {
+                paramsNode = MAPPER.readTree(paramsNode.asText());
+            }
+            catch (Exception e)
+            {
+                paramsNode = MAPPER.createObjectNode();
+            }
+        }
+        if (paramsNode.isObject())
+        {
+            Iterator<String> names = paramsNode.fieldNames();
+            while (names.hasNext())
+            {
+                String name = names.next();
+                params.put(name, render(paramsNode.path(name).asText(""), variables));
+            }
+        }
+
+        step.setAction("SMS");
+        if (templateId <= 0L)
+        {
+            variables.put("smsStatus", "fail");
+            variables.put("smsError", "未配置短信模板");
+            step.setDetail("短信节点未配置templateId");
+            result.getSteps().add(step);
+            return nextNode(current, nodeMap, edges, variables, null);
+        }
+
+        try
+        {
+            SmsResult smsResult = smsService.send(phone, templateId, params, sessionId, request.getRecordId());
+            variables.put("smsStatus", smsResult.isSuccess() ? "success" : "fail");
+            variables.put("smsMsgId", smsResult.getMsgId());
+            variables.put("smsContent", smsResult.getContent());
+            variables.put("smsError", smsResult.isSuccess() ? "" : smsResult.getMessage());
+            step.setDetail("发送短信至 " + phone + "：" + (smsResult.isSuccess()
+                    ? "成功（" + smsResult.getMsgId() + "）" : "失败（" + smsResult.getMessage() + "）"));
+        }
+        catch (Exception e)
+        {
+            variables.put("smsStatus", "fail");
+            variables.put("smsError", e.getMessage());
+            step.setDetail("短信发送异常：" + e.getMessage());
+        }
         result.getSteps().add(step);
         return nextNode(current, nodeMap, edges, variables, null);
     }

@@ -319,6 +319,26 @@
               </el-form-item>
             </template>
 
+            <!-- 发送短信 -->
+            <template v-if="selectedNode.type === 'sms'">
+              <el-form-item label="短信模板">
+                <el-select v-model="selectedNode.config.templateId" placeholder="请选择短信模板" filterable style="width:100%" @change="markDirty">
+                  <el-option v-for="t in smsTemplates" :key="t.templateId" :label="t.templateName" :value="t.templateId" />
+                </el-select>
+              </el-form-item>
+              <el-form-item v-if="currentSmsTemplate" label="模板内容">
+                <div class="panel-hint">{{ currentSmsTemplate.content }}</div>
+              </el-form-item>
+              <el-form-item label="收件号码">
+                <el-input v-model="selectedNode.config.phoneVar" placeholder="流程变量名，默认 callerNumber" @input="markDirty" />
+                <div class="panel-hint">取该流程变量的值作为收件号码；为空时回退主叫号码。</div>
+              </el-form-item>
+              <el-form-item label="模板参数">
+                <el-input v-model="selectedNode.config.params" type="textarea" :rows="4" placeholder='JSON，如 {"queuePos":"3"}' @input="markDirty" />
+                <div class="panel-hint">参数值支持 ${变量}，如 {"ticketNo":"${ticketNo}"}。发送结果写入 smsStatus/smsMsgId/smsContent 变量。</div>
+              </el-form-item>
+            </template>
+
             <!-- 转人工 -->
             <template v-if="selectedNode.type === 'agent'">
               <el-form-item label="分配方式">
@@ -429,6 +449,7 @@ import { getNodesByFlowId } from '@/api/lawyers/ivrNode'
 import { getEdgesByFlowId } from '@/api/lawyers/ivrEdge'
 import { listActiveAgent } from '@/api/lawyers/agent'
 import { listEnabledGroups } from '@/api/lawyers/skill'
+import { listEnabledTemplates } from '@/api/lawyers/sms'
 
 const NODE_W = 148
 const NODE_H = 58
@@ -443,6 +464,7 @@ const TYPE_META = {
   menu: { label: '按键菜单', color: '#F59E0B', icon: '☰' },
   intention: { label: '意图识别', color: '#8A6DE9', icon: '◎' },
   agentChat: { label: '智能体', color: '#52C41A', icon: '🤖' },
+  sms: { label: '发送短信', color: '#2F54EB', icon: '✉' },
   sentiment: { label: '情绪分析', color: '#F56C6C', icon: '♡' },
   extract: { label: '信息抽取', color: '#8A6DE9', icon: 'ƒ' },
   service: { label: 'HTTP服务', color: '#409EFF', icon: '⇄' },
@@ -455,7 +477,7 @@ const TYPE_META = {
   hangup: { label: '挂断', color: '#909399', icon: '■' }
 }
 
-const PALETTE_ORDER = ['start', 'say', 'answer', 'received', 'menu', 'intention', 'agentChat', 'sentiment', 'extract', 'service', 'script', 'child', 'condition', 'variable', 'agent', 'transfer', 'hangup']
+const PALETTE_ORDER = ['start', 'say', 'answer', 'received', 'menu', 'intention', 'agentChat', 'sms', 'sentiment', 'extract', 'service', 'script', 'child', 'condition', 'variable', 'agent', 'transfer', 'hangup']
 
 function defaultConfig(type) {
   switch (type) {
@@ -471,6 +493,8 @@ function defaultConfig(type) {
       return { intentionCode: '', promptTemplate: '' }
     case 'agentChat':
       return { agentId: null, welcome: '', maxTurns: 5, resultVar: 'agentReply', handoffVar: 'agentHandoff' }
+    case 'sms':
+      return { templateId: null, phoneVar: 'callerNumber', params: '' }
     case 'sentiment':
       return { text: '${lastInput}' }
     case 'extract':
@@ -534,7 +558,8 @@ export default {
       canvasW: CANVAS_W,
       canvasH: CANVAS_H,
       agentOptions: [],
-      skillGroups: []
+      skillGroups: [],
+      smsTemplates: []
     }
   },
   computed: {
@@ -551,6 +576,10 @@ export default {
     selectedEdge() {
       if (this.selectedKind !== 'edge') return null
       return this.edges.find(e => e.id === this.selectedId) || null
+    },
+    currentSmsTemplate() {
+      if (!this.selectedNode || !this.selectedNode.config.templateId) return null
+      return this.smsTemplates.find(t => t.templateId === this.selectedNode.config.templateId) || null
     },
     draftPath() {
       if (!this.edgeDraft) return ''
@@ -589,6 +618,11 @@ export default {
         this.skillGroups = res.data || []
       }).catch(() => {
         this.skillGroups = []
+      })
+      listEnabledTemplates().then(res => {
+        this.smsTemplates = res.data || []
+      }).catch(() => {
+        this.smsTemplates = []
       })
     },
     async loadDesign() {

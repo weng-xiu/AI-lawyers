@@ -165,7 +165,7 @@
 </template>
 
 <script>
-import { submitConsultation, getUserHistory, getConsultationDetail, submitEvaluation, getQuestionCategories } from "@/api/lawyers/userConsultation";
+import { submitConsultation, getUserHistory, getConsultationResult, submitEvaluation, getQuestionCategories } from "@/api/lawyers/userConsultation";
 import Pagination from "@/components/Pagination";
 
 export default {
