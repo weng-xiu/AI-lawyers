@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.agent.AiAgentMessageMapper">
+
+    <resultMap type="AiAgentMessage" id="AiAgentMessageResult">
+        <result property="messageId"     column="message_id"     />
+        <result property="sessionId"     column="session_id"     />
+        <result property="agentId"       column="agent_id"       />
+        <result property="flowId"        column="flow_id"        />
+        <result property="nodeId"        column="node_id"        />
+        <result property="recordId"      column="record_id"      />
+        <result property="callerNumber"  column="caller_number"  />
+        <result property="role"          column="role"           />
+        <result property="content"       column="content"        />
+        <result property="handoff"       column="handoff"        />
+        <result property="reason"        column="reason"         />
+        <result property="knowledgeRefs" column="knowledge_refs" />
+        <result property="turnNo"        column="turn_no"        />
+        <result property="createTime"    column="create_time"    />
+    </resultMap>
+
+    <sql id="selectAiAgentMessageVo">
+        select message_id, session_id, agent_id, flow_id, node_id, record_id, caller_number, role,
+               content, handoff, reason, knowledge_refs, turn_no, create_time
+        from ai_agent_message
+    </sql>
+
+    <select id="selectAiAgentMessageList" parameterType="AiAgentMessage" resultMap="AiAgentMessageResult">
+        <include refid="selectAiAgentMessageVo"/>
+        <where>
+            <if test="sessionId != null and sessionId != ''"> and session_id = #{sessionId}</if>
+            <if test="agentId != null"> and agent_id = #{agentId}</if>
+            <if test="recordId != null"> and record_id = #{recordId}</if>
+            <if test="callerNumber != null and callerNumber != ''"> and caller_number = #{callerNumber}</if>
+            <if test="role != null and role != ''"> and role = #{role}</if>
+        </where>
+        order by message_id desc
+    </select>
+
+    <select id="selectAiAgentMessageByMessageId" parameterType="Long" resultMap="AiAgentMessageResult">
+        <include refid="selectAiAgentMessageVo"/>
+        where message_id = #{messageId}
+    </select>
+
+    <select id="selectRecentBySession" resultMap="AiAgentMessageResult">
+        select * from (
+            <include refid="selectAiAgentMessageVo"/>
+            where session_id = #{sessionId}
+            order by message_id desc
+            limit #{limit}
+        ) t order by t.message_id asc
+    </select>
+
+    <select id="selectMaxTurnNo" resultType="java.lang.Integer">
+        select max(turn_no) from ai_agent_message where session_id = #{sessionId}
+    </select>
+
+    <insert id="insertAiAgentMessage" parameterType="AiAgentMessage" useGeneratedKeys="true" keyProperty="messageId">
+        insert into ai_agent_message
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="sessionId != null and sessionId != ''">session_id,</if>
+            <if test="agentId != null">agent_id,</if>
+            <if test="flowId != null">flow_id,</if>
+            <if test="nodeId != null">node_id,</if>
+            <if test="recordId != null">record_id,</if>
+            <if test="callerNumber != null">caller_number,</if>
+            <if test="role != null and role != ''">role,</if>
+            <if test="content != null">content,</if>
+            <if test="handoff != null and handoff != ''">handoff,</if>
+            <if test="reason != null">reason,</if>
+            <if test="knowledgeRefs != null">knowledge_refs,</if>
+            <if test="turnNo != null">turn_no,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="sessionId != null and sessionId != ''">#{sessionId},</if>
+            <if test="agentId != null">#{agentId},</if>
+            <if test="flowId != null">#{flowId},</if>
+            <if test="nodeId != null">#{nodeId},</if>
+            <if test="recordId != null">#{recordId},</if>
+            <if test="callerNumber != null">#{callerNumber},</if>
+            <if test="role != null and role != ''">#{role},</if>
+            <if test="content != null">#{content},</if>
+            <if test="handoff != null and handoff != ''">#{handoff},</if>
+            <if test="reason != null">#{reason},</if>
+            <if test="knowledgeRefs != null">#{knowledgeRefs},</if>
+            <if test="turnNo != null">#{turnNo},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <delete id="deleteAiAgentMessageByMessageId" parameterType="Long">
+        delete from ai_agent_message where message_id = #{messageId}
+    </delete>
+</mapper>

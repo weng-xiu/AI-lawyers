@@ -46,6 +46,8 @@ import ai.lawyers.system.domain.lawyers.ivr.IntentionMatchResult;
 import ai.lawyers.system.domain.lawyers.ivr.IvrExecuteRequest;
 import ai.lawyers.system.domain.lawyers.ivr.IvrExecuteResult;
 import ai.lawyers.system.domain.lawyers.ivr.IvrNodeStep;
+import ai.lawyers.system.domain.lawyers.agent.AgentChatResult;
+import ai.lawyers.system.service.lawyers.agent.IAgentChatService;
 import ai.lawyers.system.service.lawyers.IAiCallRecordService;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 import ai.lawyers.system.service.lawyers.ivr.IAiIvrEdgeService;
@@ -63,7 +65,7 @@ import ai.lawyers.system.service.lawyers.voice.VoiceModelEnum;
  * 支持节点类型（与前端设计器画板对齐）：
  *  start / say / answer(ASR收声) / menu / received(DTMF收号) / intention / condition /
  *  sentiment(情绪) / extract(信息抽取) / service(HTTP调用) / script(JS脚本) / child(子流程) /
- *  agent(转人工) / transfer(转外线) / variable / hangup
+ *  agentChat(智能体对话) / agent(转人工) / transfer(转外线) / variable / hangup
  *
  *  SmartCall 节点语义：
  *  - 文本类配置支持 ${表达式} SpEL 模板（如 ${lastInput}）；
@@ -91,6 +93,7 @@ public class IvrEngineServiceImpl implements IIvrEngineService
     private static final String NODE_CHILD = "child";
     private static final String NODE_CONDITION = "condition";
     private static final String NODE_AGENT = "agent";
+    private static final String NODE_AGENT_CHAT = "agentchat";
     private static final String NODE_TRANSFER = "transfer";
     private static final String NODE_HANGUP = "hangup";
     private static final String NODE_VARIABLE = "variable";
@@ -126,6 +129,12 @@ public class IvrEngineServiceImpl implements IIvrEngineService
 
     @Autowired
     private VoiceEngineManager voiceEngineManager;
+
+    @Autowired
+    private IAgentChatService agentChatService;
+
+    @Autowired
+    private ai.lawyers.system.service.lawyers.skill.IAgentDispatchService agentDispatchService;
 
     @Override
     public IvrExecuteResult executeFlow(IvrExecuteRequest request)
@@ -355,9 +364,34 @@ public class IvrEngineServiceImpl implements IIvrEngineService
                     current = chosen == null ? null : nodeMap.get(chosen.getTargetNodeId());
                     break;
 
+                case NODE_AGENT_CHAT:
+                    current = executeAgentChat(current, nodeMap, edges, variables, inputs,
+                            request, sessionId, flow, step, result);
+                    break;
+
                 case NODE_AGENT:
                 case NODE_TRANSFER:
-                    String target = transferTarget(current, variables);
+                    String target;
+                    JsonNode tcfg = config(current);
+                    String dispatchMode = tcfg.has("dispatchMode") ? tcfg.get("dispatchMode").asText() : "static";
+                    if ("dispatch".equals(dispatchMode))
+                    {
+                        // B5 智能队列分配：按 groupId 或 B1 写入的 agentCategoryId 动态选坐席
+                        target = dispatchAgent(tcfg, variables, request, sessionId, step, result, NODE_AGENT.equals(type));
+                        if (target == null)
+                        {
+                            // 排队中：沿排队连线（变量 dispatchQueued=true）继续，不终止流程
+                            variables.put("dispatchQueued", true);
+                            result.getSteps().add(step);
+                            current = nextNode(current, nodeMap, edges, variables, null);
+                            break;
+                        }
+                        variables.put("dispatchQueued", false);
+                    }
+                    else
+                    {
+                        target = transferTarget(current, variables);
+                    }
                     result.setTransferTarget(target);
                     step.setAction("TRANSFER");
                     step.setDetail((NODE_AGENT.equals(type) ? "转人工坐席：" : "转外线：") + target);
@@ -504,6 +538,89 @@ public class IvrEngineServiceImpl implements IIvrEngineService
             return "（TTS已合成" + audio.length + "字节音频）";
         }
         return "";
+    }
+
+    private AiIvrNode executeAgentChat(AiIvrNode current, Map<Long, AiIvrNode> nodeMap,
+                                       List<AiIvrEdge> edges, Map<String, Object> variables,
+                                       Deque<String> inputs, IvrExecuteRequest request,
+                                       String sessionId, AiIvrFlow flow,
+                                       IvrNodeStep step, IvrExecuteResult result)
+    {
+        JsonNode json = config(current);
+        long agentId = json.path("agentId").asLong(0L);
+        String welcome = render(json.path("welcome").asText(""), variables);
+        int maxTurns = json.path("maxTurns").asInt(5);
+        String resultVar = json.path("resultVar").asText("agentReply");
+        String handoffVar = json.path("handoffVar").asText("agentHandoff");
+
+        // 累计本轮会话在该流程中的对话轮数，达到上限强制转人工
+        int turnCount = variables.get("agentTurnCount") instanceof Number
+                ? ((Number) variables.get("agentTurnCount")).intValue() : 0;
+
+        String reply;
+        boolean handoff;
+        String reason;
+
+        if (agentId <= 0L)
+        {
+            reply = "智能体未正确配置，为您转接人工。";
+            handoff = true;
+            reason = "节点未配置agentId";
+        }
+        else if (turnCount >= maxTurns)
+        {
+            reply = "已达最大对话轮数，为您转接人工坐席。";
+            handoff = true;
+            reason = "达到最大轮数(" + maxTurns + ")";
+        }
+        else
+        {
+            // 取用户输入：优先消费输入队列，兜底取上一个 answer 节点写入的 lastInput
+            String userInput = pollInput(inputs, variables);
+            if (StringUtils.isEmpty(userInput) && variables.get("lastInput") != null)
+            {
+                userInput = String.valueOf(variables.get("lastInput"));
+            }
+            // 首轮无输入时直接播报欢迎语，不调用模型
+            if (StringUtils.isEmpty(userInput) && StringUtils.isNotEmpty(welcome))
+            {
+                reply = welcome;
+                handoff = false;
+                reason = null;
+            }
+            else
+            {
+                turnCount++;
+                AgentChatResult chatResult = agentChatService.chat(agentId, sessionId, userInput,
+                        request.getRecordId(), flow == null ? null : flow.getFlowId(),
+                        current.getNodeId(), request.getCallerNumber());
+                reply = chatResult.getReply();
+                handoff = chatResult.isHandoff();
+                reason = chatResult.getReason();
+                if (chatResult.getCategoryId() != null)
+                {
+                    variables.put("agentCategoryId", chatResult.getCategoryId());
+                }
+            }
+        }
+
+        variables.put(resultVar, reply);
+        variables.put(handoffVar, handoff);
+        variables.put("agentTurnCount", turnCount);
+        if (handoff)
+        {
+            result.setTransferTarget("人工坐席");
+        }
+
+        step.setAction("AGENT_CHAT");
+        String detail = "智能体回复（第" + turnCount + "轮）：" + truncate(reply, 200);
+        if (handoff)
+        {
+            detail += " [转人工" + (StringUtils.isNotEmpty(reason) ? "：" + reason : "") + "]";
+        }
+        step.setDetail(detail);
+        result.getSteps().add(step);
+        return nextNode(current, nodeMap, edges, variables, null);
     }
 
     private AiIvrNode executeSentiment(AiIvrNode current, Map<Long, AiIvrNode> nodeMap,
@@ -1178,8 +1295,86 @@ public class IvrEngineServiceImpl implements IIvrEngineService
         return value == null ? null : value.asText();
     }
 
-    private String transferTarget(AiIvrNode node, Map<String, Object> variables)
+    /**
+     * B5 智能队列分配：按技能组动态选择坐席。
+     *
+     * <p>节点配置支持：groupId（固定技能组）、categoryVar（从流程变量取咨询分类ID，默认
+     * agentCategoryId，承接 B1 agentChat 结果）、enqueueIfNoAgent（无空闲是否排队，默认 true）。
+     * 分配成功返回坐席标识；若排队中返回 null（调用方沿排队连线继续）。</p>
+     */
+    private String dispatchAgent(JsonNode cfg, Map<String, Object> variables,
+                                 IvrExecuteRequest request, String sessionId,
+                                 IvrNodeStep step, IvrExecuteResult result, boolean isAgentNode)
     {
+        Long groupId = cfg.has("groupId") && !cfg.get("groupId").isNull() ? cfg.get("groupId").asLong() : null;
+        String categoryVar = cfg.has("categoryVar") && StringUtils.isNotEmpty(cfg.get("categoryVar").asText())
+                ? cfg.get("categoryVar").asText() : "agentCategoryId";
+        boolean enqueue = !cfg.has("enqueueIfNoAgent") || cfg.get("enqueueIfNoAgent").asBoolean(true);
+
+        ai.lawyers.system.domain.lawyers.skill.DispatchContext ctx =
+                ai.lawyers.system.domain.lawyers.skill.DispatchContext.of(
+                        sessionId, request.getRecordId(), request.getCallerNumber());
+        ctx.setEnqueueIfNoAgent(enqueue);
+        Object prio = variables.get("dispatchPriority");
+        if (prio instanceof Number)
+        {
+            ctx.setPriority(((Number) prio).intValue());
+        }
+
+        ai.lawyers.system.domain.lawyers.skill.DispatchResult dr;
+        if (groupId != null)
+        {
+            dr = agentDispatchService.dispatch(groupId, ctx);
+        }
+        else
+        {
+            Object catObj = variables.get(categoryVar);
+            Long categoryId = catObj instanceof Number ? ((Number) catObj).longValue() : null;
+            if (categoryId == null)
+            {
+                // 未指定技能组且无分类信息，回退到静态目标
+                String fallback = cfg.has("fallbackTarget") ? cfg.get("fallbackTarget").asText() : "人工坐席";
+                step.setAction("TRANSFER");
+                step.setDetail("智能分配未指定技能组/分类，回退到：" + fallback);
+                return fallback;
+            }
+            dr = agentDispatchService.dispatchByCategory(categoryId, ctx);
+        }
+
+        // 回写流程变量，供后续节点/SpEL 使用
+        variables.put("dispatchSuccess", dr.isSuccess());
+        variables.put("dispatchMessage", dr.getMessage());
+        if (dr.getGroupId() != null)
+        {
+            variables.put("dispatchGroupId", dr.getGroupId());
+            variables.put("dispatchGroupName", dr.getGroupName());
+        }
+        if (dr.isSuccess())
+        {
+            variables.put("dispatchAgentId", dr.getAgentId());
+            variables.put("dispatchAgentName", dr.getAgentName());
+            step.setAction("TRANSFER");
+            step.setDetail("智能分配坐席：" + dr.getAgentName()
+                    + "（" + dr.getGroupName() + "，策略：" + dr.getStrategy() + "）");
+            return "坐席ID " + dr.getAgentId();
+        }
+        else if (dr.getQueueId() != null)
+        {
+            variables.put("dispatchQueueId", dr.getQueueId());
+            variables.put("dispatchQueuePosition", dr.getQueuePosition());
+            step.setAction("QUEUE");
+            step.setDetail(dr.getMessage() + "（技能组：" + dr.getGroupName() + "）");
+            return null;
+        }
+        else
+        {
+            step.setAction("TRANSFER");
+            step.setDetail("智能分配失败：" + dr.getMessage());
+            return "人工坐席";
+        }
+    }
+
+    private String transferTarget(AiIvrNode node, Map<String, Object> variables) {
         JsonNode json = config(node);
         if (json.has("agentExtension"))
         {

@@ -295,16 +295,71 @@
               <div class="panel-hint">子流程执行结束后，其流程变量会合并回当前流程，最多嵌套3层。</div>
             </template>
 
+            <!-- 智能体对话 -->
+            <template v-if="selectedNode.type === 'agentChat'">
+              <el-form-item label="选择智能体">
+                <el-select v-model="selectedNode.config.agentId" placeholder="请选择AI智能体" filterable style="width: 100%" @change="markDirty">
+                  <el-option v-for="a in agentOptions" :key="a.agentId" :label="a.agentName" :value="a.agentId" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="欢迎语">
+                <el-input v-model="selectedNode.config.welcome" type="textarea" :rows="2"
+                  placeholder="首轮无输入时播报，留空则使用智能体配置的欢迎语" @input="markDirty" />
+              </el-form-item>
+              <el-form-item label="最大对话轮数">
+                <el-input-number v-model="selectedNode.config.maxTurns" :min="1" :max="20" @change="markDirty" />
+                <div class="panel-hint">达到轮数自动转人工，防止无限循环。</div>
+              </el-form-item>
+              <el-form-item label="回复变量名">
+                <el-input v-model="selectedNode.config.resultVar" placeholder="agentReply" @input="markDirty" />
+              </el-form-item>
+              <el-form-item label="转人工标记变量">
+                <el-input v-model="selectedNode.config.handoffVar" placeholder="agentHandoff" @input="markDirty" />
+                <div class="panel-hint">连线上用表达式 #agentHandoff == true 可分支到转人工。</div>
+              </el-form-item>
+            </template>
+
             <!-- 转人工 -->
             <template v-if="selectedNode.type === 'agent'">
-              <el-form-item label="技能队列">
+              <el-form-item label="分配方式">
+                <el-radio-group v-model="selectedNode.config.dispatchMode" @change="markDirty" size="mini">
+                  <el-radio-button label="static">静态</el-radio-button>
+                  <el-radio-button label="dispatch">智能分配</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
+              <template v-if="selectedNode.config.dispatchMode === 'dispatch'">
+                <el-form-item label="技能组">
+                  <el-select v-model="selectedNode.config.groupId" placeholder="按分类自动匹配" clearable filterable style="width:100%" @change="markDirty">
+                    <el-option v-for="g in skillGroups" :key="g.groupId" :label="g.groupName" :value="g.groupId" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="分类变量">
+                  <el-input v-model="selectedNode.config.categoryVar" placeholder="默认 agentCategoryId" @input="markDirty" />
+                </el-form-item>
+                <el-form-item label="无空闲排队">
+                  <el-switch v-model="selectedNode.config.enqueueIfNoAgent" @change="markDirty" />
+                </el-form-item>
+                <div class="panel-hint">智能分配按 B1 智能体写入的分类（agentCategoryId）匹配技能组；排队时变量 dispatchQueued=true，可连"排队提示"节点。</div>
+              </template>
+              <el-form-item v-else label="技能队列">
                 <el-input v-model="selectedNode.config.queue" placeholder="坐席技能队列名称" @input="markDirty" />
               </el-form-item>
             </template>
 
             <!-- 转外线 -->
             <template v-if="selectedNode.type === 'transfer'">
-              <el-form-item label="目标号码">
+              <el-form-item label="分配方式">
+                <el-radio-group v-model="selectedNode.config.dispatchMode" @change="markDirty" size="mini">
+                  <el-radio-button label="static">静态</el-radio-button>
+                  <el-radio-button label="dispatch">智能分配</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
+              <el-form-item v-if="selectedNode.config.dispatchMode==='dispatch'" label="技能组">
+                <el-select v-model="selectedNode.config.groupId" placeholder="按分类自动匹配" clearable filterable style="width:100%" @change="markDirty">
+                  <el-option v-for="g in skillGroups" :key="g.groupId" :label="g.groupName" :value="g.groupId" />
+                </el-select>
+              </el-form-item>
+              <el-form-item v-else label="目标号码">
                 <el-input v-model="selectedNode.config.targetNumber" placeholder="如 12348 或 020-12348" @input="markDirty" />
               </el-form-item>
             </template>
@@ -372,6 +427,8 @@
 import { getFlow, saveDesign } from '@/api/lawyers/ivrFlow'
 import { getNodesByFlowId } from '@/api/lawyers/ivrNode'
 import { getEdgesByFlowId } from '@/api/lawyers/ivrEdge'
+import { listActiveAgent } from '@/api/lawyers/agent'
+import { listEnabledGroups } from '@/api/lawyers/skill'
 
 const NODE_W = 148
 const NODE_H = 58
@@ -385,6 +442,7 @@ const TYPE_META = {
   received: { label: 'DTMF收号', color: '#FF8C00', icon: '#' },
   menu: { label: '按键菜单', color: '#F59E0B', icon: '☰' },
   intention: { label: '意图识别', color: '#8A6DE9', icon: '◎' },
+  agentChat: { label: '智能体', color: '#52C41A', icon: '🤖' },
   sentiment: { label: '情绪分析', color: '#F56C6C', icon: '♡' },
   extract: { label: '信息抽取', color: '#8A6DE9', icon: 'ƒ' },
   service: { label: 'HTTP服务', color: '#409EFF', icon: '⇄' },
@@ -397,7 +455,7 @@ const TYPE_META = {
   hangup: { label: '挂断', color: '#909399', icon: '■' }
 }
 
-const PALETTE_ORDER = ['start', 'say', 'answer', 'received', 'menu', 'intention', 'sentiment', 'extract', 'service', 'script', 'child', 'condition', 'variable', 'agent', 'transfer', 'hangup']
+const PALETTE_ORDER = ['start', 'say', 'answer', 'received', 'menu', 'intention', 'agentChat', 'sentiment', 'extract', 'service', 'script', 'child', 'condition', 'variable', 'agent', 'transfer', 'hangup']
 
 function defaultConfig(type) {
   switch (type) {
@@ -411,6 +469,8 @@ function defaultConfig(type) {
       return { prompt: '', options: [{ key: '1', label: '选项一' }] }
     case 'intention':
       return { intentionCode: '', promptTemplate: '' }
+    case 'agentChat':
+      return { agentId: null, welcome: '', maxTurns: 5, resultVar: 'agentReply', handoffVar: 'agentHandoff' }
     case 'sentiment':
       return { text: '${lastInput}' }
     case 'extract':
@@ -422,9 +482,9 @@ function defaultConfig(type) {
     case 'child':
       return { flowId: null, flowCode: '', resultVar: 'childResult' }
     case 'agent':
-      return { queue: '' }
+      return { dispatchMode: 'static', groupId: null, categoryVar: 'agentCategoryId', enqueueIfNoAgent: true, queue: '' }
     case 'transfer':
-      return { targetNumber: '' }
+      return { dispatchMode: 'static', groupId: null, targetNumber: '' }
     case 'condition':
       return { expr: '' }
     case 'variable':
@@ -472,7 +532,9 @@ export default {
       nodeW: NODE_W,
       nodeH: NODE_H,
       canvasW: CANVAS_W,
-      canvasH: CANVAS_H
+      canvasH: CANVAS_H,
+      agentOptions: [],
+      skillGroups: []
     }
   },
   computed: {
@@ -507,6 +569,7 @@ export default {
     window.addEventListener('mousemove', this.onWindowMouseMove)
     window.addEventListener('mouseup', this.onWindowMouseUp)
     window.addEventListener('keydown', this.onKeyDown)
+    this.loadAgents()
     this.loadDesign()
   },
   beforeDestroy() {
@@ -516,6 +579,18 @@ export default {
   },
   methods: {
     // ---------- 加载 ----------
+    loadAgents() {
+      listActiveAgent().then(res => {
+        this.agentOptions = res.data || []
+      }).catch(() => {
+        this.agentOptions = []
+      })
+      listEnabledGroups().then(res => {
+        this.skillGroups = res.data || []
+      }).catch(() => {
+        this.skillGroups = []
+      })
+    },
     async loadDesign() {
       if (!this.flowId) {
         this.$message.warning('缺少流程ID参数')

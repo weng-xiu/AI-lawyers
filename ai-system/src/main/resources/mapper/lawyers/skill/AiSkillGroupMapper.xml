@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.skill.AiSkillGroupMapper">
+
+    <resultMap type="AiSkillGroup" id="AiSkillGroupResult">
+        <result property="groupId"                column="group_id"                />
+        <result property="groupName"              column="group_name"              />
+        <result property="groupCode"              column="group_code"              />
+        <result property="categoryId"             column="category_id"             />
+        <result property="strategy"               column="strategy"                />
+        <result property="maxWait"                column="max_wait"                />
+        <result property="wrapUpTime"             column="wrap_up_time"            />
+        <result property="serviceLevelThreshold"  column="service_level_threshold" />
+        <result property="overflowGroupId"        column="overflow_group_id"       />
+        <result property="status"                 column="status"                  />
+        <result property="createBy"               column="create_by"               />
+        <result property="createTime"             column="create_time"             />
+        <result property="updateBy"               column="update_by"               />
+        <result property="updateTime"             column="update_time"             />
+        <result property="remark"                 column="remark"                  />
+        <result property="categoryName"           column="category_name"           />
+        <result property="memberCount"            column="member_count"            />
+    </resultMap>
+
+    <resultMap type="AiSkillGroupMember" id="AiSkillGroupMemberResult">
+        <result property="id"            column="id"             />
+        <result property="groupId"       column="group_id"       />
+        <result property="agentId"       column="agent_id"       />
+        <result property="skillLevel"    column="skill_level"    />
+        <result property="priority"      column="priority"       />
+        <result property="maxConcurrent" column="max_concurrent" />
+        <result property="status"        column="status"         />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="agentName"     column="agent_name"     />
+        <result property="agentStatus"   column="agent_status"   />
+        <result property="callStatus"    column="call_status"    />
+    </resultMap>
+
+    <sql id="selectGroupVo">
+        select g.group_id, g.group_name, g.group_code, g.category_id, g.strategy, g.max_wait,
+               g.wrap_up_time, g.service_level_threshold, g.overflow_group_id, g.status,
+               g.create_by, g.create_time, g.update_by, g.update_time, g.remark,
+               c.category_name,
+               (select count(1) from ai_skill_group_member m where m.group_id = g.group_id and m.status = '1') as member_count
+        from ai_skill_group g
+        left join ai_consultation_category c on c.category_id = g.category_id
+    </sql>
+
+    <select id="selectAiSkillGroupList" parameterType="AiSkillGroup" resultMap="AiSkillGroupResult">
+        <include refid="selectGroupVo"/>
+        <where>
+            <if test="groupName != null and groupName != ''"> and g.group_name like concat('%', #{groupName}, '%')</if>
+            <if test="groupCode != null and groupCode != ''"> and g.group_code = #{groupCode}</if>
+            <if test="categoryId != null"> and g.category_id = #{categoryId}</if>
+            <if test="strategy != null and strategy != ''"> and g.strategy = #{strategy}</if>
+            <if test="status != null and status != ''"> and g.status = #{status}</if>
+        </where>
+        order by g.group_id asc
+    </select>
+
+    <select id="selectAiSkillGroupByGroupId" parameterType="Long" resultMap="AiSkillGroupResult">
+        <include refid="selectGroupVo"/>
+        where g.group_id = #{groupId}
+    </select>
+
+    <select id="selectByCategoryId" parameterType="Long" resultMap="AiSkillGroupResult">
+        <include refid="selectGroupVo"/>
+        where g.category_id = #{categoryId} and g.status = '1'
+        limit 1
+    </select>
+
+    <insert id="insertAiSkillGroup" parameterType="AiSkillGroup" useGeneratedKeys="true" keyProperty="groupId">
+        insert into ai_skill_group
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="groupName != null and groupName != ''">group_name,</if>
+            <if test="groupCode != null and groupCode != ''">group_code,</if>
+            <if test="categoryId != null">category_id,</if>
+            <if test="strategy != null and strategy != ''">strategy,</if>
+            <if test="maxWait != null">max_wait,</if>
+            <if test="wrapUpTime != null">wrap_up_time,</if>
+            <if test="serviceLevelThreshold != null">service_level_threshold,</if>
+            <if test="overflowGroupId != null">overflow_group_id,</if>
+            <if test="status != null and status != ''">status,</if>
+            <if test="createBy != null and createBy != ''">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="groupName != null and groupName != ''">#{groupName},</if>
+            <if test="groupCode != null and groupCode != ''">#{groupCode},</if>
+            <if test="categoryId != null">#{categoryId},</if>
+            <if test="strategy != null and strategy != ''">#{strategy},</if>
+            <if test="maxWait != null">#{maxWait},</if>
+            <if test="wrapUpTime != null">#{wrapUpTime},</if>
+            <if test="serviceLevelThreshold != null">#{serviceLevelThreshold},</if>
+            <if test="overflowGroupId != null">#{overflowGroupId},</if>
+            <if test="status != null and status != ''">#{status},</if>
+            <if test="createBy != null and createBy != ''">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateAiSkillGroup" parameterType="AiSkillGroup">
+        update ai_skill_group
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="groupName != null and groupName != ''">group_name = #{groupName},</if>
+            <if test="groupCode != null and groupCode != ''">group_code = #{groupCode},</if>
+            <if test="categoryId != null">category_id = #{categoryId},</if>
+            <if test="strategy != null and strategy != ''">strategy = #{strategy},</if>
+            <if test="maxWait != null">max_wait = #{maxWait},</if>
+            <if test="wrapUpTime != null">wrap_up_time = #{wrapUpTime},</if>
+            <if test="serviceLevelThreshold != null">service_level_threshold = #{serviceLevelThreshold},</if>
+            <if test="overflowGroupId != null">overflow_group_id = #{overflowGroupId},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where group_id = #{groupId}
+    </update>
+
+    <delete id="deleteAiSkillGroupByGroupId" parameterType="Long">
+        delete from ai_skill_group where group_id = #{groupId}
+    </delete>
+
+    <delete id="deleteAiSkillGroupByGroupIds" parameterType="String">
+        delete from ai_skill_group where group_id in
+        <foreach item="groupId" collection="array" open="(" separator="," close=")">#{groupId}</foreach>
+    </delete>
+
+    <!-- 成员管理 -->
+    <select id="selectMembersByGroupId" parameterType="Long" resultMap="AiSkillGroupMemberResult">
+        select m.id, m.group_id, m.agent_id, m.skill_level, m.priority, m.max_concurrent, m.status,
+               m.create_time, m.update_time, a.agent_name, a.status as agent_status, a.call_status
+        from ai_skill_group_member m
+        left join ai_call_agent_status a on a.agent_id = m.agent_id
+        where m.group_id = #{groupId}
+        order by m.skill_level desc, m.priority desc, m.id asc
+    </select>
+
+    <select id="selectMemberByGroupAndAgent" resultMap="AiSkillGroupMemberResult">
+        select id, group_id, agent_id, skill_level, priority, max_concurrent, status, create_time, update_time
+        from ai_skill_group_member
+        where group_id = #{groupId} and agent_id = #{agentId}
+        limit 1
+    </select>
+
+    <insert id="batchInsertMembers" parameterType="java.util.List">
+        insert into ai_skill_group_member (group_id, agent_id, skill_level, priority, max_concurrent, status, create_time)
+        values
+        <foreach collection="list" item="m" separator=",">
+            (#{m.groupId}, #{m.agentId}, #{m.skillLevel}, #{m.priority}, #{m.maxConcurrent},
+             <choose><when test="m.status != null and m.status != ''">#{m.status}</when><otherwise>'1'</otherwise></choose>,
+             sysdate())
+        </foreach>
+    </insert>
+
+    <delete id="deleteMembersByGroupIds" parameterType="String">
+        delete from ai_skill_group_member where group_id in
+        <foreach item="groupId" collection="array" open="(" separator="," close=")">#{groupId}</foreach>
+    </delete>
+
+    <delete id="deleteMembersByGroupAndAgent">
+        delete from ai_skill_group_member
+        where group_id = #{groupId}
+        and agent_id in
+        <foreach item="agentId" collection="agentIds" open="(" separator="," close=")">#{agentId}</foreach>
+    </delete>
+
+</mapper>

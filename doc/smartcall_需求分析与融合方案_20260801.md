@@ -1,382 +1,323 @@
-# SmartCall 项目解析与 AI-lawyers 功能融合方案
+# SmartCall 项目解析与 AI-lawyers 深度融合方案（修订版）
 
-**文档日期**：2026-08-01
-**项目来源**：https://gitee.com/gdzWork/SmartCall
+**文档日期**：2026-08-01（2026-08-16 修订）
+**项目来源**：https://gitee.com/gdzWork/SmartCall （Apache-2.0）
+**修订说明**：初版将 IVR、意图识别、智能外呼等列为"待建设"，经代码核对，这些能力在本项目中**已实质性落地**。本次修订按"已落地 / 部分落地 / 待建设"重新校准基线，聚焦真正的差距点与深度融合路径。
 
 ---
 
 ## 一、SmartCall 项目核心解析
 
-### 1.1 项目概述
+### 1.1 项目定位
 
-SmartCall 是一套基于 **AI 大模型 + Asterisk 通信引擎** 构建的新一代智能客服呼叫中心系统。系统深度融合了 AI 语音机器人、智能 IVR 流程编排、实时语音识别（ASR）、语音合成（TTS）、大模型意图识别等核心能力。
+SmartCall 是一套基于 **AI 大模型 + Asterisk 通信引擎**的新一代智能客服呼叫中心，核心是"传统呼叫中心与 AI 大模型深度融合"——围绕 IVR 流程编排、ASR/TTS、大模型意图识别、智能体知识库问答构建 AI 机器人与用户的自然对话能力。运营管理模块（坐席、线路、CDR、外呼、大屏）提供数据模型与扩展接口供二次开发。
 
-**技术栈**：
-- Java 17 + Spring Boot 3.5.x + Spring Cloud
-- MyBatis-Flex 1.11.5 + MySQL 8.0+ + Redis 6.0+
-- Asterisk 22 (PJSIP) + Asterisk-Java
-- Spring AI（大模型集成框架）
-- 阿里云 NLS / 通义千问 DashScope（ASR/TTS）
-- Vue 3（前端）
+### 1.2 技术栈与本项目对比
 
-### 1.2 核心能力模块
+| 层次 | SmartCall | AI-lawyers（本项目） | 融合策略 |
+|------|-----------|----------------------|----------|
+| JDK | Java 17 | **Java 8** | 不升级 JDK，所有移植代码须兼容 8（禁用 record/sealed/虚拟线程） |
+| 框架 | Spring Boot 3.5.x + Spring Cloud | Spring Boot 2.5.x 单体（RuoYi） | **保持单体**，不引入微服务/Nacos/Gateway |
+| ORM | MyBatis-Flex 1.11.5 | MyBatis | 沿用 MyBatis，实体/XML 手写 |
+| 通信 | Asterisk 22 (PJSIP) + Asterisk-Java | FreeSWITCH/Asterisk/HTTP/Simulator 网关适配器 | 复用本项目现有 `ICallDispatchService` 网关抽象 |
+| AI 框架 | Spring AI（DashScope/DeepSeek） | 自研 OpenAI 兼容/Claude 协议客户端 | 复用 `AiModelConfigService`，不引入 Spring AI |
+| 语音 | Alibaba NLS SDK / DashScope SDK | HTTP 直连（DashScope CosyVoice + Whisper 兼容） | 沿用 HTTP 方式，避免 Java17 SDK 依赖 |
+| 脚本 | Groovy 3.0 + Nashorn 15.6 | Nashorn（Java 8 内置） | 仅用 JS，不引入 Groovy |
+| 前端 | Vue 3 + LogicFlow | **Vue 2 + Element UI** + 自研 SVG 设计器 | 保持 Vue2，设计器用自研 SVG，不引入 LogicFlow |
+| 认证 | OAuth2 + 多租户 | Spring Security + JWT（RuoYi） | 沿用 RuoYi 权限/菜单/数据权限 |
+| 数据库 | MySQL 8.0 | MySQL 5.7/8.0 | 兼容现有 |
 
-#### 1.2.1 AI 智能应答
-| 功能 | 说明 |
-|------|------|
-| 大模型意图识别 | 集成通义千问、DeepSeek 等主流大模型，通过 Prompt 工程实现精准来电意图分类 |
-| AI 智能体对话 | 内置知识库智能体集成（MaxKB），支持多轮智能问答、上下文记忆 |
-| 正则+模型双引擎 | 正则快速匹配 + AI 模型深度识别，兼顾速度与精度 |
-| 情绪分析 | 集成阿里云 NLP 情感分析，实时感知客户情绪，负面自动升级人工 |
-| AI 信息提取 | 基于大模型从对话中提取姓名、地址、订单号等结构化信息 |
+> 关键结论：两个项目技术代差明显（Java17/SpringBoot3/Vue3 vs Java8/SpringBoot2/Vue2）。**不能直接拷贝代码或依赖**，融合方式是"移植设计思想与协议适配，用本项目技术栈重新实现"。
 
-#### 1.2.2 智能 IVR 流程编排
-**15种流程节点**：
-1. 🎙️ 语音播放（Say）- TTS 实时合成，支持 SpEL 表达式
-2. 🎧 语音识别收听（Answer）- ASR 实时转文字，支持客户打断
-3. 🔢 DTMF 收号（Received）- 按键输入采集
-4. 🧠 意图识别（Intention）- AI 大模型多意图分类
-5. 🤖 智能体对话（Agent）- 知识库多轮问答
-6. 🔀 条件分支（Condition）- SpEL 表达式动态路由
-7. 📋 信息提取（Extract）- AI 提取结构化信息
-8. 🔌 HTTP 服务调用（Service）- 流程中调用外部 API
-9. 📜 脚本执行（Script）- Groovy / JavaScript 脚本
-10. 🔗 转接人工（Transfer）- 智能队列分配
-11. 📂 子流程调用（Child）- 流程模块化复用
-12. 📌 变量赋值（Variable）- 全局变量管理
-13. 📴 挂断（Hangup）- 支持挂断前结束语
+### 1.3 SmartCall 核心能力清单
 
-#### 1.2.3 企业级架构基座
-- 微服务 + 单体双模架构
-- RBAC 权限体系（按钮级）
-- 多租户架构
-- OAuth2 统一认证
-- API 网关（路由/鉴权/限流/日志）
-
-#### 1.2.4 可扩展运营能力
-| 模块 | 说明 |
-|------|------|
-| 📊 数据大屏 | 通话趋势、AI/人工占比、坐席效能分析 |
-| 👥 坐席管理 | 坐席全生命周期、实时状态监控、通话保持/转接 |
-| 📋 通话记录（CDR） | 全量通话记录、录音管理、呼损统计 |
-| 📤 智能外呼 | 批量外呼、智能重拨、多机器人并发 |
-| 📡 线路管理 | SIP 中继线路注册、状态监控、多线路智能路由 |
-
-### 1.3 系统架构
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                        Web 前端 (Vue 3)                  │
-└────────────┬────────────────────────────────────────────┘
-             │
-┌────────────▼────────────────────────────────────────────┐
-│                    Nginx / API Gateway                    │
-│            (路由转发 / OAuth2 鉴权 / 限流)               │
-└────────────┬────────────────────────────────────────────┘
-             │
-┌────────────▼────────────────────────────────────────────┐
-│              smart-aster (核心呼叫模块)                   │
-│  ┌─────────────┐  ┌─────────────┐  ┌──────────────┐   │
-│  │ IVR 流程引擎 │  │ ASR/TTS 对接 │  │ AI 意图识别  │   │
-│  └─────────────┘  └─────────────┘  └──────────────┘   │
-│  Asterisk AMI/AGI 集成  ←→  PJSIP 通话控制              │
-└────────────┬────────────────────────────────────────────┘
-             │
-┌────────────▼──────────┐  ┌─────────────────────────────┐
-│   smart-maxkb         │  │    smart-upms (用户/权限)    │
-│  (AI 智能体对接模块)  │  │  system / user / resource    │
-└────────────┬──────────┘  └─────────────────────────────┘
-             │
-┌────────────▼────────────────────────────────────────────┐
-│              语音服务 (WebSocket) / 大模型 API            │
-│  通义千问 DashScope / 阿里云 NLS / DeepSeek / MaxKB     │
-└──────────────────────────────────────────────────────────┘
-```
-
-### 1.4 项目模块结构
-
-```
-SmartCall
-├── smart-aster          # 核心呼叫模块（IVR引擎/ASR/TTS/AI意图）
-├── smart-maxkb          # MaxKB 智能体对接模块
-├── smart-gateway        # API 网关
-├── smart-auth           # 统一认证中心
-├── smart-boot           # 单体模式启动器
-├── smart-api            # 服务间 Feign API
-├── smart-common         # 公共模块
-├── smart-upms           # 用户权限管理
-│   ├── smart-system     # 系统管理（字典/组织/角色/菜单/租户）
-│   ├── smart-user       # 用户管理
-│   └── smart-resource   # 资源管理（文件/OSS/短信）
-├── smart-ops            # 运维监控
-├── script               # 部署脚本
-├── sql                  # 数据库脚本
-└── docs                 # 文档与配置模板
-```
+- **AI 智能应答**：大模型意图识别、MaxKB 智能体多轮对话（插件化 `NodeGranter`，可扩 Dify/Coze/FastGPT）、正则+模型双引擎、阿里云 NLP 情绪分析、LLM 信息抽取。
+- **智能 IVR**：LogicFlow 拖拽编排，**16 类节点**（Say/Answer/Received/Intention/Agent/Condition/Extract/Service/Script/Transfer/Child/Variable/Hangup/SMS 等），SpEL 表达式动态路由，在线调试。
+- **语音**：ASR/TTS 接口抽象（`VoiceModelEnum`），内置阿里云 NLS、通义千问 DashScope、电信三家，可自定义扩展。
+- **架构基座**：微服务+单体双模、RBAC、多租户、OAuth2、API 网关。
+- **可扩展运营能力**：数据大屏、坐席管理、CDR、智能外呼、SIP 线路管理。
 
 ---
 
-## 二、AI-lawyers 现有架构分析
+## 二、AI-lawyers 融合现状基线（已核对代码）
 
-### 2.1 技术栈
-- **后端**：Spring Boot + MyBatis + MySQL（基于 RuoYi 框架）
-- **前端**：Vue 2 + Element UI
-- **缓存**：Redis
-- **权限**：Spring Security + JWT
+> 以下结论经实际代码核对，对应进度记录见 `doc/smartcall_融合进度_20260815.md`。
 
-### 2.2 现有模块结构
+### 2.1 已实质性落地（可运行）
 
-```
-AI-lawyers
-├── ai-admin          # 后端管理模块（Controller层）
-├── ai-common         # 公共模块
-├── ai-framework      # 框架层（安全/配置/数据源）
-├── ai-generator      # 代码生成器
-├── ai-quartz         # 定时任务
-├── ai-system         # 系统模块（Domain/Mapper/Service层）
-├── ai-ui             # 管理端前端（Vue 2）
-├── aiuser-ui         # 用户端前端
-└── sql               # 数据库脚本
-```
+| 能力 | 落地情况 | 关键代码 |
+|------|----------|----------|
+| **IVR 流程数据模型** | flow/node/edge/intention/intention_log/execution_log 六张表 + 完整 CRUD | `domain/lawyers/ivr/`、`sql/ai_system_ivr_20260801.sql` |
+| **IVR 执行引擎** | 1337 行，支持 **16 类节点**（start/say/menu/dtmf/answer/received/intention/condition/sentiment/extract/service/script/child/agent/transfer/variable/hangup），含 SpEL 模板、子流程嵌套(≤3层)、JS 脚本、HTTP 调用、防死循环(200步)、执行日志、结果回写话单 | `service/impl/lawyers/ivr/engine/IvrEngineServiceImpl.java` |
+| **可视化设计器** | 原生 SVG 拖拽设计器（非 LogicFlow），节点面板/连线/属性配置/缩放 | `ai-ui/.../ivr/flow/designer.vue` |
+| **AI 意图识别** | 正则优先(置信度1.0)+大模型兜底(0.6)双引擎，结果自动映射咨询分类，落日志 | `IntentionRecognitionServiceImpl.java` |
+| **情绪分析/信息抽取** | 基于 LLM `chatJson`，关键词/异常兜底，结果写入流程变量 | `IvrEngineServiceImpl` 的 sentiment/extract 节点 |
+| **智能外呼** | task/callee/result 三表 + 定时扫描执行引擎(15s)，支持模拟/网关双模式、失败重试、网关事件回调、接通后联动 IVR、可自动建工单 | `OutboundExecutionServiceImpl.java`（689 行） |
+| **ASR/TTS 抽象** | `AsrEngine`/`TtsEngine` 接口 + VoiceEngineManager 路由 + DashScope CosyVoice TTS + Whisper 兼容 ASR + Mock 降级 | `service/lawyers/voice/`（8 个文件） |
+| **真实大模型调用** | OpenAI 兼容协议 + Claude Anthropic 协议，提供 callAiModel/chat/chatJson/testConnection | `AiModelConfigServiceImpl` |
+| **呼叫中心联动** | IVR/外呼结果回写 `ai_call_record`，转接 `ai_call_transfer`，自动建 `ai_call_ticket` | 既有呼叫中心模块 |
 
-### 2.3 已有的呼叫中心功能
+### 2.2 部分落地（有抽象/预留，未完全打通）
 
-| 功能模块 | 数据表 | 说明 |
-|---------|--------|------|
-| 坐席状态 | ai_call_agent_status | 坐席签入/签出、状态管理 |
-| 来电记录 | ai_call_record | 通话记录、来电人信息、通话时长 |
-| 工单管理 | ai_call_ticket | 工单流转、处理、归档 |
-| 转接管理 | ai_call_transfer | 通话转接记录 |
-| 台账记录 | ai_call_ledger | 咨询台账、满意度评价 |
+| 能力 | 现状 | 缺口 |
+|------|------|------|
+| Answer 实时收声 | 节点语义完整，从 `inputs` 队列取文本 | **实时流式 ASR 未接入**，需语音网关 WebSocket 推送识别文本 |
+| Say 播报 | SpEL 模板 + 可合成 TTS 音频文件 | 缺少与 Asterisk/FreeSWITCH 的 playback 通道对接 |
+| 情绪分析 | LLM 通道完整 | 阿里云 NLP SDK 通道为预留 |
+| 转人工 | agent/transfer 节点 + 坐席状态模型 | 缺少按技能组/负载的智能队列分配算法 |
+| 线路管理 | `ai_call_trunk` 中继模型 + 网关适配器 | 缺少 PJSIP endpoints/aors/auths/contacts/queues 细粒度模型 |
+| 外呼执行 | 模拟模式完整可用 | 真实网关联调需 Asterisk/FreeSWITCH 环境 |
 
-### 2.4 已有的 AI 功能
+### 2.3 待建设（本次深度融合重点）
 
-| 功能模块 | 数据表 | 说明 |
-|---------|--------|------|
-| 模型配置 | ai_model_config | AI 大模型配置管理 |
-| 系统提示词 | ai_system_prompt | 系统级 Prompt 配置 |
-| 法律知识库 | ai_legal_knowledge | 法律知识条目管理 |
-| 咨询分类 | ai_consultation_category | 法律咨询分类 |
-| 法律咨询 | ai_legal_consultation | 法律咨询记录 |
+| 编号 | 能力 | 说明 |
+|------|------|------|
+| **B1** | **MaxKB/Dify 智能体对话节点** | 代码中无任何实现，是 SmartCall 最核心的 AI 能力差距。当前 agent 节点为空壳 |
+| **B2** | **实时 WebSocket 流式 ASR/TTS** | 当前 ASR 是"节点取文本"模式，TTS 仅合成文件；未实现通话过程中的实时双向语音流 |
+| **B3** | **Asterisk PJSIP 管理模型 + 注册监控** | endpoints/aors/auths/contacts/queues 数据模型与在线状态监控 |
+| **B4** | **数据大屏与坐席效能报表** | 通话趋势、AI/人工占比、坐席效能、呼损统计 |
+| **B5** | 智能队列分配算法 | 按技能组、负载、优先级的转人工路由（B1/B2 的配套） |
+| **B6** | 短信发送节点（SMS） | SmartCall 有 SMS 节点，本项目缺失（可对接阿里云/腾讯云短信） |
+
+### 2.4 明确不移植（与本项目定位/技术栈冲突）
+
+- 微服务拆分、Spring Cloud、Nacos、API 网关、OAuth2 认证中心——本项目保持 RuoYi 单体。
+- 多租户——12348 公共法律服务为单租户政务场景。
+- 前端迁移 Vue3/LogicFlow——成本高、收益低，自研 SVG 设计器已满足需求。
+- Groovy 脚本引擎、Spring AI、Alibaba NLS SDK（Java17 依赖）——用 Java8 兼容替代方案。
 
 ---
 
-## 三、功能融合方案设计
+## 三、深度融合目标与原则
 
-### 3.1 融合目标
+### 3.1 目标
 
-将 SmartCall 的核心特色能力融入 AI-lawyers 12348 热线系统，重点融合：
+将 SmartCall 中**本项目尚缺失的核心 AI 对话与实时语音能力**融入 12348 热线，形成完整链路：
 
-1. **IVR 智能流程编排** - 可视化拖拽式 IVR 设计器
-2. **AI 意图识别与智能体** - 大模型驱动的来电意图分类与知识库对话
-3. **智能外呼任务** - 批量外呼、回访任务管理
-4. **ASR/TTS 集成框架** - 语音识别与合成的统一抽象接口
+```
+来电 → IVR 流程引擎 → [意图识别 / 智能体多轮问答 / 情绪分析 / 信息抽取]
+       → ASR 实时转写 + TTS 实时播报 → 负面情绪/复杂问题自动转人工坐席
+       → 通话记录/工单/台账闭环；外呼任务复用同一套流程
+```
 
-### 3.2 功能模块映射
+### 3.2 原则
 
-| SmartCall 模块 | AI-lawyers 融合位置 | 实现方式 |
-|---------------|---------------------|---------|
-| IVR 流程编排 | ai-system + ai-ui | 新建 ivr 子模块 |
-| AI 意图识别 | ai-system + 现有模型配置 | 扩展 AiModelConfig |
-| 智能体对话 | ai-system + 知识库 | 新建 agent 子模块 |
-| 智能外呼 | ai-system + ai-ui | 新建 outbound 子模块 |
-| ASR/TTS 框架 | ai-common + ai-system | 新建语音接口抽象 |
+1. **不升级技术栈**：全部代码兼容 Java 8 + Spring Boot 2.5 + Vue 2。
+2. **复用现有底座**：大模型走 `AiModelConfigService`，呼叫走 `ICallDispatchService` 网关，权限走 RuoYi，不另起炉灶。
+3. **接口抽象先行**：智能体平台、ASR/TTS 引擎均用接口 + 管理器模式，可插拔（对齐 SmartCall 的 `NodeGranter`/`VoiceModelEnum` 设计思想）。
+4. **政务场景定制**：智能体默认对接法律知识库，意图分类对齐 `ai_consultation_category`，情绪负面自动升级人工并建工单。
+5. **可独立验证**：每个批次都能在无 Asterisk 环境下通过"模拟模式 + 在线调试"验证业务逻辑。
 
-### 3.3 新增数据表设计
+---
 
-#### 3.3.1 IVR 流程相关表
+## 四、待建设能力详细设计
 
-**ai_ivr_flow（IVR流程表）**
+### 4.1 B1：智能体（Agent）对话节点【最高优先级】
+
+**目标**：让 IVR 中的 `agent` 节点调用知识库智能体进行多轮法律问答，支持上下文记忆、智能体选择、负面情绪转人工。
+
+#### 4.1.1 数据模型
+
+新增表 `ai_agent_config`（智能体配置）：
+
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| flow_id | bigint | 流程ID（主键） |
-| flow_name | varchar(100) | 流程名称 |
-| flow_code | varchar(50) | 流程编码（唯一） |
-| description | varchar(500) | 流程描述 |
-| flow_data | text | 流程定义JSON（LogicFlow格式） |
-| status | char(1) | 状态（0草稿 1已发布 2停用） |
-| version | int | 版本号 |
-| create_by / create_time / update_by / update_time / remark | - | 标准字段 |
+| agent_id | bigint PK | 智能体ID |
+| agent_name | varchar(100) | 名称（如"民事法律咨询助手"） |
+| provider | varchar(30) | 平台：maxkb / dify / fastgpt / coze / local |
+| api_url | varchar(500) | 对话接口地址 |
+| api_key | varchar(500) | 认证密钥（加密存储） |
+| app_id | varchar(100) | 平台应用/知识库ID |
+| category_id | bigint | 关联咨询分类（用于按意图选智能体） |
+| system_prompt | text | 系统提示词（local 模式生效） |
+| model_id | bigint | 关联大模型配置（local 模式） |
+| knowledge_ids | varchar(500) | 关联本项目法律知识库ID（多个逗号分隔） |
+| enable_context | char(1) | 是否启用多轮上下文（0/1） |
+| context_rounds | int | 上下文保留轮数（默认5） |
+| status | char(1) | 状态（0停用 1启用） |
+| 标准字段 | - | create_by/create_time/update_by/update_time/remark |
 
-**ai_ivr_node（IVR节点表）**
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| node_id | bigint | 节点ID |
-| flow_id | bigint | 所属流程ID |
-| node_type | varchar(30) | 节点类型（say/answer/intention/agent/transfer等） |
-| node_name | varchar(100) | 节点名称 |
-| node_config | text | 节点配置JSON |
-| position_x | int | 画布X坐标 |
-| position_y | int | 画布Y坐标 |
-| sort_order | int | 排序 |
-
-**ai_ivr_edge（IVR连线表）**
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| edge_id | bigint | 连线ID |
-| flow_id | bigint | 所属流程ID |
-| source_node_id | bigint | 源节点ID |
-| target_node_id | bigint | 目标节点ID |
-| edge_label | varchar(100) | 连线标签（条件分支用） |
-| condition_expr | varchar(500) | 条件表达式（SpEL） |
-
-#### 3.3.2 AI 意图相关表
-
-**ai_ivr_intention（意图定义表）**
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| intention_id | bigint | 意图ID |
-| intention_name | varchar(100) | 意图名称 |
-| intention_code | varchar(50) | 意图编码 |
-| description | varchar(500) | 描述 |
-| regex_pattern | varchar(500) | 正则匹配模式 |
-| prompt_template | text | AI 识别 Prompt 模板 |
-| example_utterances | text | 示例话术（JSON数组） |
-| model_id | bigint | 关联AI模型ID |
-| status | char(1) | 状态 |
-
-**ai_ivr_intention_log（意图识别日志表）**
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| log_id | bigint | 日志ID |
-| record_id | bigint | 通话记录ID |
-| session_id | varchar(64) | 会话ID |
-| input_text | varchar(1000) | 输入文本 |
-| matched_intention | varchar(50) | 匹配的意图 |
-| confidence | decimal(5,4) | 置信度 |
-| match_method | char(1) | 匹配方式（1正则 2AI模型） |
-| create_time | datetime | 创建时间 |
-
-#### 3.3.3 外呼任务相关表
-
-**ai_outbound_task（外呼任务表）**
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| task_id | bigint | 任务ID |
-| task_name | varchar(100) | 任务名称 |
-| task_type | char(1) | 任务类型（1批量外呼 2回访 3通知） |
-| caller_number | varchar(20) | 主叫号码 |
-| ivr_flow_id | bigint | 关联IVR流程ID |
-| start_time | datetime | 开始时间 |
-| end_time | datetime | 结束时间 |
-| total_count | int | 总号码数 |
-| completed_count | int | 已完成数 |
-| answered_count | int | 已接通数 |
-| failed_count | int | 失败数 |
-| status | char(1) | 状态（0待执行 1执行中 2已完成 3已暂停） |
-| priority | int | 优先级 |
-| retry_count | int | 重拨次数 |
-| retry_interval | int | 重拨间隔（分钟） |
-
-**ai_outbound_callee（外呼号码表）**
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| callee_id | bigint | ID |
-| task_id | bigint | 任务ID |
-| callee_number | varchar(20) | 被叫号码 |
-| callee_name | varchar(50) | 被叫姓名 |
-| callee_params | text | 附加参数（JSON） |
-| call_status | char(1) | 呼叫状态（0待呼叫 1呼叫中 2已接通 3未接 4失败 5已完成） |
-| call_time | datetime | 呼叫时间 |
-| call_duration | int | 通话时长（秒） |
-| record_id | bigint | 关联通话记录ID |
-| retry_times | int | 已重拨次数 |
-
-### 3.4 后端代码结构设计
+#### 4.1.2 后端设计
 
 ```
 ai-system/src/main/java/ai/lawyers/system/
-├── domain/lawyers/
-│   ├── ivr/
-│   │   ├── AiIvrFlow.java          # IVR流程
-│   │   ├── AiIvrNode.java          # IVR节点
-│   │   ├── AiIvrEdge.java          # IVR连线
-│   │   ├── AiIvrIntention.java     # 意图定义
-│   │   └── AiIvrIntentionLog.java  # 意图识别日志
-│   └── outbound/
-│       ├── AiOutboundTask.java      # 外呼任务
-│       └── AiOutboundCallee.java    # 外呼号码
-├── mapper/lawyers/
-│   ├── ivr/
-│   │   ├── AiIvrFlowMapper.xml
-│   │   ├── AiIvrNodeMapper.xml
-│   │   ├── AiIvrEdgeMapper.xml
-│   │   ├── AiIvrIntentionMapper.xml
-│   │   └── AiIvrIntentionLogMapper.xml
-│   └── outbound/
-│       ├── AiOutboundTaskMapper.xml
-│       └── AiOutboundCalleeMapper.xml
-└── service/lawyers/
-    ├── ivr/
-    │   ├── IAiIvrFlowService.java
-    │   ├── IAiIvrIntentionService.java
-    │   └── impl/
-    │       ├── AiIvrFlowServiceImpl.java
-    │       └── AiIvrIntentionServiceImpl.java
-    └── outbound/
-        ├── IAiOutboundTaskService.java
-        └── impl/
-            └── AiOutboundTaskServiceImpl.java
+├── domain/lawyers/agent/AiAgentConfig.java
+├── mapper/lawyers/agent/AiAgentConfigMapper.java (+xml)
+├── service/lawyers/agent/
+│   ├── IAiAgentConfigService.java
+│   ├── IAgentChatService.java              # 智能体对话统一接口
+│   └── impl/
+│       ├── AiAgentConfigServiceImpl.java
+│       ├── AgentChatServiceImpl.java       # 统一入口，按 provider 路由
+│       └── provider/
+│           ├── MaxKbChatProvider.java      # MaxKB HTTP 适配
+│           ├── DifyChatProvider.java       # Dify 适配
+│           └── LocalRagChatProvider.java   # 本地知识库 RAG（复用 ai_legal_knowledge + callAiModel）
 ```
 
-```
-ai-admin/src/main/java/ai/lawyers/web/controller/lawyers/
-├── ivr/
-│   ├── AiIvrFlowController.java       # IVR流程管理
-│   └── AiIvrIntentionController.java  # 意图管理
-└── outbound/
-    └── AiOutboundTaskController.java   # 外呼任务管理
-```
+- `IAgentChatService.chat(agentId, sessionId, userMessage, variables)` 返回 `{answer, intent, sentiment, suggestedTransfer, metadata}`。
+- 会话上下文按 `callerNumber + sessionId` 维护，存 Redis（TTL 30 分钟），结构为消息轮次列表。
+- `LocalRagChatProvider`：先用关键词/向量（如无向量库则 LIKE 检索）从 `ai_legal_knowledge` 取 Top-K 知识片段拼入 Prompt，再调 `chatJson`，做到不依赖外部智能体平台也能用。
+- IVR `agent` 节点改造：读取节点配置 `agentId/knowledgeIds/maxRounds`，循环调用 `IAgentChatService.chat`，每轮把 ASR 文本传入、把回答交 TTS 播报；当返回 `suggestedTransfer=true`（情绪负面/用户要求人工）或达到最大轮次时，走 transfer 节点。
+
+#### 4.1.3 前端设计
+
+- `ai-ui/src/views/lawyers/agent/config.vue`：智能体配置 CRUD（provider 下拉、连接测试、关联分类/知识库）。
+- 设计器 agent 节点属性面板增加"选择智能体""最大对话轮数""负面情绪转人工"配置项。
+- 在线调试面板支持多轮对话输入，展示智能体回答与转人工触发标记。
+
+#### 4.1.4 验收
+
+- 配置一个 local 智能体，在 IVR 测试中输入法律问题，能基于知识库多轮回答。
+- 输入"我要投诉/找律师/人工"等，自动触发转人工分支。
+
+---
+
+### 4.2 B2：实时 WebSocket 流式 ASR/TTS
+
+**目标**：通话过程中实时语音转文字、实时文字转语音播报，支撑 Answer 收声与 agent 多轮对话。
+
+#### 4.2.1 设计
+
+- Java 8 下用 **OkHttp WebSocket**（或 Tyrus）作客户端，连接语音网关/ASR 服务。
+- 抽象接口 `IRealtimeVoiceService`：
+  - `startRecognition(sessionId, callback)`：开始流式识别，回调 `onPartial(text)`/`onFinal(text)`/`onError`。
+  - `stopRecognition(sessionId)`。
+  - `streamSpeak(sessionId, text)`：流式合成并推送播报。
+- 实现 `DashScopeRealtimeVoiceService`（通义千问 Qwen3-ASR / CosyVoice 实时协议，HTTP/WS），无法连通时降级为现有"文件 TTS + 文本输入"模式。
+- 与 IVR 引擎集成：`answer` 节点阻塞等待 `onFinal` 回调写入流程变量 `lastInput`；`say`/`agent` 回答调用 `streamSpeak`。
+- 通话音频流由 FreeSWITCH/Asterisk 通过媒体网关转发（不在本期实现 PBX 侧，只定义对接契约）。
+
+#### 4.2.2 验收
+
+- Mock 语音网关下，模拟推送音频/文本，IVR answer 节点能拿到最终识别文本并继续流程。
+- agent 回答能触发 TTS 播报（文件模式即可，真实流式需网关）。
+
+---
+
+### 4.3 B3：Asterisk PJSIP 管理模型与监控
+
+**目标**：在现有 `ai_call_trunk` 中继基础上，补齐 PJSIP 端点、注册、队列的数据模型与监控。
+
+#### 4.3.1 数据表
+
+- `ai_pjsip_endpoint`：端点（extension、callerid、context、allow、auth、aors）。
+- `ai_pjsip_registration`：注册状态（endpoint、server、status、last_qualify）。
+- `ai_call_queue`：队列（queue_name、strategy、strategy=ringall/leastrecent/rrmemory、wrapuptime）。
+- `ai_call_queue_member`：队列坐席成员（queue_id、agent_id、paused）。
+
+#### 4.3.2 功能
+
+- 通过 AMI/Asterisk- Java（Java8 兼容版本）或 HTTP 定时拉取 PJSIP 注册状态、在线坐席。
+- 队列状态展示（等待数、最长等待、可用坐席），为 B5 智能分配提供数据。
+- 前端：线路管理下新增"分机端点""队列管理"页。
+
+> 依赖真实 Asterisk 环境，可在有环境时实施；无环境时仅完成数据模型与管理 CRUD。
+
+---
+
+### 4.4 B4：数据大屏与坐席效能报表
+
+**目标**：对齐 SmartCall 数据大屏，提供实时话务态势。
+
+- **大屏页**（`ai-ui/.../dashboard/screen.vue`）：今日呼入/呼出量、接通率、AI 应答占比、转人工率、在线坐席数、呼损数、通话趋势折线、坐席效能 Top 榜。
+- 后端新增聚合查询接口（复用现有 `ai_call_record`/`ai_outbound_result`/`ai_ivr_execution_log` 统计口径）。
+- 坐席效能：应答数、平均通话时长、满意度、转接次数（基于 `ai_call_record.agent_id` 聚合）。
+- WebSocket/SSE 推送实时指标（可选，初期用 10s 轮询）。
+
+---
+
+### 4.5 B5：智能队列分配（转人工路由）
+
+**目标**：转人工时按技能组 + 负载 + 优先级选最优坐席。
+
+- 新增 `ai_agent_skill`（坐席-咨询分类技能映射 + 熟练度）。
+- `IAgentDispatchService.selectBestAgent(categoryId, callerNumber)`：
+  1. 按意图映射的 `categoryId` 筛选有该技能的就绪坐席；
+  2. 同技能组内按"当前通话数最少 + 熟练度最高"排序；
+  3. 无匹配则回退到默认技能组或排队。
+- IVR `transfer`/`agent` 节点调用该服务确定 `transferTarget`，写回 `ai_call_record`。
+
+---
+
+### 4.6 B6：SMS 短信节点
+
+- IVR 新增 `sms` 节点，配置 `smsCode`（模板编码）、`phone`（SpEL 变量）、`params`。
+- 抽象 `ISmsService`，提供阿里云/腾讯云短信实现与 Mock 实现，异步发送不阻塞流程。
+- 用于身份核验、通话后通知、回访提醒。
+
+---
+
+## 五、模块映射与代码结构（修订）
+
+### 5.1 SmartCall → AI-lawyers 映射表
+
+| SmartCall | AI-lawyers | 状态 |
+|-----------|------------|------|
+| smart-aster IVR 引擎 | `IvrEngineServiceImpl`（16 节点） | ✅ 已实现 |
+| smart-aster ASR/TTS | `service/lawyers/voice/` | ✅ 抽象+文件模式；⏳ 实时流 B2 |
+| smart-aster 意图识别 | `IntentionRecognitionServiceImpl` | ✅ |
+| smart-maxkb 智能体 | **待建 B1** | ❌ |
+| smart-upms | RuoYi 权限体系 | ✅ 直接复用 |
+| CDR/转接 | ai_call_record/transfer/ticket/ledger | ✅ |
+| 智能外呼 | outbound 三表 + 执行引擎 | ✅ |
+| 坐席/队列 | ai_call_agent_status + **待建 B3/B5** | 🟡 |
+| 数据大屏 | **待建 B4** | ❌ |
+| SMS 节点 | **待建 B6** | ❌ |
+
+### 5.2 新增代码结构
 
 ```
+ai-system/src/main/java/ai/lawyers/system/
+├── domain/lawyers/agent/AiAgentConfig.java
+├── mapper/lawyers/agent/AiAgentConfigMapper.xml
+├── service/lawyers/agent/
+│   ├── IAiAgentConfigService.java
+│   ├── IAgentChatService.java
+│   └── impl/provider/{MaxKb,Dify,LocalRag}ChatProvider.java
+└── service/lawyers/voice/realtime/   # B2 实时语音
+
+ai-admin/.../controller/lawyers/agent/AiAgentConfigController.java
+
 ai-ui/src/
-├── api/lawyers/
-│   ├── ivr.js           # IVR相关API
-│   └── outbound.js      # 外呼相关API
-└── views/lawyers/
-    ├── ivr/
-    │   ├── flow.vue         # IVR流程列表
-    │   ├── flowDesign.vue   # IVR流程设计器
-    │   └── intention.vue    # 意图管理
-    └── outbound/
-        ├── task.vue         # 外呼任务列表
-        └── taskDetail.vue   # 外呼任务详情
+├── api/lawyers/agent.js
+└── views/lawyers/agent/config.vue
 ```
 
-### 3.5 核心融合点
+---
 
-#### 3.5.1 IVR 流程引擎与现有呼叫中心集成
-- IVR 流程发布后关联到来电号码/技能组
-- 通话接入时根据配置触发对应 IVR 流程
-- 流程节点执行结果更新到通话记录
+## 六、分阶段实施计划
 
-#### 3.5.2 AI 意图识别与现有法律咨询集成
-- 意图识别结果自动关联咨询分类
-- AI 智能体对话复用现有法律知识库
-- 意图识别日志与通话记录关联
+| 阶段 | 内容 | 依赖 | 可验证性 |
+|------|------|------|----------|
+| **B1** | 智能体配置表 + 对话接口 + LocalRag/MaxKB 适配 + IVR agent 节点打通 + 前端配置页 | 现有 LLM/知识库 | 无外部依赖，IVR 在线调试即可验证 |
+| **B5** | 坐席技能 + 智能队列分配 | 现有坐席状态 | 可单元测试/模拟坐席验证 |
+| **B6** | SMS 节点 + 短信服务抽象 + Mock 实现 | 无 | 模拟模式验证 |
+| **B4** | 数据大屏 + 坐席效能聚合接口 | 现有统计表 | 直接访问页面 |
+| **B2** | 实时语音接口抽象 + WS 客户端 + 与 IVR 集成 | 语音网关契约 | 需 Mock 网关 |
+| **B3** | PJSIP/队列模型 + AMI 监控 | Asterisk 环境 | 需真实环境 |
 
-#### 3.5.3 外呼任务与现有工单/台账集成
-- 外呼结果自动生成通话记录
-- 外呼中可触发工单创建
-- 外呼任务支持关联回访工单
+**建议优先级**：B1 → B5 → B6 → B4 → B2 → B3。B1 是核心 AI 能力差距且可立即落地；B5/B6/B4 不依赖 PBX 环境可并行；B2/B3 需语音/通信环境，靠后。
 
 ---
 
-## 四、实施计划
+## 七、风险与对策
 
-| 阶段 | 任务 | 产出 |
-|------|------|------|
-| 阶段一 | 数据库表设计与SQL脚本生成 | sql/ai_system_ivr_*.sql, sql/ai_system_outbound_*.sql |
-| 阶段二 | 后端Domain/Mapper/Service层实现 | ai-system 模块代码 |
-| 阶段三 | 后端Controller层实现 | ai-admin 模块代码 |
-| 阶段四 | 前端API与页面实现 | ai-ui 模块代码 |
-| 阶段五 | 菜单配置与集成测试 | 菜单SQL + 测试报告 |
+1. **技术代差**：SmartCall 基于 Java17/SpringBoot3，禁止直接拷贝。对策：仅移植接口设计思想，用 Java8 重写；引入任何新依赖前确认其 Java8 兼容性。
+2. **智能体平台依赖**：MaxKB/Dify 需单独部署。对策：优先实现 LocalRag 提供方，复用本项目法律知识库 + LLM，保证无外部平台也可运行；MaxKB/Dify 作为可选 provider。
+3. **实时语音复杂**：B2 涉及媒体流、ASR/TTS 双向流、PBX 集成，工程量大。对策：先定义接口契约 + Mock 实现打通 IVR 链路，真实流式在有语音网关时分阶段接入。
+4. **Asterisk 环境**：B3 需真实 PBX。对策：数据模型与 CRUD 先行，监控联调后置。
+5. **政务合规**：12348 场景对数据出境、通话合规有要求。对策：默认支持内网部署的本地模型/本地知识库，云端 ASR/TTS 可关闭。
+6. **类加载冲突**：项目存在 ai-system 与 ai-admin 同包同名类，已通过禁用 devtools restart 解决（见 `RuoYiApplication`），后续新增类应放在唯一包路径，避免重复定义。
 
 ---
 
-## 五、风险与注意事项
+## 八、附录：当前可立即体验的融合能力
 
-1. **技术栈差异**：SmartCall 基于 Spring Boot 3 + MyBatis-Flex，AI-lawyers 基于 Spring Boot 2 + MyBatis，需注意 API 兼容性
-2. **Asterisk 集成**：实际电话交换功能依赖 Asterisk，当前阶段聚焦业务数据模型与管理功能
-3. **前端框架差异**：SmartCall 使用 Vue 3 + LogicFlow，AI-lawyers 使用 Vue 2，需选择兼容的流程图组件
-4. **大模型集成**：复用现有 AiModelConfig 配置，扩展支持语音模型
+执行演示脚本 `sql/ai_system_ivr_smartcall_demo_20260815.sql` 后，登录管理端 → 外呼与IVR → IVR流程管理 → 对 `SMARTCALL_DEMO` 点"测试"，可体验已落地的完整节点链：
+
+```
+收号(DTMF) → 收声(Answer) → 情绪分析 → 信息抽取 → 子流程 → 条件分支 → 转人工
+```
+
+这是 B1（智能体节点）落地前的基础能力底座。

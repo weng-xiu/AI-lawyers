@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.agent.AiAgentConfigMapper">
+
+    <resultMap type="AiAgentConfig" id="AiAgentConfigResult">
+        <result property="agentId"         column="agent_id"         />
+        <result property="agentName"       column="agent_name"       />
+        <result property="provider"        column="provider"         />
+        <result property="apiUrl"          column="api_url"          />
+        <result property="apiKey"          column="api_key"          />
+        <result property="appId"           column="app_id"           />
+        <result property="categoryId"      column="category_id"      />
+        <result property="systemPrompt"    column="system_prompt"    />
+        <result property="modelId"         column="model_id"         />
+        <result property="knowledgeIds"    column="knowledge_ids"    />
+        <result property="enableContext"   column="enable_context"   />
+        <result property="contextRounds"   column="context_rounds"   />
+        <result property="handoffKeywords" column="handoff_keywords" />
+        <result property="welcome"         column="welcome"          />
+        <result property="status"          column="status"           />
+        <result property="createBy"        column="create_by"        />
+        <result property="createTime"      column="create_time"      />
+        <result property="updateBy"        column="update_by"        />
+        <result property="updateTime"      column="update_time"      />
+        <result property="remark"          column="remark"           />
+    </resultMap>
+
+    <sql id="selectAiAgentConfigVo">
+        select agent_id, agent_name, provider, api_url, api_key, app_id, category_id, system_prompt,
+               model_id, knowledge_ids, enable_context, context_rounds, handoff_keywords, welcome, status,
+               create_by, create_time, update_by, update_time, remark
+        from ai_agent_config
+    </sql>
+
+    <select id="selectAiAgentConfigList" parameterType="AiAgentConfig" resultMap="AiAgentConfigResult">
+        <include refid="selectAiAgentConfigVo"/>
+        <where>
+            <if test="agentName != null and agentName != ''"> and agent_name like concat('%', #{agentName}, '%')</if>
+            <if test="provider != null and provider != ''"> and provider = #{provider}</if>
+            <if test="categoryId != null"> and category_id = #{categoryId}</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+        </where>
+        order by agent_id desc
+    </select>
+
+    <select id="selectAiAgentConfigByAgentId" parameterType="Long" resultMap="AiAgentConfigResult">
+        <include refid="selectAiAgentConfigVo"/>
+        where agent_id = #{agentId}
+    </select>
+
+    <select id="selectActiveAgentConfigs" resultMap="AiAgentConfigResult">
+        <include refid="selectAiAgentConfigVo"/>
+        where status = '1'
+        order by agent_id desc
+    </select>
+
+    <insert id="insertAiAgentConfig" parameterType="AiAgentConfig" useGeneratedKeys="true" keyProperty="agentId">
+        insert into ai_agent_config
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="agentName != null and agentName != ''">agent_name,</if>
+            <if test="provider != null and provider != ''">provider,</if>
+            <if test="apiUrl != null">api_url,</if>
+            <if test="apiKey != null">api_key,</if>
+            <if test="appId != null">app_id,</if>
+            <if test="categoryId != null">category_id,</if>
+            <if test="systemPrompt != null">system_prompt,</if>
+            <if test="modelId != null">model_id,</if>
+            <if test="knowledgeIds != null">knowledge_ids,</if>
+            <if test="enableContext != null and enableContext != ''">enable_context,</if>
+            <if test="contextRounds != null">context_rounds,</if>
+            <if test="handoffKeywords != null">handoff_keywords,</if>
+            <if test="welcome != null">welcome,</if>
+            <if test="status != null and status != ''">status,</if>
+            <if test="createBy != null and createBy != ''">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="agentName != null and agentName != ''">#{agentName},</if>
+            <if test="provider != null and provider != ''">#{provider},</if>
+            <if test="apiUrl != null">#{apiUrl},</if>
+            <if test="apiKey != null">#{apiKey},</if>
+            <if test="appId != null">#{appId},</if>
+            <if test="categoryId != null">#{categoryId},</if>
+            <if test="systemPrompt != null">#{systemPrompt},</if>
+            <if test="modelId != null">#{modelId},</if>
+            <if test="knowledgeIds != null">#{knowledgeIds},</if>
+            <if test="enableContext != null and enableContext != ''">#{enableContext},</if>
+            <if test="contextRounds != null">#{contextRounds},</if>
+            <if test="handoffKeywords != null">#{handoffKeywords},</if>
+            <if test="welcome != null">#{welcome},</if>
+            <if test="status != null and status != ''">#{status},</if>
+            <if test="createBy != null and createBy != ''">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateAiAgentConfig" parameterType="AiAgentConfig">
+        update ai_agent_config
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="agentName != null and agentName != ''">agent_name = #{agentName},</if>
+            <if test="provider != null and provider != ''">provider = #{provider},</if>
+            <if test="apiUrl != null">api_url = #{apiUrl},</if>
+            <if test="apiKey != null">api_key = #{apiKey},</if>
+            <if test="appId != null">app_id = #{appId},</if>
+            <if test="categoryId != null">category_id = #{categoryId},</if>
+            <if test="systemPrompt != null">system_prompt = #{systemPrompt},</if>
+            <if test="modelId != null">model_id = #{modelId},</if>
+            <if test="knowledgeIds != null">knowledge_ids = #{knowledgeIds},</if>
+            <if test="enableContext != null and enableContext != ''">enable_context = #{enableContext},</if>
+            <if test="contextRounds != null">context_rounds = #{contextRounds},</if>
+            <if test="handoffKeywords != null">handoff_keywords = #{handoffKeywords},</if>
+            <if test="welcome != null">welcome = #{welcome},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where agent_id = #{agentId}
+    </update>
+
+    <delete id="deleteAiAgentConfigByAgentId" parameterType="Long">
+        delete from ai_agent_config where agent_id = #{agentId}
+    </delete>
+
+    <delete id="deleteAiAgentConfigByAgentIds" parameterType="String">
+        delete from ai_agent_config where agent_id in
+        <foreach item="agentId" collection="array" open="(" separator="," close=")">
+            #{agentId}
+        </foreach>
+    </delete>
+</mapper>

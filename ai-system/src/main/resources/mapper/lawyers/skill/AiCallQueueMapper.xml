@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.skill.AiCallQueueMapper">
+
+    <resultMap type="AiCallQueue" id="AiCallQueueResult">
+        <result property="queueId"       column="queue_id"       />
+        <result property="sessionId"     column="session_id"     />
+        <result property="recordId"      column="record_id"      />
+        <result property="callerNumber"  column="caller_number"  />
+        <result property="groupId"       column="group_id"       />
+        <result property="enqueueTime"   column="enqueue_time"   />
+        <result property="dequeueTime"   column="dequeue_time"   />
+        <result property="agentId"       column="agent_id"       />
+        <result property="waitDuration"  column="wait_duration"  />
+        <result property="queueStatus"   column="queue_status"   />
+        <result property="strategyUsed"  column="strategy_used"  />
+        <result property="priority"      column="priority"       />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="groupName"     column="group_name"     />
+        <result property="agentName"     column="agent_name"     />
+    </resultMap>
+
+    <sql id="selectQueueVo">
+        select q.queue_id, q.session_id, q.record_id, q.caller_number, q.group_id, q.enqueue_time,
+               q.dequeue_time, q.agent_id, q.wait_duration, q.queue_status, q.strategy_used, q.priority,
+               q.create_time, q.update_time,
+               g.group_name, a.agent_name
+        from ai_call_queue q
+        left join ai_skill_group g on g.group_id = q.group_id
+        left join ai_call_agent_status a on a.agent_id = q.agent_id
+    </sql>
+
+    <select id="selectAiCallQueueList" parameterType="AiCallQueue" resultMap="AiCallQueueResult">
+        <include refid="selectQueueVo"/>
+        <where>
+            <if test="sessionId != null and sessionId != ''"> and q.session_id = #{sessionId}</if>
+            <if test="recordId != null"> and q.record_id = #{recordId}</if>
+            <if test="callerNumber != null and callerNumber != ''"> and q.caller_number like concat('%', #{callerNumber}, '%')</if>
+            <if test="groupId != null"> and q.group_id = #{groupId}</if>
+            <if test="queueStatus != null and queueStatus != ''"> and q.queue_status = #{queueStatus}</if>
+            <if test="agentId != null"> and q.agent_id = #{agentId}</if>
+        </where>
+        order by q.queue_id desc
+    </select>
+
+    <select id="selectAiCallQueueByQueueId" parameterType="Long" resultMap="AiCallQueueResult">
+        <include refid="selectQueueVo"/>
+        where q.queue_id = #{queueId}
+    </select>
+
+    <select id="selectQueuingByGroupId" parameterType="Long" resultMap="AiCallQueueResult">
+        <include refid="selectQueueVo"/>
+        where q.group_id = #{groupId} and q.queue_status = '0'
+        order by q.priority desc, q.enqueue_time asc
+    </select>
+
+    <select id="countQueuingByGroupId" parameterType="Long" resultType="int">
+        select count(1) from ai_call_queue where group_id = #{groupId} and queue_status = '0'
+    </select>
+
+    <select id="selectQueuingBySessionId" parameterType="String" resultMap="AiCallQueueResult">
+        <include refid="selectQueueVo"/>
+        where q.session_id = #{sessionId} and q.queue_status = '0'
+        order by q.queue_id desc limit 1
+    </select>
+
+    <select id="countBefore" resultType="int">
+        select count(1) from ai_call_queue
+        where group_id = #{groupId} and queue_status = '0'
+          and (priority &gt; #{priority} or (priority = #{priority} and enqueue_time &lt; #{enqueueTime}))
+    </select>
+
+    <insert id="insertAiCallQueue" parameterType="AiCallQueue" useGeneratedKeys="true" keyProperty="queueId">
+        insert into ai_call_queue
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="sessionId != null and sessionId != ''">session_id,</if>
+            <if test="recordId != null">record_id,</if>
+            <if test="callerNumber != null and callerNumber != ''">caller_number,</if>
+            <if test="groupId != null">group_id,</if>
+            <if test="enqueueTime != null">enqueue_time,</if>
+            <if test="queueStatus != null and queueStatus != ''">queue_status,</if>
+            <if test="strategyUsed != null and strategyUsed != ''">strategy_used,</if>
+            <if test="priority != null">priority,</if>
+            <if test="agentId != null">agent_id,</if>
+            <if test="waitDuration != null">wait_duration,</if>
+            <if test="dequeueTime != null">dequeue_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="sessionId != null and sessionId != ''">#{sessionId},</if>
+            <if test="recordId != null">#{recordId},</if>
+            <if test="callerNumber != null and callerNumber != ''">#{callerNumber},</if>
+            <if test="groupId != null">#{groupId},</if>
+            <if test="enqueueTime != null">#{enqueueTime},</if>
+            <if test="queueStatus != null and queueStatus != ''">#{queueStatus},</if>
+            <if test="strategyUsed != null and strategyUsed != ''">#{strategyUsed},</if>
+            <if test="priority != null">#{priority},</if>
+            <if test="agentId != null">#{agentId},</if>
+            <if test="waitDuration != null">#{waitDuration},</if>
+            <if test="dequeueTime != null">#{dequeueTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateAiCallQueue" parameterType="AiCallQueue">
+        update ai_call_queue
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="agentId != null">agent_id = #{agentId},</if>
+            <if test="queueStatus != null and queueStatus != ''">queue_status = #{queueStatus},</if>
+            <if test="strategyUsed != null and strategyUsed != ''">strategy_used = #{strategyUsed},</if>
+            <if test="waitDuration != null">wait_duration = #{waitDuration},</if>
+            <if test="dequeueTime != null">dequeue_time = #{dequeueTime},</if>
+            <if test="priority != null">priority = #{priority},</if>
+        </trim>
+        where queue_id = #{queueId}
+    </update>
+
+    <update id="expireQueued">
+        update ai_call_queue
+        set queue_status = #{status}, dequeue_time = sysdate(),
+            wait_duration = timestampdiff(second, enqueue_time, sysdate())
+        where group_id = #{groupId} and queue_status = '0' and enqueue_time &lt; #{beforeTime}
+    </update>
+
+    <delete id="deleteAiCallQueueByQueueIds" parameterType="String">
+        delete from ai_call_queue where queue_id in
+        <foreach item="queueId" collection="array" open="(" separator="," close=")">#{queueId}</foreach>
+    </delete>
+
+</mapper>

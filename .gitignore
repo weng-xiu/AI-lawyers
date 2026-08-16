@@ -52,3 +52,4 @@ nbdist/
 /aiuser-ui/node_modules/
 /node_modules/
 /third_party/
+/.m2-repo/
