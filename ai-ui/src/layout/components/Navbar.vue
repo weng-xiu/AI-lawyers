@@ -115,8 +115,8 @@ export default {
   height: 56px;
   overflow: hidden;
   position: relative;
-  background: #003F7D;
-  border-bottom: 1px solid #1e40af;
+  background: #1A3C6E;
+  border-bottom: 1px solid #255A99;
 
   .hamburger-container {
     line-height: 56px;
@@ -125,7 +125,7 @@ export default {
     cursor: pointer;
     transition: background .3s;
     -webkit-tap-highlight-color:transparent;
-    color: #e2e8f0;
+    color: #DCE2EB;
 
     &:hover {
       background: rgba(255, 255, 255, 0.08)
@@ -160,7 +160,7 @@ export default {
       padding: 0 8px;
       height: 100%;
       font-size: 18px;
-      color: #e2e8f0;
+      color: #DCE2EB;
       vertical-align: text-bottom;
 
       &.hover-effect {
@@ -194,7 +194,7 @@ export default {
           bottom: 10px;
           font-size: 14px;
           font-weight: bold;
-          color: #F5F8FC;
+          color: #FFFFFF;
         }
 
         .el-icon-caret-bottom {
@@ -203,7 +203,7 @@ export default {
           right: -20px;
           top: 25px;
           font-size: 12px;
-          color: #cbd5e1;
+          color: #DCE2EB;
         }
       }
     }

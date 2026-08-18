@@ -155,7 +155,7 @@
           <template slot-scope="scope">
             <el-button type="text" size="mini" icon="el-icon-view" @click="handleView(scope.row)">查看</el-button>
             <el-button type="text" size="mini" icon="el-icon-edit" @click="handleEdit(scope.row)">编辑</el-button>
-            <el-button type="text" size="mini" icon="el-icon-delete" style="color: #DC2626" @click="handleDelete(scope.row)">删除</el-button>
+            <el-button type="text" size="mini" icon="el-icon-delete" style="color: #C63D4A" @click="handleDelete(scope.row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -586,7 +586,7 @@ export default {
 <style lang="scss" scoped>
 .work-order-page {
   min-height: calc(100vh - 84px);
-  background: #F5F8FC;
+  background: #F5F7FA;
   padding: 24px;
 
   .search-card {
@@ -645,31 +645,31 @@ export default {
           font-size: 28px;
           font-weight: 700;
           line-height: 1.2;
-          color: #1e293b;
+          color: #1F2A3A;
         }
 
         .stat-label {
           font-size: 14px;
-          color: #64748b;
+          color: #5A6A7E;
           margin-top: 6px;
         }
       }
 
       &.stat-pending {
         .stat-icon {
-          background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+          background: linear-gradient(135deg, #E8923A 0%, #d97706 100%);
         }
       }
 
       &.stat-processing {
         .stat-icon {
-          background: linear-gradient(135deg, #1677FF 0%, #005BAC 100%);
+          background: linear-gradient(135deg, #255A99 0%, #1A3C6E 100%);
         }
       }
 
       &.stat-completed {
         .stat-icon {
-          background: linear-gradient(135deg, #16A34A 0%, #16A34A 100%);
+          background: linear-gradient(135deg, #2B8C6E 0%, #2B8C6E 100%);
         }
       }
 
@@ -704,18 +704,18 @@ export default {
     }
 
     .order-link {
-      color: #1677FF;
+      color: #255A99;
       cursor: pointer;
 
       &:hover {
-        color: #005BAC;
+        color: #1A3C6E;
         text-decoration: underline;
       }
     }
   }
 
   ::v-deep .el-drawer {
-    background: #F5F8FC;
+    background: #F5F7FA;
 
     .el-drawer__body {
       padding: 0;
@@ -731,7 +731,7 @@ export default {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid #DCE2EB;
 
     .drawer-title {
       display: flex;
@@ -741,17 +741,17 @@ export default {
       .order-no {
         font-size: 18px;
         font-weight: 700;
-        color: #1e293b;
+        color: #1F2A3A;
       }
     }
 
     .close-btn {
       font-size: 20px;
-      color: #64748b;
+      color: #5A6A7E;
       padding: 8px;
 
       &:hover {
-        color: #1e293b;
+        color: #1F2A3A;
       }
     }
   }
@@ -764,7 +764,7 @@ export default {
     ::v-deep .el-tabs__header {
       margin: 0;
       padding: 0 24px;
-      border-bottom: 1px solid #e2e8f0;
+      border-bottom: 1px solid #DCE2EB;
     }
 
     ::v-deep .el-tabs__item {
@@ -791,10 +791,10 @@ export default {
       .section-title {
         font-size: 15px;
         font-weight: 600;
-        color: #1e293b;
+        color: #1F2A3A;
         margin-bottom: 16px;
         padding-left: 10px;
-        border-left: 3px solid #1677FF;
+        border-left: 3px solid #255A99;
       }
     }
   }
@@ -807,31 +807,31 @@ export default {
     }
 
     ::v-deep .el-timeline-item__timestamp {
-      color: #64748b;
+      color: #5A6A7E;
       font-size: 12px;
     }
 
     .timeline-content {
-      background: #F5F8FC;
+      background: #F5F7FA;
       border-radius: 8px;
       padding: 16px 20px;
 
       .timeline-title {
         font-size: 14px;
         font-weight: 600;
-        color: #1e293b;
+        color: #1F2A3A;
         margin-bottom: 6px;
       }
 
       .timeline-user {
         font-size: 12px;
-        color: #1677FF;
+        color: #255A99;
         margin-bottom: 8px;
       }
 
       .timeline-desc {
         font-size: 13px;
-        color: #64748b;
+        color: #5A6A7E;
         line-height: 1.6;
       }
     }
@@ -840,7 +840,7 @@ export default {
   .drawer-footer {
     background: #fff;
     padding: 16px 24px;
-    border-top: 1px solid #e2e8f0;
+    border-top: 1px solid #DCE2EB;
     display: flex;
     justify-content: flex-end;
     gap: 12px;

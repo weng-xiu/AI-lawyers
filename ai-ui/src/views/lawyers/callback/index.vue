@@ -298,10 +298,10 @@ export default {
           xAxis: { type: 'category', boundaryGap: false, data: data.map(i => i.date) },
           yAxis: { type: 'value' },
           series: [
-            { name: '非常满意', type: 'line', smooth: true, data: data.map(i => i.verySatisfied || 0), itemStyle: { color: '#67c23a' } },
-            { name: '满意', type: 'line', smooth: true, data: data.map(i => i.satisfied || 0), itemStyle: { color: '#409eff' } },
-            { name: '一般', type: 'line', smooth: true, data: data.map(i => i.normal || 0), itemStyle: { color: '#F59E0B' } },
-            { name: '不满意', type: 'line', smooth: true, data: data.map(i => i.unsatisfied || 0), itemStyle: { color: '#f56c6c' } }
+            { name: '非常满意', type: 'line', smooth: true, data: data.map(i => i.verySatisfied || 0), itemStyle: { color: '#2B8C6E' } },
+            { name: '满意', type: 'line', smooth: true, data: data.map(i => i.satisfied || 0), itemStyle: { color: '#1A3C6E' } },
+            { name: '一般', type: 'line', smooth: true, data: data.map(i => i.normal || 0), itemStyle: { color: '#E8923A' } },
+            { name: '不满意', type: 'line', smooth: true, data: data.map(i => i.unsatisfied || 0), itemStyle: { color: '#C63D4A' } }
           ]
         }
         this.trendChart.setOption(option, true)
@@ -429,10 +429,10 @@ export default {
   .cb-stat-label { font-size: 13px; opacity: 0.9; }
   .cb-stat-value { font-size: 26px; font-weight: 600; line-height: 1.2; margin-top: 4px; }
 }
-.cb-stat-total { background: linear-gradient(135deg, #409eff, #66b1ff); }
-.cb-stat-done { background: linear-gradient(135deg, #67c23a, #95d475); }
-.cb-stat-pending { background: linear-gradient(135deg, #F59E0B, #f3b55c); }
-.cb-stat-score { background: linear-gradient(135deg, #f56c6c, #f89898); }
+.cb-stat-total { background: linear-gradient(135deg, #1A3C6E, #255A99); }
+.cb-stat-done { background: linear-gradient(135deg, #2B8C6E, #54A68B); }
+.cb-stat-pending { background: linear-gradient(135deg, #E8923A, #EFA960); }
+.cb-stat-score { background: linear-gradient(135deg, #C63D4A, #D98089); }
 .cb-trend-card { margin-bottom: 16px; }
 .cb-trend-chart { height: 280px; }
 .cb-card-header { display: flex; align-items: center; justify-content: space-between; }

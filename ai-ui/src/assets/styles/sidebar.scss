@@ -5,7 +5,7 @@
     transition: margin-left .28s;
     margin-left: $base-sidebar-width;
     position: relative;
-    background-color: #F5F8FC;
+    background-color: #F5F7FA;
   }
 
   .sidebarHide {
@@ -16,7 +16,7 @@
     -webkit-transition: width .28s;
     transition: width 0.28s;
     width: $base-sidebar-width !important;
-    background: #003F7D;
+    background: #1A3C6E;
     height: 100%;
     position: fixed;
     font-size: 0px;
@@ -25,7 +25,7 @@
     left: 0;
     z-index: 1001;
     overflow: hidden;
-    border-right: 1px solid #00336B;
+    border-right: 1px solid #16335C;
 
     // reset element-ui css
     .horizontal-collapse-transition {
@@ -79,7 +79,7 @@
     // menu hover
     .submenu-title-noDropdown,
     .el-submenu__title {
-      color: #D9EAF7 !important;
+      color: #DCE2EB !important;
       &:hover {
         background-color: rgba(255, 255, 255, 0.08) !important;
       }
@@ -87,14 +87,14 @@
 
     & .theme-dark .is-active > .el-submenu__title {
       color: #FFFFFF !important;
-      background-color: #1677FF !important;
-      border-left: 4px solid #D4A017;
+      background-color: #255A99 !important;
+      border-left: 4px solid #C9A96E;
     }
 
     & .nest-menu .el-submenu>.el-submenu__title,
     & .el-submenu .el-menu-item {
       min-width: $base-sidebar-width !important;
-      color: #D9EAF7 !important;
+      color: #DCE2EB !important;
 
       &:hover {
         background-color: rgba(255, 255, 255, 0.08) !important;
@@ -103,7 +103,7 @@
 
     & .theme-dark .nest-menu .el-submenu>.el-submenu__title,
     & .theme-dark .el-submenu .el-menu-item {
-      background-color: #00336B !important;
+      background-color: #16335C !important;
 
       &:hover {
         background-color: rgba(255, 255, 255, 0.08) !important;
@@ -112,8 +112,8 @@
 
     & .theme-dark .el-menu-item.is-active {
       color: #FFFFFF !important;
-      background-color: #1677FF !important;
-      border-left: 4px solid #D4A017;
+      background-color: #255A99 !important;
+      border-left: 4px solid #C9A96E;
     }
   }
 

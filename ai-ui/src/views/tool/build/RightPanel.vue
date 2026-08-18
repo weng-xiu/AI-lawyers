@@ -892,7 +892,7 @@ export default {
   box-sizing: border-box;
   & .close-btn {
     cursor: pointer;
-    color: #f56c6c;
+    color: #C63D4A;
   }
   & .el-input + .el-input {
     margin-left: 4px;
@@ -902,7 +902,7 @@ export default {
   margin-top: 4px;
 }
 .select-item.sortable-chosen {
-  border: 1px dashed #409eff;
+  border: 1px dashed #1A3C6E;
 }
 .select-line-icon {
   line-height: 32px;
@@ -929,7 +929,7 @@ export default {
   top: 0;
   left: 0;
   cursor: pointer;
-  background: #409eff;
+  background: #1A3C6E;
   z-index: 1;
   border-radius: 0 0 6px 0;
   text-align: center;

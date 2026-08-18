@@ -2,20 +2,20 @@
 // 引入此文件到话务系统相关页面即可应用
 
 // 颜色定义
-$cc-bg: #f0f2f5;
+$cc-bg: #F5F7FA;
 $cc-bg-card: #ffffff;
-$cc-bg-hover: #f5f7fa;
-$cc-border: #e4e7ed;
-$cc-border-light: #ebeef5;
-$cc-text-primary: #303133;
-$cc-text-secondary: #606266;
-$cc-text-muted: #909399;
-$cc-primary: #005BAC;
-$cc-primary-light: #1677FF;
-$cc-primary-dark: #003F7D;
-$cc-success: #16A34A;
-$cc-warning: #F59E0B;
-$cc-danger: #f56c6c;
+$cc-bg-hover: #F3EDE0;
+$cc-border: #DCE2EB;
+$cc-border-light: #EAF0F8;
+$cc-text-primary: #1F2A3A;
+$cc-text-secondary: #5A6A7E;
+$cc-text-muted: #B0BCCA;
+$cc-primary: #1A3C6E;
+$cc-primary-light: #255A99;
+$cc-primary-dark: #16335C;
+$cc-success: #2B8C6E;
+$cc-warning: #E8923A;
+$cc-danger: #C63D4A;
 
 // 话务系统页面容器
 .cc-page {
@@ -161,19 +161,19 @@ $cc-danger: #f56c6c;
     color: $cc-text-secondary;
   }
   .el-tag--success {
-    background: #f0f9eb;
-    border-color: #e1f3d8;
-    color: #67c23a;
+    background: #EDF5EF;
+    border-color: #D6E9DC;
+    color: #2B8C6E;
   }
   .el-tag--warning {
-    background: #fdf6ec;
-    border-color: #faecd8;
-    color: #F59E0B;
+    background: #FDF3E7;
+    border-color: #FAE3C8;
+    color: #E8923A;
   }
   .el-tag--danger {
-    background: #fef0f0;
-    border-color: #fde2e2;
-    color: #f56c6c;
+    background: #FBECEE;
+    border-color: #F5D6DA;
+    color: #C63D4A;
   }
 
   // 工具栏

@@ -122,14 +122,14 @@ export default {
     statCards() {
       const aiSolved = Math.max(0, (Number(this.aiRatio.totalSessions) || 0) - (Number(this.aiRatio.handoffSessions) || 0));
       return [
-        { label: "今日呼入", value: this.num(this.callSummary.totalCalls), color: "#409EFF" },
-        { label: "已接通", value: this.num(this.callSummary.answeredCalls), color: "#67C23A" },
-        { label: "未接", value: this.num(this.callSummary.missedCalls), color: "#F56C6C" },
-        { label: "转接", value: this.num(this.callSummary.transferredCalls), color: "#F59E0B" },
-        { label: "均通话时长(秒)", value: this.num(this.callSummary.avgDuration), color: "#36cfc9" },
-        { label: "坐席在线/总数", value: `${this.num(this.agentStatusSummary.onlineAgents)}/${this.num(this.agentStatusSummary.totalAgents)}`, color: "#909399" },
-        { label: "平均满意度", value: this.num(this.satisfactionSummary.avgSatisfaction), color: "#7c5cff" },
-        { label: "AI独立解决", value: aiSolved, color: "#2f8f46" }
+        { label: "今日呼入", value: this.num(this.callSummary.totalCalls), color: "#1A3C6E" },
+        { label: "已接通", value: this.num(this.callSummary.answeredCalls), color: "#2B8C6E" },
+        { label: "未接", value: this.num(this.callSummary.missedCalls), color: "#C63D4A" },
+        { label: "转接", value: this.num(this.callSummary.transferredCalls), color: "#E8923A" },
+        { label: "均通话时长(秒)", value: this.num(this.callSummary.avgDuration), color: "#3B73B3" },
+        { label: "坐席在线/总数", value: `${this.num(this.agentStatusSummary.onlineAgents)}/${this.num(this.agentStatusSummary.totalAgents)}`, color: "#8C8C8C" },
+        { label: "平均满意度", value: this.num(this.satisfactionSummary.avgSatisfaction), color: "#9B6EAA" },
+        { label: "AI独立解决", value: aiSolved, color: "#54A68B" }
       ];
     }
   },
@@ -182,10 +182,10 @@ export default {
         xAxis: { type: 'category', data: x, axisLabel: { rotate: 40, fontSize: 10 } },
         yAxis: { type: 'value', minInterval: 1 },
         series: [
-          { name: '呼入', type: 'line', smooth: true, data: total, itemStyle: { color: '#409EFF' } },
-          { name: '接通', type: 'bar', barMaxWidth: 12, data: answered, itemStyle: { color: '#67C23A' } },
-          { name: '未接', type: 'bar', barMaxWidth: 12, data: missed, itemStyle: { color: '#F56C6C' } },
-          { name: '转接', type: 'bar', barMaxWidth: 12, data: transferred, itemStyle: { color: '#F59E0B' } }
+          { name: '呼入', type: 'line', smooth: true, data: total, itemStyle: { color: '#1A3C6E' } },
+          { name: '接通', type: 'bar', barMaxWidth: 12, data: answered, itemStyle: { color: '#2B8C6E' } },
+          { name: '未接', type: 'bar', barMaxWidth: 12, data: missed, itemStyle: { color: '#C63D4A' } },
+          { name: '转接', type: 'bar', barMaxWidth: 12, data: transferred, itemStyle: { color: '#E8923A' } }
         ]
       });
     },
@@ -218,8 +218,8 @@ export default {
           center: ['50%', '45%'],
           label: { formatter: '{b}\n{c}' },
           data: [
-            { name: 'AI独立解决', value: solved, itemStyle: { color: '#2f8f46' } },
-            { name: '转人工', value: handoff, itemStyle: { color: '#F59E0B' } }
+            { name: 'AI独立解决', value: solved, itemStyle: { color: '#2B8C6E' } },
+            { name: '转人工', value: handoff, itemStyle: { color: '#C9A96E' } }
           ]
         }]
       });
@@ -249,8 +249,8 @@ export default {
 <style scoped>
 .dashboard-container { padding: 16px 20px; }
 .filter-bar { display: flex; align-items: center; margin-bottom: 14px; }
-.filter-bar .title { font-size: 18px; font-weight: 600; color: #1f2d3d; margin-right: 20px; }
-.filter-bar .auto-tip { font-size: 12px; color: #909399; margin-left: 12px; }
+.filter-bar .title { font-size: 18px; font-weight: 600; color: #1F2A3A; margin-right: 20px; }
+.filter-bar .auto-tip { font-size: 12px; color: #8C8C8C; margin-left: 12px; }
 .stat-row { margin-bottom: 12px; }
 .stat-card { border-radius: 6px; padding: 16px 10px; color: #fff; text-align: center; }
 .stat-num { font-size: 24px; font-weight: bold; }

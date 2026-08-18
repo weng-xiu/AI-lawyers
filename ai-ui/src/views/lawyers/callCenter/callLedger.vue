@@ -176,7 +176,7 @@
           <template slot-scope="scope">
             <el-button type="text" size="mini" icon="el-icon-view" @click="handleDetail(scope.row)">查看详情</el-button>
             <el-button type="text" size="mini" icon="el-icon-edit" @click="handleEdit(scope.row)">编辑</el-button>
-            <el-button type="text" size="mini" icon="el-icon-delete" style="color: #f56c6c" @click="handleDelete(scope.row)">删除</el-button>
+            <el-button type="text" size="mini" icon="el-icon-delete" style="color: #C63D4A" @click="handleDelete(scope.row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -232,7 +232,7 @@
           </el-descriptions-item>
           <el-descriptions-item label="问题分类">{{ detailForm.subCategory }}</el-descriptions-item>
           <el-descriptions-item label="涉及金额" v-if="detailForm.involveAmount">
-            <span style="color: #f56c6c; font-weight: bold;">¥{{ detailForm.involveAmount }}</span>
+            <span style="color: #C63D4A; font-weight: bold;">¥{{ detailForm.involveAmount }}</span>
           </el-descriptions-item>
           <el-descriptions-item label="咨询摘要" :span="2">
             <div class="content-text">{{ detailForm.consultContent }}</div>
@@ -695,7 +695,7 @@ export default {
 <style lang="scss" scoped>
 .call-ledger {
   padding: 24px;
-  background-color: #F5F8FC;
+  background-color: #F5F7FA;
   min-height: calc(100vh - 84px);
 }
 
@@ -721,13 +721,13 @@ export default {
     }
     .stat-info {
       flex: 1;
-      .stat-value { font-size: 24px; font-weight: 600; color: #1e293b; line-height: 1.2; }
-      .stat-label { font-size: 13px; color: #64748b; margin-top: 6px; }
+      .stat-value { font-size: 24px; font-weight: 600; color: #1F2A3A; line-height: 1.2; }
+      .stat-label { font-size: 13px; color: #5A6A7E; margin-top: 6px; }
     }
-    &.stat-total .stat-icon { background: linear-gradient(135deg, #1677FF, #005BAC); }
-    &.stat-phone .stat-icon { background: linear-gradient(135deg, #1677FF, #005BAC); }
-    &.stat-site .stat-icon { background: linear-gradient(135deg, #16A34A, #16A34A); }
-    &.stat-online .stat-icon { background: linear-gradient(135deg, #f59e0b, #d97706); }
+    &.stat-total .stat-icon { background: linear-gradient(135deg, #255A99, #1A3C6E); }
+    &.stat-phone .stat-icon { background: linear-gradient(135deg, #255A99, #1A3C6E); }
+    &.stat-site .stat-icon { background: linear-gradient(135deg, #2B8C6E, #2B8C6E); }
+    &.stat-online .stat-icon { background: linear-gradient(135deg, #E8923A, #d97706); }
     &.stat-video .stat-icon { background: linear-gradient(135deg, #7C3AED, #7c3aed); }
     &.stat-satisfaction .stat-icon { background: linear-gradient(135deg, #06b6d4, #0891b2); }
   }
@@ -747,11 +747,11 @@ export default {
 .template-bar {
   padding: 16px 0;
   margin-bottom: 16px;
-  border-top: 1px dashed #e2e8f0;
-  border-bottom: 1px dashed #e2e8f0;
+  border-top: 1px dashed #DCE2EB;
+  border-bottom: 1px dashed #DCE2EB;
   .template-label {
     font-size: 13px;
-    color: #64748b;
+    color: #5A6A7E;
     margin-right: 10px;
     font-weight: 600;
   }
@@ -768,12 +768,12 @@ export default {
 }
 
 .link-blue {
-  color: #1677FF;
+  color: #255A99;
   cursor: pointer;
   &:hover { text-decoration: underline; }
 }
 
-.text-muted { color: #cbd5e1; }
+.text-muted { color: #B0BCCA; }
 
 .satisfaction-text {
   display: inline-flex;
@@ -781,10 +781,10 @@ export default {
   gap: 6px;
   font-size: 12px;
   i { font-size: 12px; }
-  &.satisfaction-1 { color: #16A34A; i { color: #16A34A; } }
-  &.satisfaction-2 { color: #1677FF; i { color: #1677FF; } }
-  &.satisfaction-3 { color: #f59e0b; i { color: #f59e0b; } }
-  &.satisfaction-4 { color: #DC2626; i { color: #DC2626; } }
+  &.satisfaction-1 { color: #2B8C6E; i { color: #2B8C6E; } }
+  &.satisfaction-2 { color: #255A99; i { color: #255A99; } }
+  &.satisfaction-3 { color: #E8923A; i { color: #E8923A; } }
+  &.satisfaction-4 { color: #C63D4A; i { color: #C63D4A; } }
 }
 
 .detail-dialog, .form-dialog {
@@ -799,11 +799,11 @@ export default {
     align-items: center;
     font-size: 15px;
     font-weight: 600;
-    color: #1e293b;
+    color: #1F2A3A;
     margin-bottom: 16px;
     padding-left: 8px;
     .title-bar {
-      width: 4px; height: 16px; background: #1677FF;
+      width: 4px; height: 16px; background: #255A99;
       border-radius: 2px; margin-right: 12px;
     }
   }
@@ -816,11 +816,11 @@ export default {
 
 .reply-content {
   padding: 20px;
-  background: #F5F8FC;
+  background: #F5F7FA;
   border-radius: 6px;
   line-height: 1.8;
   color: #334155;
-  border-left: 3px solid #1677FF;
+  border-left: 3px solid #255A99;
   white-space: pre-wrap;
 }
 

@@ -190,12 +190,12 @@ export default {
 .title {
   font-size: 18px;
   font-weight: bold;
-  color: #303133;
+  color: #1F2A3A;
 }
 
 .title i {
   margin-right: 8px;
-  color: #409EFF;
+  color: #1A3C6E;
 }
 
 .consultation-result {
@@ -204,7 +204,7 @@ export default {
 
 .result-title {
   font-weight: bold;
-  color: #409EFF;
+  color: #1A3C6E;
 }
 
 .result-title i {

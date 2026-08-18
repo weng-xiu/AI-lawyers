@@ -115,7 +115,7 @@ export default {
   .welcome-section {
     text-align: center;
     padding: 30px 0;
-    background: linear-gradient(135deg, #409EFF, #36A3F5);
+    background: linear-gradient(135deg, #1A3C6E, #36A3F5);
     color: white;
     border-radius: 8px;
     margin-bottom: 20px;

@@ -865,8 +865,8 @@ export default {
     margin-top: 4px;
   }
 }
-.cm-stat-voice { background: linear-gradient(135deg, #67c23a, #95d475); }
-.cm-stat-img { background: linear-gradient(135deg, #409eff, #66b1ff); }
-.cm-stat-video { background: linear-gradient(135deg, #F59E0B, #f3b55c); }
-.cm-stat-total { background: linear-gradient(135deg, #909399, #b1b3b8); }
+.cm-stat-voice { background: linear-gradient(135deg, #2B8C6E, #54A68B); }
+.cm-stat-img { background: linear-gradient(135deg, #1A3C6E, #255A99); }
+.cm-stat-video { background: linear-gradient(135deg, #E8923A, #EFA960); }
+.cm-stat-total { background: linear-gradient(135deg, #8C8C8C, #b1b3b8); }
 </style>

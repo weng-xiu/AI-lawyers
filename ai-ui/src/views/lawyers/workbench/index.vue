@@ -213,12 +213,12 @@ export default {
 <style lang="scss" scoped>
 .workbench {
   padding: 24px;
-  background: #F5F8FC;
+  background: #F5F7FA;
   min-height: calc(100vh - 84px);
 }
 
 .wb-banner {
-  background: linear-gradient(135deg, #003F7D 0%, #1677FF 100%);
+  background: linear-gradient(135deg, #16335C 0%, #255A99 100%);
   border-radius: 12px;
   padding: 28px 32px;
   color: #fff;
@@ -267,19 +267,19 @@ export default {
       color: #fff;
     }
     .wb-stat-body { flex: 1; }
-    .wb-stat-value { font-size: 24px; font-weight: 700; color: #1e293b; line-height: 1.2; }
-    .wb-stat-title { font-size: 13px; color: #64748b; margin-top: 6px; }
+    .wb-stat-value { font-size: 24px; font-weight: 700; color: #1F2A3A; line-height: 1.2; }
+    .wb-stat-title { font-size: 13px; color: #5A6A7E; margin-top: 6px; }
   }
-  .wb-sicon-blue { background: linear-gradient(135deg, #1677FF, #005BAC); }
-  .wb-sicon-green { background: linear-gradient(135deg, #16A34A, #16A34A); }
-  .wb-sicon-orange { background: linear-gradient(135deg, #f59e0b, #d97706); }
+  .wb-sicon-blue { background: linear-gradient(135deg, #255A99, #1A3C6E); }
+  .wb-sicon-green { background: linear-gradient(135deg, #2B8C6E, #2B8C6E); }
+  .wb-sicon-orange { background: linear-gradient(135deg, #E8923A, #d97706); }
   .wb-sicon-purple { background: linear-gradient(135deg, #7C3AED, #7c3aed); }
 }
 
 .wb-card {
   border-radius: 12px;
   margin-bottom: 24px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #DCE2EB;
   ::v-deep .el-card__body { padding: 20px 24px; }
   .wb-card-header {
     display: flex;
@@ -287,8 +287,8 @@ export default {
     justify-content: space-between;
     font-weight: 600;
     font-size: 15px;
-    color: #1e293b;
-    i { color: #1677FF; margin-right: 6px; }
+    color: #1F2A3A;
+    i { color: #255A99; margin-right: 6px; }
   }
 }
 
@@ -310,14 +310,14 @@ export default {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #DC2626;
+    background: #C63D4A;
     margin-top: 2px;
   }
 }
 .wb-cal-today {
-  background: #EDF5FE;
+  background: #E9EFF7;
   border-radius: 6px;
-  color: #1677FF;
+  color: #255A99;
   font-weight: 700;
 }
 
@@ -334,7 +334,7 @@ export default {
   cursor: pointer;
   border-radius: 8px;
   transition: all 0.2s;
-  &:hover { background: #F5F8FC; }
+  &:hover { background: #F5F7FA; }
   .wb-quick-icon {
     width: 48px;
     height: 48px;
@@ -345,20 +345,20 @@ export default {
     font-size: 22px;
     margin-bottom: 10px;
   }
-  span { font-size: 13px; color: #475569; }
+  span { font-size: 13px; color: #5A6A7E; }
 }
-.wb-qicon-blue { background: #EDF5FE; color: #1677FF; }
-.wb-qicon-green { background: #f0fdf4; color: #16a34a; }
+.wb-qicon-blue { background: #E9EFF7; color: #255A99; }
+.wb-qicon-green { background: #f0fdf4; color: #2B8C6E; }
 .wb-qicon-blue2 { background: #e0e7ff; color: #6366f1; }
 .wb-qicon-teal { background: #ccfbf1; color: #0d9488; }
 
 .wb-record-item {
   padding: 12px 0;
-  border-bottom: 1px solid #F5F8FC;
+  border-bottom: 1px solid #F5F7FA;
   &:last-child { border-bottom: none; }
   .wb-record-top { display: flex; justify-content: space-between; align-items: center; }
-  .wb-record-phone { font-size: 14px; font-weight: 600; color: #1e293b; }
-  .wb-record-name { font-size: 12px; color: #475569; margin-top: 6px; }
+  .wb-record-phone { font-size: 14px; font-weight: 600; color: #1F2A3A; }
+  .wb-record-name { font-size: 12px; color: #5A6A7E; margin-top: 6px; }
   .wb-record-time { font-size: 12px; color: #94a3b8; margin-top: 4px; }
 }
 

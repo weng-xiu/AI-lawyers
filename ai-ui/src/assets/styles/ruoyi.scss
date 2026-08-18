@@ -123,8 +123,8 @@
   .el-table__header-wrapper, .el-table__fixed-header-wrapper {
     th {
       word-break: break-word;
-      background-color: #f8f8f9;
-      color: #515a6e;
+      background-color: #EDF0F5;
+      color: #5A6A7E;
       height: 48px;
       font-size: 13px;
     }
@@ -140,8 +140,8 @@
 /** 表单布局 **/
 .form-header {
   font-size: 15px;
-  color: #6379bb;
-  border-bottom: 1px solid #ddd;
+  color: #1A3C6E;
+  border-bottom: 1px solid #DCE2EB;
   margin: 8px 10px 25px 10px;
   padding-bottom: 5px
 }
@@ -251,7 +251,7 @@
 
 /* text color */
 .text-navy {
-  color: #1ab394;
+  color: #1A3C6E;
 }
 
 .text-primary {
@@ -259,23 +259,23 @@
 }
 
 .text-success {
-  color: #1c84c6;
+  color: #2B8C6E;
 }
 
 .text-info {
-  color: #23c6c8;
+  color: #2B6BB0;
 }
 
 .text-warning {
-  color: #f8ac59;
+  color: #E8923A;
 }
 
 .text-danger {
-  color: #ed5565;
+  color: #C63D4A;
 }
 
 .text-muted {
-  color: #888888;
+  color: #B0BCCA;
 }
 
 /* image */

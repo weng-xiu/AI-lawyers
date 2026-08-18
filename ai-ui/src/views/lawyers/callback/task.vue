@@ -402,8 +402,8 @@ export default {
 }
 .rvt-stat-label { font-size: 13px; opacity: 0.9; }
 .rvt-stat-value { font-size: 26px; font-weight: 600; line-height: 1.2; }
-.rvt-stat-total { background: linear-gradient(135deg, #409eff, #66b1ff); }
-.rvt-stat-pending { background: linear-gradient(135deg, #F59E0B, #f0c78a); }
-.rvt-stat-done { background: linear-gradient(135deg, #67c23a, #95d475); }
-.rvt-stat-overdue { background: linear-gradient(135deg, #f56c6c, #f89898); }
+.rvt-stat-total { background: linear-gradient(135deg, #1A3C6E, #255A99); }
+.rvt-stat-pending { background: linear-gradient(135deg, #E8923A, #EFC89A); }
+.rvt-stat-done { background: linear-gradient(135deg, #2B8C6E, #54A68B); }
+.rvt-stat-overdue { background: linear-gradient(135deg, #C63D4A, #D98089); }
 </style>

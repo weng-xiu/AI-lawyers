@@ -233,9 +233,9 @@
           <el-timeline-item v-for="t in detailTransfers" :key="t.transferId"
             :timestamp="parseTime(t.transferTime)" placement="top" size="normal">
             <span style="font-weight:600;">{{ t.fromAgentName }}</span>
-            <i class="el-icon-right" style="margin:0 6px;color:#909399;"></i>
-            <span style="font-weight:600;color:#409EFF;">{{ t.toAgentName }}</span>
-            <span style="color:#909399;margin-left:8px;">{{ t.reason || '转接' }}</span>
+            <i class="el-icon-right" style="margin:0 6px;color:#8C8C8C;"></i>
+            <span style="font-weight:600;color:#1A3C6E;">{{ t.toAgentName }}</span>
+            <span style="color:#8C8C8C;margin-left:8px;">{{ t.reason || '转接' }}</span>
           </el-timeline-item>
         </el-timeline>
         <el-empty v-else description="暂无转接记录" :image-size="50" />
@@ -337,7 +337,7 @@
         </el-form-item>
         <el-form-item label="关联来电">
           <el-tag size="small" type="info">记录ID: {{ ticketForm.recordId }}</el-tag>
-          <span style="margin-left:8px;color:#909399;font-size:12px;">{{ ticketForm.callerName || '未知来电人' }}</span>
+          <span style="margin-left:8px;color:#8C8C8C;font-size:12px;">{{ ticketForm.callerName || '未知来电人' }}</span>
         </el-form-item>
       </el-form>
       <div slot="footer" class="dialog-footer">
@@ -628,11 +628,11 @@ export default {
   .detail-section-title {
     font-size: 14px;
     font-weight: 600;
-    color: #303133;
+    color: #1F2A3A;
     margin-bottom: 10px;
     padding-left: 8px;
-    border-left: 3px solid #409EFF;
-    i { margin-right: 4px; color: #409EFF; }
+    border-left: 3px solid #1A3C6E;
+    i { margin-right: 4px; color: #1A3C6E; }
   }
 }
 </style>

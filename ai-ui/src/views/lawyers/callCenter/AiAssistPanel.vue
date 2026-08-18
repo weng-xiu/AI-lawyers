@@ -155,13 +155,13 @@ export default {
   display: inline-block; background: linear-gradient(135deg, #667eea, #764ba2);
   color: #fff; font-size: 11px; padding: 1px 6px; border-radius: 4px; margin-right: 6px;
 }
-.ai-empty { text-align: center; color: #909399; padding: 24px 0; }
+.ai-empty { text-align: center; color: #8C8C8C; padding: 24px 0; }
 .ai-empty i { font-size: 28px; margin-bottom: 8px; }
 .ai-section { margin-bottom: 14px; }
-.ai-section-title { font-size: 13px; font-weight: 600; color: #303133; margin-bottom: 8px; }
-.ai-law-item { background: #f5f7fa; border-left: 3px solid #409eff; padding: 6px 10px; margin-bottom: 6px; border-radius: 0 4px 4px 0; font-size: 13px; }
-.ai-hint { color: #c0c4cc; font-size: 12px; }
-.ai-script-list { margin: 0; padding-left: 18px; color: #606266; font-size: 13px; line-height: 1.8; }
-.ai-summary { background: #f0f9eb; border: 1px solid #e1f3d8; padding: 10px; border-radius: 4px; font-size: 12px; white-space: pre-wrap; color: #67c23a; }
+.ai-section-title { font-size: 13px; font-weight: 600; color: #1F2A3A; margin-bottom: 8px; }
+.ai-law-item { background: #f5f7fa; border-left: 3px solid #1A3C6E; padding: 6px 10px; margin-bottom: 6px; border-radius: 0 4px 4px 0; font-size: 13px; }
+.ai-hint { color: #B0BCCA; font-size: 12px; }
+.ai-script-list { margin: 0; padding-left: 18px; color: #5A6A7E; font-size: 13px; line-height: 1.8; }
+.ai-summary { background: #EDF5EF; border: 1px solid #D6E9DC; padding: 10px; border-radius: 4px; font-size: 12px; white-space: pre-wrap; color: #2B8C6E; }
 .ai-actions { display: flex; gap: 10px; margin-top: 12px; }
 </style>

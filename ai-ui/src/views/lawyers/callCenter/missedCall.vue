@@ -441,10 +441,10 @@ export default {
     margin-top: 6px;
   }
 }
-.mc-stat-today { background: linear-gradient(135deg, #f56c6c, #f89898); }
-.mc-stat-week { background: linear-gradient(135deg, #F59E0B, #f3b55c); }
-.mc-stat-cb { background: linear-gradient(135deg, #67c23a, #95d475); }
-.mc-stat-rate { background: linear-gradient(135deg, #409eff, #66b1ff); }
+.mc-stat-today { background: linear-gradient(135deg, #C63D4A, #D98089); }
+.mc-stat-week { background: linear-gradient(135deg, #E8923A, #EFA960); }
+.mc-stat-cb { background: linear-gradient(135deg, #2B8C6E, #54A68B); }
+.mc-stat-rate { background: linear-gradient(135deg, #1A3C6E, #255A99); }
 
 .mc-tabs {
   background: #fff;
@@ -466,7 +466,7 @@ export default {
   .mc-voice-avatar {
     width: 48px; height: 48px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #409eff, #66b1ff);
+    background: linear-gradient(135deg, #1A3C6E, #255A99);
     color: #fff;
     display: flex; align-items: center; justify-content: center;
     font-size: 22px;
@@ -477,22 +477,22 @@ export default {
   .mc-voice-top {
     display: flex; align-items: center; gap: 12px;
     margin-bottom: 8px;
-    .mc-voice-name { font-weight: 600; font-size: 14px; color: #303133; }
-    .mc-voice-number { color: #909399; font-size: 13px; }
+    .mc-voice-name { font-weight: 600; font-size: 14px; color: #1F2A3A; }
+    .mc-voice-number { color: #8C8C8C; font-size: 13px; }
   }
   .mc-voice-content {
-    color: #606266;
+    color: #5A6A7E;
     font-size: 13px;
     padding: 10px 14px;
     background: #fff;
     border-radius: 4px;
     margin: 8px 0;
-    border-left: 3px solid #409eff;
+    border-left: 3px solid #1A3C6E;
     line-height: 1.6;
   }
   .mc-voice-meta {
     display: flex; align-items: center; gap: 16px;
-    color: #909399; font-size: 12px;
+    color: #8C8C8C; font-size: 12px;
     margin-top: 8px;
   }
 }

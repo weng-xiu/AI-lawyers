@@ -3,21 +3,29 @@
 * So I modified the default color and you can modify it to your liking.
 **/
 
-/* theme color - 司法蓝政务风 */
-$--color-primary: #005BAC;
-$--color-success: #16A34A;
-$--color-warning: #F59E0B;
-$--color-danger: #DC2626;
-$--color-info: #64748B;
+/* theme color - 司法蓝政务风（12348配色规范） */
+$--color-primary: #1A3C6E;
+$--color-success: #2B8C6E;
+$--color-warning: #E8923A;
+$--color-danger: #C63D4A;
+$--color-info: #8C8C8C;
 
 $--button-font-weight: 400;
 
-// $--color-text-regular: #1f2d3d;
+$--color-text-primary: #1F2A3A;
+$--color-text-regular: #1F2A3A;
+$--color-text-secondary: #5A6A7E;
+$--color-text-placeholder: #B0BCCA;
 
-$--border-color-light: #e4e7ed;
-$--border-color-lighter: #ebeef5;
+$--border-color-base: #DCE2EB;
+$--border-color-light: #DCE2EB;
+$--border-color-lighter: #EAF0F8;
+$--border-color-extra-light: #F0F3F8;
 
-$--table-border: 1px solid #ebeef5;
+$--background-color-base: #F5F7FA;
+
+$--table-border: 1px solid #DCE2EB;
+$--table-header-background-color: #EDF0F5;
 
 /* icon font path, required */
 $--font-path: '~element-ui/lib/theme-chalk/fonts';

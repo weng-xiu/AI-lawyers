@@ -337,8 +337,8 @@ export default {
       flex-shrink: 0;
       background: #94a3b8;
 
-      &.dot-1 { background: #16A34A; box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15); }
-      &.dot-2 { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15); }
+      &.dot-1 { background: #2B8C6E; box-shadow: 0 0 0 3px rgba(43, 140, 110, 0.15); }
+      &.dot-2 { background: #E8923A; box-shadow: 0 0 0 3px rgba(232, 146, 58, 0.15); }
       &.dot-3 { background: #7C3AED; box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15); }
     }
 
@@ -353,8 +353,8 @@ export default {
       line-height: 22px;
       padding: 0 10px;
       border-radius: 12px;
-      background: #fef2f2;
-      color: #DC2626;
+      background: #FBECEE;
+      color: #C63D4A;
       border: 1px solid #fecaca;
       cursor: pointer;
       white-space: nowrap;

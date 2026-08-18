@@ -401,7 +401,7 @@ export default {
 .trunk-container { padding: 24px; }
 .test-card { margin-top: 16px; }
 .recognize-result { margin-top: 16px; display: flex; align-items: center; gap: 12px; }
-.result-text { color: #606266; font-size: 13px; }
+.result-text { color: #5A6A7E; font-size: 13px; }
 .call-test-result { margin-top: 12px; }
-.call-test-result p { margin: 8px 0 0; font-size: 13px; color: #606266; }
+.call-test-result p { margin: 8px 0 0; font-size: 13px; color: #5A6A7E; }
 </style>

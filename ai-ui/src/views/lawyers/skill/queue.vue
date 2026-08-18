@@ -23,9 +23,9 @@
 
     <el-row :gutter="16" class="mb8">
       <el-col :span="6"><el-card shadow="never" class="stat-card"><div class="stat-num" style="color:#E6A23C">{{ stat.queuing }}</div><div>当前排队</div></el-card></el-col>
-      <el-col :span="6"><el-card shadow="never" class="stat-card"><div class="stat-num" style="color:#67C23A">{{ stat.assigned }}</div><div>今日已分配</div></el-card></el-col>
-      <el-col :span="6"><el-card shadow="never" class="stat-card"><div class="stat-num" style="color:#909399">{{ stat.overflow }}</div><div>今日超时溢出</div></el-card></el-col>
-      <el-col :span="6"><el-card shadow="never" class="stat-card"><div class="stat-num" style="color:#F56C6C">{{ stat.kicked }}</div><div>今日已放弃/踢除</div></el-card></el-col>
+      <el-col :span="6"><el-card shadow="never" class="stat-card"><div class="stat-num" style="color:#2B8C6E">{{ stat.assigned }}</div><div>今日已分配</div></el-card></el-col>
+      <el-col :span="6"><el-card shadow="never" class="stat-card"><div class="stat-num" style="color:#8C8C8C">{{ stat.overflow }}</div><div>今日超时溢出</div></el-card></el-col>
+      <el-col :span="6"><el-card shadow="never" class="stat-card"><div class="stat-num" style="color:#C63D4A">{{ stat.kicked }}</div><div>今日已放弃/踢除</div></el-card></el-col>
     </el-row>
 
     <el-table v-loading="loading" :data="queueList" border size="small">
@@ -45,7 +45,7 @@
       </el-table-column>
       <el-table-column label="等待时长" width="100" align="center">
         <template slot-scope="scope">
-          <span :style="{color: scope.row.waitDuration>30?'#F56C6C':'#303133'}">{{ scope.row.waitDuration || 0 }}秒</span>
+          <span :style="{color: scope.row.waitDuration>30?'#C63D4A':'#1F2A3A'}">{{ scope.row.waitDuration || 0 }}秒</span>
         </template>
       </el-table-column>
       <el-table-column label="入队时间" prop="enqueueTime" width="160" />
@@ -54,7 +54,7 @@
         <template slot-scope="scope">
           <el-button v-if="scope.row.queueStatus==='0'" type="text" size="mini" icon="el-icon-user"
                      @click="openAssign(scope.row)" v-hasPermi="['lawyers:queue:assign']">手动分配</el-button>
-          <el-button v-if="scope.row.queueStatus==='0'" type="text" size="mini" icon="el-icon-close" style="color:#F56C6C"
+          <el-button v-if="scope.row.queueStatus==='0'" type="text" size="mini" icon="el-icon-close" style="color:#C63D4A"
                      @click="handleKick(scope.row)" v-hasPermi="['lawyers:queue:kick']">踢除</el-button>
         </template>
       </el-table-column>

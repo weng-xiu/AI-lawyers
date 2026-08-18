@@ -156,7 +156,7 @@ export default {
         grid: { left: 40, right: 20, top: 20, bottom: 30 },
         xAxis: { type: 'category', data: x, axisLabel: { rotate: 40, fontSize: 10 } },
         yAxis: { type: 'value', axisLabel: { formatter: '{value}%' } },
-        series: [{ type: 'line', smooth: true, data: y, areaStyle: {}, itemStyle: { color: '#409EFF' } }]
+        series: [{ type: 'line', smooth: true, data: y, areaStyle: {}, itemStyle: { color: '#1A3C6E' } }]
       })
     },
     handleAlarm(row) {
@@ -205,11 +205,11 @@ export default {
 .ov-card { border-radius: 6px; padding: 16px; color: #fff; text-align: center; }
 .ov-num { font-size: 24px; font-weight: bold; }
 .ov-label { font-size: 12px; margin-top: 6px; opacity: 0.9; }
-.ov-total { background: #409EFF; }
-.ov-success { background: #67C23A; }
-.ov-info { background: #909399; }
-.ov-warn { background: #F59E0B; }
-.ov-primary { background: #36cfc9; }
-.ov-danger { background: #F56C6C; }
+.ov-total { background: #1A3C6E; }
+.ov-success { background: #2B8C6E; }
+.ov-info { background: #8C8C8C; }
+.ov-warn { background: #E8923A; }
+.ov-primary { background: #3B73B3; }
+.ov-danger { background: #C63D4A; }
 .panel-card { margin-bottom: 0; }
 </style>

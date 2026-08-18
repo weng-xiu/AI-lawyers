@@ -233,18 +233,18 @@ export default {
 .title {
   font-size: 18px;
   font-weight: bold;
-  color: #303133;
+  color: #1F2A3A;
 }
 
 .title i {
   margin-right: 8px;
-  color: #409EFF;
+  color: #1A3C6E;
 }
 
 .empty-history {
   text-align: center;
   padding: 40px 0;
-  color: #909399;
+  color: #8C8C8C;
 }
 
 .empty-history i {
@@ -270,13 +270,13 @@ export default {
 
 .item-content h4 {
   margin: 0 0 5px 0;
-  color: #606266;
+  color: #5A6A7E;
   font-size: 14px;
 }
 
 .item-content p {
   margin: 0;
-  color: #303133;
+  color: #1F2A3A;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -300,12 +300,12 @@ export default {
 
 .detail-item h4 {
   margin: 0 0 5px 0;
-  color: #606266;
+  color: #5A6A7E;
 }
 
 .detail-item p {
   margin: 0;
-  color: #303133;
+  color: #1F2A3A;
 }
 
 .answer-content {

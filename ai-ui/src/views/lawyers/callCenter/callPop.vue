@@ -303,7 +303,7 @@ export default {
 
 <style lang="scss" scoped>
 .call-pop {
-  background: #F5F8FC;
+  background: #F5F7FA;
   min-height: 100vh;
   margin: 0;
   padding: 24px;
@@ -316,7 +316,7 @@ export default {
 }
 
 .cp-banner {
-  background: linear-gradient(135deg, #16A34A 0%, #16A34A 100%);
+  background: linear-gradient(135deg, #2B8C6E 0%, #2B8C6E 100%);
   border-radius: 10px;
   padding: 28px 36px;
   color: #fff;
@@ -463,7 +463,7 @@ export default {
 
 .cp-card {
   border-radius: 10px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #DCE2EB;
   margin-bottom: 20px;
 
   &::v-deep .el-card__body {
@@ -477,11 +477,11 @@ export default {
   justify-content: space-between;
   font-weight: 600;
   font-size: 14px;
-  color: #1e293b;
+  color: #1F2A3A;
 }
 
 .cp-edit-btn {
-  color: #1677FF;
+  color: #255A99;
 }
 
 .cp-caller-header {
@@ -489,7 +489,7 @@ export default {
   align-items: center;
   gap: 16px;
   padding-bottom: 20px;
-  border-bottom: 1px solid #F5F8FC;
+  border-bottom: 1px solid #F5F7FA;
   margin-bottom: 20px;
 }
 
@@ -497,7 +497,7 @@ export default {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #1677FF 0%, #005BAC 100%);
+  background: linear-gradient(135deg, #255A99 0%, #1A3C6E 100%);
   color: #fff;
   display: flex;
   align-items: center;
@@ -510,7 +510,7 @@ export default {
   .cp-caller-name {
     font-size: 16px;
     font-weight: 600;
-    color: #1e293b;
+    color: #1F2A3A;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -519,7 +519,7 @@ export default {
 
   .cp-caller-phone {
     font-size: 13px;
-    color: #64748b;
+    color: #5A6A7E;
   }
 }
 
@@ -539,11 +539,11 @@ export default {
 }
 
 .cp-detail-label {
-  color: #64748b;
+  color: #5A6A7E;
 }
 
 .cp-detail-value {
-  color: #1e293b;
+  color: #1F2A3A;
   font-weight: 500;
 }
 
@@ -556,14 +556,14 @@ export default {
 .cp-tag {
   &.cp-tag-yellow {
     background: #fef3c7;
-    border-color: #f59e0b;
+    border-color: #E8923A;
     color: #d97706;
   }
 
   &.cp-tag-blue {
     background: #D6E9FB;
-    border-color: #1677FF;
-    color: #005BAC;
+    border-color: #255A99;
+    color: #1A3C6E;
   }
 }
 
@@ -606,7 +606,7 @@ export default {
 .cp-ai-value {
   font-size: 14px;
   font-weight: 600;
-  color: #1e293b;
+  color: #1F2A3A;
   margin-bottom: 8px;
 }
 
@@ -627,11 +627,11 @@ export default {
 }
 
 .cp-ai-pref {
-  color: #1677FF;
+  color: #255A99;
 }
 
 .cp-ai-freq {
-  color: #f59e0b;
+  color: #E8923A;
 }
 
 .cp-ai-sub {
@@ -653,14 +653,14 @@ export default {
 
   i {
     font-size: 18px;
-    color: #f59e0b;
+    color: #E8923A;
   }
 }
 
 .cp-article-title {
   font-size: 13px;
   font-weight: 600;
-  color: #1e293b;
+  color: #1F2A3A;
   margin-bottom: 16px;
 }
 
@@ -675,13 +675,13 @@ export default {
   align-items: center;
   gap: 12px;
   padding: 12px;
-  background: #F5F8FC;
+  background: #F5F7FA;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
 
   &:hover {
-    background: #F5F8FC;
+    background: #F5F7FA;
   }
 }
 
@@ -689,8 +689,8 @@ export default {
   width: 36px;
   height: 36px;
   border-radius: 6px;
-  background: #EDF5FE;
-  color: #1677FF;
+  background: #E9EFF7;
+  color: #255A99;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -705,7 +705,7 @@ export default {
 
 .cp-article-name {
   font-size: 13px;
-  color: #1e293b;
+  color: #1F2A3A;
   font-weight: 500;
   margin-bottom: 2px;
   white-space: nowrap;
@@ -737,16 +737,16 @@ export default {
     height: 36px;
     line-height: 36px;
     font-size: 13px;
-    color: #64748b;
+    color: #5A6A7E;
 
     &.is-active {
-      color: #16A34A;
+      color: #2B8C6E;
       font-weight: 600;
     }
   }
 
   &::v-deep .el-tabs__active-bar {
-    background-color: #16A34A;
+    background-color: #2B8C6E;
   }
 }
 
@@ -764,14 +764,14 @@ export default {
   display: flex;
   gap: 14px;
   padding: 14px 16px;
-  background: #F5F8FC;
+  background: #F5F7FA;
   border-radius: 8px;
-  border: 1px solid #F5F8FC;
+  border: 1px solid #F5F7FA;
   transition: all 0.2s;
 
   &:hover {
-    background: #F5F8FC;
-    border-color: #e2e8f0;
+    background: #F5F7FA;
+    border-color: #DCE2EB;
   }
 }
 
@@ -780,7 +780,7 @@ export default {
   height: 40px;
   border-radius: 50%;
   background: #E7F6EE;
-  color: #16A34A;
+  color: #2B8C6E;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -803,7 +803,7 @@ export default {
 .cp-call-title {
   font-size: 14px;
   font-weight: 500;
-  color: #1e293b;
+  color: #1F2A3A;
   flex: 1;
 }
 
@@ -821,7 +821,7 @@ export default {
 
 .cp-call-duration {
   font-size: 12px;
-  color: #64748b;
+  color: #5A6A7E;
 }
 
 .cp-action-bar {
@@ -832,7 +832,7 @@ export default {
   width: 100%;
   max-width: 1400px;
   background: #fff;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid #DCE2EB;
   padding: 16px 24px;
   display: flex;
   justify-content: center;
@@ -856,33 +856,33 @@ export default {
   }
 
   &.cp-btn-green {
-    background: linear-gradient(135deg, #16A34A 0%, #16A34A 100%);
+    background: linear-gradient(135deg, #2B8C6E 0%, #2B8C6E 100%);
     border: none;
     color: #fff;
 
     &:hover {
-      background: linear-gradient(135deg, #16A34A 0%, #047857 100%);
+      background: linear-gradient(135deg, #2B8C6E 0%, #207058 100%);
     }
   }
 
   &.cp-btn-blue {
-    background: linear-gradient(135deg, #1677FF 0%, #005BAC 100%);
+    background: linear-gradient(135deg, #255A99 0%, #1A3C6E 100%);
     border: none;
     color: #fff;
 
     &:hover {
-      background: linear-gradient(135deg, #005BAC 0%, #005BAC 100%);
+      background: linear-gradient(135deg, #1A3C6E 0%, #1A3C6E 100%);
     }
   }
 
   &.cp-btn-gray {
-    background: #F5F8FC;
-    border: 1px solid #e2e8f0;
-    color: #475569;
+    background: #F5F7FA;
+    border: 1px solid #DCE2EB;
+    color: #5A6A7E;
 
     &:hover {
-      background: #e2e8f0;
-      color: #1e293b;
+      background: #DCE2EB;
+      color: #1F2A3A;
     }
   }
 

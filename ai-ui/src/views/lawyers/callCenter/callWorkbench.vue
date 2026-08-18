@@ -113,7 +113,7 @@
               <el-button type="text" size="mini" @click="$router.push('/inbound/callRecord')">全部</el-button>
             </div>
           </div>
-          <el-table :data="pagedCalls" size="small" class="wb-table" :header-cell-style="{background:'#F5F8FC',color:'#64748b',fontWeight:600}">
+          <el-table :data="pagedCalls" size="small" class="wb-table" :header-cell-style="{background:'#F5F7FA',color:'#5A6A7E',fontWeight:600}">
             <el-table-column label="来电号码" prop="callerNumber" min-width="120" align="left">
               <template slot-scope="scope">
                 <span class="wb-phone">{{ scope.row.callerNumber }}</span>
@@ -224,27 +224,27 @@ export default {
         { value: '-', label: '满意度' }
       ],
       statCards: [
-        { title: '总通话数', value: '-', trend: '全部', trendUp: true, icon: 'el-icon-phone', color: '#1677FF', bg: '#EDF5FE' },
-        { title: '今日通话', value: '-', trend: '-', trendUp: true, icon: 'el-icon-phone-outline', color: '#16A34A', bg: '#ecfdf5' },
-        { title: '今日服务时长', value: '-', trend: '-', trendUp: true, icon: 'el-icon-time', color: '#f59e0b', bg: '#fffbeb' },
+        { title: '总通话数', value: '-', trend: '全部', trendUp: true, icon: 'el-icon-phone', color: '#255A99', bg: '#E9EFF7' },
+        { title: '今日通话', value: '-', trend: '-', trendUp: true, icon: 'el-icon-phone-outline', color: '#2B8C6E', bg: '#EDF5EF' },
+        { title: '今日服务时长', value: '-', trend: '-', trendUp: true, icon: 'el-icon-time', color: '#E8923A', bg: '#fffbeb' },
         { title: '平均满意度', value: '-', trend: '-', trendUp: true, icon: 'el-icon-star-on', color: '#7C3AED', bg: '#f5f3ff' }
       ],
       teamItems: [
-        { value: '-', label: '团队总通话', color: '#1677FF' },
-        { value: '-', label: '团队成员', color: '#16A34A' },
-        { value: '-', label: '团队满意度', color: '#f59e0b' },
+        { value: '-', label: '团队总通话', color: '#255A99' },
+        { value: '-', label: '团队成员', color: '#2B8C6E' },
+        { value: '-', label: '团队满意度', color: '#E8923A' },
         { value: '-', label: '平均时长', color: '#7C3AED' }
       ],
       noticeList: [],
       quickEntries: [
-        { name: '来电弹屏', icon: 'el-icon-phone', color: '#1677FF', bg: '#EDF5FE', path: '/inbound/callPopup' },
+        { name: '来电弹屏', icon: 'el-icon-phone', color: '#255A99', bg: '#E9EFF7', path: '/inbound/callPopup' },
         { name: '图文服务', icon: 'el-icon-chat-dot-square', color: '#06b6d4', bg: '#ecfeff', path: '/workbench/chat' },
-        { name: '视频咨询', icon: 'el-icon-video-camera', color: '#f59e0b', bg: '#fffbeb', path: '/workbench/video' },
+        { name: '视频咨询', icon: 'el-icon-video-camera', color: '#E8923A', bg: '#fffbeb', path: '/workbench/video' },
         { name: '来电弹屏', icon: 'el-icon-monitor', color: '#7C3AED', bg: '#f5f3ff', path: '/inbound/callPopup' },
         { name: '台账填写', icon: 'el-icon-document', color: '#0d9488', bg: '#ccfbf1', path: '/business/callLedger' },
         { name: '工单登记', icon: 'el-icon-edit', color: '#6366f1', bg: '#e0e7ff', path: '/business/workOrder' },
         { name: '回访任务', icon: 'el-icon-back', color: '#db2777', bg: '#fce7f3', path: '/business/callback/task' },
-        { name: '风险预警', icon: 'el-icon-warning', color: '#DC2626', bg: '#fef2f2', path: '/resource/riskWarning' }
+        { name: '风险预警', icon: 'el-icon-warning', color: '#C63D4A', bg: '#FBECEE', path: '/resource/riskWarning' }
       ],
       allCalls: []
     }
@@ -305,17 +305,17 @@ export default {
 
         const totalCount = total.totalCount || 0
         this.statCards = [
-          { title: '总通话数', value: totalCount.toLocaleString(), trend: '全部记录', trendUp: true, icon: 'el-icon-phone', color: '#1677FF', bg: '#EDF5FE' },
-          { title: '今日通话', value: today.todayCalls || 0, trend: today.todayCalls > 0 ? '+' + today.todayCalls : '今日暂无', trendUp: true, icon: 'el-icon-phone-outline', color: '#16A34A', bg: '#ecfdf5' },
-          { title: '今日服务时长', value: this.fmtDuration(today.todayServiceDuration || 0), trend: '今日累计', trendUp: true, icon: 'el-icon-time', color: '#f59e0b', bg: '#fffbeb' },
+          { title: '总通话数', value: totalCount.toLocaleString(), trend: '全部记录', trendUp: true, icon: 'el-icon-phone', color: '#255A99', bg: '#E9EFF7' },
+          { title: '今日通话', value: today.todayCalls || 0, trend: today.todayCalls > 0 ? '+' + today.todayCalls : '今日暂无', trendUp: true, icon: 'el-icon-phone-outline', color: '#2B8C6E', bg: '#EDF5EF' },
+          { title: '今日服务时长', value: this.fmtDuration(today.todayServiceDuration || 0), trend: '今日累计', trendUp: true, icon: 'el-icon-time', color: '#E8923A', bg: '#fffbeb' },
           { title: '平均满意度', value: total.avgRating ? Number(total.avgRating).toFixed(1) + '分' : '暂无', trend: '综合评分', trendUp: true, icon: 'el-icon-star-on', color: '#7C3AED', bg: '#f5f3ff' }
         ]
 
         const teamTotal = teams.reduce((s, t) => s + (t.callCount || 0), 0)
         this.teamItems = [
-          { value: teamTotal.toLocaleString(), label: '团队总通话', color: '#1677FF' },
-          { value: teams.length, label: '团队成员', color: '#16A34A' },
-          { value: total.avgRating ? Number(total.avgRating).toFixed(1) + '%' : '暂无', label: '团队满意度', color: '#f59e0b' },
+          { value: teamTotal.toLocaleString(), label: '团队总通话', color: '#255A99' },
+          { value: teams.length, label: '团队成员', color: '#2B8C6E' },
+          { value: total.avgRating ? Number(total.avgRating).toFixed(1) + '%' : '暂无', label: '团队满意度', color: '#E8923A' },
           { value: this.fmtDuration(total.avgDuration || 0), label: '平均时长', color: '#7C3AED' }
         ]
 
@@ -403,7 +403,7 @@ export default {
 
 <style lang="scss" scoped>
 .wb-home {
-  background: #F5F8FC;
+  background: #F5F7FA;
   min-height: calc(100vh - 84px);
   padding: 24px;
   margin: 0;
@@ -412,7 +412,7 @@ export default {
 
 /* 横幅 */
 .wb-banner {
-  background: linear-gradient(135deg, #003F7D 0%, #005BAC 55%, #1677FF 100%);
+  background: linear-gradient(135deg, #16335C 0%, #1A3C6E 55%, #255A99 100%);
   border-radius: 16px;
   padding: 28px 32px;
   color: #fff;
@@ -470,7 +470,7 @@ export default {
   &:hover { box-shadow: 0 10px 24px rgba(15,23,42,.08); transform: translateY(-3px); }
 }
 .wb-kpi-top { display: flex; justify-content: space-between; align-items: center; }
-.wb-kpi-title { font-size: 13px; color: #64748b; font-weight: 500; }
+.wb-kpi-title { font-size: 13px; color: #5A6A7E; font-weight: 500; }
 .wb-kpi-icon {
   width: 40px; height: 40px; border-radius: 11px;
   display: flex; align-items: center; justify-content: center;
@@ -479,7 +479,7 @@ export default {
 .wb-kpi-value { font-size: 28px; font-weight: 700; color: #0f172a; line-height: 1.3; margin: 10px 0 8px; }
 .wb-kpi-foot {
   font-size: 12px; color: #94a3b8; display: flex; align-items: center; gap: 6px;
-  i { color: #16A34A; }
+  i { color: #2B8C6E; }
 }
 
 /* 面板通用 */
@@ -494,10 +494,10 @@ export default {
   .wb-panel-title {
     font-size: 15px; font-weight: 600; color: #0f172a;
     display: flex; align-items: center; gap: 8px;
-    i { color: #005BAC; font-size: 16px; }
+    i { color: #1A3C6E; font-size: 16px; }
   }
   .wb-badge {
-    background: #DC2626; color: #fff; font-size: 11px; font-weight: 600;
+    background: #C63D4A; color: #fff; font-size: 11px; font-weight: 600;
     min-width: 20px; height: 20px; line-height: 20px; padding: 0 6px;
     border-radius: 10px; text-align: center;
   }
@@ -507,21 +507,21 @@ export default {
 /* 待办 */
 .wb-todo-list { min-height: 120px; }
 .wb-empty {
-  text-align: center; color: #cbd5e1; padding: 24px 0;
+  text-align: center; color: #B0BCCA; padding: 24px 0;
   i { font-size: 32px; display: block; margin-bottom: 8px; opacity: .7; }
   p { font-size: 13px; margin: 0; }
 }
 .wb-todo-item {
   display: flex; align-items: stretch;
-  padding: 12px 0; border-bottom: 1px dashed #F5F8FC;
+  padding: 12px 0; border-bottom: 1px dashed #F5F7FA;
   &:last-child { border-bottom: none; }
 }
 .wb-todo-bar { width: 3px; border-radius: 2px; margin-right: 14px; }
-.pri-1 { background: #DC2626; }
-.pri-2 { background: #f59e0b; }
+.pri-1 { background: #C63D4A; }
+.pri-2 { background: #E8923A; }
 .pri-3 { background: #94a3b8; }
 .wb-todo-body { flex: 1; min-width: 0; }
-.wb-todo-title { font-size: 13px; color: #1e293b; font-weight: 500; margin-bottom: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wb-todo-title { font-size: 13px; color: #1F2A3A; font-weight: 500; margin-bottom: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wb-todo-meta { display: flex; align-items: center; justify-content: space-between; }
 .wb-todo-due { font-size: 11px; color: #94a3b8; display: flex; align-items: center; gap: 3px; }
 
@@ -537,17 +537,17 @@ export default {
     height: 32px; padding: 0; border-radius: 7px;
     display: flex; align-items: center; justify-content: center;
     transition: all .15s;
-    &:hover { background: #EDF5FE; }
+    &:hover { background: #E9EFF7; }
   }
 }
 .wb-cal-cell {
   width: 100%; height: 32px; display: flex; flex-direction: column;
   align-items: center; justify-content: center; position: relative;
-  font-size: 12px; color: #475569; border-radius: 7px; cursor: pointer;
-  &.is-today { background: #005BAC; color: #fff; font-weight: 600; }
+  font-size: 12px; color: #5A6A7E; border-radius: 7px; cursor: pointer;
+  &.is-today { background: #1A3C6E; color: #fff; font-weight: 600; }
   &.has-todo em {
     width: 4px; height: 4px; border-radius: 50%;
-    background: #f59e0b; margin-top: 1px; font-style: normal;
+    background: #E8923A; margin-top: 1px; font-style: normal;
   }
   &.is-today.has-todo em { background: #fde68a; }
 }
@@ -558,7 +558,7 @@ export default {
   display: flex; flex-direction: column; align-items: center;
   padding: 18px 8px; cursor: pointer; border-radius: 12px;
   transition: all .2s;
-  &:hover { background: #F5F8FC; transform: translateY(-2px); }
+  &:hover { background: #F5F7FA; transform: translateY(-2px); }
   span { font-size: 12px; color: #334155; margin-top: 10px; }
 }
 .wb-qk-icon {
@@ -570,12 +570,12 @@ export default {
 
 /* 表格 */
 .wb-table {
-  ::v-deep th { background: #F5F8FC !important; }
-  ::v-deep td { border-color: #F5F8FC !important; }
-  .wb-phone { font-weight: 600; color: #1e293b; font-family: 'Consolas', monospace; }
+  ::v-deep th { background: #F5F7FA !important; }
+  ::v-deep td { border-color: #F5F7FA !important; }
+  .wb-phone { font-weight: 600; color: #1F2A3A; font-family: 'Consolas', monospace; }
 }
 .wb-table-empty {
-  text-align: center; color: #cbd5e1; padding: 28px 0;
+  text-align: center; color: #B0BCCA; padding: 28px 0;
   i { font-size: 28px; display: block; margin-bottom: 6px; }
   span { font-size: 13px; }
 }
@@ -584,13 +584,13 @@ export default {
 .wb-notice-list { min-height: 120px; }
 .wb-notice-item {
   display: flex; align-items: center; gap: 12px;
-  padding: 12px 6px; border-bottom: 1px dashed #F5F8FC;
+  padding: 12px 6px; border-bottom: 1px dashed #F5F7FA;
   cursor: pointer; transition: background .15s; border-radius: 6px;
   &:last-child { border-bottom: none; }
-  &:hover { background: #F5F8FC; .wb-nc-title { color: #005BAC; } }
-  .wb-nc-bar { width: 3px; align-self: stretch; background: #1677FF; border-radius: 2px; }
+  &:hover { background: #F5F7FA; .wb-nc-title { color: #1A3C6E; } }
+  .wb-nc-bar { width: 3px; align-self: stretch; background: #255A99; border-radius: 2px; }
   .wb-nc-body { flex: 1; min-width: 0; }
-  .wb-nc-title { font-size: 13px; color: #1e293b; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color .15s; }
+  .wb-nc-title { font-size: 13px; color: #1F2A3A; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color .15s; }
   .wb-nc-date { font-size: 11px; color: #94a3b8; margin-top: 4px; display: flex; align-items: center; gap: 3px; }
 }
 
@@ -598,12 +598,12 @@ export default {
 .wb-team-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .wb-team-item {
   text-align: center; padding: 18px 8px;
-  background: #F5F8FC; border-radius: 10px;
+  background: #F5F7FA; border-radius: 10px;
   transition: all .2s;
-  &:hover { background: #F5F8FC; transform: translateY(-2px); }
+  &:hover { background: #F5F7FA; transform: translateY(-2px); }
 }
 .wb-tm-val { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
-.wb-tm-lbl { font-size: 12px; color: #64748b; }
+.wb-tm-lbl { font-size: 12px; color: #5A6A7E; }
 
 /* 公告详情 */
 .wb-notice-detail {

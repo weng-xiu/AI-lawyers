@@ -474,7 +474,7 @@ export default {
     margin-left: 6px;
   }
   .el-icon-plus{
-    color: #409EFF;
+    color: #1A3C6E;
   }
   .el-icon-delete{
     color: #157a0c;
@@ -494,7 +494,7 @@ export default {
 }
 
 $selectedColor: #f6f7ff;
-$lighterBlue: #409EFF;
+$lighterBlue: #1A3C6E;
 
 .container {
   position: relative;
@@ -590,7 +590,7 @@ $lighterBlue: #409EFF;
   border-top: none;
   border-left: none;
   .delete-btn{
-    color: #F56C6C;
+    color: #C63D4A;
   }
 }
 .logo-wrapper{
@@ -755,11 +755,11 @@ $lighterBlue: #409EFF;
   }
   & > .drawing-item-delete{
     right: 24px;
-    border-color: #F56C6C;
-    color: #F56C6C;
+    border-color: #C63D4A;
+    color: #C63D4A;
     background: #fff;
     &:hover{
-      background: #F56C6C;
+      background: #C63D4A;
       color: #fff;
     }
   }

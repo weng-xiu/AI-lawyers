@@ -207,7 +207,7 @@ export default {
 <style scoped>
 .sms-template-content {
   font-size: 13px;
-  color: #606266;
+  color: #5A6A7E;
   background: #f5f7fa;
   border-radius: 4px;
   padding: 8px 10px;

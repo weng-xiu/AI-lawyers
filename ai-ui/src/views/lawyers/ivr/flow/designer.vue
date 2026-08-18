@@ -55,7 +55,7 @@
           <svg :width="canvasW" :height="canvasH" class="designer-svg">
             <defs>
               <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                <path d="M 0 0 L 10 5 L 0 10 z" :fill="edgeDraft ? '#409EFF' : '#909399'" />
+                <path d="M 0 0 L 10 5 L 0 10 z" :fill="edgeDraft ? '#1A3C6E' : '#8C8C8C'" />
               </marker>
             </defs>
             <rect class="canvas-bg" :width="canvasW" :height="canvasH" fill="transparent" />
@@ -76,7 +76,7 @@
               />
               <g class="edge-label" :transform="edgeLabelPos(edge)" @click.stop="selectEdge(edge)">
                 <rect :x="-labelW(edge) / 2" :y="-10" :width="labelW(edge)" height="20" rx="4" fill="#FFFFFF" stroke="#DCDFE6" stroke-width="1" />
-                <text :x="0" :y="4" text-anchor="middle" font-size="11" fill="#606266">{{ edgeLabel(edge) }}</text>
+                <text :x="0" :y="4" text-anchor="middle" font-size="11" fill="#5A6A7E">{{ edgeLabel(edge) }}</text>
               </g>
             </g>
 
@@ -102,7 +102,7 @@
               <rect class="node-accent" :x="0" :y="0" :width="6" :height="nodeH" rx="3" :style="{ fill: nodeColor(node) }" />
               <circle class="node-icon" :cx="22" :cy="nodeH / 2" :r="14" :style="{ fill: nodeColor(node) }" />
               <text :x="22" :y="nodeH / 2 + 5" text-anchor="middle" font-size="14" fill="#FFF">{{ nodeIcon(node) }}</text>
-              <text class="node-name" :x="46" :y="nodeH / 2 + 5" font-size="13" fill="#303133">{{ nodeName(node) }}</text>
+              <text class="node-name" :x="46" :y="nodeH / 2 + 5" font-size="13" fill="#1F2A3A">{{ nodeName(node) }}</text>
               <circle
                 class="port port-in"
                 :cx="0"
@@ -457,24 +457,24 @@ const CANVAS_W = 2600
 const CANVAS_H = 1600
 
 const TYPE_META = {
-  start: { label: '开始', color: '#67C23A', icon: '▶' },
-  say: { label: '语音播报', color: '#409EFF', icon: '♪' },
+  start: { label: '开始', color: '#2B8C6E', icon: '▶' },
+  say: { label: '语音播报', color: '#1A3C6E', icon: '♪' },
   answer: { label: '语音收声', color: '#2D8CF0', icon: '♫' },
   received: { label: 'DTMF收号', color: '#FF8C00', icon: '#' },
-  menu: { label: '按键菜单', color: '#F59E0B', icon: '☰' },
+  menu: { label: '按键菜单', color: '#E8923A', icon: '☰' },
   intention: { label: '意图识别', color: '#8A6DE9', icon: '◎' },
   agentChat: { label: '智能体', color: '#52C41A', icon: '🤖' },
   sms: { label: '发送短信', color: '#2F54EB', icon: '✉' },
-  sentiment: { label: '情绪分析', color: '#F56C6C', icon: '♡' },
+  sentiment: { label: '情绪分析', color: '#C63D4A', icon: '♡' },
   extract: { label: '信息抽取', color: '#8A6DE9', icon: 'ƒ' },
-  service: { label: 'HTTP服务', color: '#409EFF', icon: '⇄' },
+  service: { label: 'HTTP服务', color: '#1A3C6E', icon: '⇄' },
   script: { label: '脚本执行', color: '#13C2C2', icon: 'ƒ' },
   child: { label: '子流程', color: '#722ED1', icon: '⊞' },
-  condition: { label: '条件分支', color: '#F56C6C', icon: '◇' },
+  condition: { label: '条件分支', color: '#C63D4A', icon: '◇' },
   agent: { label: '转人工', color: '#13C2C2', icon: '☎' },
   transfer: { label: '转外线', color: '#722ED1', icon: '↗' },
-  variable: { label: '变量赋值', color: '#67C23A', icon: '=' },
-  hangup: { label: '挂断', color: '#909399', icon: '■' }
+  variable: { label: '变量赋值', color: '#2B8C6E', icon: '=' },
+  hangup: { label: '挂断', color: '#8C8C8C', icon: '■' }
 }
 
 const PALETTE_ORDER = ['start', 'say', 'answer', 'received', 'menu', 'intention', 'agentChat', 'sms', 'sentiment', 'extract', 'service', 'script', 'child', 'condition', 'variable', 'agent', 'transfer', 'hangup']
@@ -871,7 +871,7 @@ export default {
     },
 
     nodeColor(node) {
-      return TYPE_META[node.type] ? TYPE_META[node.type].color : '#409EFF'
+      return TYPE_META[node.type] ? TYPE_META[node.type].color : '#1A3C6E'
     },
 
     nodeIcon(node) {
@@ -1161,12 +1161,12 @@ export default {
 .flow-title {
   font-size: 15px;
   font-weight: 600;
-  color: #303133;
+  color: #1F2A3A;
   margin: 0 10px;
 }
 
 .dirty-tip {
-  color: #F59E0B;
+  color: #E8923A;
   font-size: 12px;
   margin-left: 8px;
 }
@@ -1190,13 +1190,13 @@ export default {
 .palette-title {
   font-size: 14px;
   font-weight: 600;
-  color: #303133;
+  color: #1F2A3A;
   margin-bottom: 4px;
 }
 
 .palette-tip {
   font-size: 11px;
-  color: #909399;
+  color: #8C8C8C;
   margin-bottom: 10px;
 }
 
@@ -1213,12 +1213,12 @@ export default {
 }
 
 .palette-item:hover {
-  border-color: #409eff;
+  border-color: #1A3C6E;
   box-shadow: 0 2px 8px rgba(64, 158, 255, 0.15);
 }
 
 .palette-item.active {
-  border-color: #409eff;
+  border-color: #1A3C6E;
   background: #ecf5ff;
 }
 
@@ -1237,7 +1237,7 @@ export default {
 
 .palette-label {
   font-size: 13px;
-  color: #303133;
+  color: #1F2A3A;
 }
 
 .palette-help {
@@ -1246,7 +1246,7 @@ export default {
   background: #f5f7fa;
   border-radius: 6px;
   font-size: 11px;
-  color: #909399;
+  color: #8C8C8C;
   line-height: 1.8;
 }
 
@@ -1287,18 +1287,18 @@ export default {
 
 .edge-line {
   fill: none;
-  stroke: #909399;
+  stroke: #8C8C8C;
   stroke-width: 2;
   cursor: pointer;
 }
 
 .edge-line.selected {
-  stroke: #409eff;
+  stroke: #1A3C6E;
   stroke-width: 3;
 }
 
 .edge-line.draft {
-  stroke: #409eff;
+  stroke: #1A3C6E;
   stroke-width: 2;
   stroke-dasharray: 6 4;
 }
@@ -1333,7 +1333,7 @@ export default {
   left: 16px;
   display: inline-block;
   padding: 6px 12px;
-  background: #409eff;
+  background: #1A3C6E;
   color: #fff;
   border-radius: 4px;
   font-size: 12px;
@@ -1354,13 +1354,13 @@ export default {
 .panel-title {
   font-size: 14px;
   font-weight: 600;
-  color: #303133;
+  color: #1F2A3A;
   margin-bottom: 12px;
 }
 
 .panel-hint {
   font-size: 11px;
-  color: #909399;
+  color: #8C8C8C;
   line-height: 1.6;
   margin: 4px 0 8px;
 }
@@ -1368,7 +1368,7 @@ export default {
 .panel-empty {
   margin-top: 120px;
   text-align: center;
-  color: #c0c4cc;
+  color: #B0BCCA;
 }
 
 .panel-empty i {
