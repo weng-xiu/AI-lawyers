@@ -237,6 +237,7 @@
 import { getCallerProfile, getCallerHistory, getCallerTickets, getCallerTrack, updateCallerProfile } from "@/api/lawyers/callPopup"
 import { autoFillLedger, addLedger, transferCall, holdCall, resumeCall, hangupCall, afterWork } from "@/api/lawyers/callCenter"
 import AiAssistPanel from "./AiAssistPanel.vue"
+import callSocket from "@/utils/callSocket"
 
 export default {
   name: "CallPopup",
@@ -297,6 +298,7 @@ export default {
       this.startTimer()
     }
     this.startSyncTimer()
+    this.registerCallSocket()
     const callerNumber = this.$route.query.callerNumber || this.$route.params.callerNumber
     if (callerNumber) {
       this.loadProfile(callerNumber)
@@ -305,8 +307,59 @@ export default {
   beforeDestroy() {
     this.clearTimer()
     if (this.pollTimer) clearInterval(this.pollTimer)
+    this.unregisterCallSocket()
   },
   methods: {
+    registerCallSocket() {
+      // 实时事件驱动通话状态，5 秒轮询作为兜底
+      callSocket.on('ANSWERED', this.onWsAnswered)
+      callSocket.on('HANGUP', this.onWsHangup)
+      callSocket.on('CALL_END', this.onWsHangup)
+      callSocket.on('CALL_START', this.onWsCallStart)
+      callSocket.on('DTMF', this.onWsDtmf)
+    },
+    unregisterCallSocket() {
+      callSocket.off('ANSWERED', this.onWsAnswered)
+      callSocket.off('HANGUP', this.onWsHangup)
+      callSocket.off('CALL_END', this.onWsHangup)
+      callSocket.off('CALL_START', this.onWsCallStart)
+      callSocket.off('DTMF', this.onWsDtmf)
+    },
+    isMyEvent(data) {
+      if (!data) return true
+      if (data.agentId == null) return true
+      return String(data.agentId) === String(this.agentId)
+    },
+    onWsAnswered(data) {
+      if (!this.isMyEvent(data)) return
+      if (!this.connected) {
+        this.connected = true
+        this.callEnded = false
+        this.startTimer()
+      }
+      this.callStatus = '1'
+      if (data && data.recordId) this.currentRecordId = data.recordId
+    },
+    onWsCallStart(data) {
+      if (!this.isMyEvent(data)) return
+      if (data && data.recordId) this.currentRecordId = data.recordId
+      if (!this.connected) {
+        this.connected = true
+        this.callEnded = false
+        this.startTimer()
+      }
+    },
+    onWsHangup(data) {
+      if (!this.isMyEvent(data)) return
+      this.connected = false
+      this.callEnded = true
+      this.callStatus = '0'
+      this.clearTimer()
+    },
+    onWsDtmf(data) {
+      // DTMF 事件可用于扩展按键交互（如满意度评价），目前仅记录
+      if (!this.isMyEvent(data)) return
+    },
     startSyncTimer() {
       if (this.pollTimer) clearInterval(this.pollTimer)
       this.pollTimer = setInterval(() => this.syncFromAgent(), 5000)

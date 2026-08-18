@@ -75,6 +75,7 @@
 <script>
 import { mapGetters } from 'vuex'
 import { getMyAgent, makeCall } from '@/api/lawyers/callCenter'
+import callSocket from '@/utils/callSocket'
 
 export default {
   name: 'AgentStatusBar',
@@ -132,6 +133,7 @@ export default {
     this.$store.dispatch('agent/restore').then(() => {
       this.syncCallState()
       this.startPolling()
+      this.registerCallSocket()
     })
     this.timer = setInterval(() => {
       this.now = Date.now()
@@ -140,8 +142,87 @@ export default {
   beforeDestroy() {
     if (this.timer) clearInterval(this.timer)
     if (this.pollTimer) clearInterval(this.pollTimer)
+    this.unregisterCallSocket()
   },
   methods: {
+    registerCallSocket() {
+      // 实时推送：坐席状态、外呼/挂机；保留轮询作为兜底
+      callSocket.on('AGENT_STATUS', this.onWsAgentStatus)
+      callSocket.on('AGENT_LOGIN', this.onWsAgentStatus)
+      callSocket.on('AGENT_LOGOUT', this.onWsAgentLogout)
+      callSocket.on('CALL_START', this.onWsCallStart)
+      callSocket.on('CALL_END', this.onWsCallEnd)
+      callSocket.on('INBOUND_RING', this.onWsInboundRing)
+      callSocket.on('ANSWERED', this.onWsAnswered)
+    },
+    unregisterCallSocket() {
+      callSocket.off('AGENT_STATUS', this.onWsAgentStatus)
+      callSocket.off('AGENT_LOGIN', this.onWsAgentStatus)
+      callSocket.off('AGENT_LOGOUT', this.onWsAgentLogout)
+      callSocket.off('CALL_START', this.onWsCallStart)
+      callSocket.off('CALL_END', this.onWsCallEnd)
+      callSocket.off('INBOUND_RING', this.onWsInboundRing)
+      callSocket.off('ANSWERED', this.onWsAnswered)
+    },
+    onWsAgentStatus(data) {
+      if (!data) return
+      // 仅处理本坐席的事件
+      const my = this.$store.state.agent.agent
+      if (my && data.agentId != null && String(data.agentId) !== String(my.agentId)) return
+      this.$store.dispatch('agent/refresh').catch(() => {})
+    },
+    onWsAgentLogout(data) {
+      const my = this.$store.state.agent.agent
+      if (my && data && data.agentId != null && String(data.agentId) !== String(my.agentId)) return
+      this.$store.dispatch('agent/refresh').catch(() => {})
+    },
+    onWsCallStart(data) {
+      if (!data) return
+      const my = this.$store.state.agent.agent
+      if (my && data.agentId != null && String(data.agentId) !== String(my.agentId)) return
+      // 若事件中携带主叫号码，作为外呼标记
+      if (data.phone) {
+        this.pendingOutbound = data.phone
+        this.currentDirection = data.direction || 'out'
+      }
+      this.$store.dispatch('agent/refresh').then(agent => this.syncCallState(agent)).catch(() => {})
+    },
+    onWsCallEnd() {
+      this.pendingOutbound = ''
+      this.$store.dispatch('agent/refresh').then(agent => this.syncCallState(agent)).catch(() => {})
+    },
+    onWsInboundRing(data) {
+      if (!data) return
+      const my = this.$store.state.agent.agent
+      if (my && data.agentId != null && String(data.agentId) !== String(my.agentId)) return
+      // 入站振铃：立即弹屏并提醒
+      const target = {
+        path: '/inbound/callPopup',
+        query: {
+          callerNumber: data.caller || data.callerNumber || '',
+          direction: 'in',
+          callStatus: '1',
+          recordId: data.recordId || null
+        }
+      }
+      if (this.$route.path === '/inbound/callPopup') {
+        this.$router.replace(target).catch(() => {})
+      } else {
+        this.$router.push(target).catch(() => {})
+      }
+      this.$notify({
+        title: '来电提醒',
+        message: '来电号码：' + (data.caller || data.callerNumber || '未知'),
+        type: 'warning',
+        duration: 4000
+      })
+    },
+    onWsAnswered(data) {
+      if (!data) return
+      const my = this.$store.state.agent.agent
+      if (my && data.agentId != null && String(data.agentId) !== String(my.agentId)) return
+      this.$store.dispatch('agent/refresh').then(agent => this.syncCallState(agent)).catch(() => {})
+    },
     startPolling() {
       if (this.pollTimer) clearInterval(this.pollTimer)
       this.pollTimer = setInterval(() => this.refreshAgent(), 5000)

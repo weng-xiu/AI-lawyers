@@ -121,6 +121,8 @@ public class SecurityConfig
                     // 静态资源，可匿名访问
                     .antMatchers(HttpMethod.GET, "/", "/*.html", "/**/*.html", "/**/*.css", "/**/*.js", "/profile/**").permitAll()
                     .antMatchers("/swagger-ui.html", "/swagger-resources/**", "/webjars/**", "/*/api-docs", "/druid/**").permitAll()
+                    // WebSocket（呼叫事件 / 图文对话）握手放行，业务鉴权在通道层按 userId 处理
+                    .antMatchers("/ws/**").permitAll()
                     // 除上面外的所有请求全部需要鉴权认证
                     .anyRequest().authenticated();
             })

@@ -185,8 +185,19 @@ call:
     # 回访类任务或转人工类外呼接通后自动创建工单
     autoCreateTicket: true
 
+  # ---------- 入站呼叫（PSTN/分机来电 → 排队 → 坐席） ----------
+  inbound:
+    # 是否启用入站呼叫自动处理（ESL 监听到 CHANNEL_CREATE[inbound] 后触发）
+    enabled: true
+    # 默认技能组ID（DNIS 未匹配到技能组时使用）
+    defaultGroupId: 1
+
   # ---------- 语音网关 / CTI 中间件 ----------
   gateway:
+    # ESL 入站长连接总开关（监听 FreeSWITCH 实时呼叫事件）
+    # 部署真实 FreeSWITCH 时置为 true，并在“资源管理-运营商线路”中配置 vendor=FREESWITCH 的线路
+    esl:
+      enabled: true
     # FreeSWITCH ESL
     freeswitch:
       eslPort: 8021

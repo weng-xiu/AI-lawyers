@@ -15,6 +15,7 @@ import ai.lawyers.system.domain.lawyers.trunk.DialResult;
 import ai.lawyers.system.service.lawyers.IAiAiCallSessionService;
 import ai.lawyers.system.service.lawyers.IAiCallAgentStatusService;
 import ai.lawyers.system.service.lawyers.IAiCallRecordService;
+import ai.lawyers.system.service.lawyers.CallEventPublisher;
 import ai.lawyers.system.service.lawyers.trunk.ICallDispatchService;
 
 @Service
@@ -43,6 +44,23 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
      */
     @Autowired
     private ICallDispatchService callDispatchService;
+
+    @Autowired(required = false)
+    private CallEventPublisher callEventPublisher;
+
+    /** 推送坐席状态变更（推送失败不影响业务） */
+    private void publishStatus(AiCallAgentStatus agent, String type)
+    {
+        if (callEventPublisher == null || agent == null || agent.getUserId() == null) return;
+        try
+        {
+            callEventPublisher.publishToUser(agent.getUserId(), type, agent);
+        }
+        catch (Exception e)
+        {
+            log.warn("推送坐席状态事件失败: agentId={} type={}", agent.getAgentId(), type);
+        }
+    }
 
     @Override
     public AiCallAgentStatus selectAiCallAgentStatusByAgentId(Long agentId)
@@ -120,7 +138,9 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
                 agent.setUserId(userId);
             }
             aiCallAgentStatusMapper.clearCurrentCall(agent.getAgentId());
-            return aiCallAgentStatusMapper.updateAiCallAgentStatus(agent) > 0 ? 1 : 0;
+            int rc = aiCallAgentStatusMapper.updateAiCallAgentStatus(agent) > 0 ? 1 : 0;
+            if (rc > 0) publishStatus(agent, "AGENT_LOGIN");
+            return rc;
         }
         return 0;
     }
@@ -142,7 +162,9 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
             agent.setLogoutTime(new Date());
             agent.setCallStatus("0");
             aiCallAgentStatusMapper.clearCurrentCall(agent.getAgentId());
-            return aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+            int rc = aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+            if (rc > 0) publishStatus(agent, "AGENT_LOGOUT");
+            return rc;
         }
         return 0;
     }
@@ -161,7 +183,9 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
                 agent.setLoginTime(new Date());
                 agent.setLogoutTime(null);
             }
-            return aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+            int rc = aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+            if (rc > 0) publishStatus(agent, "AGENT_STATUS");
+            return rc;
         }
         return 0;
     }
@@ -189,6 +213,7 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
         agent.setCallStartTime(new Date());
         agent.setStatus("2");
         aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+        publishStatus(agent, "CALL_START");
 
         // 解耦触发：人工接听后异步启动 AI 辅助会话（独立链路，不影响人工状态机）
         triggerAiAssistAsync(record.getRecordId(), agentId, phone, agent.getAgentName());
@@ -366,7 +391,9 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
         agent.setCallStatus("0");
         agent.setStatus("1");
         aiCallAgentStatusMapper.clearCurrentCall(agentId);
-        return aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+        int rc = aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+        if (rc > 0) publishStatus(agent, "CALL_END");
+        return rc;
     }
 
     @Override

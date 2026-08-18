@@ -1,4 +1,6 @@
 import { agentLogin, agentLogout, getCurrentAgent, updateAgentStatus, updateCallMode } from '@/api/lawyers/callCenter'
+import callSocket from '@/utils/callSocket'
+import store from '@/store'
 
 const BINDING_KEY = 'AI_AGENT_BINDING'
 
@@ -17,6 +19,27 @@ function writeBinding(binding) {
   } catch (e) {
     // 忽略隐私模式等场景下的存储失败
   }
+}
+
+// 已通过 WebSocket 连接过的 userId，避免与其他账号切换时重复连
+let connectedUserId = null
+
+// 坐席在线（status=1 在线/2 忙碌/3 休息）时建立呼叫事件通道；离线则关闭
+function ensureCallSocket(agent) {
+  if (!agent || !agent.userId) {
+    callSocket.close()
+    connectedUserId = null
+    return
+  }
+  // status: 0=离线 1=在线 2=忙碌 3=休息
+  if (agent.status === '0') {
+    callSocket.close()
+    connectedUserId = null
+    return
+  }
+  if (connectedUserId === agent.userId && callSocket.ws) return
+  callSocket.connect(agent.userId)
+  connectedUserId = agent.userId
 }
 
 const state = {
@@ -67,17 +90,20 @@ const actions = {
     writeBinding(binding)
   },
 
-  login({ commit }, { agentId, userId, ip }) {
+  login({ commit, dispatch }, { agentId, userId, ip }) {
     return agentLogin({ agentId, userId, ip: ip || '' }).then(() => {
       const binding = { agentId, userId }
       commit('SET_BINDING', binding)
       writeBinding(binding)
+      return dispatch('refresh')
     })
   },
 
   logout({ commit, state }) {
     return agentLogout({ agentId: state.agentId, userId: state.userId }).then(() => {
       try { localStorage.removeItem(BINDING_KEY) } catch (e) {}
+      callSocket.close()
+      connectedUserId = null
       commit('CLEAR')
     })
   },
@@ -94,11 +120,21 @@ const actions = {
     return getCurrentAgent(state.agentId).then(res => {
       const agent = res.data || null
       commit('SET_AGENT', agent)
+      ensureCallSocket(agent)
       return agent
     }).catch(() => {
       commit('SET_AGENT', null)
       return null
     })
+  },
+
+  // 建立/关闭呼叫 WebSocket；由签入/刷新时调用
+  ensureCallSocket({ state }, agent) {
+    ensureCallSocket(agent || state.agent)
+  },
+
+  closeCallSocket() {
+    callSocket.close()
   },
 
   setStatus({ dispatch, state }, status) {
