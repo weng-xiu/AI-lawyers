@@ -190,7 +190,7 @@ call:
     # 是否启用入站呼叫自动处理（ESL 监听到 CHANNEL_CREATE[inbound] 后触发）
     enabled: true
     # 默认技能组ID（DNIS 未匹配到技能组时使用）
-    defaultGroupId: 1
+    defaultGroupId: 104
 
   # ---------- 语音网关 / CTI 中间件 ----------
   gateway:

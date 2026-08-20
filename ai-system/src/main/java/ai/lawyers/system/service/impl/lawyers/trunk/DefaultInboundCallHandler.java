@@ -10,7 +10,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import ai.lawyers.common.utils.StringUtils;
-import ai.lawyers.framework.websocket.CallWebSocketServer;
 import ai.lawyers.system.domain.lawyers.AiCallAgentStatus;
 import ai.lawyers.system.domain.lawyers.AiCallRecord;
 import ai.lawyers.system.domain.lawyers.skill.AiSkillGroup;
@@ -20,6 +19,7 @@ import ai.lawyers.system.domain.lawyers.skill.DispatchResult;
 import ai.lawyers.system.domain.lawyers.trunk.AiCallTrunk;
 import ai.lawyers.system.mapper.lawyers.AiCallRecordMapper;
 import ai.lawyers.system.mapper.lawyers.trunk.AiCallTrunkMapper;
+import ai.lawyers.system.service.lawyers.CallEventPublisher;
 import ai.lawyers.system.service.lawyers.IAiCallAgentStatusService;
 import ai.lawyers.system.service.lawyers.skill.IAgentDispatchService;
 import ai.lawyers.system.service.lawyers.skill.IAiSkillGroupService;
@@ -71,6 +71,9 @@ public class DefaultInboundCallHandler implements InboundCallHandler
 
     @Autowired
     private AiCallTrunkMapper trunkMapper;
+
+    @Autowired(required = false)
+    private CallEventPublisher callEventPublisher;
 
     @Override
     public void handleIncomingCall(Map<String, Object> ctx)
@@ -133,7 +136,6 @@ public class DefaultInboundCallHandler implements InboundCallHandler
     private void bridgeToAssignedAgent(String uuid, DispatchResult result, Long recordId, String host)
     {
         Long agentId = result.getAgentId();
-        String extension = resolveExtension(agentId);
 
         // 更新话单归属坐席
         AiCallRecord update = new AiCallRecord();
@@ -142,22 +144,26 @@ public class DefaultInboundCallHandler implements InboundCallHandler
         update.setStatus("0");
         callRecordMapper.updateAiCallRecord(update);
 
-        // 更新坐席当前通话
+        // 加载坐席记录（用于拿 userId 和绑定的 SIP 分机号）
         AiCallAgentStatus agent = agentStatusService.selectAiCallAgentStatusByAgentId(agentId);
         Long userId = agent != null ? agent.getUserId() : null;
+        String extension = resolveExtension(agentId, agent);
 
         // 推送来电弹屏给坐席（前端收到后振铃/弹屏）
         Map<String, Object> data = buildData(uuid, recordId, agentId,
                 null, null, null, null, "来电已分配");
         data.put("agentName", result.getAgentName());
         data.put("extension", extension);
-        if (userId != null)
+        if (callEventPublisher != null)
         {
-            CallWebSocketServer.sendToUser(userId, "{\"type\":\"INBOUND_RING\",\"data\":" + toJson(data) + "}");
-        }
-        else
-        {
-            CallWebSocketServer.broadcast("{\"type\":\"INBOUND_RING\",\"data\":" + toJson(data) + "}");
+            if (userId != null)
+            {
+                callEventPublisher.publishToUser(userId, "INBOUND_RING", data);
+            }
+            else
+            {
+                callEventPublisher.broadcast("INBOUND_RING", data);
+            }
         }
 
         // 若坐席配置了分机且有可用网关，把媒体腿桥接到分机
@@ -204,10 +210,15 @@ public class DefaultInboundCallHandler implements InboundCallHandler
     }
 
     /**
-     * 解析坐席分机号：默认约定 分机=工号(agentId)，可在此扩展为查 ai_agent_extension 表。
+     * 解析坐席分机号：优先取坐席记录中绑定的 sipExtension，未配置时回退到
+     * 默认约定 分机=1000+agentId。
      */
-    private String resolveExtension(Long agentId)
+    private String resolveExtension(Long agentId, AiCallAgentStatus agent)
     {
+        if (agent != null && StringUtils.isNotEmpty(agent.getSipExtension()))
+        {
+            return agent.getSipExtension();
+        }
         return agentId == null ? null : String.valueOf(1000 + agentId);
     }
 
@@ -235,7 +246,10 @@ public class DefaultInboundCallHandler implements InboundCallHandler
 
     private void broadcastEvent(String type, Map<String, Object> data)
     {
-        CallWebSocketServer.broadcast("{\"type\":\"" + type + "\",\"data\":" + toJson(data) + "}");
+        if (callEventPublisher != null)
+        {
+            callEventPublisher.broadcast(type, data);
+        }
     }
 
     private Map<String, Object> buildData(String uuid, Long recordId, Long agentId,
@@ -252,24 +266,6 @@ public class DefaultInboundCallHandler implements InboundCallHandler
         m.put("message", msg);
         m.put("ts", System.currentTimeMillis());
         return m;
-    }
-
-    private String toJson(Map<String, Object> m)
-    {
-        StringBuilder sb = new StringBuilder("{");
-        boolean first = true;
-        for (Map.Entry<String, Object> e : m.entrySet())
-        {
-            if (!first) sb.append(',');
-            first = false;
-            sb.append('"').append(e.getKey()).append("\":");
-            Object v = e.getValue();
-            if (v == null) sb.append("null");
-            else if (v instanceof Number || v instanceof Boolean) sb.append(v);
-            else sb.append('"').append(v.toString().replace("\\", "\\\\").replace("\"", "\\\""))
-                    .append('"');
-        }
-        return sb.append('}').toString();
     }
 
     private String str(Object o) { return o == null ? null : o.toString(); }

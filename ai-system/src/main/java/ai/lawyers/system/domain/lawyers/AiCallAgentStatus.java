@@ -50,6 +50,9 @@ public class AiCallAgentStatus extends BaseEntity
     @Excel(name = "通话状态", readConverterExp = "0=空闲,1=通话中,2=保持,3=咨询中,4=三方,5=话后整理")
     private String callStatus;
 
+    @Excel(name = "SIP分机号")
+    private String sipExtension;
+
     public void setAgentId(Long agentId)
     {
         this.agentId = agentId;
@@ -158,6 +161,15 @@ public class AiCallAgentStatus extends BaseEntity
     {
         return callStatus;
     }
+    public void setSipExtension(String sipExtension)
+    {
+        this.sipExtension = sipExtension;
+    }
+
+    public String getSipExtension()
+    {
+        return sipExtension;
+    }
 
     @Override
     public String toString() {
@@ -174,6 +186,7 @@ public class AiCallAgentStatus extends BaseEntity
             .append("currentCallPhone", getCurrentCallPhone())
             .append("callStartTime", getCallStartTime())
             .append("callStatus", getCallStatus())
+            .append("sipExtension", getSipExtension())
             .append("createBy", getCreateBy())
             .append("createTime", getCreateTime())
             .append("updateBy", getUpdateBy())

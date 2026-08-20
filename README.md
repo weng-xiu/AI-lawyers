@@ -30,7 +30,7 @@ AI律师话务系统是一套面向公共法律服务热线的**专业呼叫中�
 |------|----------|------|
 | 后端框架 | Spring Boot + Spring Security | 提供RESTful API与安全认证 |
 | ORM | MyBatis Plus | 简化数据访问 |
-| 前端 | Vue 3 + Element Plus | 坐席工作台与管理后台UI |
+| 前端 | Vue 2 + Element UI | 坐席工作台与管理后台UI |
 | 工作流 | Flowable | 工单流转与审批 |
 | 语音网关 | SIP协议（FreeSWITCH / Asterisk） | 电话接入与呼叫控制 |
 | 语音识别 | ASR（阿里云/科大讯飞） | 实时转写通话内容 |
@@ -134,34 +134,193 @@ AI律师话务系统是一套面向公共法律服务热线的**专业呼叫中�
 - Node.js 16+
 - FreeSWITCH 1.10+（或 Asterisk）
 
-### 6.2 后端启动
+### 6.2 数据库初始化
 
 ```bash
-# 克隆项目
-git clone https://github.com/your-repo/legal-call-center.git
-
-# 导入数据库脚本（sql目录）
+# 导入基础库与话务业务库
 mysql -u root -p < sql/ry_2025.sql
 mysql -u root -p < sql/legal_call.sql
 
-# 修改application.yml中数据库、Redis、语音网关配置
-# 启动服务
-mvn clean install
-java -jar ruoyi-admin.jar
+# 话单表 agent_id 字段需允许为空（来话在坐席分配前先落单）
+mysql -u root -p -e "ALTER TABLE ai_call_record MODIFY COLUMN agent_id bigint(20) DEFAULT NULL;"
+
+# 坐席表新增 SIP 分机绑定字段
+mysql -u root -p -e "ALTER TABLE ai_call_agent_status ADD COLUMN sip_extension varchar(20) DEFAULT NULL COMMENT 'SIP分机号' AFTER call_status;"
+
+# 为管理员坐席（agent_id=100）绑定分机 1002
+mysql -u root -p -e "UPDATE ai_call_agent_status SET sip_extension='1002' WHERE agent_id=100;"
 ```
 
-### 6.3 前端启动
+### 6.3 FreeSWITCH 安装与配置
+
+1. 安装 FreeSWITCH 1.10+（Windows 版默认安装到 `C:\Program Files\FreeSWITCH`）
+2. 确认 `conf/sip_profiles/internal.xml` 中开启了 WebSocket 监听：
+   ```xml
+   <param name="ws-binding"  value=":5066"/>
+   <param name="wss-binding" value=":7443"/>
+   ```
+3. 默认分机配置在 `conf/directory/default/` 下，已预置 **1001** 和 **1002**（密码均为 `1234`）
+4. 启动 FreeSWITCH（**Windows 下建议加 `-nonat` 参数避免 NAT 检测卡死**）：
+   ```bat
+   cd "C:\Program Files\FreeSWITCH"
+   FreeSwitchConsole.exe -nonat -conf conf -log <项目目录>\.fs\log -db <项目目录>\.fs\db -run <项目目录>\.fs\run
+   ```
+5. 验证端口监听：
+   ```
+   5060/UDP  SIP 分机注册
+   5066/TCP  SIP WebSocket（浏览器网页软电话接入）
+   7443/TCP  SIP WSS
+   8021/TCP  ESL（后端事件订阅）
+   ```
+
+### 6.4 后端启动
 
 ```bash
-cd ruoyi-ui
+# 修改 ai-admin/src/main/resources/application.yml 中数据库、Redis、FreeSWITCH ESL 配置
+# FreeSWITCH ESL 默认连接 127.0.0.1:8021，密码 ClueCon
+
+# 编译打包
+mvn clean install -DskipTests
+
+# 启动
+java -jar ai-admin/target/ai-admin.jar
+```
+
+后端启动后会自动连接 FreeSWITCH ESL，订阅呼叫事件。关键配置项：
+
+```yaml
+call:
+  inbound:
+    default-group-id: 104   # 默认技能组ID（综合咨询组）
+  freeswitch:
+    host: 127.0.0.1
+    port: 8021
+    password: ClueCon
+```
+
+### 6.5 前端启动
+
+```bash
+cd ai-ui
 npm install
 npm run dev
 ```
 
-访问 `http://localhost:80`，默认账号 admin/admin123。
+访问 `http://localhost/`（或 `http://localhost:80/`），默认账号 **admin/admin123**。
 
+---
 
-## 七、项目特色
+## 七、本地呼入呼出调试
+
+### 7.1 架构说明
+
+本系统支持两种坐席接入方式：
+
+| 接入方式 | 说明 | 适用场景 |
+|----------|------|----------|
+| 桌面软电话（MicroSIP/Zoiper） | 通过 UDP 注册到 FreeSWITCH 5060 端口 | 传统坐席、生产环境 |
+| 浏览器网页软电话（WebRTC + JsSIP） | 坐席签入后自动通过 WebSocket 注册到 5066 端口 | 开发调试、无客户端部署 |
+
+浏览器网页软电话在坐席**签入时自动注册** `sip_extension` 字段对应的分机号，**签出时自动注销**，无需手动配置软电话。
+
+### 7.2 前置准备
+
+1. 启动 MySQL、Redis、FreeSWITCH、后端、前端（见第六章）
+2. 确认 FreeSWITCH 已注册分机：
+   ```bat
+   "C:\Program Files\FreeSWITCH\fs_cli.exe" -x "show registrations"
+   ```
+3. 如使用桌面软电话测试，配置 1001 分机：
+   - SIP 服务器：`198.18.0.1`（或 FreeSWITCH 绑定的 IP）
+   - 端口：`5060`
+   - 用户名/登录名：`1001`
+   - 密码：`1234`
+   - 传输协议：UDP
+
+> **注意**：若机器安装了 Clash 等代理工具，FreeSWITCH 可能绑定到 Clash TUN 网卡地址 `198.18.0.1`。浏览器访问时需确保该地址可达，或将 Clash 的 TUN 模式临时关闭。
+
+### 7.3 坐席签入（自动注册浏览器分机）
+
+1. 浏览器访问 `http://localhost/`，使用 admin/admin123 登录
+2. 浏览器地址栏右侧弹出麦克风权限请求时，点击**允许**（WebRTC 通话必需）
+3. 进入呼叫中心工作台，点击**签入**（工号 100）
+4. 观察右上角坐席状态栏：
+   - 🟡 `分机 1002 注册中…` → 正在通过 WebSocket 连接 FreeSWITCH
+   - 🟢 `分机 1002 已就绪` → 注册成功，可接听来电
+   - 🔴 `分机 1002 注册失败` → 鼠标悬停查看错误原因
+5. 后端验证：
+   ```bat
+   fs_cli -x "show registrations"
+   ```
+   应看到 1002 分机通过 `network_proto=ws` 注册。
+
+### 7.4 呼入测试（1001 拨打 1002）
+
+1. 确保软电话 1001 已注册，坐席 100（分机 1002）已签入且状态为"空闲"
+2. 用软电话 1001 拨打 **1002**
+3. 事件链路：
+
+```
+FreeSWITCH CHANNEL_CREATE
+    → 后端 ESL 捕获（DefaultInboundCallHandler）
+    → 插入话单（ai_call_record）
+    → ACD 分配坐席（AgentDispatchServiceImpl，策略 round_robin）
+    → 桥接分机 1002（uuid_transfer → user/1002）
+    → 浏览器收到来电（SipIncomingAlert 浮层 + 来电弹屏）
+    → 点击"接听"（WebRTC 建立语音通道）
+    → 通话中可：保持/转接/三方/挂机
+    → CHANNEL_HANGUP → 话单闭环（end_time/duration/status）
+```
+
+4. 后端实时日志（`logs/sys-info.log`）关键字段：
+   ```
+   [ESL] 入站来话 1001 -> 1002
+   [Inbound] 收到来话 caller=1001 dnis=1002
+   分配成功：主叫[1001] → 坐席[管理员] 技能组[综合咨询组]
+   bridgeToAssignedAgent: 桥接坐席 ext=1002 result=true
+   ```
+
+### 7.5 呼出测试
+
+1. 坐席签入后，在工作台外呼面板输入目标号码（如另一部分机 1001）
+2. 点击外呼，后端通过 ESL 向 FreeSWITCH 发送 originate 命令
+3. FreeSWITCH 先呼叫坐席分机 1002，坐席接听后再呼叫被叫号码
+4. 通话建立后同样支持保持、转接、挂机等操作
+
+### 7.6 常用调试命令
+
+```bat
+# 查看已注册分机
+fs_cli -x "show registrations"
+
+# 查看当前通话通道
+fs_cli -x "show channels"
+
+# 查看 sofia profile 状态（含 WS/WSS 绑定地址）
+fs_cli -x "sofia status profile internal"
+
+# 查看 SIP 中继状态
+fs_cli -x "sofia status gateway"
+
+# 实时查看事件（类似 tcpdump）
+fs_cli -x "events plain CHANNEL_CREATE CHANNEL_ANSWER CHANNEL_HANGUP"
+```
+
+### 7.7 常见问题排查
+
+| 问题 | 原因 | 解决方法 |
+|------|------|----------|
+| 浏览器分机一直"注册中…" | 5 秒轮询重复注册导致连接被杀 | 已修复（agent.js 增加 Promise 守卫）；强制刷新页面 |
+| FreeSWITCH 启动卡住（68MB 内存不监听端口） | NAT/UPnP 检测卡死 | 启动时加 `-nonat` 参数 |
+| 话单插入失败 `Field 'agent_id' doesn't have a default value` | 来话先落单后分配坐席 | 执行 `ALTER TABLE ai_call_record MODIFY agent_id bigint DEFAULT NULL` |
+| 1002 软电话未注册导致 FreeSWITCH 崩溃 | B-leg 无法建立 | 使用浏览器自动注册，确保 5066 端口可达 |
+| 浏览器无法获取麦克风 | 非 HTTPS/localhost 访问 | 通过 `http://localhost/` 访问，或配置 HTTPS（WSS 7443） |
+| ESL 连接断开 | FreeSWITCH 重启 | 后端自动重连，查看日志 `[ESL-127.0.0.1] 鉴权成功` |
+| Clash 代理导致 WS 连接失败 | 198.18.0.1 是 Clash TUN 网段 | 临时关闭 Clash TUN 模式，或配置直连规则 |
+
+---
+
+## 八、项目特色
 
 - ✅ **纯话务聚焦**：完全围绕电话服务场景，不混杂图文、视频等其他渠道
 - ✅ **深度集成RuoYi-Vue**：利用框架现成的权限、日志、代码生成，缩短开发周期
@@ -171,7 +330,7 @@ npm run dev
 - ✅ **工单闭环**：从咨询到回访，全程可追溯
 
 
-## 八、后续规划
+## 九、后续规划
 
 - 对接大模型实现智能问答辅助（生成回复建议）
 - 增加预测式外呼，主动服务

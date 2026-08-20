@@ -13,7 +13,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import ai.lawyers.common.utils.StringUtils;
-import ai.lawyers.framework.websocket.CallWebSocketServer;
 import ai.lawyers.system.domain.lawyers.AiCallAgentStatus;
 import ai.lawyers.system.domain.lawyers.AiCallRecord;
 import ai.lawyers.system.domain.lawyers.trunk.AiCallDialLog;
@@ -21,6 +20,7 @@ import ai.lawyers.system.domain.lawyers.trunk.AiCallTrunk;
 import ai.lawyers.system.mapper.lawyers.AiCallRecordMapper;
 import ai.lawyers.system.mapper.lawyers.trunk.AiCallDialLogMapper;
 import ai.lawyers.system.mapper.lawyers.trunk.AiCallTrunkMapper;
+import ai.lawyers.system.service.lawyers.CallEventPublisher;
 import ai.lawyers.system.service.lawyers.IAiCallAgentStatusService;
 import ai.lawyers.system.service.lawyers.trunk.ICallDispatchService;
 
@@ -76,6 +76,9 @@ public class EslEventBridgeService implements EslEventListener
 
     @Autowired(required = false)
     private InboundCallHandler inboundCallHandler;
+
+    @Autowired(required = false)
+    private CallEventPublisher callEventPublisher;
 
     /** host:port -> client */
     private final Map<String, FreeSwitchEslInboundClient> clients = new ConcurrentHashMap<>();
@@ -293,44 +296,23 @@ public class EslEventBridgeService implements EslEventListener
             data.put("ts", System.currentTimeMillis());
 
             // 如果能找到坐席的 userId，定向推送；否则广播给所有在线坐席
-            if (agentId != null)
+            if (callEventPublisher != null)
             {
-                AiCallAgentStatus agent = agentStatusService.selectAiCallAgentStatusByAgentId(agentId);
-                if (agent != null && agent.getUserId() != null)
+                if (agentId != null)
                 {
-                    CallWebSocketServer.sendToUser(agent.getUserId(), toJson(eventType, data));
-                    return;
+                    AiCallAgentStatus agent = agentStatusService.selectAiCallAgentStatusByAgentId(agentId);
+                    if (agent != null && agent.getUserId() != null)
+                    {
+                        callEventPublisher.publishToUser(agent.getUserId(), eventType, data);
+                        return;
+                    }
                 }
+                callEventPublisher.broadcast(eventType, data);
             }
-            CallWebSocketServer.broadcast(toJson(eventType, data));
         }
         catch (Exception e)
         {
             log.error("[ESL-Bridge] 推送事件失败: uuid={} type={}", uuid, eventType, e);
         }
-    }
-
-    private String toJson(String type, Map<String, Object> data)
-    {
-        StringBuilder sb = new StringBuilder("{\"type\":\"").append(type).append("\",\"data\":{");
-        boolean first = true;
-        for (Map.Entry<String, Object> e : data.entrySet())
-        {
-            if (!first) sb.append(',');
-            first = false;
-            sb.append('"').append(e.getKey()).append("\":");
-            Object v = e.getValue();
-            if (v == null) sb.append("null");
-            else if (v instanceof Number || v instanceof Boolean) sb.append(v);
-            else sb.append('"').append(safe(v.toString())).append('"');
-        }
-        sb.append("}}");
-        return sb.toString();
-    }
-
-    private String safe(String s)
-    {
-        return s.replace("\\", "\\\\").replace("\"", "\\\"")
-                .replace("\n", "\\n").replace("\r", "\\r");
     }
 }

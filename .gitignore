@@ -53,3 +53,4 @@ nbdist/
 /node_modules/
 /third_party/
 /.m2-repo/
+/.fs/

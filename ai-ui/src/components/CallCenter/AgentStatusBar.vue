@@ -5,6 +5,11 @@
         <el-tag size="mini" effect="plain" type="primary">工号 {{ agent.agentId }}</el-tag>
         <span class="agent-name">{{ agent.agentName || nickName }}</span>
         <span class="agent-account">账号 {{ nickName }}</span>
+        <el-tooltip :content="sipStatusHint" placement="bottom">
+          <el-tag size="mini" effect="plain" :type="sipTagType" class="sip-status-tag">
+            <i class="el-icon-phone" /> 分机{{ agent.sipExtension || '--' }} {{ sipStatusText }}
+          </el-tag>
+        </el-tooltip>
       </template>
       <template v-else>
         <el-tag size="mini" type="danger" effect="dark">未签入</el-tag>
@@ -96,7 +101,7 @@ export default {
     }
   },
   computed: {
-    ...mapGetters(['nickName', 'userId', 'permissions']),
+    ...mapGetters(['nickName', 'userId', 'permissions', 'sipStatus', 'sipError']),
     canAccess() {
       const perms = this.permissions || []
       return perms.some(p =>
@@ -127,6 +132,42 @@ export default {
     callStatusText() {
       const map = { '0': '空闲', '1': '通话中', '2': '保持', '3': '咨询中', '4': '三方通话', '5': '话后整理' }
       return map[this.agent ? this.agent.callStatus : '0'] || '空闲'
+    },
+    sipStatusText() {
+      const map = {
+        offline: '未注册',
+        registering: '注册中…',
+        connected: '连接中…',
+        registered: '已就绪',
+        unregistered: '已注销',
+        failed: '注册失败',
+        disconnected: '连接断开'
+      }
+      return map[this.sipStatus] || '未注册'
+    },
+    sipTagType() {
+      switch (this.sipStatus) {
+        case 'registered': return 'success'
+        case 'registering':
+        case 'connected': return 'warning'
+        case 'failed':
+        case 'disconnected': return 'danger'
+        default: return 'info'
+      }
+    },
+    sipStatusHint() {
+      if (!this.agent || !this.agent.sipExtension) return '当前坐席未绑定 SIP 分机，需在 ai_call_agent_status.sip_extension 中配置'
+      const map = {
+        offline: '浏览器未注册到 FreeSWITCH（分机 ' + this.agent.sipExtension + '）',
+        registering: '正在通过 WebSocket 注册分机 ' + this.agent.sipExtension,
+        connected: 'WebSocket 已连接，等待 SIP 注册结果',
+        registered: '分机 ' + this.agent.sipExtension + ' 已注册，可直接接听来电',
+        unregistered: '分机已注销',
+        failed: '分机注册失败，请检查 FreeSWITCH ws 端口 5066 与密码',
+        disconnected: 'SIP WebSocket 已断开，JsSIP 将自动重连'
+      }
+      const base = map[this.sipStatus] || ''
+      return this.sipError ? base + '（错误：' + this.sipError + '）' : base
     }
   },
   created() {
@@ -401,6 +442,11 @@ export default {
 
     .agent-name { font-weight: 600; color: #0f172a; }
     .agent-account { color: #94a3b8; }
+
+    .sip-status-tag {
+      margin-left: 4px;
+      i { margin-right: 2px; }
+    }
   }
 
   .agent-status {

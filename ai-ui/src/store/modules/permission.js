@@ -54,6 +54,29 @@ const permission = {
 
 // 遍历后台传来的路由字符串，转换为组件对象
 function filterAsyncRouter(asyncRouterMap, lastRouter = false, type = false) {
+  // 记录已出现的路由 name，避免后端菜单存在同 path/routeName 的重复记录时
+  // 触发 [vue-router] Duplicate named routes definition 警告
+  const usedNames = new Set()
+  const dedupe = (route) => {
+    if (route.name) {
+      if (usedNames.has(route.name)) {
+        let i = 2
+        while (usedNames.has(route.name + i)) i++
+        route.name = route.name + i
+      }
+      usedNames.add(route.name)
+    }
+  }
+  const walk = (list) => {
+    list.forEach(route => {
+      dedupe(route)
+      if (route.children && route.children.length) {
+        walk(route.children)
+      }
+    })
+  }
+  walk(asyncRouterMap)
+
   return asyncRouterMap.filter(route => {
     if (type && route.children) {
       route.children = filterChildren(route.children)

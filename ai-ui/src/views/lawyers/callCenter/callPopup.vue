@@ -62,7 +62,7 @@
                 <div class="cp-ai-label">来电意图预测</div>
                 <div class="cp-ai-value">{{ profileData.intentPrediction }}</div>
                 <div class="cp-ai-confidence">
-                  <el-progress :percentage="profileData.intentConfidence || 0" :show-text="false" stroke-width="4" color="#7C3AED" />
+                  <el-progress :percentage="profileData.intentConfidence || 0" :show-text="false" :stroke-width="4" color="#7C3AED" />
                   <span>置信度 {{ profileData.intentConfidence || 0 }}%</span>
                 </div>
               </div>
@@ -188,7 +188,7 @@
 
     <!-- 通话操作按钮 -->
     <div class="cp-action-bar">
-      <el-button type="success" size="medium" class="cp-action-btn cp-btn-green" @click="handleAnswer" :disabled="connected">
+      <el-button type="success" size="medium" class="cp-action-btn cp-btn-green" @click="handleAnswer" :disabled="connected || !incomingRinging">
         <i class="el-icon-microphone"></i><span>接听</span>
       </el-button>
       <el-button size="medium" class="cp-action-btn cp-btn-orange" :disabled="!connected || !(callStatus === '1' || callStatus === '2')" @click="handleHold">
@@ -268,6 +268,13 @@ export default {
     agentId() {
       return this.$store.state.agent.agentId
     },
+    sipCall() {
+      return this.$store.state.agent.sipCall
+    },
+    // 浏览器侧 SIP 有振铃中的来电时，接听按钮才可点
+    incomingRinging() {
+      return !!(this.sipCall && this.sipCall.direction === 'incoming' && this.sipCall.state === 'ringing')
+    },
     callStatusText() {
       const map = { '0': '空闲', '1': '通话中', '2': '保持', '3': '咨询中', '4': '三方通话', '5': '话后整理' }
       return map[this.callStatus] || '空闲'
@@ -287,13 +294,34 @@ export default {
       if (val === 'call' && this.historyList.length === 0) this.loadHistory()
       if (val === 'ticket' && this.ticketList.length === 0) this.loadTickets()
       if (val === 'track' && this.trackList.length === 0) this.loadTrack()
+    },
+    // 监听浏览器侧 SIP 通话状态：全局浮层接听/拒接后同步本页状态
+    sipCall(val) {
+      if (!val) {
+        if (this.connected) {
+          this.connected = false
+          this.callEnded = true
+          this.callStatus = '0'
+          this.clearTimer()
+        }
+        return
+      }
+      if (val.state === 'answered' && !this.connected) {
+        this.connected = true
+        this.callEnded = false
+        this.callStatus = '1'
+        this.startTimer()
+      } else if (val.state === 'ringing' && this.direction !== 'out') {
+        this.connected = false
+        this.callEnded = false
+      }
     }
   },
   created() {
     this.direction = this.$route.query.direction === 'out' ? 'out' : 'in'
     this.callStatus = this.$route.query.callStatus || '0'
-    // 呼出或已接通（自动应答）时直接进入通话计时
-    this.connected = this.direction === 'out' || this.callStatus !== '0'
+    // 呼出场景直接进入通话计时；入站振铃时不自动置为 connected，需等用户点接听
+    this.connected = this.direction === 'out'
     if (this.connected) {
       this.startTimer()
     }
@@ -422,19 +450,21 @@ export default {
       }).catch(() => { this.tabLoading = false })
     },
     handleAnswer() {
-      // 线路接通由语音网关完成，这里同步坐席状态：已接通则开始计时
-      this.$store.dispatch('agent/refresh').then(agent => {
-        if (agent && agent.callStatus !== '0') {
-          this.connected = true
-          this.callEnded = false
-          this.callStatus = agent.callStatus
-          this.currentRecordId = agent.currentCallId || null
-          this.startTimer()
-          this.$message.success('已接听来电')
-        } else {
-          this.$message.warning('线路尚未接通，请稍候')
-        }
-      }).catch(() => {})
+      // 手动接听：通过 WebRTC SIP 软电话接听浏览器侧的来电
+      if (!this.incomingRinging) {
+        this.$message.warning('当前没有振铃中的来电')
+        return
+      }
+      const ok = this.$store.dispatch('agent/sipAnswer')
+      if (ok) {
+        this.connected = true
+        this.callEnded = false
+        this.callStatus = '1'
+        this.startTimer()
+        this.$message.success('正在接听来电')
+      } else {
+        this.$message.error('接听失败，请检查麦克风权限或分机注册状态')
+      }
     },
     startTimer() {
       this.timer = setInterval(() => { this.seconds++; this.callDuration = this.formatTime(this.seconds) }, 1000)
