@@ -27,4 +27,15 @@ public interface AiCallTicketMapper
     public int updateTicketProcess(@Param("ticketId") Long ticketId, @Param("processContent") String processContent, @Param("assignUserId") Long assignUserId, @Param("assignUserName") String assignUserName);
 
     public int archiveTicket(Long ticketId);
+
+    /**
+     * 查询已超过 SLA 截止时间但尚未标记超时的待处理工单。
+     * 供 TicketSlaScheduleTask 定时扫描使用。
+     */
+    public List<AiCallTicket> selectOvertimePendingTickets();
+
+    /**
+     * 标记工单为已超时并记录提醒时间。
+     */
+    public int markOvertime(@Param("ticketId") Long ticketId, @Param("remindTime") java.util.Date remindTime);
 }

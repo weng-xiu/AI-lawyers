@@ -137,4 +137,14 @@ public class AiCallTicketController extends BaseController
         String ticketNo = aiCallTicketService.generateTicketNo();
         return success(ticketNo);
     }
+
+    /**
+     * 查询工单流转记录（创建/处理/完成/归档）。
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:call:ticket:query')")
+    @GetMapping("/{ticketId}/timeline")
+    public AjaxResult timeline(@PathVariable("ticketId") Long ticketId)
+    {
+        return success(aiCallTicketService.selectTicketTimeline(ticketId));
+    }
 }

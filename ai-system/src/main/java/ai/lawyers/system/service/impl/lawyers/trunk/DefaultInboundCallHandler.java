@@ -21,10 +21,12 @@ import ai.lawyers.system.mapper.lawyers.AiCallRecordMapper;
 import ai.lawyers.system.mapper.lawyers.trunk.AiCallTrunkMapper;
 import ai.lawyers.system.service.lawyers.CallEventPublisher;
 import ai.lawyers.system.service.lawyers.IAiCallAgentStatusService;
+import ai.lawyers.system.service.lawyers.IAiCallBlacklistService;
 import ai.lawyers.system.service.lawyers.skill.IAgentDispatchService;
 import ai.lawyers.system.service.lawyers.skill.IAiSkillGroupService;
 import ai.lawyers.system.service.lawyers.trunk.gateway.CallGatewayFactory;
 import ai.lawyers.system.service.lawyers.trunk.gateway.ICallGatewayAdapter;
+import ai.lawyers.system.service.lawyers.trunk.gateway.esl.EslEventBridgeService;
 import ai.lawyers.system.service.lawyers.trunk.gateway.esl.InboundCallHandler;
 
 /**
@@ -72,6 +74,12 @@ public class DefaultInboundCallHandler implements InboundCallHandler
     @Autowired
     private AiCallTrunkMapper trunkMapper;
 
+    @Autowired
+    private IAiCallBlacklistService blacklistService;
+
+    @Autowired(required = false)
+    private EslEventBridgeService eslEventBridgeService;
+
     @Autowired(required = false)
     private CallEventPublisher callEventPublisher;
 
@@ -92,6 +100,24 @@ public class DefaultInboundCallHandler implements InboundCallHandler
 
         log.info("[Inbound] 收到来话 uuid={} caller={} dnis={} host={}", uuid, caller, dnis, host);
 
+        // 黑名单拦截：命中生效中的黑名单号码，直接挂断且不落话单
+        if (StringUtils.isNotEmpty(caller) && blacklistService.isBlacklisted(caller))
+        {
+            log.warn("[Inbound] 黑名单来电拦截: {}", caller);
+            if (eslEventBridgeService != null)
+            {
+                try
+                {
+                    eslEventBridgeService.hangupCall(host, uuid);
+                }
+                catch (Exception ex)
+                {
+                    log.warn("[Inbound] 黑名单号码挂断指令下发失败 uuid={} caller={}: {}", uuid, caller, ex.getMessage());
+                }
+            }
+            return;
+        }
+
         try
         {
             // 1. 建立话单
@@ -99,6 +125,8 @@ public class DefaultInboundCallHandler implements InboundCallHandler
             record.setCallerNumber(caller);
             record.setCallTime(new Date());
             record.setStatus("0"); // 接通中
+            // 写入通道 UUID，供 RECORD_STOP / HANGUP 等 ESL 事件回写录音与时长
+            record.setCallUuid(uuid);
             record.setRemark("ESL入站 uuid=" + uuid + " dnis=" + dnis);
             record.setCreateBy("esl-inbound");
             record.setCreateTime(new Date());

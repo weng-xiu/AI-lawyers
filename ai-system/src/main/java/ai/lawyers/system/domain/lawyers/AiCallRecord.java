@@ -55,6 +55,24 @@ public class AiCallRecord extends BaseEntity
     @Excel(name = "工单ID", cellType = ColumnType.NUMERIC)
     private Long ticketId;
 
+    /** 通话通道UUID（FreeSWITCH Unique-ID），用于 ESL 事件关联 */
+    private String callUuid;
+
+    @Excel(name = "录音文件路径")
+    private String recordFile;
+
+    @Excel(name = "录音访问URL")
+    private String recordingUrl;
+
+    @Excel(name = "录音时长(秒)", cellType = ColumnType.NUMERIC)
+    private Integer recordDuration;
+
+    @Excel(name = "ASR转写状态", readConverterExp = "0=待转写,1=转写中,2=已完成,3=失败")
+    private Integer asrStatus;
+
+    @Excel(name = "ASR转写文本")
+    private String transcript;
+
     private String agentName;
 
     private String categoryName;
@@ -186,6 +204,66 @@ public class AiCallRecord extends BaseEntity
         return ticketId;
     }
 
+    public String getCallUuid()
+    {
+        return callUuid;
+    }
+
+    public void setCallUuid(String callUuid)
+    {
+        this.callUuid = callUuid;
+    }
+
+    public String getRecordFile()
+    {
+        return recordFile;
+    }
+
+    public void setRecordFile(String recordFile)
+    {
+        this.recordFile = recordFile;
+    }
+
+    public String getRecordingUrl()
+    {
+        return recordingUrl;
+    }
+
+    public void setRecordingUrl(String recordingUrl)
+    {
+        this.recordingUrl = recordingUrl;
+    }
+
+    public Integer getRecordDuration()
+    {
+        return recordDuration;
+    }
+
+    public void setRecordDuration(Integer recordDuration)
+    {
+        this.recordDuration = recordDuration;
+    }
+
+    public Integer getAsrStatus()
+    {
+        return asrStatus;
+    }
+
+    public void setAsrStatus(Integer asrStatus)
+    {
+        this.asrStatus = asrStatus;
+    }
+
+    public String getTranscript()
+    {
+        return transcript;
+    }
+
+    public void setTranscript(String transcript)
+    {
+        this.transcript = transcript;
+    }
+
     public String getAgentName() 
     {
         return agentName;
@@ -223,6 +301,12 @@ public class AiCallRecord extends BaseEntity
             .append("status", getStatus())
             .append("transferId", getTransferId())
             .append("ticketId", getTicketId())
+            .append("callUuid", getCallUuid())
+            .append("recordFile", getRecordFile())
+            .append("recordingUrl", getRecordingUrl())
+            .append("recordDuration", getRecordDuration())
+            .append("asrStatus", getAsrStatus())
+            .append("transcript", getTranscript())
             .append("agentName", getAgentName())
             .append("categoryName", getCategoryName())
             .append("createBy", getCreateBy())

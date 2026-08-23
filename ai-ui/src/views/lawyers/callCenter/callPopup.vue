@@ -238,6 +238,7 @@ import { getCallerProfile, getCallerHistory, getCallerTickets, getCallerTrack, u
 import { autoFillLedger, addLedger, transferCall, holdCall, resumeCall, hangupCall, afterWork } from "@/api/lawyers/callCenter"
 import AiAssistPanel from "./AiAssistPanel.vue"
 import callSocket from "@/utils/callSocket"
+import { getSipPhone } from "@/utils/webrtcSipPhone"
 
 export default {
   name: "CallPopup",
@@ -327,6 +328,11 @@ export default {
     }
     this.startSyncTimer()
     this.registerCallSocket()
+    // 直接订阅浏览器侧 SIP 软电话事件，确保对方挂断时本页立即结束通话
+    // （不依赖后端 HANGUP 广播，因为内部分机互拨/PSTN入站可能没有 dial_log 映射）
+    this.sipPhone = getSipPhone()
+    this.sipPhone.on('sessionEnded', this.onSipHangup)
+    this.sipPhone.on('sessionFailed', this.onSipHangup)
     const callerNumber = this.$route.query.callerNumber || this.$route.params.callerNumber
     if (callerNumber) {
       this.loadProfile(callerNumber)
@@ -336,8 +342,26 @@ export default {
     this.clearTimer()
     if (this.pollTimer) clearInterval(this.pollTimer)
     this.unregisterCallSocket()
+    if (this.sipPhone) {
+      this.sipPhone.off('sessionEnded', this.onSipHangup)
+      this.sipPhone.off('sessionFailed', this.onSipHangup)
+      this.sipPhone = null
+    }
   },
   methods: {
+    // 浏览器侧 SIP 通话结束（对方挂机/拒接/失败）：立即结束本页通话状态
+    onSipHangup() {
+      if (!this.connected && !this.incomingRinging) return
+      this.connected = false
+      this.callEnded = true
+      this.callStatus = '0'
+      this.clearTimer()
+      this.$message.info('对方已挂断')
+      // 同步刷新坐席状态（后端可能未感知，前端主动拉一次）
+      if (this.agentId != null) {
+        this.$store.dispatch('agent/refresh').catch(() => {})
+      }
+    },
     registerCallSocket() {
       // 实时事件驱动通话状态，5 秒轮询作为兜底
       callSocket.on('ANSWERED', this.onWsAnswered)

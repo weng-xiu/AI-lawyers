@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.schedule.AiWorkShiftMapper">
+
+    <resultMap type="AiWorkShift" id="AiWorkShiftResult">
+        <result property="shiftId"      column="shift_id"      />
+        <result property="shiftName"    column="shift_name"    />
+        <result property="startTime"    column="start_time"    />
+        <result property="endTime"      column="end_time"      />
+        <result property="isOvernight"  column="is_overnight"  />
+        <result property="breakStart"   column="break_start"   />
+        <result property="breakEnd"     column="break_end"     />
+        <result property="status"       column="status"        />
+        <result property="createBy"     column="create_by"     />
+        <result property="createTime"   column="create_time"   />
+        <result property="updateBy"     column="update_by"     />
+        <result property="updateTime"   column="update_time"   />
+        <result property="remark"       column="remark"        />
+    </resultMap>
+
+    <sql id="selectAiWorkShiftVo">
+        select shift_id, shift_name, start_time, end_time, is_overnight,
+               break_start, break_end, status,
+               create_by, create_time, update_by, update_time, remark
+        from ai_work_shift
+    </sql>
+
+    <select id="selectAiWorkShiftList" parameterType="AiWorkShift" resultMap="AiWorkShiftResult">
+        <include refid="selectAiWorkShiftVo"/>
+        <where>
+            <if test="shiftName != null and shiftName != ''"> and shift_name like concat('%', #{shiftName}, '%')</if>
+            <if test="status != null"> and status = #{status}</if>
+            <if test="isOvernight != null"> and is_overnight = #{isOvernight}</if>
+        </where>
+        order by shift_id asc
+    </select>
+
+    <select id="selectAiWorkShiftByShiftId" parameterType="Long" resultMap="AiWorkShiftResult">
+        <include refid="selectAiWorkShiftVo"/>
+        where shift_id = #{shiftId}
+    </select>
+
+    <select id="selectAllEnabled" resultMap="AiWorkShiftResult">
+        <include refid="selectAiWorkShiftVo"/>
+        where status = 1
+        order by shift_id asc
+    </select>
+
+    <insert id="insertAiWorkShift" parameterType="AiWorkShift" useGeneratedKeys="true" keyProperty="shiftId">
+        insert into ai_work_shift
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="shiftName != null and shiftName != ''">shift_name,</if>
+            <if test="startTime != null and startTime != ''">start_time,</if>
+            <if test="endTime != null and endTime != ''">end_time,</if>
+            <if test="isOvernight != null">is_overnight,</if>
+            <if test="breakStart != null">break_start,</if>
+            <if test="breakEnd != null">break_end,</if>
+            <if test="status != null">status,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="shiftName != null and shiftName != ''">#{shiftName},</if>
+            <if test="startTime != null and startTime != ''">#{startTime},</if>
+            <if test="endTime != null and endTime != ''">#{endTime},</if>
+            <if test="isOvernight != null">#{isOvernight},</if>
+            <if test="breakStart != null">#{breakStart},</if>
+            <if test="breakEnd != null">#{breakEnd},</if>
+            <if test="status != null">#{status},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateAiWorkShift" parameterType="AiWorkShift">
+        update ai_work_shift
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="shiftName != null and shiftName != ''">shift_name = #{shiftName},</if>
+            <if test="startTime != null and startTime != ''">start_time = #{startTime},</if>
+            <if test="endTime != null and endTime != ''">end_time = #{endTime},</if>
+            <if test="isOvernight != null">is_overnight = #{isOvernight},</if>
+            <if test="breakStart != null">break_start = #{breakStart},</if>
+            <if test="breakEnd != null">break_end = #{breakEnd},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where shift_id = #{shiftId}
+    </update>
+
+    <delete id="deleteAiWorkShiftByShiftId" parameterType="Long">
+        delete from ai_work_shift where shift_id = #{shiftId}
+    </delete>
+
+    <delete id="deleteAiWorkShiftByShiftIds" parameterType="String">
+        delete from ai_work_shift where shift_id in
+        <foreach item="shiftId" collection="array" open="(" separator="," close=")">
+            #{shiftId}
+        </foreach>
+    </delete>
+</mapper>

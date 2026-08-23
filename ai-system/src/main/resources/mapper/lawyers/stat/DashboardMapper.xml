@@ -9,7 +9,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                ifnull(sum(case when status = '1' then 1 else 0 end), 0) as answeredCalls,
                ifnull(sum(case when status = '3' then 1 else 0 end), 0) as missedCalls,
                ifnull(sum(case when status = '2' then 1 else 0 end), 0) as transferredCalls,
-               ifnull(round(avg(case when status = '1' then duration end), 0), 0) as avgDuration
+               ifnull(round(avg(case when status = '1' then duration end), 0), 0) as avgDuration,
+               ifnull((select count(*) from ai_call_dial_log
+                        where create_time &gt;= #{beginTime} and create_time &lt; #{endTime}), 0) as outboundCalls,
+               ifnull((select round(avg(queue_wait_ms), 0) from ai_call_dial_log
+                        where create_time &gt;= #{beginTime} and create_time &lt; #{endTime}
+                          and queue_wait_ms is not null), 0) as avgQueueWaitMs,
+               ifnull((select round(
+                           sum(case when queue_status = '3' then 1 else 0 end) / nullif(count(*), 0) * 100, 2)
+                        from ai_call_queue
+                        where enqueue_time &gt;= #{beginTime} and enqueue_time &lt; #{endTime}), 0) as abandonRate
         from ai_call_record
         where call_time &gt;= #{beginTime} and call_time &lt; #{endTime}
     </select>

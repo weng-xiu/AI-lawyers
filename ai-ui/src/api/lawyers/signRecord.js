@@ -42,3 +42,13 @@ export function delSignRecord(signIds) {
     method: 'delete'
   })
 }
+
+// 导出签署记录
+export function exportSignRecord(query) {
+  return request({
+    url: '/lawyers/signRecord/export',
+    method: 'get',
+    params: query,
+    responseType: 'blob'
+  })
+}

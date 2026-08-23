@@ -110,4 +110,16 @@ public class AiCallRecordServiceImpl implements IAiCallRecordService
 
         return result;
     }
+
+    @Override
+    public AiCallRecord selectAiCallRecordByCallUuid(String callUuid)
+    {
+        return aiCallRecordMapper.selectAiCallRecordByCallUuid(callUuid);
+    }
+
+    @Override
+    public int updateRecordingInfo(AiCallRecord aiCallRecord)
+    {
+        return aiCallRecordMapper.updateRecordingInfo(aiCallRecord);
+    }
 }

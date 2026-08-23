@@ -115,7 +115,7 @@ export default {
     // 独立查询：按人工记录ID拉取关联的AI辅助会话
     loadSession(recordId) {
       getAiAssistByRecord(recordId).then(res => {
-        this.session = res.data || res.code === 200 ? res.data : null
+        this.session = (res.data || (res.code === 200 ? res.data : null))
         if (res && res.data) this.session = res.data
       }).catch(() => { this.session = null })
     },

@@ -318,8 +318,17 @@ export default {
       }).catch(() => {})
     },
     toggleMember(row) {
-      // 复用 updateMember 接口（通过 addMembers 的 update 能力或成员状态变更），这里直接调添加/移除
-      this.$modal.msgSuccess((row.status === '1' ? '已启用' : '已停用'))
+      const oldStatus = row.status === '1' ? '0' : '1'
+      // 启用：重新加入技能组（携带原技能等级）；停用：从技能组中移除
+      const action = row.status === '1'
+        ? addMembers(this.current.groupId, [row.agentId], row.skillLevel || 3)
+        : removeMembers(this.current.groupId, [row.agentId])
+      action.then(() => {
+        this.$modal.msgSuccess(row.status === '1' ? '已启用' : '已停用')
+      }).catch(() => {
+        // 失败回滚开关状态
+        row.status = oldStatus
+      })
     }
   }
 }

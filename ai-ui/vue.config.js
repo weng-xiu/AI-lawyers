@@ -32,7 +32,7 @@ module.exports = {
   devServer: {
     host: '0.0.0.0',
     port: port,
-    open: true,
+    open: false,
     proxy: {
       // detail: https://cli.vuejs.org/config/#devserver-proxy
       [process.env.VUE_APP_BASE_API]: {
@@ -41,6 +41,12 @@ module.exports = {
         pathRewrite: {
           ['^' + process.env.VUE_APP_BASE_API]: ''
         }
+      },
+      // 呼叫事件 WebSocket 代理：/ws/call/{userId} -> 后端
+      '^/ws/call': {
+        target: baseUrl.replace(/^http/, 'ws'),
+        ws: true,
+        changeOrigin: true
       },
       // springdoc proxy
       '^/v3/api-docs/(.*)': {

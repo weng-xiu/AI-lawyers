@@ -29,6 +29,17 @@ public class AiCallTicket extends BaseEntity
     @Excel(name = "优先级", readConverterExp = "1=紧急,2=普通,3=低")
     private String priority;
 
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Excel(name = "SLA截止时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    private Date dueTime;
+
+    @Excel(name = "是否超时", readConverterExp = "0=否,1=是")
+    private Integer overtimeFlag;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Excel(name = "最后提醒时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    private Date remindTime;
+
     @Excel(name = "状态", readConverterExp = "0=待处理,1=处理中,2=已完成,3=已归档")
     private String status;
 
@@ -106,6 +117,35 @@ public class AiCallTicket extends BaseEntity
     public String getPriority() 
     {
         return priority;
+    }
+    public void setDueTime(Date dueTime)
+    {
+        this.dueTime = dueTime;
+    }
+
+    public Date getDueTime()
+    {
+        return dueTime;
+    }
+
+    public void setOvertimeFlag(Integer overtimeFlag)
+    {
+        this.overtimeFlag = overtimeFlag;
+    }
+
+    public Integer getOvertimeFlag()
+    {
+        return overtimeFlag;
+    }
+
+    public void setRemindTime(Date remindTime)
+    {
+        this.remindTime = remindTime;
+    }
+
+    public Date getRemindTime()
+    {
+        return remindTime;
     }
     public void setStatus(String status) 
     {
@@ -191,6 +231,9 @@ public class AiCallTicket extends BaseEntity
             .append("title", getTitle())
             .append("content", getContent())
             .append("priority", getPriority())
+            .append("dueTime", getDueTime())
+            .append("overtimeFlag", getOvertimeFlag())
+            .append("remindTime", getRemindTime())
             .append("status", getStatus())
             .append("assignUserId", getAssignUserId())
             .append("assignUserName", getAssignUserName())

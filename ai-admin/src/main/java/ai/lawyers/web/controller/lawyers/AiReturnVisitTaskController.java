@@ -19,7 +19,10 @@ import ai.lawyers.common.core.page.TableDataInfo;
 import ai.lawyers.common.enums.BusinessType;
 import ai.lawyers.common.utils.poi.ExcelUtil;
 import ai.lawyers.system.domain.lawyers.AiReturnVisitTask;
+import ai.lawyers.system.domain.lawyers.trunk.DialRequest;
+import ai.lawyers.system.domain.lawyers.trunk.DialResult;
 import ai.lawyers.system.service.lawyers.IAiReturnVisitTaskService;
+import ai.lawyers.system.service.lawyers.trunk.ICallDispatchService;
 
 /**
  * 回访任务Controller
@@ -32,6 +35,9 @@ public class AiReturnVisitTaskController extends BaseController
 {
     @Autowired
     private IAiReturnVisitTaskService aiReturnVisitTaskService;
+
+    @Autowired
+    private ICallDispatchService callDispatchService;
 
     @PreAuthorize("@ss.hasPermi('lawyers:returnVisitTask:list')")
     @GetMapping("/list")
@@ -100,5 +106,42 @@ public class AiReturnVisitTaskController extends BaseController
     public AjaxResult getStats()
     {
         return success(aiReturnVisitTaskService.selectReturnVisitTaskStats());
+    }
+
+    /**
+     * 一键外呼：根据回访任务中的号码发起外呼。
+     * 任务的 callerNumber 作为主叫显号，calleeNumber/callerNumber 作为被叫，
+     * 统一交给运营商线路调度器下发。
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:returnVisitTask:edit')")
+    @Log(title = "回访任务一键外呼", businessType = BusinessType.OTHER)
+    @PutMapping("/call/{taskId}")
+    public AjaxResult call(@PathVariable("taskId") Long taskId)
+    {
+        AiReturnVisitTask task = aiReturnVisitTaskService.selectAiReturnVisitTaskByTaskId(taskId);
+        if (task == null)
+        {
+            return error("回访任务不存在");
+        }
+        String callee = task.getCallerNumber();
+        if (callee == null || callee.trim().isEmpty())
+        {
+            return error("该回访任务无来电号码，无法外呼");
+        }
+        DialRequest request = new DialRequest();
+        request.setCalleeNumber(callee.trim());
+        request.setCallerNumber(task.getCallerName());
+        request.setPriority(50);
+        request.setCreateBy(getUsername());
+        request.setRemark("回访任务一键外呼 taskNo=" + task.getTaskNo());
+        DialResult result = callDispatchService.dialWithQueue(request);
+        if (result != null && result.isSuccess())
+        {
+            AjaxResult ajax = AjaxResult.success("外呼已发起");
+            ajax.put("data", result);
+            return ajax;
+        }
+        String msg = result == null ? "无可用线路" : result.getMessage();
+        return error("外呼发起失败：" + msg);
     }
 }

@@ -195,6 +195,8 @@ export default {
       callSocket.on('CALL_END', this.onWsCallEnd)
       callSocket.on('INBOUND_RING', this.onWsInboundRing)
       callSocket.on('ANSWERED', this.onWsAnswered)
+      // 后端 ESL 推送的挂断事件（可能为广播，需在回调内过滤）
+      callSocket.on('HANGUP', this.onWsCallEnd)
     },
     unregisterCallSocket() {
       callSocket.off('AGENT_STATUS', this.onWsAgentStatus)
@@ -204,6 +206,7 @@ export default {
       callSocket.off('CALL_END', this.onWsCallEnd)
       callSocket.off('INBOUND_RING', this.onWsInboundRing)
       callSocket.off('ANSWERED', this.onWsAnswered)
+      callSocket.off('HANGUP', this.onWsCallEnd)
     },
     onWsAgentStatus(data) {
       if (!data) return
@@ -228,7 +231,13 @@ export default {
       }
       this.$store.dispatch('agent/refresh').then(agent => this.syncCallState(agent)).catch(() => {})
     },
-    onWsCallEnd() {
+    onWsCallEnd(data) {
+      // HANGUP 可能是无 agentId 的广播（内部分机互拨/PSTN入站场景），
+      // 此时无法判断是不是本坐席的通话，直接刷新本坐席状态即可（后端 callStatus 本就该是 0）
+      const my = this.$store.state.agent.agent
+      if (data && data.agentId != null && my && String(data.agentId) !== String(my.agentId)) {
+        return
+      }
       this.pendingOutbound = ''
       this.$store.dispatch('agent/refresh').then(agent => this.syncCallState(agent)).catch(() => {})
     },

@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiCallBlacklistMapper">
+
+    <resultMap type="AiCallBlacklist" id="AiCallBlacklistResult">
+        <result property="id"              column="id"               />
+        <result property="phoneNumber"     column="phone_number"     />
+        <result property="listType"        column="list_type"        />
+        <result property="reason"          column="reason"           />
+        <result property="status"          column="status"           />
+        <result property="effectiveStart"  column="effective_start"  />
+        <result property="effectiveEnd"    column="effective_end"    />
+        <result property="createBy"        column="create_by"        />
+        <result property="createTime"      column="create_time"      />
+        <result property="updateBy"        column="update_by"        />
+        <result property="updateTime"      column="update_time"      />
+        <result property="remark"          column="remark"           />
+    </resultMap>
+
+    <sql id="selectVo">
+        select id, phone_number, list_type, reason, status, effective_start, effective_end,
+               create_by, create_time, update_by, update_time, remark
+        from ai_call_blacklist
+    </sql>
+
+    <select id="selectList" parameterType="AiCallBlacklist" resultMap="AiCallBlacklistResult">
+        <include refid="selectVo"/>
+        <where>
+            <if test="phoneNumber != null and phoneNumber != ''"> and phone_number like concat('%', #{phoneNumber}, '%')</if>
+            <if test="listType != null"> and list_type = #{listType}</if>
+            <if test="status != null"> and status = #{status}</if>
+            <if test="reason != null and reason != ''"> and reason like concat('%', #{reason}, '%')</if>
+        </where>
+        order by id desc
+    </select>
+
+    <select id="selectById" parameterType="Long" resultMap="AiCallBlacklistResult">
+        <include refid="selectVo"/>
+        where id = #{id}
+    </select>
+
+    <select id="selectByPhone" parameterType="String" resultMap="AiCallBlacklistResult">
+        <include refid="selectVo"/>
+        where phone_number = #{phoneNumber}
+        order by list_type asc, id desc
+    </select>
+
+    <insert id="insert" parameterType="AiCallBlacklist" useGeneratedKeys="true" keyProperty="id">
+        insert into ai_call_blacklist
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="phoneNumber != null and phoneNumber != ''">phone_number,</if>
+            <if test="listType != null">list_type,</if>
+            <if test="reason != null">reason,</if>
+            <if test="status != null">status,</if>
+            <if test="effectiveStart != null">effective_start,</if>
+            <if test="effectiveEnd != null">effective_end,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="phoneNumber != null and phoneNumber != ''">#{phoneNumber},</if>
+            <if test="listType != null">#{listType},</if>
+            <if test="reason != null">#{reason},</if>
+            <if test="status != null">#{status},</if>
+            <if test="effectiveStart != null">#{effectiveStart},</if>
+            <if test="effectiveEnd != null">#{effectiveEnd},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="update" parameterType="AiCallBlacklist">
+        update ai_call_blacklist
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="phoneNumber != null and phoneNumber != ''">phone_number = #{phoneNumber},</if>
+            <if test="listType != null">list_type = #{listType},</if>
+            <if test="reason != null">reason = #{reason},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="effectiveStart != null">effective_start = #{effectiveStart},</if>
+            <if test="effectiveEnd != null">effective_end = #{effectiveEnd},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteByIds" parameterType="String">
+        delete from ai_call_blacklist where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

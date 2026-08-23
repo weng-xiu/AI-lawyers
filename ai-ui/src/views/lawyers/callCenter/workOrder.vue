@@ -307,6 +307,15 @@
 
 <script>
 import { listTicket, getTicket, addTicket, updateTicket, delTicket, processTicket, completeTicket, archiveTicket, generateTicketNo } from "@/api/lawyers/callCenter"
+import request from '@/utils/request'
+
+// 查询工单流转记录（若后端接口存在）
+export function getTicketTimeline(ticketId) {
+  return request({
+    url: '/lawyers/call/ticket/' + ticketId + '/timeline',
+    method: 'get'
+  })
+}
 
 export default {
   name: "WorkOrder",
@@ -485,7 +494,84 @@ export default {
         this.currentOrder = response.data
         this.activeTab = 'basic'
         this.drawerVisible = true
+        this.loadTimeline(row.ticketId)
       }).catch(() => {})
+    },
+    loadTimeline(ticketId) {
+      this.timelineList = []
+      getTicketTimeline(ticketId).then(res => {
+        const data = res.data || res.rows || []
+        if (Array.isArray(data) && data.length) {
+          this.timelineList = data.map(item => ({
+            time: item.operateTime || item.createTime || item.time,
+            title: item.title || item.action || item.nodeName || '流转',
+            user: item.operator || item.operateUserName || item.userName || item.user || '系统',
+            description: item.content || item.remark || item.description || '',
+            color: item.color || '#255A99',
+            icon: item.icon || undefined
+          }))
+        } else {
+          this.buildFallbackTimeline()
+        }
+      }).catch(() => {
+        // 后端无该接口时，从工单数据自身组装时间线
+        this.buildFallbackTimeline()
+      })
+    },
+    buildFallbackTimeline() {
+      const order = this.currentOrder || {}
+      const list = []
+      if (order.createTime) {
+        list.push({
+          time: order.createTime,
+          title: '工单创建',
+          user: order.createUserName || order.createBy || '系统',
+          description: '工单已创建，等待分派处理',
+          color: '#255A99',
+          icon: 'el-icon-document-add'
+        })
+      }
+      if (order.processTime || order.assignTime) {
+        list.push({
+          time: order.processTime || order.assignTime,
+          title: '开始处理',
+          user: order.assignUserName || order.processUserName || '处理人',
+          description: order.processContent || '工单已分派给处理人',
+          color: '#E6A23C',
+          icon: 'el-icon-loading'
+        })
+      }
+      if (order.completeTime) {
+        list.push({
+          time: order.completeTime,
+          title: '处理完成',
+          user: order.completeUserName || order.assignUserName || '处理人',
+          description: order.completeContent || '工单处理已完成',
+          color: '#2B8C6E',
+          icon: 'el-icon-circle-check'
+        })
+      }
+      if (order.archiveTime) {
+        list.push({
+          time: order.archiveTime,
+          title: '工单归档',
+          user: order.archiveUserName || '系统',
+          description: order.archiveRemark || '工单已归档',
+          color: '#7C3AED',
+          icon: 'el-icon-folder'
+        })
+      }
+      if (!list.length) {
+        list.push({
+          time: order.createTime || '',
+          title: '工单信息',
+          user: order.assignUserName || '-',
+          description: order.content || '暂无流转记录',
+          color: '#909399',
+          icon: 'el-icon-info'
+        })
+      }
+      this.timelineList = list
     },
     handleEdit(row) {
       this.resetForm()

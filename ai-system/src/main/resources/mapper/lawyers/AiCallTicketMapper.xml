@@ -11,6 +11,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="title"           column="title"            />
         <result property="content"         column="content"          />
         <result property="priority"        column="priority"         />
+        <result property="dueTime"         column="due_time"         />
+        <result property="overtimeFlag"    column="overtime_flag"    />
+        <result property="remindTime"      column="remind_time"      />
         <result property="status"          column="status"           />
         <result property="assignUserId"    column="assign_user_id"   />
         <result property="assignUserName"  column="assign_user_name" />
@@ -28,7 +31,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <sql id="selectAiCallTicketVo">
         select t.ticket_id, t.ticket_no, t.record_id, t.title, t.content, 
-               t.priority, t.status, t.assign_user_id, t.assign_user_name, 
+               t.priority, t.due_time, t.overtime_flag, t.remind_time,
+               t.status, t.assign_user_id, t.assign_user_name, 
                t.process_content, t.process_time, t.close_time, t.create_by, 
                t.create_time, t.update_by, t.update_time, t.remark,
                cr.caller_number, cr.caller_name
@@ -44,6 +48,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="priority != null and priority != ''"> and t.priority = #{priority}</if>
             <if test="status != null and status != ''"> and t.status = #{status}</if>
             <if test="assignUserId != null"> and t.assign_user_id = #{assignUserId}</if>
+            <if test="recordId != null"> and t.record_id = #{recordId}</if>
             <if test="callerNumber != null and callerNumber != ''"> and cr.caller_number like concat('%', #{callerNumber}, '%')</if>
         </where>
         order by t.create_time desc
@@ -73,6 +78,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="title != null and title != ''">title,</if>
             <if test="content != null">content,</if>
             <if test="priority != null">priority,</if>
+            <if test="dueTime != null">due_time,</if>
+            <if test="overtimeFlag != null">overtime_flag,</if>
+            <if test="remindTime != null">remind_time,</if>
             <if test="status != null">status,</if>
             <if test="assignUserId != null">assign_user_id,</if>
             <if test="assignUserName != null">assign_user_name,</if>
@@ -86,6 +94,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="title != null and title != ''">#{title},</if>
             <if test="content != null">#{content},</if>
             <if test="priority != null">#{priority},</if>
+            <if test="dueTime != null">#{dueTime},</if>
+            <if test="overtimeFlag != null">#{overtimeFlag},</if>
+            <if test="remindTime != null">#{remindTime},</if>
             <if test="status != null">#{status},</if>
             <if test="assignUserId != null">#{assignUserId},</if>
             <if test="assignUserName != null">#{assignUserName},</if>
@@ -103,6 +114,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="title != null and title != ''">title = #{title},</if>
             <if test="content != null">content = #{content},</if>
             <if test="priority != null">priority = #{priority},</if>
+            <if test="dueTime != null">due_time = #{dueTime},</if>
+            <if test="overtimeFlag != null">overtime_flag = #{overtimeFlag},</if>
+            <if test="remindTime != null">remind_time = #{remindTime},</if>
             <if test="status != null">status = #{status},</if>
             <if test="assignUserId != null">assign_user_id = #{assignUserId},</if>
             <if test="assignUserName != null">assign_user_name = #{assignUserName},</if>
@@ -138,6 +152,23 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         update ai_call_ticket
         set status = '3',
             close_time = sysdate(),
+            update_time = sysdate()
+        where ticket_id = #{ticketId}
+    </update>
+
+    <select id="selectOvertimePendingTickets" resultMap="AiCallTicketResult">
+        <include refid="selectAiCallTicketVo"/>
+        where t.status = '0'
+          and t.due_time is not null
+          and t.due_time &lt; now()
+          and (t.overtime_flag = 0 or t.overtime_flag is null)
+        order by t.due_time asc
+    </select>
+
+    <update id="markOvertime">
+        update ai_call_ticket
+        set overtime_flag = 1,
+            remind_time = #{remindTime},
             update_time = sysdate()
         where ticket_id = #{ticketId}
     </update>

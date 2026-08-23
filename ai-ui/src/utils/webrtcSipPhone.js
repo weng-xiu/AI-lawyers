@@ -12,7 +12,7 @@ import { Message } from 'element-ui'
 import callSocket from './callSocket'
 
 // 默认 FreeSWITCH WebSocket 地址（开发环境）
-const DEFAULT_SIP_WS_URL = 'ws://198.18.0.1:5066'
+const DEFAULT_SIP_WS_URL = 'ws://localhost:5066'
 const DEFAULT_SIP_DOMAIN = '198.18.0.1'
 const DEFAULT_SIP_PASSWORD = '1234'
 

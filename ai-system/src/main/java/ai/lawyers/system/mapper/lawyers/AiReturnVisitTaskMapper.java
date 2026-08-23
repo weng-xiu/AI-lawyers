@@ -1,6 +1,8 @@
 package ai.lawyers.system.mapper.lawyers;
 
+import java.util.Date;
 import java.util.List;
+import org.apache.ibatis.annotations.Param;
 import ai.lawyers.system.domain.lawyers.AiReturnVisitTask;
 
 /**
@@ -24,4 +26,13 @@ public interface AiReturnVisitTaskMapper
 
     /** 回访任务统计：总数、待回访、已完成、已逾期 */
     public java.util.Map<String, Object> selectReturnVisitTaskStats();
+
+    /**
+     * 将所有 status=0(待回访) 且 plan_time 早于指定时间的任务标记为 status=2(已逾期)。
+     * 供定时任务每分钟扫描调用。
+     *
+     * @param now 当前时间
+     * @return 更新行数
+     */
+    public int markOverdueTasks(@Param("now") Date now);
 }

@@ -29,4 +29,16 @@ public interface IAiCallRecordService
 
     /** 工作台汇总：今日统计 + 团队概况 + 最近通话 */
     public java.util.Map<String, Object> getWorkbenchSummary();
+
+    /** 按 FreeSWITCH 通道 UUID 查询话单 */
+    public AiCallRecord selectAiCallRecordByCallUuid(String callUuid);
+
+    /**
+     * 更新录音信息（按 recordId 或 callUuid 关联）。
+     *
+     * @param aiCallRecord 录音字段：recordFile / recordingUrl / recordDuration /
+     *                     asrStatus / transcript，至少设置 recordId 或 callUuid 之一
+     * @return 受影响行数
+     */
+    public int updateRecordingInfo(AiCallRecord aiCallRecord);
 }

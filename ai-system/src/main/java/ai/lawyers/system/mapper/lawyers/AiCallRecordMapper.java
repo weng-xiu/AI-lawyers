@@ -38,4 +38,14 @@ public interface AiCallRecordMapper
 
     /** 来电弹屏：按号码查询历史通话 */
     public List<AiCallRecord> selectAiCallRecordByCallerNumber(@org.apache.ibatis.annotations.Param("callerNumber") String callerNumber, @org.apache.ibatis.annotations.Param("limit") Integer limit);
+
+    /** 按 FreeSWITCH 通道 UUID 查询话单（ESL 事件回写时使用） */
+    public AiCallRecord selectAiCallRecordByCallUuid(String callUuid);
+
+    /**
+     * 按 recordId 或 callUuid 更新录音信息。
+     * <p>{@link AiCallRecord#getRecordId()} 不为空时按主键更新，否则按
+     * {@link AiCallRecord#getCallUuid()} 更新。</p>
+     */
+    public int updateRecordingInfo(AiCallRecord aiCallRecord);
 }

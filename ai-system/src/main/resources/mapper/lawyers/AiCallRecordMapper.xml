@@ -19,6 +19,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="status"          column="status"           />
         <result property="transferId"      column="transfer_id"      />
         <result property="ticketId"        column="ticket_id"        />
+        <result property="callUuid"        column="call_uuid"        />
+        <result property="recordFile"      column="record_file"      />
+        <result property="recordingUrl"    column="recording_url"    />
+        <result property="recordDuration"  column="record_duration"  />
+        <result property="asrStatus"       column="asr_status"       />
+        <result property="transcript"      column="transcript"       />
         <result property="agentName"       column="agent_name"       />
         <result property="categoryName"    column="category_name"    />
         <result property="createBy"        column="create_by"        />
@@ -31,7 +37,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <sql id="selectAiCallRecordVo">
         select cr.record_id, cr.caller_number, cr.caller_name, cr.caller_address, cr.call_time, 
                cr.end_time, cr.duration, cr.agent_id, cr.category_id, cr.content, cr.answer, 
-               cr.status, cr.transfer_id, cr.ticket_id, cr.create_by, cr.create_time, 
+               cr.status, cr.transfer_id, cr.ticket_id, cr.call_uuid,
+               cr.record_file, cr.recording_url, cr.record_duration, cr.asr_status, cr.transcript,
+               cr.create_by, cr.create_time, 
                cr.update_by, cr.update_time, cr.remark,
                a.agent_name, c.category_name
         from ai_call_record cr
@@ -144,6 +152,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="status != null">status,</if>
             <if test="transferId != null">transfer_id,</if>
             <if test="ticketId != null">ticket_id,</if>
+            <if test="callUuid != null and callUuid != ''">call_uuid,</if>
+            <if test="recordFile != null">record_file,</if>
+            <if test="recordingUrl != null">recording_url,</if>
+            <if test="recordDuration != null">record_duration,</if>
+            <if test="asrStatus != null">asr_status,</if>
+            <if test="transcript != null">transcript,</if>
             <if test="createBy != null">create_by,</if>
             <if test="remark != null">remark,</if>
             create_time
@@ -162,6 +176,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="status != null">#{status},</if>
             <if test="transferId != null">#{transferId},</if>
             <if test="ticketId != null">#{ticketId},</if>
+            <if test="callUuid != null and callUuid != ''">#{callUuid},</if>
+            <if test="recordFile != null">#{recordFile},</if>
+            <if test="recordingUrl != null">#{recordingUrl},</if>
+            <if test="recordDuration != null">#{recordDuration},</if>
+            <if test="asrStatus != null">#{asrStatus},</if>
+            <if test="transcript != null">#{transcript},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="remark != null">#{remark},</if>
             sysdate()
@@ -184,6 +204,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="status != null">status = #{status},</if>
             <if test="transferId != null">transfer_id = #{transferId},</if>
             <if test="ticketId != null">ticket_id = #{ticketId},</if>
+            <if test="callUuid != null and callUuid != ''">call_uuid = #{callUuid},</if>
+            <if test="recordFile != null">record_file = #{recordFile},</if>
+            <if test="recordingUrl != null">recording_url = #{recordingUrl},</if>
+            <if test="recordDuration != null">record_duration = #{recordDuration},</if>
+            <if test="asrStatus != null">asr_status = #{asrStatus},</if>
+            <if test="transcript != null">transcript = #{transcript},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="remark != null">remark = #{remark},</if>
             update_time = sysdate()
@@ -201,4 +227,32 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{recordId}
         </foreach>
     </delete>
+
+    <select id="selectAiCallRecordByCallUuid" parameterType="String" resultMap="AiCallRecordResult">
+        <include refid="selectAiCallRecordVo"/>
+        where cr.call_uuid = #{callUuid}
+        limit 1
+    </select>
+
+    <update id="updateRecordingInfo" parameterType="ai.lawyers.system.domain.lawyers.AiCallRecord">
+        update ai_call_record
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="recordFile != null">record_file = #{recordFile},</if>
+            <if test="recordingUrl != null">recording_url = #{recordingUrl},</if>
+            <if test="recordDuration != null">record_duration = #{recordDuration},</if>
+            <if test="asrStatus != null">asr_status = #{asrStatus},</if>
+            <if test="transcript != null">transcript = #{transcript},</if>
+            update_time = sysdate()
+        </trim>
+        <where>
+            <choose>
+                <when test="recordId != null">
+                    record_id = #{recordId}
+                </when>
+                <otherwise>
+                    call_uuid = #{callUuid}
+                </otherwise>
+            </choose>
+        </where>
+    </update>
 </mapper>

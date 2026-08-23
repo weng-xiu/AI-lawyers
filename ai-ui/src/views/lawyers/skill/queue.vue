@@ -116,16 +116,40 @@ export default {
         this.queueList = res.rows
         this.total = res.total
         this.loading = false
-        this.refreshStat()
+        // 若后端返回了今日统计字段，直接使用
+        const s = res.data || res.stat || {}
+        if (s.assigned != null || s.overflow != null || s.kicked != null) {
+          this.stat.assigned = s.assigned != null ? s.assigned : this.stat.assigned
+          this.stat.overflow = s.overflow != null ? s.overflow : this.stat.overflow
+          this.stat.kicked = s.kicked != null ? s.kicked : this.stat.kicked
+          this._statFromList = true
+        } else {
+          this._statFromList = false
+          this.refreshStat()
+        }
       })
     },
     refreshStat() {
+      // 当前排队数（实时）
       listQueuing(this.queryParams.groupId).then(res => {
         const list = res.data || []
         this.stat.queuing = list.length
       })
-      // 统计今日各状态数量（用 list 不分页查今天）
-      listQueue({ pageSize: 1, pageNum: 1 }).then(() => {})
+      // 今日各状态统计：优先使用后端列表返回的统计字段，否则按状态分别查询总数
+      const baseParams = { pageNum: 1, pageSize: 1, groupId: this.queryParams.groupId }
+      if (this.stat.assigned !== undefined && this._statFromList) {
+        // 已有列表数据提供的统计字段，直接使用
+        return
+      }
+      listQueue({ ...baseParams, queueStatus: '1' }).then(res => {
+        this.stat.assigned = res.total || 0
+      }).catch(() => {})
+      listQueue({ ...baseParams, queueStatus: '2' }).then(res => {
+        this.stat.overflow = res.total || 0
+      }).catch(() => {})
+      listQueue({ ...baseParams, queueStatus: '3' }).then(res => {
+        this.stat.kicked = res.total || 0
+      }).catch(() => {})
     },
     resetQuery() {
       this.queryParams = { pageNum: 1, pageSize: 10, groupId: null, callerNumber: '', queueStatus: '' }

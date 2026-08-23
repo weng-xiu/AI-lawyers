@@ -9,7 +9,7 @@ let lastNotifiedSipStatus = 'offline'
 
 const BINDING_KEY = 'AI_AGENT_BINDING'
 // SIP 分机注册配置（FreeSWITCH internal ws 端口 5066）
-const SIP_WS_URL = process.env.VUE_APP_SIP_WS_URL || 'ws://198.18.0.1:5066'
+const SIP_WS_URL = process.env.VUE_APP_SIP_WS_URL || 'ws://localhost:5066'
 const SIP_DOMAIN = process.env.VUE_APP_SIP_DOMAIN || '198.18.0.1'
 const SIP_PASSWORD = process.env.VUE_APP_SIP_PASSWORD || '1234'
 

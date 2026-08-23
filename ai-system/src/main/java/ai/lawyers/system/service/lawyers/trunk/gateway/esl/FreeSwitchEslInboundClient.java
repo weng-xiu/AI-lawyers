@@ -171,10 +171,10 @@ public class FreeSwitchEslInboundClient
         log.info("[ESL-{}] 鉴权成功，订阅呼叫事件", host);
 
         // 3. 事件订阅（plain 文本格式，便于无第三方库解析）
-        //    关注：通道生命周期、DTMF 按键、后台任务返回
+        //    关注：通道生命周期、DTMF 按键、后台任务返回、录音停止
         write("event plain CHANNEL_CREATE CHANNEL_ANSWER CHANNEL_HANGUP "
                 + "CHANNEL_HANGUP_COMPLETE CHANNEL_BRIDGE CHANNEL_UNBRIDGE "
-                + "DTMF BACKGROUND_JOB\n\n");
+                + "DTMF BACKGROUND_JOB RECORD_STOP\n\n");
         String eventResp = readBlock();
         if (eventResp == null || !eventResp.contains("+OK"))
         {

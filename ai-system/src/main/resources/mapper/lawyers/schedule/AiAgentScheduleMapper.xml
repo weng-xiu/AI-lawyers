@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.schedule.AiAgentScheduleMapper">
+
+    <resultMap type="AiAgentSchedule" id="AiAgentScheduleResult">
+        <result property="scheduleId"    column="schedule_id"    />
+        <result property="agentId"       column="agent_id"       />
+        <result property="shiftId"       column="shift_id"       />
+        <result property="scheduleDate"  column="schedule_date"  />
+        <result property="scheduleType"  column="schedule_type"  />
+        <result property="status"        column="status"         />
+        <result property="checkInTime"   column="check_in_time"  />
+        <result property="checkOutTime"  column="check_out_time" />
+        <result property="createBy"      column="create_by"      />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"      column="update_by"      />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"        column="remark"         />
+    </resultMap>
+
+    <resultMap type="AiAgentScheduleVO" id="AiAgentScheduleVOResult" extends="AiAgentScheduleResult">
+        <result property="agentName"     column="agent_name"     />
+        <result property="shiftName"     column="shift_name"     />
+        <result property="startTime"     column="start_time"     />
+        <result property="endTime"       column="end_time"       />
+    </resultMap>
+
+    <sql id="selectScheduleVo">
+        select s.schedule_id, s.agent_id, s.shift_id,
+               date_format(s.schedule_date, '%Y-%m-%d') as schedule_date,
+               s.schedule_type, s.status,
+               s.check_in_time, s.check_out_time,
+               s.create_by, s.create_time, s.update_by, s.update_time, s.remark,
+               a.agent_name,
+               w.shift_name,
+               date_format(w.start_time, '%H:%i') as start_time,
+               date_format(w.end_time, '%H:%i')   as end_time
+        from ai_agent_schedule s
+        left join ai_call_agent_status a on s.agent_id = a.agent_id
+        left join ai_work_shift w         on s.shift_id  = w.shift_id
+    </sql>
+
+    <select id="selectScheduleList" parameterType="AiAgentScheduleVO" resultMap="AiAgentScheduleVOResult">
+        <include refid="selectScheduleVo"/>
+        <where>
+            <if test="agentId != null"> and s.agent_id = #{agentId}</if>
+            <if test="shiftId != null"> and s.shift_id = #{shiftId}</if>
+            <if test="scheduleType != null"> and s.schedule_type = #{scheduleType}</if>
+            <if test="status != null"> and s.status = #{status}</if>
+            <if test="agentName != null and agentName != ''"> and a.agent_name like concat('%', #{agentName}, '%')</if>
+            <if test="params != null and params.beginDate != null and params.beginDate != ''">
+                and s.schedule_date &gt;= #{params.beginDate}
+            </if>
+            <if test="params != null and params.endDate != null and params.endDate != ''">
+                and s.schedule_date &lt;= #{params.endDate}
+            </if>
+        </where>
+        order by s.schedule_date desc, s.schedule_id desc
+    </select>
+
+    <select id="selectAiAgentScheduleByScheduleId" parameterType="Long" resultMap="AiAgentScheduleResult">
+        select schedule_id, agent_id, shift_id,
+               date_format(schedule_date, '%Y-%m-%d') as schedule_date,
+               schedule_type, status, check_in_time, check_out_time,
+               create_by, create_time, update_by, update_time, remark
+        from ai_agent_schedule
+        where schedule_id = #{scheduleId}
+    </select>
+
+    <select id="selectByAgentAndDate" resultMap="AiAgentScheduleResult">
+        select schedule_id, agent_id, shift_id,
+               date_format(schedule_date, '%Y-%m-%d') as schedule_date,
+               schedule_type, status, check_in_time, check_out_time,
+               create_by, create_time, update_by, update_time, remark
+        from ai_agent_schedule
+        where agent_id = #{agentId}
+          and schedule_date = #{scheduleDate}
+        limit 1
+    </select>
+
+    <select id="selectByDateRange" resultMap="AiAgentScheduleVOResult">
+        <include refid="selectScheduleVo"/>
+        where s.schedule_date &gt;= #{startDate}
+          and s.schedule_date &lt;= #{endDate}
+        order by s.schedule_date asc, s.schedule_id asc
+    </select>
+
+    <select id="selectTodayByAgentId" resultMap="AiAgentScheduleVOResult">
+        <include refid="selectScheduleVo"/>
+        where s.agent_id = #{agentId}
+          and s.schedule_date = curdate()
+        limit 1
+    </select>
+
+    <insert id="insertAiAgentSchedule" parameterType="AiAgentSchedule" useGeneratedKeys="true" keyProperty="scheduleId">
+        insert into ai_agent_schedule
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="agentId != null">agent_id,</if>
+            <if test="shiftId != null">shift_id,</if>
+            <if test="scheduleDate != null and scheduleDate != ''">schedule_date,</if>
+            <if test="scheduleType != null">schedule_type,</if>
+            <if test="status != null">status,</if>
+            <if test="checkInTime != null">check_in_time,</if>
+            <if test="checkOutTime != null">check_out_time,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="agentId != null">#{agentId},</if>
+            <if test="shiftId != null">#{shiftId},</if>
+            <if test="scheduleDate != null and scheduleDate != ''">#{scheduleDate},</if>
+            <if test="scheduleType != null">#{scheduleType},</if>
+            <if test="status != null">#{status},</if>
+            <if test="checkInTime != null">#{checkInTime},</if>
+            <if test="checkOutTime != null">#{checkOutTime},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <insert id="batchInsert" parameterType="java.util.List">
+        insert into ai_agent_schedule
+            (agent_id, shift_id, schedule_date, schedule_type, status,
+             check_in_time, check_out_time, create_by, create_time, remark)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (
+                #{item.agentId}, #{item.shiftId}, #{item.scheduleDate},
+                <choose>
+                    <when test="item.scheduleType != null">#{item.scheduleType}</when>
+                    <otherwise>1</otherwise>
+                </choose>,
+                <choose>
+                    <when test="item.status != null">#{item.status}</when>
+                    <otherwise>1</otherwise>
+                </choose>,
+                #{item.checkInTime}, #{item.checkOutTime},
+                #{item.createBy}, sysdate(), #{item.remark}
+            )
+        </foreach>
+    </insert>
+
+    <update id="updateAiAgentSchedule" parameterType="AiAgentSchedule">
+        update ai_agent_schedule
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="agentId != null">agent_id = #{agentId},</if>
+            <if test="shiftId != null">shift_id = #{shiftId},</if>
+            <if test="scheduleDate != null and scheduleDate != ''">schedule_date = #{scheduleDate},</if>
+            <if test="scheduleType != null">schedule_type = #{scheduleType},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="checkInTime != null">check_in_time = #{checkInTime},</if>
+            <if test="checkOutTime != null">check_out_time = #{checkOutTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where schedule_id = #{scheduleId}
+    </update>
+
+    <update id="checkIn">
+        update ai_agent_schedule
+        set check_in_time = #{checkInTime},
+            status = 1,
+            update_time = sysdate()
+        where agent_id = #{agentId}
+          and schedule_date = #{scheduleDate}
+    </update>
+
+    <update id="checkOut">
+        update ai_agent_schedule
+        set check_out_time = #{checkOutTime},
+            update_time = sysdate()
+        where agent_id = #{agentId}
+          and schedule_date = #{scheduleDate}
+    </update>
+
+    <delete id="deleteAiAgentScheduleByScheduleId" parameterType="Long">
+        delete from ai_agent_schedule where schedule_id = #{scheduleId}
+    </delete>
+
+    <delete id="deleteAiAgentScheduleByScheduleIds" parameterType="String">
+        delete from ai_agent_schedule where schedule_id in
+        <foreach item="scheduleId" collection="array" open="(" separator="," close=")">
+            #{scheduleId}
+        </foreach>
+    </delete>
+</mapper>
