@@ -102,6 +102,10 @@ export default {
   },
   computed: {
     ...mapGetters(['nickName', 'userId', 'permissions', 'sipStatus', 'sipError']),
+    // 浏览器 SIP 软电话是否被环境变量关闭
+    sipDisabled() {
+      return process.env.VUE_APP_SIP_ENABLED === 'false'
+    },
     canAccess() {
       const perms = this.permissions || []
       return perms.some(p =>
@@ -134,6 +138,8 @@ export default {
       return map[this.agent ? this.agent.callStatus : '0'] || '空闲'
     },
     sipStatusText() {
+      // SIP 功能被环境变量关闭时，固定显示"未启用"，不随状态变化
+      if (this.sipDisabled) return '未启用'
       const map = {
         offline: '未注册',
         registering: '注册中…',
@@ -146,6 +152,7 @@ export default {
       return map[this.sipStatus] || '未注册'
     },
     sipTagType() {
+      if (this.sipDisabled) return 'info'
       switch (this.sipStatus) {
         case 'registered': return 'success'
         case 'registering':
@@ -156,6 +163,9 @@ export default {
       }
     },
     sipStatusHint() {
+      if (this.sipDisabled) {
+        return '浏览器 SIP 软电话已通过 VUE_APP_SIP_ENABLED=false 关闭，坐席可使用硬件话机或桌面软电话'
+      }
       if (!this.agent || !this.agent.sipExtension) return '当前坐席未绑定 SIP 分机，需在 ai_call_agent_status.sip_extension 中配置'
       const map = {
         offline: '浏览器未注册到 FreeSWITCH（分机 ' + this.agent.sipExtension + '）',

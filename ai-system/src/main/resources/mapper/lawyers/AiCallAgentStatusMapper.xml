@@ -18,6 +18,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="callStartTime"  column="call_start_time" />
         <result property="callStatus"     column="call_status"     />
         <result property="sipExtension"   column="sip_extension"   />
+        <result property="userName"       column="user_name"       />
+        <result property="nickName"       column="nick_name"       />
+        <result property="phonenumber"    column="phonenumber"     />
+        <result property="deptName"       column="dept_name"       />
         <result property="createBy"       column="create_by"       />
         <result property="createTime"     column="create_time"     />
         <result property="updateBy"       column="update_by"       />
@@ -26,33 +30,42 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectAiCallAgentStatusVo">
-        select agent_id, user_id, agent_name, status, login_time, logout_time, last_login_ip, call_mode, current_call_id, current_call_phone, call_start_time, call_status, sip_extension, create_by, create_time, update_by, update_time, remark
-        from ai_call_agent_status
+        select a.agent_id, a.user_id, a.agent_name, a.status, a.login_time, a.logout_time, a.last_login_ip,
+               a.call_mode, a.current_call_id, a.current_call_phone, a.call_start_time, a.call_status,
+               a.sip_extension, a.create_by, a.create_time, a.update_by, a.update_time, a.remark,
+               u.user_name, u.nick_name, u.phonenumber, d.dept_name
+        from ai_call_agent_status a
+        left join sys_user u on a.user_id = u.user_id
+        left join sys_dept d on u.dept_id = d.dept_id
     </sql>
-    
+
     <select id="selectAiCallAgentStatusList" parameterType="AiCallAgentStatus" resultMap="AiCallAgentStatusResult">
         <include refid="selectAiCallAgentStatusVo"/>
         <where>
-            <if test="agentName != null and agentName != ''"> and agent_name like concat('%', #{agentName}, '%')</if>
-            <if test="status != null and status != ''"> and status = #{status}</if>
+            <if test="agentName != null and agentName != ''"> and a.agent_name like concat('%', #{agentName}, '%')</if>
+            <if test="status != null and status != ''"> and a.status = #{status}</if>
+            <if test="userId != null"> and a.user_id = #{userId}</if>
+            <if test="sipExtension != null and sipExtension != ''"> and a.sip_extension = #{sipExtension}</if>
         </where>
-        order by create_time desc
+        order by a.create_time desc
     </select>
-    
+
     <select id="selectAiCallAgentStatusByAgentId" parameterType="Long" resultMap="AiCallAgentStatusResult">
         <include refid="selectAiCallAgentStatusVo"/>
-        where agent_id = #{agentId}
+        where a.agent_id = #{agentId}
     </select>
-    
+
     <select id="selectAiCallAgentStatusByUserId" parameterType="Long" resultMap="AiCallAgentStatusResult">
         <include refid="selectAiCallAgentStatusVo"/>
-        where user_id = #{userId}
+        where a.user_id = #{userId}
+        order by a.create_time desc
+        limit 1
     </select>
-    
+
     <select id="selectOnlineAgents" resultMap="AiCallAgentStatusResult">
         <include refid="selectAiCallAgentStatusVo"/>
-        where status in ('1', '2')
-        order by agent_id
+        where a.status in ('1', '2')
+        order by a.agent_id
     </select>
 
     <select id="selectTodayRecordsByAgent" parameterType="Long" resultType="java.util.Map">

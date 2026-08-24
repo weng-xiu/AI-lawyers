@@ -1,11 +1,13 @@
 /**
  * 基于 JsSIP 的 WebRTC 网页软电话
  *
- * 用于坐席签入后通过浏览器向 FreeSWITCH 注册 SIP 分机，
- * 实现真正的语音通话（RTP/SRTP via WebRTC），而不仅仅是
- * 业务状态通道（callSocket 仅传输 JSON 事件）。
- *
- * FreeSWITCH internal profile 默认开启 ws-port 5066 / wss-port 7443。
+ * 设计要点（避免反复注册）：
+ * 1. UA 单例：同一个分机只创建一次 JsSIP.UA，由 JsSIP 内部负责
+ *    WebSocket 断线重连（connection_recovery_*）与 SIP 注册刷新（register_expires）。
+ * 2. 业务层不应在 5 秒轮询里反复调用 register/unregister，否则会打断 JsSIP 的
+ *    指数退避重连，导致"不断新建 UA、不断连 5066"。
+ * 3. register() 幂等：相同 extension/domain/wsUrl 已在注册或已注册时直接复用。
+ * 4. unregister() 仅在签出/分机变更/退出时调用，真正销毁 UA。
  */
 import JsSIP from 'jssip'
 import { Message } from 'element-ui'
@@ -27,17 +29,19 @@ class WebRtcSipPhone {
     this.localAudio = null
     this.listeners = {}
     this.registered = false
-    this.registrationStatus = 'offline' // offline | registering | registered | failed
+    this.registrationStatus = 'offline' // offline | registering | connected | registered | disconnected | failed
+    // 当前 UA 对应的注册参数，用于判断 register() 是否需要重建
+    this._activeKey = null
+    this.extension = null
+    this.lastError = null
   }
 
   /**
-   * 注册 SIP 分机
+   * 注册 SIP 分机（幂等）。
    * @param {Object} opts { extension, password, domain, wsUrl }
+   * @returns {Promise<void>} resolve 仅表示首次注册成功；重复调用直接 resolve。
    */
   register(opts = {}) {
-    if (this.ua) {
-      this.unregister()
-    }
     const extension = opts.extension
     const password = opts.password || DEFAULT_SIP_PASSWORD
     const domain = opts.domain || DEFAULT_SIP_DOMAIN
@@ -46,8 +50,35 @@ class WebRtcSipPhone {
       return Promise.reject(new Error('缺少分机号'))
     }
 
+    const key = `${extension}|${domain}|${wsUrl}`
+
+    // 已经注册到同一个目标 —— 直接复用
+    if (this.ua && this._activeKey === key) {
+      if (this.registered) return Promise.resolve()
+      if (this.registrationStatus === 'registering' || this.registrationStatus === 'connected') {
+        // 正在握手中，复用当前 UA；返回一个一次性 promise 等结果
+        return new Promise((resolve, reject) => {
+          const onReg = () => { cleanup(); resolve() }
+          const onFail = () => { cleanup(); reject(new Error('SIP 注册失败')) }
+          const cleanup = () => {
+            this.off('registered', onReg)
+            this.off('registrationFailed', onFail)
+          }
+          this.on('registered', onReg)
+          this.on('registrationFailed', onFail)
+        })
+      }
+      // 已存在 UA 但当前未注册（例如断线中）—— 不重建，交给 JsSIP 自动重连
+      return Promise.resolve()
+    }
+
+    // 分机/地址变更：先销毁旧 UA
+    this._destroyUa()
+
     this.registrationStatus = 'registering'
     this.lastError = null
+    this.extension = extension
+    this._activeKey = key
     this.emit('statusChange', this.registrationStatus)
 
     const socket = new JsSIP.WebSocketInterface(wsUrl)
@@ -56,9 +87,14 @@ class WebRtcSipPhone {
       uri: `sip:${extension}@${domain}`,
       password,
       register: true,
+      // 注册有效期（秒），JsSIP 会在到期前自动刷新注册
+      register_expires: 300,
       session_timers: false,
-      connection_recovery_min_interval: 2,
-      connection_recovery_max_interval:30
+      // WebSocket 断线自动重连退避（秒）
+      // 最小 10s、最大 60s：FreeSWITCH 未启动时避免频繁刷屏，
+      // 服务恢复后最长 60s 内自动连上，无需刷新页面
+      connection_recovery_min_interval: 10,
+      connection_recovery_max_interval: 60
     }
     console.info('[SIP] 开始注册分机', extension, '->', wsUrl)
 
@@ -73,20 +109,18 @@ class WebRtcSipPhone {
 
     this._bindUaEvents()
     this.ua.start()
-    this.extension = extension
 
     return new Promise((resolve, reject) => {
       const onReg = () => { cleanup(); resolve() }
       const onFail = () => { cleanup(); reject(new Error('SIP 注册失败')) }
-      const onConn = () => { cleanup(); reject(new Error('SIP WebSocket 连接失败')) }
       const cleanup = () => {
         this.off('registered', onReg)
         this.off('registrationFailed', onFail)
-        this.off('disconnected', onConn)
       }
       this.on('registered', onReg)
       this.on('registrationFailed', onFail)
-      this.on('disconnected', onConn)
+      // 注意：不再监听 disconnected 来 reject，因为断线后 JsSIP 会自动重连，
+      // 不应把它当成"注册失败"抛给业务层反复重试
     })
   }
 
@@ -98,8 +132,24 @@ class WebRtcSipPhone {
     this.ua.on('disconnected', (data) => {
       this.registered = false
       this.registrationStatus = 'disconnected'
-      this.lastError = (data && (data.socket && data.socket.url) + ' ' + (data.error && (data.error.message || ''))) || null
+      // JsSIP disconnected 事件的 data.error 可能是布尔值 true（连接失败）
+      // 或 Error 对象，这里统一提取可读信息
+      let errMsg = ''
+      if (data) {
+        if (data.socket && data.socket.url) errMsg += data.socket.url
+        if (data.error instanceof Error) {
+          errMsg += (errMsg ? ' ' : '') + data.error.message
+        } else if (typeof data.error === 'string') {
+          errMsg += (errMsg ? ' ' : '') + data.error
+        } else if (data.error === true) {
+          errMsg += (errMsg ? ' ' : '') + '连接被拒绝或服务未启动'
+        } else if (data.cause) {
+          errMsg += (errMsg ? ' ' : '') + data.cause
+        }
+      }
+      this.lastError = errMsg || null
       this.emit('statusChange', this.registrationStatus)
+      // JsSIP 内部会按 connection_recovery_* 自动重连，这里不要销毁 UA
     })
     this.ua.on('registered', () => {
       this.registered = true
@@ -119,16 +169,37 @@ class WebRtcSipPhone {
     this.ua.on('registrationFailed', (data) => {
       this.registered = false
       this.registrationStatus = 'failed'
-      this.lastError = (data && (data.cause || '') + ' ' + ((data.response && data.response.status_code) || '')) || 'registration failed'
+      this.lastError = (data && (data.cause || '')) + ' ' +
+                       ((data && data.response && data.response.status_code) || '') || 'registration failed'
       this.emit('statusChange', this.registrationStatus)
       this.emit('registrationFailed', data)
-      console.warn('[SIP] 注册失败:', data && data.cause, data && data.response && data.response.status_code, data && data.response && data.response.reason_phrase)
+      console.warn('[SIP] 注册失败（JsSIP 将自动重试）:',
+        data && data.cause,
+        data && data.response && data.response.status_code,
+        data && data.response && data.response.reason_phrase)
+      // JsSIP 默认会按 register_expires/退避策略自动重试注册，
+      // 这里不销毁 UA，避免业务层重复创建
     })
     this.ua.on('newRTCSession', (data) => {
       const session = data.session
       const isIncoming = session.direction === 'incoming'
       this._attachSession(session, isIncoming)
     })
+  }
+
+  _destroyUa() {
+    if (this.ua) {
+      try {
+        if (this.registered) {
+          this.ua.unregister({ all: true })
+        }
+        this.ua.stop()
+      } catch (e) {}
+      this.ua = null
+    }
+    this._activeKey = null
+    this.registered = false
+    this.registrationStatus = 'offline'
   }
 
   _attachSession(session, isIncoming) {
@@ -179,7 +250,6 @@ class WebRtcSipPhone {
       this.emit('sessionProgress', { isIncoming, callId: callInfo.callId })
     })
     session.on('accepted', (data) => {
-      // 确保本地有用户交互才会播放，用户点"接听"时已满足
       this.emit('sessionAccepted', { isIncoming, callId: callInfo.callId, data })
       callSocket.dispatch({
         type: isIncoming ? 'SIP_ANSWERED' : 'SIP_CALL_CONNECTED',
@@ -266,19 +336,12 @@ class WebRtcSipPhone {
     }
   }
 
-  /** 注销并销毁 UA */
+  /**
+   * 注销并销毁 UA。仅在签出 / 分机变更 / 退出系统时调用。
+   * 注意：WebSocket 断线重连由 JsSIP 内部处理，业务层不要在轮询中调用本方法。
+   */
   unregister() {
-    if (this.ua) {
-      try {
-        if (this.registered) {
-          this.ua.unregister({ all: true })
-        }
-        this.ua.stop()
-      } catch (e) {}
-      this.ua = null
-    }
-    this.registered = false
-    this.registrationStatus = 'offline'
+    this._destroyUa()
     this.emit('statusChange', this.registrationStatus)
   }
 

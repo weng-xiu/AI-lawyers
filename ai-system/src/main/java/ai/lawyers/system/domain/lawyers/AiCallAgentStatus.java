@@ -53,6 +53,36 @@ public class AiCallAgentStatus extends BaseEntity
     @Excel(name = "SIP分机号")
     private String sipExtension;
 
+    // ===== 以下为 LEFT JOIN sys_user / sys_dept 回显字段，不映射到数据库列 =====
+
+    /** 关联系统用户的登录名 */
+    @Excel(name = "登录账号")
+    private String userName;
+
+    /** 关联系统用户的昵称（真实姓名） */
+    @Excel(name = "用户昵称")
+    private String nickName;
+
+    /** 关联系统用户的手机号 */
+    @Excel(name = "手机号")
+    private String phonenumber;
+
+    /** 所属部门名称 */
+    @Excel(name = "所属部门")
+    private String deptName;
+
+    public String getUserName() { return userName; }
+    public void setUserName(String userName) { this.userName = userName; }
+
+    public String getNickName() { return nickName; }
+    public void setNickName(String nickName) { this.nickName = nickName; }
+
+    public String getPhonenumber() { return phonenumber; }
+    public void setPhonenumber(String phonenumber) { this.phonenumber = phonenumber; }
+
+    public String getDeptName() { return deptName; }
+    public void setDeptName(String deptName) { this.deptName = deptName; }
+
     public void setAgentId(Long agentId)
     {
         this.agentId = agentId;

@@ -23,6 +23,13 @@
               <el-form-item label="手机号码" prop="phonenumber">
                 <el-input v-model="queryParams.phonenumber" placeholder="请输入手机号码" clearable style="width: 240px" @keyup.enter.native="handleQuery" />
               </el-form-item>
+              <el-form-item label="用户身份" prop="lawyerFlag">
+                <el-select v-model="queryParams.lawyerFlag" placeholder="全部用户" clearable style="width: 160px">
+                  <el-option label="全部用户" value="" />
+                  <el-option label="律师" value="1" />
+                  <el-option label="非律师" value="0" />
+                </el-select>
+              </el-form-item>
               <el-form-item label="状态" prop="status">
                 <el-select v-model="queryParams.status" placeholder="用户状态" clearable style="width: 240px">
                   <el-option v-for="dict in dict.type.sys_normal_disable" :key="dict.value" :label="dict.label" :value="dict.value" />
@@ -63,6 +70,12 @@
               <el-table-column label="用户昵称" align="center" key="nickName" prop="nickName" v-if="columns[2].visible" :show-overflow-tooltip="true" />
               <el-table-column label="部门" align="center" key="deptName" prop="dept.deptName" v-if="columns[3].visible" :show-overflow-tooltip="true" />
               <el-table-column label="手机号码" align="center" key="phonenumber" prop="phonenumber" v-if="columns[4].visible" width="120" />
+              <el-table-column label="身份" align="center" width="90">
+                <template slot-scope="scope">
+                  <el-tag v-if="scope.row.lawyerFlag === '1'" size="mini" type="success">律师</el-tag>
+                  <el-tag v-else size="mini" type="info">普通</el-tag>
+                </template>
+              </el-table-column>
               <el-table-column label="状态" align="center" key="status" v-if="columns[5].visible">
                 <template slot-scope="scope">
                   <el-switch v-model="scope.row.status" active-value="0" inactive-value="1" @change="handleStatusChange(scope.row)"></el-switch>
@@ -172,6 +185,47 @@
             </el-form-item>
           </el-col>
         </el-row>
+        <el-divider content-position="left">律师资料（勾选后在咨询台账中可作为承办律师选择）</el-divider>
+        <el-row>
+          <el-col :span="12">
+            <el-form-item label="是否律师" prop="lawyerFlag">
+              <el-switch v-model="form.lawyerFlag" active-value="1" inactive-value="0"></el-switch>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item v-if="form.lawyerFlag === '1'" label="执业年限" prop="practiceYears">
+              <el-input-number v-model="form.practiceYears" :min="0" :max="80" controls-position="right" style="width:100%"></el-input-number>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <template v-if="form.lawyerFlag === '1'">
+          <el-row>
+            <el-col :span="12">
+              <el-form-item label="执业证号" prop="lawyerLicense">
+                <el-input v-model="form.lawyerLicense" placeholder="请输入执业证号" maxlength="50" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="所属律所" prop="lawFirm">
+                <el-input v-model="form.lawFirm" placeholder="请输入所属律所" maxlength="200" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row>
+            <el-col :span="24">
+              <el-form-item label="专业领域" prop="specialty">
+                <el-input v-model="form.specialty" placeholder="多个专业领域用逗号分隔，如：婚姻家事,合同纠纷,劳动争议" maxlength="500" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row>
+            <el-col :span="24">
+              <el-form-item label="律师简介" prop="lawyerIntro">
+                <el-input v-model="form.lawyerIntro" type="textarea" :rows="2" placeholder="请输入律师简介" maxlength="2000" show-word-limit></el-input>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </template>
       </el-form>
       <div slot="footer" class="dialog-footer">
         <el-button type="primary" @click="submitForm">确 定</el-button>
@@ -274,7 +328,8 @@ export default {
         userName: undefined,
         phonenumber: undefined,
         status: undefined,
-        deptId: undefined
+        deptId: undefined,
+        lawyerFlag: undefined
       },
       // 列信息
       columns: [
@@ -400,7 +455,13 @@ export default {
         status: "0",
         remark: undefined,
         postIds: [],
-        roleIds: []
+        roleIds: [],
+        lawyerFlag: "0",
+        lawyerLicense: undefined,
+        lawFirm: undefined,
+        specialty: undefined,
+        practiceYears: undefined,
+        lawyerIntro: undefined
       }
       this.resetForm("form")
     },

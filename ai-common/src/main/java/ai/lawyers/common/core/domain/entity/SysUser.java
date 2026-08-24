@@ -76,6 +76,28 @@ public class SysUser extends BaseEntity
     /** 用户类型（00系统用户 01普通用户） */
     private String userType;
 
+    /** 是否为律师（0否 1是） */
+    @Excel(name = "是否律师", readConverterExp = "0=否,1=是")
+    private String lawyerFlag;
+
+    /** 执业证号 */
+    @Excel(name = "执业证号")
+    private String lawyerLicense;
+
+    /** 所属律所 */
+    @Excel(name = "所属律所")
+    private String lawFirm;
+
+    /** 专业领域（多个用逗号分隔，如：婚姻家事,合同纠纷） */
+    @Excel(name = "专业领域")
+    private String specialty;
+
+    /** 执业年限 */
+    private Integer practiceYears;
+
+    /** 律师简介 */
+    private String lawyerIntro;
+
     /** 部门对象 */
     @Excels({
         @Excel(name = "部门名称", targetAttr = "deptName", type = Type.EXPORT),
@@ -271,6 +293,66 @@ public class SysUser extends BaseEntity
     public void setUserType(String userType)
     {
         this.userType = userType;
+    }
+
+    public String getLawyerFlag()
+    {
+        return lawyerFlag;
+    }
+
+    public void setLawyerFlag(String lawyerFlag)
+    {
+        this.lawyerFlag = lawyerFlag;
+    }
+
+    public String getLawyerLicense()
+    {
+        return lawyerLicense;
+    }
+
+    public void setLawyerLicense(String lawyerLicense)
+    {
+        this.lawyerLicense = lawyerLicense;
+    }
+
+    public String getLawFirm()
+    {
+        return lawFirm;
+    }
+
+    public void setLawFirm(String lawFirm)
+    {
+        this.lawFirm = lawFirm;
+    }
+
+    public String getSpecialty()
+    {
+        return specialty;
+    }
+
+    public void setSpecialty(String specialty)
+    {
+        this.specialty = specialty;
+    }
+
+    public Integer getPracticeYears()
+    {
+        return practiceYears;
+    }
+
+    public void setPracticeYears(Integer practiceYears)
+    {
+        this.practiceYears = practiceYears;
+    }
+
+    public String getLawyerIntro()
+    {
+        return lawyerIntro;
+    }
+
+    public void setLawyerIntro(String lawyerIntro)
+    {
+        this.lawyerIntro = lawyerIntro;
     }
 
     public SysDept getDept()

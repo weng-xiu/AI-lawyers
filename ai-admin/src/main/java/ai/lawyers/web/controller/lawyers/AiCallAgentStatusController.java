@@ -11,7 +11,9 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import ai.lawyers.common.annotation.Anonymous;
 import ai.lawyers.common.annotation.Log;
 import ai.lawyers.common.core.controller.BaseController;
 import ai.lawyers.common.core.domain.AjaxResult;
@@ -118,6 +120,20 @@ public class AiCallAgentStatusController extends BaseController
             return success("坐席注销成功");
         }
         return error("坐席注销失败");
+    }
+
+    /**
+     * 浏览器关闭/页面卸载时的自动签出接口。
+     * <p>通过 navigator.sendBeacon 调用，无需鉴权（@Anonymous），
+     * 仅依据前端传入的 agentId/userId 执行签出，属于"尽力而为"的兜底操作。</p>
+     */
+    @Anonymous
+    @PostMapping("/autoLogout")
+    public AjaxResult autoLogout(@RequestParam(value = "agentId", required = false) Long agentId,
+                                 @RequestParam(value = "userId", required = false) Long userId)
+    {
+        int result = aiCallAgentStatusService.agentLogout(agentId, userId);
+        return result > 0 ? success() : error("无在线坐席需要签出");
     }
 
     @PreAuthorize("@ss.hasPermi('lawyers:call:agent:status')")
