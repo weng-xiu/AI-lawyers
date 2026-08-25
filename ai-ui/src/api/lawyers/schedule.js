@@ -41,7 +41,7 @@ export function delShift(shiftIds) {
 
 export function listEnabledShifts() {
   return request({
-    url: '/lawyers/schedule/shift/listEnabled',
+    url: '/lawyers/schedule/shift/enabled',
     method: 'get'
   })
 }

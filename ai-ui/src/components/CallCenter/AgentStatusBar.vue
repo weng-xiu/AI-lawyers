@@ -62,24 +62,12 @@
         <el-button type="primary" :loading="loginLoading" @click="confirmLogin">签 入</el-button>
       </div>
     </el-dialog>
-
-    <el-dialog title="外呼" :visible.sync="dialOpen" width="360px" append-to-body :close-on-click-modal="false">
-      <el-form label-width="80px" size="small">
-        <el-form-item label="被叫号码">
-          <el-input v-model="dialForm.phone" placeholder="请输入号码" @keyup.enter.native="confirmDial" />
-        </el-form-item>
-      </el-form>
-      <div slot="footer">
-        <el-button @click="dialOpen = false">取 消</el-button>
-        <el-button type="primary" :loading="dialLoading" @click="confirmDial">呼 出</el-button>
-      </div>
-    </el-dialog>
   </div>
 </template>
 
 <script>
 import { mapGetters } from 'vuex'
-import { getMyAgent, makeCall } from '@/api/lawyers/callCenter'
+import { getMyAgent } from '@/api/lawyers/callCenter'
 import callSocket from '@/utils/callSocket'
 
 export default {
@@ -89,9 +77,6 @@ export default {
       loginOpen: false,
       loginLoading: false,
       loginForm: { agentId: '', agentName: '', bound: false },
-      dialOpen: false,
-      dialLoading: false,
-      dialForm: { phone: '' },
       now: Date.now(),
       timer: null,
       lastCallStatus: '0',
@@ -390,32 +375,8 @@ export default {
         this.$message.warning('当前通话中，请先挂机')
         return
       }
-      this.dialForm.phone = ''
-      this.dialOpen = true
-    },
-    confirmDial() {
-      const phone = String(this.dialForm.phone || '').trim()
-      if (!phone) {
-        this.$message.warning('请输入被叫号码')
-        return
-      }
-      this.dialLoading = true
-      makeCall({ agentId: this.agent.agentId, phone }).then(() => {
-        this.dialLoading = false
-        this.dialOpen = false
-        this.pendingOutbound = phone
-        this.currentDirection = 'out'
-        this.lastCallStatus = this.agent.callStatus
-        // 呼出成功后直接进入来电弹屏页面
-        this.$router.push({
-          path: '/inbound/callPopup',
-          query: { callerNumber: phone, direction: 'out', callStatus: '1' }
-        }).catch(() => {})
-        this.$message.success('外呼成功')
-        this.refreshAgent()
-      }).catch(() => {
-        this.dialLoading = false
-      })
+      // 打开右下角拖拽拨号框（若用户之前关闭过，重新打开）
+      this.$store.dispatch('agent/openDialer')
     },
     goCallPage() {
       this.$router.push({

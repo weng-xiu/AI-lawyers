@@ -17,4 +17,4 @@ CREATE TABLE IF NOT EXISTS ai_call_blacklist (
   PRIMARY KEY (id),
   UNIQUE KEY uk_phone_type (phone_number, list_type),
   KEY idx_phone (phone_number)
-) ENGINE=InnoDB DEFAULT CHARSET=utfmb4 COMMENT='通话黑白名单';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='通话黑白名单';

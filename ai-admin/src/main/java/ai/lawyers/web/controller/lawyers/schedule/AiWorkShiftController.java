@@ -56,7 +56,7 @@ public class AiWorkShiftController extends BaseController
      * 获取班次详细信息
      */
     @PreAuthorize("@ss.hasPermi('lawyers:schedule:query')")
-    @GetMapping(value = "/{shiftId}")
+    @GetMapping(value = "/{shiftId:\\d+}")
     public AjaxResult getInfo(@PathVariable("shiftId") Long shiftId)
     {
         return success(aiWorkShiftService.selectAiWorkShiftByShiftId(shiftId));

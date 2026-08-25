@@ -178,7 +178,9 @@ const state = {
   // SIP 注册/连接的最新错误信息（便于排障）
   sipError: null,
   // 当前 SIP 通话信息（来电/去电）
-  sipCall: null
+  sipCall: null,
+  // 拖拽拨号框显隐（由坐席状态栏"外呼"按钮控制）
+  dialerVisible: false
 }
 
 const mutations = {
@@ -197,6 +199,9 @@ const mutations = {
   },
   SET_SIP_CALL(state, call) {
     state.sipCall = call || null
+  },
+  SET_DIALER_VISIBLE(state, visible) {
+    state.dialerVisible = !!visible
   },
   CLEAR(state) {
     state.agent = null
@@ -373,6 +378,15 @@ const actions = {
   setCallMode({ dispatch, state }, callMode) {
     if (state.agentId == null) return Promise.resolve()
     return updateCallMode({ agentId: state.agentId, callMode }).then(() => dispatch('refresh'))
+  },
+
+  // 打开拖拽拨号框（由坐席状态栏"外呼"按钮触发）
+  openDialer({ commit }) {
+    commit('SET_DIALER_VISIBLE', true)
+  },
+  // 关闭拖拽拨号框
+  closeDialer({ commit }) {
+    commit('SET_DIALER_VISIBLE', false)
   }
 }
 

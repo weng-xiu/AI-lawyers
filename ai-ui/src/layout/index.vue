@@ -10,6 +10,13 @@
       </div>
       <app-main/>
       <settings ref="settingRef"/>
+      <draggable-dialer
+        :visible="dialerVisible && !!agent"
+        :agent="agent"
+        :contacts="dialerContacts"
+        @close="onDialerClose"
+        @call-made="onCallMade"
+      />
     </div>
   </div>
 </template>
@@ -20,18 +27,32 @@ import ResizeMixin from './mixin/ResizeHandler'
 import { mapState } from 'vuex'
 import variables from '@/assets/styles/variables.scss'
 import AgentStatusBar from '@/components/CallCenter/AgentStatusBar'
+import DraggableDialer from '@/components/CallCenter/DraggableDialer'
 
 export default {
   name: 'Layout',
   components: {
     AppMain,
     AgentStatusBar,
+    DraggableDialer,
     Navbar,
     Settings,
     Sidebar,
     TagsView
   },
   mixins: [ResizeMixin],
+  data() {
+    return {
+      // 内置常用联系人示例（可替换为后端接口数据）
+      dialerContacts: [
+        { id: 1, name: '12348 法律服务热线', phone: '12348' },
+        { id: 2, name: '12345 政务服务热线', phone: '12345' },
+        { id: 3, name: '测试分机 1001', phone: '1001' },
+        { id: 4, name: '测试分机 1002', phone: '1002' },
+        { id: 5, name: '测试分机 1003', phone: '1003' }
+      ]
+    }
+  },
   computed: {
     ...mapState({
       theme: state => state.settings.theme,
@@ -51,6 +72,14 @@ export default {
     },
     variables() {
       return variables
+    },
+    // 当前签入的坐席
+    agent() {
+      return this.$store.state.agent.agent
+    },
+    // 拖拽拨号框显隐（由坐席状态栏"外呼"按钮打开）
+    dialerVisible() {
+      return this.$store.state.agent.dialerVisible
     }
   },
   methods: {
@@ -59,6 +88,16 @@ export default {
     },
     setLayout() {
       this.$refs.settingRef.openSetting()
+    },
+    onDialerClose() {
+      this.$store.dispatch('agent/closeDialer')
+    },
+    // 外呼成功后跳转到通话弹屏页
+    onCallMade({ phone }) {
+      this.$router.push({
+        path: '/inbound/callPopup',
+        query: { callerNumber: phone, direction: 'out', callStatus: '1' }
+      }).catch(() => {})
     }
   }
 }
