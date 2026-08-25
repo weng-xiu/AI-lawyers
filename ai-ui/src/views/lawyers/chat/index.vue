@@ -142,19 +142,12 @@
     <el-dialog title="会话转接" :visible.sync="transferOpen" width="400px" append-to-body>
       <el-form label-width="60px" size="small">
         <el-form-item label="转接至">
-          <el-select v-model="transferAssignee" placeholder="请选择坐席" style="width: 100%" filterable>
-            <el-option
-              v-for="user in userOptions"
-              :key="user.userId"
-              :label="user.nickName || user.userName"
-              :value="user.userName"
-            />
-          </el-select>
+          <user-select v-model="transferUserId" placeholder="请选择受理人" @change="onTransferUserChange" />
         </el-form-item>
       </el-form>
       <div slot="footer">
         <el-button @click="transferOpen = false">取 消</el-button>
-        <el-button type="primary" @click="confirmTransfer" :disabled="!transferAssignee">确 定</el-button>
+        <el-button type="primary" @click="confirmTransfer" :disabled="!transferUserId">确 定</el-button>
       </div>
     </el-dialog>
   </div>
@@ -166,7 +159,6 @@ import {
   listChatMessage, sendChatMessage,
   closeChatSession, transferChatSession, markRead
 } from "@/api/lawyers/chat"
-import { listUser } from "@/api/system/user"
 
 export default {
   name: "Chat",
@@ -182,8 +174,8 @@ export default {
       activeCount: 0,
       todayCount: 0,
       transferOpen: false,
-      transferAssignee: '',
-      userOptions: [],
+      transferUserId: null,
+      transferUserName: '',
       pollTimer: null
     }
   },
@@ -200,7 +192,6 @@ export default {
   },
   created() {
     this.loadSessions()
-    this.loadUsers()
   },
   mounted() {
     this.pollTimer = setInterval(() => {
@@ -226,10 +217,9 @@ export default {
         this.todayCount = d.todayCount || 0
       }).catch(() => {})
     },
-    loadUsers() {
-      listUser({ pageNum: 1, pageSize: 100 }).then(res => {
-        this.userOptions = res.rows || []
-      }).catch(() => {})
+    onTransferUserChange(val, user) {
+      this.transferUserId = val
+      this.transferUserName = user ? (user.nickName || user.userName) : ''
     },
     selectSession(sess) {
       this.currentSession = sess
@@ -274,13 +264,15 @@ export default {
     },
     handleTransfer() {
       if (!this.currentSession) return
-      this.transferAssignee = ''
+      this.transferUserId = null
+      this.transferUserName = ''
       this.transferOpen = true
     },
     confirmTransfer() {
       transferChatSession({
         sessionId: this.currentSession.sessionId,
-        assignee: this.transferAssignee
+        userId: this.transferUserId,
+        assignee: this.transferUserName
       }).then(() => {
         this.$message.success('转接成功')
         this.transferOpen = false

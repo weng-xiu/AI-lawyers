@@ -11,10 +11,12 @@ import ai.lawyers.common.utils.uuid.IdUtils;
 import ai.lawyers.system.domain.lawyers.AiCallLedger;
 import ai.lawyers.system.domain.lawyers.AiCallRecord;
 import ai.lawyers.system.domain.lawyers.AiCallTicket;
+import ai.lawyers.system.domain.lawyers.AiCallAgentStatus;
 import ai.lawyers.system.mapper.lawyers.AiCallLedgerMapper;
 import ai.lawyers.system.service.lawyers.IAiCallLedgerService;
 import ai.lawyers.system.service.lawyers.IAiCallRecordService;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
+import ai.lawyers.system.service.lawyers.IAiCallAgentStatusService;
 
 @Service
 public class AiCallLedgerServiceImpl implements IAiCallLedgerService
@@ -27,6 +29,9 @@ public class AiCallLedgerServiceImpl implements IAiCallLedgerService
 
     @Autowired
     private IAiCallTicketService aiCallTicketService;
+
+    @Autowired
+    private IAiCallAgentStatusService aiCallAgentStatusService;
 
     @Override
     public AiCallLedger selectAiCallLedgerByLedgerId(Long ledgerId)
@@ -121,7 +126,20 @@ public class AiCallLedgerServiceImpl implements IAiCallLedgerService
             ledger.setCategoryName(record.getCategoryName());
             ledger.setConsultContent(record.getContent());
             ledger.setLawyerAnswer(record.getAnswer());
-            ledger.setLawyerName(record.getAgentName());
+            // 通过接听坐席反查其绑定的系统用户，作为承办律师默认值
+            // （仅当该用户 lawyer_flag='1' 时才是真正律师；前端可再改选）
+            if (record.getAgentId() != null) {
+                AiCallAgentStatus agent = aiCallAgentStatusService.selectAiCallAgentStatusByAgentId(record.getAgentId());
+                if (agent != null && agent.getUserId() != null) {
+                    ledger.setLawyerId(agent.getUserId());
+                    // 优先用 JOIN 回显的 nickName，兜底坐席名
+                    ledger.setLawyerName(agent.getNickName() != null ? agent.getNickName() : record.getAgentName());
+                } else {
+                    ledger.setLawyerName(record.getAgentName());
+                }
+            } else {
+                ledger.setLawyerName(record.getAgentName());
+            }
             ledger.setServiceType("1");
             ledger.setSourceChannel("电话咨询");
             // 通话时长(秒) 转为 咨询时长(分钟)

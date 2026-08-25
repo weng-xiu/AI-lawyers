@@ -37,7 +37,10 @@ public class AiConsultationCategory extends BaseEntity
     @Excel(name = "显示顺序", cellType = ColumnType.NUMERIC)
     private Integer orderNum;
 
-    /** 负责人 */
+    /** 负责人用户ID */
+    private Long leaderId;
+
+    /** 负责人（姓名快照） */
     @Excel(name = "负责人")
     private String leader;
 
@@ -107,6 +110,16 @@ public class AiConsultationCategory extends BaseEntity
     public void setOrderNum(Integer orderNum)
     {
         this.orderNum = orderNum;
+    }
+
+    public Long getLeaderId()
+    {
+        return leaderId;
+    }
+
+    public void setLeaderId(Long leaderId)
+    {
+        this.leaderId = leaderId;
     }
 
     public String getLeader()

@@ -39,6 +39,9 @@ public class AiRiskWarning extends BaseEntity
     @Excel(name = "处理人姓名")
     private String handlerName;
 
+    /** 处理人用户ID */
+    private Long handlerId;
+
     @Excel(name = "处理结果")
     private String handleResult;
 
@@ -138,6 +141,16 @@ public class AiRiskWarning extends BaseEntity
     public String getHandlerName()
     {
         return handlerName;
+    }
+
+    public void setHandlerId(Long handlerId)
+    {
+        this.handlerId = handlerId;
+    }
+
+    public Long getHandlerId()
+    {
+        return handlerId;
     }
 
     public void setHandleResult(String handleResult)

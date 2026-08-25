@@ -148,8 +148,8 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="回访人" prop="visitBy">
-              <el-input v-model="form.visitBy" placeholder="请输入回访人" />
+            <el-form-item label="回访人" prop="visitById">
+              <user-select v-model="form.visitById" placeholder="请选择回访人" @change="onVisitByChange" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -274,6 +274,9 @@ export default {
     }
   },
   methods: {
+    onVisitByChange(val, user) {
+      this.$set(this.form, 'visitBy', user ? (user.nickName || user.userName) : '')
+    },
     loadStats() {
       getCallbackStats().then(res => { this.stats = res.data || {} })
     },
@@ -390,6 +393,7 @@ export default {
         callerName: undefined,
         visitTime: undefined,
         visitBy: undefined,
+        visitById: undefined,
         satisfaction: undefined,
         visitOpinion: undefined,
         visitResult: undefined,

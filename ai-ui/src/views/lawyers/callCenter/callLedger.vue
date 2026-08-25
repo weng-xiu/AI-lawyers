@@ -22,8 +22,8 @@
         <el-form-item label="联系电话" prop="callerPhone">
           <el-input v-model="queryParams.callerPhone" placeholder="请输入联系电话" clearable style="width: 150px" />
         </el-form-item>
-        <el-form-item label="承办律师" prop="lawyerName">
-          <el-input v-model="queryParams.lawyerName" placeholder="请输入承办律师" clearable style="width: 150px" />
+        <el-form-item label="承办律师" prop="lawyerId">
+          <user-select v-model="queryParams.lawyerId" placeholder="全部律师" lawyer style="width:170px" />
         </el-form-item>
         <el-form-item label="服务方式" prop="serviceType">
           <el-select v-model="queryParams.serviceType" placeholder="请选择" clearable style="width: 150px">
@@ -363,8 +363,8 @@
               </el-form-item>
             </el-col>
             <el-col :span="8">
-              <el-form-item label="承办律师">
-                <el-input v-model="form.lawyerName" placeholder="请输入承办律师" />
+              <el-form-item label="承办律师" prop="lawyerId">
+                <user-select v-model="form.lawyerId" placeholder="请选择承办律师" lawyer @change="onLawyerChange" />
               </el-form-item>
             </el-col>
             <el-col :span="8">
@@ -454,7 +454,7 @@ export default {
         categoryName: '',
         callerName: '',
         callerPhone: '',
-        lawyerName: '',
+        lawyerId: undefined,
         serviceType: '',
         satisfaction: ''
       },
@@ -482,6 +482,10 @@ export default {
     this.loadTemplates()
   },
   methods: {
+    // 选中律师时同步回填 lawyerName，保持列表/详情展示兼容
+    onLawyerChange(val, user) {
+      this.$set(this.form, 'lawyerName', user ? (user.nickName || user.userName) : '')
+    },
     getList() {
       this.loading = true
       listLedger(this.addDateRange(this.queryParams, this.dateRange)).then(response => {
@@ -541,7 +545,7 @@ export default {
       this.queryParams = {
         pageNum: 1, pageSize: 10,
         categoryName: '', callerName: '', callerPhone: '',
-        lawyerName: '', serviceType: '', satisfaction: ''
+        lawyerId: undefined, serviceType: '', satisfaction: ''
       }
       this.handleQuery()
     },

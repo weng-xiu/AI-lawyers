@@ -57,6 +57,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             del_flag = '0'
             <if test="callerName != null and callerName != ''"> and caller_name like concat('%', #{callerName}, '%')</if>
             <if test="callerPhone != null and callerPhone != ''"> and caller_phone like concat('%', #{callerPhone}, '%')</if>
+            <if test="lawyerId != null"> and lawyer_id = #{lawyerId}</if>
             <if test="lawyerName != null and lawyerName != ''"> and lawyer_name like concat('%', #{lawyerName}, '%')</if>
             <if test="categoryId != null"> and category_id = #{categoryId}</if>
             <if test="categoryName != null and categoryName != ''"> and category_name like concat('%', #{categoryName}, '%')</if>

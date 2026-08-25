@@ -131,8 +131,8 @@
         <el-form-item label="显示排序" prop="orderNum">
           <el-input-number v-model="form.orderNum" controls-position="right" :min="0" />
         </el-form-item>
-        <el-form-item label="负责人" prop="leader">
-          <el-input v-model="form.leader" placeholder="请输入负责人" maxlength="20" />
+        <el-form-item label="负责人" prop="leaderId">
+          <user-select v-model="form.leaderId" placeholder="请选择负责人" @change="onLeaderChange" />
         </el-form-item>
         <el-form-item label="联系电话" prop="phone">
           <el-input v-model="form.phone" placeholder="请输入联系电话" maxlength="11" />
@@ -222,6 +222,9 @@ export default {
     this.getTreeselect()
   },
   methods: {
+    onLeaderChange(val, user) {
+      this.form.leader = user ? (user.nickName || user.userName) : null
+    },
     /** 查询咨询分类列表 */
     getList() {
       this.loading = true
@@ -386,6 +389,7 @@ export default {
         parentId: null,
         categoryName: null,
         orderNum: null,
+        leaderId: null,
         leader: null,
         phone: null,
         email: null,

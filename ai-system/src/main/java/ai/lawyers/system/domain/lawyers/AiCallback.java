@@ -40,6 +40,9 @@ public class AiCallback extends BaseEntity
     @Excel(name = "回访人")
     private String visitBy;
 
+    /** 回访人用户ID */
+    private Long visitById;
+
     /** 满意度（1非常满意 2满意 3一般 4不满意） */
     @Excel(name = "满意度", readConverterExp = "1=非常满意,2=满意,3=一般,4=不满意")
     private String satisfaction;
@@ -114,6 +117,16 @@ public class AiCallback extends BaseEntity
     public String getVisitBy()
     {
         return visitBy;
+    }
+
+    public void setVisitById(Long visitById)
+    {
+        this.visitById = visitById;
+    }
+
+    public Long getVisitById()
+    {
+        return visitById;
     }
 
     public void setSatisfaction(String satisfaction)

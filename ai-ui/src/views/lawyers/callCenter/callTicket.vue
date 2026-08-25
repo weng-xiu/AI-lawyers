@@ -186,9 +186,11 @@
             <el-radio label="2">高</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="处理人ID" prop="assignUserId">
-          <el-input v-model="form.assignUserId" type="number" placeholder="请输入处理人用户ID" />
-        </el-form-item>
+        <el-row :gutter="16">
+          <el-col :span="12"><el-form-item label="处理人" prop="assignUserId">
+            <user-select v-model="form.assignUserId" placeholder="请选择处理人" @change="onAssignUserChange" />
+          </el-form-item></el-col>
+        </el-row>
         <el-form-item label="备注" prop="remark">
           <el-input v-model="form.remark" type="textarea" placeholder="请输入备注" />
         </el-form-item>
@@ -290,6 +292,9 @@ export default {
     this.getList()
   },
   methods: {
+    onAssignUserChange(val, user) {
+      this.$set(this.form, 'assignUserName', user ? (user.nickName || user.userName) : '')
+    },
     getList() {
       this.loading = true
       const params = {
@@ -332,6 +337,7 @@ export default {
         priority: '0',
         recordId: undefined,
         assignUserId: undefined,
+        assignUserName: undefined,
         processResult: undefined,
         remark: undefined
       }

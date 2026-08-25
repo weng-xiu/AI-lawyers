@@ -20,13 +20,12 @@
             @keyup.enter.native="handleQuery"
           />
         </el-form-item>
-        <el-form-item label="办理人" prop="assignUserName">
-          <el-input
-            v-model="queryParams.assignUserName"
-            placeholder="请输入办理人"
+        <el-form-item label="办理人" prop="assignUserId">
+          <user-select
+            v-model="queryParams.assignUserId"
+            placeholder="全部办理人"
             clearable
-            style="width: 160px"
-            @keyup.enter.native="handleQuery"
+            style="width: 200px"
           />
         </el-form-item>
         <el-form-item label="状态" prop="status">
@@ -290,9 +289,11 @@
         <el-form-item label="工单内容" prop="content">
           <el-input v-model="form.content" type="textarea" :rows="4" placeholder="请输入工单内容" maxlength="500" show-word-limit />
         </el-form-item>
-        <el-form-item label="处理人姓名" prop="assignUserName">
-          <el-input v-model="form.assignUserName" placeholder="请输入处理人姓名" maxlength="50" />
-        </el-form-item>
+        <el-row :gutter="16">
+          <el-col :span="12"><el-form-item label="办理人" prop="assignUserId">
+            <user-select v-model="form.assignUserId" placeholder="请选择办理人" @change="onAssignUserChange" />
+          </el-form-item></el-col>
+        </el-row>
         <el-form-item label="备注" prop="remark">
           <el-input v-model="form.remark" type="textarea" :rows="2" placeholder="请输入备注" maxlength="500" />
         </el-form-item>
@@ -300,6 +301,18 @@
       <div slot="footer" class="dialog-footer">
         <el-button size="small" @click="formOpen = false">取 消</el-button>
         <el-button type="primary" size="small" @click="submitForm">确 定</el-button>
+      </div>
+    </el-dialog>
+
+    <el-dialog title="转派工单" :visible.sync="transferOpen" width="400px" append-to-body>
+      <el-form label-width="80px">
+        <el-form-item label="转派给">
+          <user-select v-model="transferUserId" placeholder="请选择新办理人" @change="onTransferUserChange" />
+        </el-form-item>
+      </el-form>
+      <div slot="footer">
+        <el-button type="primary" @click="confirmTransfer">确认</el-button>
+        <el-button @click="transferOpen = false">取消</el-button>
       </div>
     </el-dialog>
   </div>
@@ -341,7 +354,7 @@ export default {
         pageSize: 10,
         ticketNo: undefined,
         title: undefined,
-        assignUserName: undefined,
+        assignUserId: undefined,
         status: undefined
       },
       orderList: [],
@@ -349,6 +362,10 @@ export default {
       formOpen: false,
       isEdit: false,
       form: {},
+      transferOpen: false,
+      transferUserId: null,
+      transferUserName: '',
+      transferRow: null,
       rules: {
         title: [{ required: true, message: '工单标题不能为空', trigger: 'blur' }],
         content: [{ required: true, message: '工单内容不能为空', trigger: 'blur' }]
@@ -360,6 +377,9 @@ export default {
     this.calcStatData()
   },
   methods: {
+    onAssignUserChange(val, user) {
+      this.$set(this.form, 'assignUserName', user ? (user.nickName || user.userName) : '')
+    },
     getList() {
       this.loading = true
       listTicket(this.addDateRange(this.queryParams, this.dateRange)).then(response => {
@@ -415,7 +435,7 @@ export default {
         pageSize: 10,
         ticketNo: undefined,
         title: undefined,
-        assignUserName: undefined,
+        assignUserId: undefined,
         status: undefined
       }
       this.handleQuery()
@@ -474,6 +494,7 @@ export default {
         callerName: undefined,
         priority: 2,
         content: undefined,
+        assignUserId: undefined,
         assignUserName: undefined,
         remark: undefined
       }
@@ -610,24 +631,31 @@ export default {
       }).catch(() => {})
     },
     handleTransfer() {
-      this.$prompt('请输入转派处理人姓名', '工单转派', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        inputPattern: /\S+/,
-        inputErrorMessage: '处理人姓名不能为空'
-      }).then(({ value }) => {
-        const name = (value || '').trim()
-        processTicket({
-          ticketId: this.currentOrder.ticketId,
-          processContent: '工单转派给：' + name,
-          assignUserName: name,
-          assignUserId: null
-        }).then(() => {
-          this.$message.success('工单已转派给：' + name)
-          this.drawerVisible = false
-          this.getList()
-          this.calcStatData()
-        }).catch(() => {})
+      this.transferRow = this.currentOrder
+      this.transferUserId = null
+      this.transferUserName = ''
+      this.transferOpen = true
+    },
+    onTransferUserChange(val, user) {
+      this.transferUserName = user ? (user.nickName || user.userName) : ''
+    },
+    confirmTransfer() {
+      if (!this.transferUserId) {
+        this.$message.warning('请选择新办理人')
+        return
+      }
+      const name = this.transferUserName
+      processTicket({
+        ticketId: this.transferRow.ticketId,
+        processContent: '工单转派给：' + (name || this.transferUserId),
+        assignUserId: this.transferUserId,
+        assignUserName: name
+      }).then(() => {
+        this.$message.success('工单已转派')
+        this.transferOpen = false
+        this.drawerVisible = false
+        this.getList()
+        this.calcStatData()
       }).catch(() => {})
     },
     handleReturn() {

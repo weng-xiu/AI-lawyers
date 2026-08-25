@@ -51,6 +51,9 @@ public class AiPaidLegalService extends BaseEntity
     @Excel(name = "处理人")
     private String handlerName;
 
+    /** 处理人用户ID */
+    private Long handlerId;
+
     public Long getPaidId()
     {
         return paidId;
@@ -139,6 +142,16 @@ public class AiPaidLegalService extends BaseEntity
     public void setHandlerName(String handlerName)
     {
         this.handlerName = handlerName;
+    }
+
+    public void setHandlerId(Long handlerId)
+    {
+        this.handlerId = handlerId;
+    }
+
+    public Long getHandlerId()
+    {
+        return handlerId;
     }
 
     @Override

@@ -100,6 +100,11 @@
             <el-radio label="1">已核验</el-radio>
           </el-radio-group>
         </el-form-item>
+        <el-form-item label="接待坐席" prop="agentId">
+          <el-select v-model="form.agentId" placeholder="请选择接待坐席" filterable clearable style="width:100%" @change="onAgentChange">
+            <el-option v-for="a in agentOptions" :key="a.agentId" :label="a.agentName+'('+a.agentId+')'" :value="a.agentId" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="录像地址">
           <el-input v-model="form.recordingUrl" placeholder="请输入录像地址（可选）" />
         </el-form-item>
@@ -139,6 +144,7 @@
 
 <script>
 import { listVideoConsult, getVideoConsult, addVideoConsult, updateVideoConsult, delVideoConsult } from "@/api/lawyers/videoConsult"
+import { listAgent } from "@/api/lawyers/callCenter"
 
 export default {
   name: "VideoConsult",
@@ -146,6 +152,7 @@ export default {
     return {
       loading: true, ids: [], single: true, multiple: true, showSearch: true, total: 0,
       videoList: [], title: "", open: false, detailOpen: false, dateRange: [],
+      agentOptions: [],
       queryParams: { pageNum: 1, pageSize: 10, consultNo: undefined, customerName: undefined, customerPhone: undefined, status: undefined },
       form: { identityVerify: '0' },
       detailForm: {},
@@ -155,8 +162,15 @@ export default {
       }
     }
   },
-  created() { this.getList() },
+  created() { this.getList(); this.loadAgents() },
   methods: {
+    loadAgents() {
+      listAgent({ pageNum: 1, pageSize: 1000 }).then(res => { this.agentOptions = res.rows || [] })
+    },
+    onAgentChange(val) {
+      const a = this.agentOptions.find(x => x.agentId === val)
+      this.$set(this.form, 'agentName', a ? a.agentName : '')
+    },
     getList() {
       this.loading = true
       const params = { ...this.queryParams, ...this.addDateRange(this.queryParams, this.dateRange) }

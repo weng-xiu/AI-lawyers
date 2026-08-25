@@ -11,6 +11,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="callerName"     column="caller_name"     />
         <result property="visitTime"      column="visit_time"      />
         <result property="visitBy"        column="visit_by"        />
+        <result property="visitById"      column="visit_by_id"     />
         <result property="satisfaction"   column="satisfaction"    />
         <result property="visitOpinion"   column="visit_opinion"   />
         <result property="visitResult"    column="visit_result"    />
@@ -23,7 +24,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectAiCallbackVo">
-        select callback_id, ledger_id, caller_number, caller_name, visit_time, visit_by, satisfaction,
+        select callback_id, ledger_id, caller_number, caller_name, visit_time, visit_by, visit_by_id, satisfaction,
                visit_opinion, visit_result, status, create_by, create_time, update_by, update_time, remark
         from ai_callback
     </sql>
@@ -34,6 +35,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="callerNumber != null and callerNumber != ''"> and caller_number like concat('%', #{callerNumber}, '%')</if>
             <if test="callerName != null and callerName != ''"> and caller_name like concat('%', #{callerName}, '%')</if>
             <if test="visitBy != null and visitBy != ''"> and visit_by like concat('%', #{visitBy}, '%')</if>
+            <if test="visitById != null"> and visit_by_id = #{visitById}</if>
             <if test="satisfaction != null and satisfaction != ''"> and satisfaction = #{satisfaction}</if>
             <if test="status != null and status != ''"> and status = #{status}</if>
             <if test="params.beginTime != null and params.beginTime != ''"> and date(visit_time) &gt;= #{params.beginTime}</if>
@@ -81,6 +83,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="callerName != null and callerName != ''">caller_name,</if>
             <if test="visitTime != null">visit_time,</if>
             <if test="visitBy != null and visitBy != ''">visit_by,</if>
+            <if test="visitById != null">visit_by_id,</if>
             <if test="satisfaction != null and satisfaction != ''">satisfaction,</if>
             <if test="visitOpinion != null">visit_opinion,</if>
             <if test="visitResult != null">visit_result,</if>
@@ -95,6 +98,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="callerName != null and callerName != ''">#{callerName},</if>
             <if test="visitTime != null">#{visitTime},</if>
             <if test="visitBy != null and visitBy != ''">#{visitBy},</if>
+            <if test="visitById != null">#{visitById},</if>
             <if test="satisfaction != null and satisfaction != ''">#{satisfaction},</if>
             <if test="visitOpinion != null">#{visitOpinion},</if>
             <if test="visitResult != null">#{visitResult},</if>
@@ -113,6 +117,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="callerName != null and callerName != ''">caller_name = #{callerName},</if>
             <if test="visitTime != null">visit_time = #{visitTime},</if>
             <if test="visitBy != null and visitBy != ''">visit_by = #{visitBy},</if>
+            <if test="visitById != null">visit_by_id = #{visitById},</if>
             <if test="satisfaction != null and satisfaction != ''">satisfaction = #{satisfaction},</if>
             <if test="visitOpinion != null">visit_opinion = #{visitOpinion},</if>
             <if test="visitResult != null">visit_result = #{visitResult},</if>

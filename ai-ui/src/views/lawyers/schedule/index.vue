@@ -57,7 +57,9 @@
               </el-select>
             </el-form-item>
             <el-form-item label="坐席">
-              <el-input v-model="scheduleQuery.agentName" placeholder="坐席姓名" clearable style="width:160px" @keyup.enter.native="getScheduleList" />
+              <el-select v-model="scheduleQuery.agentId" placeholder="全部坐席" clearable filterable style="width:160px">
+                <el-option v-for="a in agentList" :key="a.agentId" :label="a.agentName" :value="a.agentId" />
+              </el-select>
             </el-form-item>
             <el-form-item label="日期范围">
               <el-date-picker
@@ -269,7 +271,7 @@ export default {
         pageNum: 1,
         pageSize: 10,
         shiftId: undefined,
-        agentName: undefined
+        agentId: undefined
       },
       scheduleOpen: false,
       scheduleTitle: '',
@@ -384,7 +386,7 @@ export default {
       }).catch(() => { this.scheduleLoading = false })
     },
     resetScheduleQuery() {
-      this.scheduleQuery = { pageNum: 1, pageSize: 10, shiftId: undefined, agentName: undefined }
+      this.scheduleQuery = { pageNum: 1, pageSize: 10, shiftId: undefined, agentId: undefined }
       this.initDefaultDateRange()
       this.getScheduleList()
     },

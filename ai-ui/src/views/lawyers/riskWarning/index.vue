@@ -198,8 +198,8 @@
                 <el-option label="已忽略" value="3" />
               </el-select>
             </el-form-item>
-            <el-form-item label="处理人" prop="handlerName">
-              <el-input v-model="form.handlerName" placeholder="请输入处理人姓名" />
+            <el-form-item label="处理人" prop="handlerId">
+              <user-select v-model="form.handlerId" placeholder="请选择处理人" @change="onHandlerChange" />
             </el-form-item>
             <el-form-item label="处理结果" prop="handleResult">
               <el-input v-model="form.handleResult" type="textarea" placeholder="请输入处理结果" />
@@ -557,6 +557,9 @@ export default {
       this.open = false
       this.reset()
     },
+    onHandlerChange(val, user) {
+      this.$set(this.form, 'handlerName', user ? (user.nickName || user.userName) : '')
+    },
     // 表单重置
     reset() {
       this.form = {
@@ -569,6 +572,7 @@ export default {
         customerName: undefined,
         status: undefined,
         handlerName: undefined,
+        handlerId: undefined,
         handleResult: undefined,
         handleTime: undefined,
         triggerTime: undefined,

@@ -1,9 +1,10 @@
 <template>
   <div class="app-container">
     <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="80px">
-      <el-form-item label="坐席名称" prop="agentName">
-        <el-input v-model="queryParams.agentName" placeholder="请输入坐席名称" clearable style="width: 180px"
-          @keyup.enter.native="handleQuery" />
+      <el-form-item label="坐席名称" prop="agentId">
+        <el-select v-model="queryParams.agentId" placeholder="全部坐席" filterable clearable style="width: 180px">
+          <el-option v-for="a in agentOptions" :key="a.agentId" :label="a.agentName+'('+a.agentId+')'" :value="a.agentId" />
+        </el-select>
       </el-form-item>
       <el-form-item label="开始时间" prop="beginTime">
         <el-date-picker v-model="queryParams.beginTime" type="datetime" placeholder="请选择开始时间" value-format="yyyy-MM-dd HH:mm:ss"
@@ -60,6 +61,7 @@
 
 <script>
 import { listAgentPerformance } from "@/api/lawyers/stat";
+import { listAgent } from "@/api/lawyers/callCenter";
 
 export default {
   name: "AgentPerformance",
@@ -69,19 +71,26 @@ export default {
       showSearch: true,
       total: 0,
       list: [],
+      agentOptions: [],
       queryParams: {
         pageNum: 1,
         pageSize: 10,
-        agentName: undefined,
+        agentId: undefined,
         beginTime: undefined,
         endTime: undefined
       }
     };
   },
   created() {
+    this.loadAgents();
     this.getList();
   },
   methods: {
+    loadAgents() {
+      listAgent({ pageSize: 999, status: '1' }).then(response => {
+        this.agentOptions = response.rows || [];
+      });
+    },
     getList() {
       this.loading = true;
       listAgentPerformance(this.queryParams).then(response => {

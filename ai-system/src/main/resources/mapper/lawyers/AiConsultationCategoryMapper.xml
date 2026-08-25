@@ -10,6 +10,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="parentId"        column="parent_id"        />
         <result property="ancestors"       column="ancestors"        />
         <result property="orderNum"        column="order_num"        />
+        <result property="leaderId"        column="leader_id"        />
         <result property="leader"          column="leader"           />
         <result property="phone"           column="phone"            />
         <result property="email"           column="email"            />
@@ -22,15 +23,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectAiConsultationCategoryVo">
-        select category_id, category_name, parent_id, ancestors, order_num, leader, phone, email, status, del_flag, create_by, create_time, update_by, update_time 
+        select category_id, category_name, parent_id, ancestors, order_num, leader_id, leader, phone, email, status, del_flag, create_by, create_time, update_by, update_time
         from ai_consultation_category
     </sql>
-    
+
     <select id="selectAiConsultationCategoryList" parameterType="AiConsultationCategory" resultMap="AiConsultationCategoryResult">
         <include refid="selectAiConsultationCategoryVo"/>
         <where>
             <if test="categoryName != null and categoryName != ''"> and category_name like concat('%', #{categoryName}, '%')</if>
             <if test="parentId != null "> and parent_id = #{parentId}</if>
+            <if test="leaderId != null"> and leader_id = #{leaderId}</if>
             <if test="status != null and status != ''"> and status = #{status}</if>
             <if test="delFlag != null and delFlag != ''"> and del_flag = #{delFlag}</if>
         </where>
@@ -49,6 +51,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="parentId != null">parent_id,</if>
             <if test="ancestors != null and ancestors != ''">ancestors,</if>
             <if test="orderNum != null">order_num,</if>
+            <if test="leaderId != null">leader_id,</if>
             <if test="leader != null and leader != ''">leader,</if>
             <if test="phone != null and phone != ''">phone,</if>
             <if test="email != null and email != ''">email,</if>
@@ -62,6 +65,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="parentId != null">#{parentId},</if>
             <if test="ancestors != null and ancestors != ''">#{ancestors},</if>
             <if test="orderNum != null">#{orderNum},</if>
+            <if test="leaderId != null">#{leaderId},</if>
             <if test="leader != null and leader != ''">#{leader},</if>
             <if test="phone != null and phone != ''">#{phone},</if>
             <if test="email != null and email != ''">#{email},</if>
@@ -79,6 +83,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="parentId != null">parent_id = #{parentId},</if>
             <if test="ancestors != null and ancestors != ''">ancestors = #{ancestors},</if>
             <if test="orderNum != null">order_num = #{orderNum},</if>
+            <if test="leaderId != null">leader_id = #{leaderId},</if>
             <if test="leader != null and leader != ''">leader = #{leader},</if>
             <if test="phone != null and phone != ''">phone = #{phone},</if>
             <if test="email != null and email != ''">email = #{email},</if>

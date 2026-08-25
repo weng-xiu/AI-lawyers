@@ -10,14 +10,10 @@
           @keyup.enter.native="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="坐席名称" prop="agentName">
-        <el-input
-          v-model="queryParams.agentName"
-          placeholder="请输入坐席名称"
-          clearable
-          style="width: 240px"
-          @keyup.enter.native="handleQuery"
-        />
+      <el-form-item label="坐席名称" prop="agentId">
+        <el-select v-model="queryParams.agentId" placeholder="请选择坐席" clearable filterable style="width: 240px">
+          <el-option v-for="a in agentOptions" :key="a.agentId" :label="a.agentName+'('+a.agentId+')'" :value="a.agentId" />
+        </el-select>
       </el-form-item>
       <el-form-item label="来电状态" prop="status">
         <el-select v-model="queryParams.status" placeholder="请选择状态" clearable>
@@ -164,8 +160,10 @@
         <el-form-item label="来电姓名" prop="callerName">
           <el-input v-model="form.callerName" placeholder="请输入来电姓名" />
         </el-form-item>
-        <el-form-item label="坐席ID" prop="agentId">
-          <el-input v-model="form.agentId" placeholder="请输入坐席ID" />
+        <el-form-item label="坐席" prop="agentId">
+          <el-select v-model="form.agentId" placeholder="请选择坐席" filterable clearable style="width:100%" @change="onAgentChange">
+            <el-option v-for="a in agentOptions" :key="a.agentId" :label="a.agentName+'('+a.agentId+')'" :value="a.agentId" />
+          </el-select>
         </el-form-item>
         <el-form-item label="咨询分类" prop="consultationCategory">
           <el-input v-model="form.consultationCategory" placeholder="请输入咨询分类" />
@@ -349,7 +347,7 @@
 </template>
 
 <script>
-import { listRecord, getRecord, addRecord, updateRecord, delRecord, getCallStatistics, getCallStatisticsByCategory, getCallStatisticsByDate, addTicket, generateTicketNo, listTicket, getTransfersByRecordId } from "@/api/lawyers/callCenter"
+import { listRecord, getRecord, addRecord, updateRecord, delRecord, getCallStatistics, getCallStatisticsByCategory, getCallStatisticsByDate, addTicket, generateTicketNo, listTicket, getTransfersByRecordId, listAgent } from "@/api/lawyers/callCenter"
 import * as echarts from 'echarts'
 
 export default {
@@ -381,12 +379,13 @@ export default {
         pageNum: 1,
         pageSize: 10,
         callerNumber: undefined,
-        agentName: undefined,
+        agentId: undefined,
         status: undefined,
         consultationCategory: undefined
       },
       form: {},
       detailForm: {},
+      agentOptions: [],
       statistics: {
         totalCount: 0,
         todayCount: 0,
@@ -409,8 +408,18 @@ export default {
   },
   created() {
     this.getList()
+    this.loadAgents()
   },
   methods: {
+    loadAgents() {
+      listAgent({ pageNum: 1, pageSize: 1000 }).then(response => {
+        this.agentOptions = response.rows || []
+      })
+    },
+    onAgentChange(val) {
+      const a = this.agentOptions.find(x => x.agentId === val)
+      this.$set(this.form, 'agentName', a ? a.agentName : '')
+    },
     getList() {
       this.loading = true
       const params = {
@@ -441,6 +450,7 @@ export default {
         callerNumber: undefined,
         callerName: undefined,
         agentId: undefined,
+        agentName: '',
         consultationCategory: undefined,
         consultationContent: undefined,
         status: '0',

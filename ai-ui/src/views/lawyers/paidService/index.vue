@@ -220,8 +220,8 @@
             <el-radio label="3">已关闭</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="处理人" prop="handlerName">
-          <el-input v-model="form.handlerName" placeholder="请输入处理人" />
+        <el-form-item label="处理人" prop="handlerId">
+          <user-select v-model="form.handlerId" lawyer placeholder="请选择处理人" @change="onHandlerChange" />
         </el-form-item>
         <el-form-item label="备注" prop="remark">
           <el-input v-model="form.remark" type="textarea" placeholder="请输入内容" />
@@ -367,6 +367,9 @@ export default {
       this.open = false
       this.reset()
     },
+    onHandlerChange(val, user) {
+      this.$set(this.form, 'handlerName', user ? (user.nickName || user.userName) : '')
+    },
     // 表单重置
     reset() {
       this.form = {
@@ -379,6 +382,7 @@ export default {
         paymentStatus: "0",
         serviceStatus: "0",
         handlerName: undefined,
+        handlerId: undefined,
         remark: undefined
       }
       this.resetForm("form")

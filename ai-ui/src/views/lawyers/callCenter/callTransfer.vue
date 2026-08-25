@@ -10,23 +10,15 @@
           @keyup.enter.native="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="转出坐席" prop="fromAgentName">
-        <el-input
-          v-model="queryParams.fromAgentName"
-          placeholder="请输入转出坐席名"
-          clearable
-          style="width: 200px"
-          @keyup.enter.native="handleQuery"
-        />
+      <el-form-item label="转出坐席" prop="fromAgentId">
+        <el-select v-model="queryParams.fromAgentId" placeholder="全部坐席" filterable clearable style="width: 200px">
+          <el-option v-for="a in agentOptions" :key="a.agentId" :label="a.agentName+'('+a.agentId+')'" :value="a.agentId" />
+        </el-select>
       </el-form-item>
-      <el-form-item label="转入坐席" prop="toAgentName">
-        <el-input
-          v-model="queryParams.toAgentName"
-          placeholder="请输入转入坐席名"
-          clearable
-          style="width: 200px"
-          @keyup.enter.native="handleQuery"
-        />
+      <el-form-item label="转入坐席" prop="toAgentId">
+        <el-select v-model="queryParams.toAgentId" placeholder="全部坐席" filterable clearable style="width: 200px">
+          <el-option v-for="a in agentOptions" :key="a.agentId" :label="a.agentName+'('+a.agentId+')'" :value="a.agentId" />
+        </el-select>
       </el-form-item>
       <el-form-item>
         <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
@@ -115,12 +107,18 @@
         <el-form-item label="来电记录ID" prop="recordId">
           <el-input v-model="form.recordId" placeholder="请输入来电记录ID" />
         </el-form-item>
-        <el-form-item label="转出坐席" prop="fromAgentName">
-          <el-input v-model="form.fromAgentName" placeholder="请输入转出坐席名" />
-        </el-form-item>
-        <el-form-item label="转入坐席" prop="toAgentName">
-          <el-input v-model="form.toAgentName" placeholder="请输入转入坐席名" />
-        </el-form-item>
+        <el-row :gutter="10">
+        <el-col :span="12"><el-form-item label="转出坐席" prop="fromAgentId">
+          <el-select v-model="form.fromAgentId" placeholder="请选择" filterable clearable style="width:100%" @change="onFromAgentChange">
+            <el-option v-for="a in agentOptions" :key="a.agentId" :label="a.agentName+'('+a.agentId+')'" :value="a.agentId" />
+          </el-select>
+        </el-form-item></el-col>
+        <el-col :span="12"><el-form-item label="转入坐席" prop="toAgentId">
+          <el-select v-model="form.toAgentId" placeholder="请选择" filterable clearable style="width:100%" @change="onToAgentChange">
+            <el-option v-for="a in agentOptions" :key="a.agentId" :label="a.agentName+'('+a.agentId+')'" :value="a.agentId" />
+          </el-select>
+        </el-form-item></el-col>
+        </el-row>
         <el-form-item label="转接原因" prop="reason">
           <el-input v-model="form.reason" type="textarea" :rows="3" placeholder="请输入转接原因" />
         </el-form-item>
@@ -155,6 +153,7 @@
 
 <script>
 import { listTransfer, getTransfer, addTransfer, delTransfer } from "@/api/lawyers/callTransfer"
+import { listAgent } from "@/api/lawyers/callCenter"
 
 export default {
   name: "CallTransfer",
@@ -166,6 +165,7 @@ export default {
       showSearch: true,
       total: 0,
       transferList: [],
+      agentOptions: [],
       title: "",
       open: false,
       detailOpen: false,
@@ -173,8 +173,8 @@ export default {
         pageNum: 1,
         pageSize: 10,
         recordId: undefined,
-        fromAgentName: undefined,
-        toAgentName: undefined
+        fromAgentId: undefined,
+        toAgentId: undefined
       },
       form: {},
       detailForm: {},
@@ -182,19 +182,33 @@ export default {
         recordId: [
           { required: true, message: "来电记录ID不能为空", trigger: "blur" }
         ],
-        fromAgentName: [
-          { required: true, message: "转出坐席不能为空", trigger: "blur" }
+        fromAgentId: [
+          { required: true, message: "转出坐席不能为空", trigger: "change" }
         ],
-        toAgentName: [
-          { required: true, message: "转入坐席不能为空", trigger: "blur" }
+        toAgentId: [
+          { required: true, message: "转入坐席不能为空", trigger: "change" }
         ]
       }
     }
   },
   created() {
+    this.loadAgents()
     this.getList()
   },
   methods: {
+    loadAgents() {
+      listAgent({ pageSize: 999, status: '1' }).then(response => {
+        this.agentOptions = response.rows || []
+      })
+    },
+    onFromAgentChange(val) {
+      const a = this.agentOptions.find(x => x.agentId === val)
+      this.$set(this.form, 'fromAgentName', a ? a.agentName : '')
+    },
+    onToAgentChange(val) {
+      const a = this.agentOptions.find(x => x.agentId === val)
+      this.$set(this.form, 'toAgentName', a ? a.agentName : '')
+    },
     getList() {
       this.loading = true
       listTransfer(this.queryParams).then(response => {

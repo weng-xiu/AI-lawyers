@@ -14,6 +14,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="paymentStatus"  column="payment_status"   />
         <result property="serviceStatus"  column="service_status"   />
         <result property="handlerName"    column="handler_name"     />
+        <result property="handlerId"      column="handler_id"       />
         <result property="createBy"       column="create_by"        />
         <result property="createTime"     column="create_time"      />
         <result property="updateBy"       column="update_by"        />
@@ -22,7 +23,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectAiPaidLegalServiceVo">
-        select paid_id, service_no, customer_name, customer_phone, service_type, amount, payment_status, service_status, handler_name, create_by, create_time, update_by, update_time, remark 
+        select paid_id, service_no, customer_name, customer_phone, service_type, amount, payment_status, service_status, handler_name, handler_id, create_by, create_time, update_by, update_time, remark 
         from ai_paid_legal_service
     </sql>
     
@@ -35,6 +36,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="serviceType != null  and serviceType != ''"> and service_type = #{serviceType}</if>
             <if test="paymentStatus != null  and paymentStatus != ''"> and payment_status = #{paymentStatus}</if>
             <if test="serviceStatus != null  and serviceStatus != ''"> and service_status = #{serviceStatus}</if>
+            <if test="handlerId != null"> and handler_id = #{handlerId}</if>
             <if test="params.beginTime != null and params.beginTime != ''"><!-- 开始时间检索 -->
                 and date_format(create_time,'%Y%m%d') &gt;= date_format(#{params.beginTime},'%Y%m%d')
             </if>
@@ -60,6 +62,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="paymentStatus != null">payment_status,</if>
             <if test="serviceStatus != null">service_status,</if>
             <if test="handlerName != null">handler_name,</if>
+            <if test="handlerId != null">handler_id,</if>
             <if test="createBy != null">create_by,</if>
             <if test="remark != null">remark,</if>
             create_time
@@ -73,6 +76,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="paymentStatus != null">#{paymentStatus},</if>
             <if test="serviceStatus != null">#{serviceStatus},</if>
             <if test="handlerName != null">#{handlerName},</if>
+            <if test="handlerId != null">#{handlerId},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="remark != null">#{remark},</if>
             sysdate()
@@ -90,6 +94,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="paymentStatus != null">payment_status = #{paymentStatus},</if>
             <if test="serviceStatus != null">service_status = #{serviceStatus},</if>
             <if test="handlerName != null">handler_name = #{handlerName},</if>
+            <if test="handlerId != null">handler_id = #{handlerId},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="remark != null">remark = #{remark},</if>
             update_time = sysdate()

@@ -230,12 +230,32 @@
         <el-button type="primary" @click="submitProfile">保 存</el-button>
       </div>
     </el-dialog>
+
+    <!-- 转接来电弹窗 -->
+    <el-dialog title="转接来电" :visible.sync="transferOpen" width="420px" append-to-body>
+      <el-form label-width="80px">
+        <el-form-item label="目标坐席">
+          <el-select v-model="transferTargetId" placeholder="请选择坐席" filterable clearable style="width:100%">
+            <el-option
+              v-for="a in onlineAgentOptions"
+              :key="a.agentId"
+              :label="a.agentName + '（' + a.agentId + '）'"
+              :value="a.agentId"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <div slot="footer">
+        <el-button @click="transferOpen = false">取 消</el-button>
+        <el-button type="primary" @click="confirmTransfer" :disabled="transferTargetId == null">转 接</el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
 import { getCallerProfile, getCallerHistory, getCallerTickets, getCallerTrack, updateCallerProfile } from "@/api/lawyers/callPopup"
-import { autoFillLedger, addLedger, transferCall, holdCall, resumeCall, hangupCall, afterWork } from "@/api/lawyers/callCenter"
+import { autoFillLedger, addLedger, transferCall, holdCall, resumeCall, hangupCall, afterWork, listAgent } from "@/api/lawyers/callCenter"
 import AiAssistPanel from "./AiAssistPanel.vue"
 import callSocket from "@/utils/callSocket"
 import { getSipPhone } from "@/utils/webrtcSipPhone"
@@ -255,6 +275,9 @@ export default {
       seconds: 0,
       timer: null,
       pollTimer: null,
+      transferOpen: false,
+      transferTargetId: null,
+      onlineAgentOptions: [],
       profileData: {},
       historyList: [],
       ticketList: [],
@@ -513,16 +536,19 @@ export default {
         this.$message.warning('请先在顶部签入坐席')
         return
       }
-      this.$prompt('请输入目标坐席工号', '转接来电', {
-        confirmButtonText: '转接',
-        cancelButtonText: '取消',
-        inputPattern: /^\d+$/,
-        inputErrorMessage: '请输入数字工号'
-      }).then(({ value }) => {
-        transferCall({ agentId: this.agentId, toAgentId: parseInt(value), remark: '' }).then(() => {
-          this.$message.success('转接请求已提交')
-          this.$store.dispatch('agent/refresh').catch(() => {})
-        }).catch(() => {})
+      // 加载在线坐席列表后弹出选择框
+      listAgent({ pageNum: 1, pageSize: 200, status: '1' }).then(res => {
+        this.onlineAgentOptions = (res.rows || []).filter(a => a.agentId !== this.agentId)
+        this.transferTargetId = null
+        this.transferOpen = true
+      }).catch(() => {})
+    },
+    confirmTransfer() {
+      if (this.transferTargetId == null) return
+      transferCall({ agentId: this.agentId, toAgentId: this.transferTargetId, remark: '' }).then(() => {
+        this.$message.success('转接请求已提交')
+        this.transferOpen = false
+        this.$store.dispatch('agent/refresh').catch(() => {})
       }).catch(() => {})
     },
     handleHold() {

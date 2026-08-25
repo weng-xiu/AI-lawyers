@@ -51,8 +51,8 @@
       <el-form-item label="来电人" prop="callerName">
         <el-input v-model="queryParams.callerName" placeholder="请输入来电人" clearable style="width: 160px" @keyup.enter.native="handleQuery" />
       </el-form-item>
-      <el-form-item label="受理人" prop="assignee">
-        <el-input v-model="queryParams.assignee" placeholder="请输入受理人" clearable style="width: 140px" @keyup.enter.native="handleQuery" />
+      <el-form-item label="受理人" prop="assigneeId">
+        <user-select v-model="queryParams.assigneeId" placeholder="全部受理人" clearable style="width: 160px" />
       </el-form-item>
       <el-form-item label="优先级" prop="priority">
         <el-select v-model="queryParams.priority" placeholder="全部" clearable style="width: 120px">
@@ -135,11 +135,9 @@
               <el-input v-model="form.taskNo" placeholder="自动生成可手填" />
             </el-form-item>
           </el-col>
-          <el-col :span="12">
-            <el-form-item label="受理人" prop="assignee">
-              <el-input v-model="form.assignee" placeholder="请输入受理人" />
-            </el-form-item>
-          </el-col>
+          <el-col :span="12"><el-form-item label="受理人" prop="assigneeId">
+            <user-select v-model="form.assigneeId" placeholder="请选择受理人" @change="onAssigneeChange" />
+          </el-form-item></el-col>
         </el-row>
         <el-row :gutter="20">
           <el-col :span="12">
@@ -248,6 +246,7 @@ export default {
         callerNumber: undefined,
         callerName: undefined,
         assignee: undefined,
+        assigneeId: undefined,
         priority: undefined,
         status: undefined
       },
@@ -343,6 +342,9 @@ export default {
       this.open = false
       this.reset()
     },
+    onAssigneeChange(val, user) {
+      this.$set(this.form, 'assignee', user ? (user.nickName || user.userName) : '')
+    },
     reset() {
       this.form = {
         taskId: undefined,
@@ -352,6 +354,7 @@ export default {
         planTime: undefined,
         actualTime: undefined,
         assignee: undefined,
+        assigneeId: undefined,
         status: '0',
         priority: '2',
         visitResult: undefined,

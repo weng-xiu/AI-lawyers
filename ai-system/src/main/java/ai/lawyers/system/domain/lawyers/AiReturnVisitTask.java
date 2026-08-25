@@ -45,6 +45,9 @@ public class AiReturnVisitTask extends BaseEntity
     @Excel(name = "受理人")
     private String assignee;
 
+    /** 受理人用户ID */
+    private Long assigneeId;
+
     /** 任务状态（0待回访 1已完成 2已逾期） */
     @Excel(name = "状态", readConverterExp = "0=待回访,1=已完成,2=已逾期")
     private String status;
@@ -125,6 +128,16 @@ public class AiReturnVisitTask extends BaseEntity
     public String getAssignee()
     {
         return assignee;
+    }
+
+    public void setAssigneeId(Long assigneeId)
+    {
+        this.assigneeId = assigneeId;
+    }
+
+    public Long getAssigneeId()
+    {
+        return assigneeId;
     }
 
     public void setStatus(String status)
