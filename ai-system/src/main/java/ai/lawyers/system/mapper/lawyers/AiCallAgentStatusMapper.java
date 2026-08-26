@@ -21,6 +21,16 @@ public interface AiCallAgentStatusMapper
 
     public int deleteAiCallAgentStatusByAgentIds(Long[] agentIds);
 
+    /**
+     * 清除指定用户的坐席绑定（将 user_id 置空，不删除运行记录）。
+     */
+    public int releaseUserIdByUserId(Long userId);
+
+    /**
+     * 清除指定工号的用户绑定（换绑时用于解绑旧工号）。
+     */
+    public int releaseUserIdByAgentId(Long agentId);
+
     public List<AiCallAgentStatus> selectOnlineAgents();
 
     public List<java.util.Map<String, Object>> selectTodayRecordsByAgent(Long agentId);

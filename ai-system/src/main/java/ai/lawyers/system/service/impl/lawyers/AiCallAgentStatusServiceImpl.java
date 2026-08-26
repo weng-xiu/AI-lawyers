@@ -456,4 +456,90 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
     {
         return aiCallAgentStatusMapper.selectTodayRecordsByAgent(agentId);
     }
+
+    @Override
+    public void syncAgentFromUser(Long userId, Long agentId, String agentName,
+                                   String sipExtension, String callMode, String operator)
+    {
+        if (userId == null) return;
+
+        // 1. 先查询该用户之前绑定的坐席记录
+        AiCallAgentStatus oldBinding = aiCallAgentStatusMapper.selectAiCallAgentStatusByUserId(userId);
+        Long oldAgentId = oldBinding != null ? oldBinding.getAgentId() : null;
+
+        if (agentId == null)
+        {
+            // 用户未配置坐席工号：清除旧绑定（不删除运行记录）
+            if (oldAgentId != null)
+            {
+                aiCallAgentStatusMapper.releaseUserIdByAgentId(oldAgentId);
+            }
+            return;
+        }
+
+        // 工号未变化：仅更新配置
+        if (agentId.equals(oldAgentId) && oldBinding != null)
+        {
+            if (agentName != null && !agentName.isEmpty())
+            {
+                oldBinding.setAgentName(agentName);
+            }
+            oldBinding.setSipExtension(sipExtension);
+            oldBinding.setCallMode(callMode != null ? callMode : "0");
+            oldBinding.setUpdateBy(operator);
+            aiCallAgentStatusMapper.updateAiCallAgentStatus(oldBinding);
+            return;
+        }
+
+        // 2. 换绑到新工号：先解绑旧工号
+        if (oldAgentId != null)
+        {
+            aiCallAgentStatusMapper.releaseUserIdByAgentId(oldAgentId);
+        }
+
+        // 3. 查询目标工号是否已存在
+        AiCallAgentStatus target = aiCallAgentStatusMapper.selectAiCallAgentStatusByAgentId(agentId);
+
+        if (target != null)
+        {
+            // 工号已存在：检查是否绑定了其他用户
+            if (target.getUserId() != null && !target.getUserId().equals(userId))
+            {
+                throw new ai.lawyers.common.exception.ServiceException(
+                    "坐席工号 " + agentId + " 已绑定其他用户，无法重复绑定");
+            }
+            // 更新绑定关系和配置（不覆盖运行时状态字段）
+            target.setUserId(userId);
+            if (agentName != null && !agentName.isEmpty())
+            {
+                target.setAgentName(agentName);
+            }
+            target.setSipExtension(sipExtension);
+            target.setCallMode(callMode != null ? callMode : "0");
+            target.setUpdateBy(operator);
+            aiCallAgentStatusMapper.updateAiCallAgentStatus(target);
+        }
+        else
+        {
+            // 工号不存在：新建坐席状态记录
+            AiCallAgentStatus newAgent = new AiCallAgentStatus();
+            newAgent.setAgentId(agentId);
+            newAgent.setUserId(userId);
+            newAgent.setAgentName(agentName != null && !agentName.isEmpty() ? agentName : ("坐席" + agentId));
+            newAgent.setSipExtension(sipExtension);
+            newAgent.setCallMode(callMode != null ? callMode : "0");
+            newAgent.setStatus("0");
+            newAgent.setCallStatus("0");
+            newAgent.setCreateBy(operator);
+            newAgent.setRemark("通过用户管理创建");
+            aiCallAgentStatusMapper.insertAiCallAgentStatus(newAgent);
+        }
+    }
+
+    @Override
+    public void releaseAgentByUserId(Long userId)
+    {
+        if (userId == null) return;
+        aiCallAgentStatusMapper.releaseUserIdByUserId(userId);
+    }
 }

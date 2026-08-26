@@ -70,6 +70,18 @@
               <el-table-column label="用户昵称" align="center" key="nickName" prop="nickName" v-if="columns[2].visible" :show-overflow-tooltip="true" />
               <el-table-column label="部门" align="center" key="deptName" prop="dept.deptName" v-if="columns[3].visible" :show-overflow-tooltip="true" />
               <el-table-column label="手机号码" align="center" key="phonenumber" prop="phonenumber" v-if="columns[4].visible" width="120" />
+              <el-table-column label="坐席工号" align="center" key="agentId" prop="agentId" width="90">
+                <template slot-scope="scope">
+                  <el-tag v-if="scope.row.agentId" size="mini" type="warning">{{ scope.row.agentId }}</el-tag>
+                  <span v-else style="color:#c0c4cc">--</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="SIP分机" align="center" key="sipExtension" prop="sipExtension" width="90">
+                <template slot-scope="scope">
+                  <el-tag v-if="scope.row.sipExtension" size="mini" type="info">{{ scope.row.sipExtension }}</el-tag>
+                  <span v-else style="color:#c0c4cc">--</span>
+                </template>
+              </el-table-column>
               <el-table-column label="身份" align="center" width="90">
                 <template slot-scope="scope">
                   <el-tag v-if="scope.row.lawyerFlag === '1'" size="mini" type="success">律师</el-tag>
@@ -226,6 +238,31 @@
             </el-col>
           </el-row>
         </template>
+        <el-divider content-position="left">呼叫中心坐席配置（填写工号后该用户即成为坐席，可签入接听/拨打电话）</el-divider>
+        <el-row>
+          <el-col :span="12">
+            <el-form-item label="坐席工号" prop="agentId">
+              <el-input v-model.number="form.agentId" placeholder="留空则为非坐席人员" maxlength="10" clearable>
+                <template slot="prepend">工号</template>
+              </el-input>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="SIP分机号" prop="sipExtension">
+              <el-input v-model="form.sipExtension" placeholder="如 1002，需与FreeSWITCH一致" maxlength="20" clearable />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row>
+          <el-col :span="12">
+            <el-form-item label="应答模式" prop="callMode">
+              <el-radio-group v-model="form.callMode">
+                <el-radio label="0">自动应答</el-radio>
+                <el-radio label="1">手动应答</el-radio>
+              </el-radio-group>
+            </el-form-item>
+          </el-col>
+        </el-row>
       </el-form>
       <div slot="footer" class="dialog-footer">
         <el-button type="primary" @click="submitForm">确 定</el-button>
@@ -368,6 +405,13 @@ export default {
             message: "请输入正确的手机号码",
             trigger: "blur"
           }
+        ],
+        sipExtension: [
+          {
+            pattern: /^[0-9a-zA-Z]{2,20}$/,
+            message: "分机号为 2-20 位数字或字母",
+            trigger: "blur"
+          }
         ]
       }
     }
@@ -461,7 +505,10 @@ export default {
         lawFirm: undefined,
         specialty: undefined,
         practiceYears: undefined,
-        lawyerIntro: undefined
+        lawyerIntro: undefined,
+        agentId: undefined,
+        sipExtension: undefined,
+        callMode: "0"
       }
       this.resetForm("form")
     },

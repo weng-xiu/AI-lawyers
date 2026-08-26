@@ -68,6 +68,11 @@ public interface SysUserMapper
     public int updateUser(SysUser user);
 
     /**
+     * 更新用户的坐席配置（agent_id / sip_extension / call_mode），允许置空。
+     */
+    public int updateUserAgentConfig(SysUser user);
+
+    /**
      * 修改用户头像
      * 
      * @param userId 用户ID

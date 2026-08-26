@@ -98,6 +98,18 @@ public class SysUser extends BaseEntity
     /** 律师简介 */
     private String lawyerIntro;
 
+    /** 坐席工号（关联 ai_call_agent_status.agent_id，空表示非坐席） */
+    @Excel(name = "坐席工号")
+    private Long agentId;
+
+    /** SIP分机号 */
+    @Excel(name = "SIP分机号")
+    private String sipExtension;
+
+    /** 应答模式（0自动 1手动） */
+    @Excel(name = "应答模式", readConverterExp = "0=自动,1=手动")
+    private String callMode;
+
     /** 部门对象 */
     @Excels({
         @Excel(name = "部门名称", targetAttr = "deptName", type = Type.EXPORT),
@@ -353,6 +365,36 @@ public class SysUser extends BaseEntity
     public void setLawyerIntro(String lawyerIntro)
     {
         this.lawyerIntro = lawyerIntro;
+    }
+
+    public Long getAgentId()
+    {
+        return agentId;
+    }
+
+    public void setAgentId(Long agentId)
+    {
+        this.agentId = agentId;
+    }
+
+    public String getSipExtension()
+    {
+        return sipExtension;
+    }
+
+    public void setSipExtension(String sipExtension)
+    {
+        this.sipExtension = sipExtension;
+    }
+
+    public String getCallMode()
+    {
+        return callMode;
+    }
+
+    public void setCallMode(String callMode)
+    {
+        this.callMode = callMode;
     }
 
     public SysDept getDept()

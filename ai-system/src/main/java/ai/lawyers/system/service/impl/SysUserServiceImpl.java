@@ -30,6 +30,7 @@ import ai.lawyers.system.mapper.SysUserRoleMapper;
 import ai.lawyers.system.service.ISysConfigService;
 import ai.lawyers.system.service.ISysDeptService;
 import ai.lawyers.system.service.ISysUserService;
+import ai.lawyers.system.service.lawyers.IAiCallAgentStatusService;
 
 /**
  * 用户 业务层处理
@@ -61,6 +62,9 @@ public class SysUserServiceImpl implements ISysUserService
 
     @Autowired
     private ISysDeptService deptService;
+
+    @Autowired
+    private IAiCallAgentStatusService agentStatusService;
 
     @Autowired
     protected Validator validator;
@@ -266,6 +270,12 @@ public class SysUserServiceImpl implements ISysUserService
         insertUserPost(user);
         // 新增用户与角色管理
         insertUserRole(user);
+        // 同步坐席配置到 ai_call_agent_status
+        if (user.getAgentId() != null)
+        {
+            agentStatusService.syncAgentFromUser(user.getUserId(), user.getAgentId(),
+                user.getNickName(), user.getSipExtension(), user.getCallMode(), user.getCreateBy());
+        }
         return rows;
     }
 
@@ -300,7 +310,13 @@ public class SysUserServiceImpl implements ISysUserService
         userPostMapper.deleteUserPostByUserId(userId);
         // 新增用户与岗位管理
         insertUserPost(user);
-        return userMapper.updateUser(user);
+        int rows = userMapper.updateUser(user);
+        // 单独维护坐席配置（允许置空解绑），并同步 ai_call_agent_status
+        userMapper.updateUserAgentConfig(user);
+        agentStatusService.syncAgentFromUser(userId, user.getAgentId(),
+            user.getNickName(), user.getSipExtension(), user.getCallMode(),
+            StringUtils.isNotEmpty(user.getUpdateBy()) ? user.getUpdateBy() : SecurityUtils.getUsername());
+        return rows;
     }
 
     /**
@@ -449,6 +465,8 @@ public class SysUserServiceImpl implements ISysUserService
         userRoleMapper.deleteUserRoleByUserId(userId);
         // 删除用户与岗位表
         userPostMapper.deleteUserPostByUserId(userId);
+        // 释放坐席绑定（不删除运行记录）
+        agentStatusService.releaseAgentByUserId(userId);
         return userMapper.deleteUserById(userId);
     }
 
@@ -466,6 +484,8 @@ public class SysUserServiceImpl implements ISysUserService
         {
             checkUserAllowed(new SysUser(userId));
             checkUserDataScope(userId);
+            // 释放坐席绑定（不删除运行记录）
+            agentStatusService.releaseAgentByUserId(userId);
         }
         // 删除用户与角色关联
         userRoleMapper.deleteUserRole(userIds);
@@ -519,6 +539,13 @@ public class SysUserServiceImpl implements ISysUserService
                     user.setUserId(u.getUserId());
                     user.setUpdateBy(operName);
                     userMapper.updateUser(user);
+                    // 同步坐席配置
+                    if (user.getAgentId() != null)
+                    {
+                        userMapper.updateUserAgentConfig(user);
+                        agentStatusService.syncAgentFromUser(u.getUserId(), user.getAgentId(),
+                            user.getNickName(), user.getSipExtension(), user.getCallMode(), operName);
+                    }
                     successNum++;
                     successMsg.append("<br/>" + successNum + "、账号 " + user.getUserName() + " 更新成功");
                 }

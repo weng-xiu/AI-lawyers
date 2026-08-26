@@ -1,0 +1,21 @@
+<include>
+  <!-- 张律师（婚姻家事） 工号102 -> SIP分机 1003 -->
+  <user id="1003">
+    <params>
+      <!-- 分机注册密码：$${default_password}，vars.xml 中为 1234，与网页软电话一致 -->
+      <param name="password" value="$${default_password}"/>
+      <param name="vm-password" value="1003"/>
+    </params>
+    <variables>
+      <variable name="toll_allow" value="domestic,international,local"/>
+      <variable name="accountcode" value="1003"/>
+      <variable name="user_context" value="default"/>
+      <!-- 来电显示姓名：弹屏/话单显示律师姓名 -->
+      <variable name="effective_caller_id_name" value="张律师(婚姻)"/>
+      <variable name="effective_caller_id_number" value="1003"/>
+      <variable name="outbound_caller_id_name" value="$${outbound_caller_name}"/>
+      <variable name="outbound_caller_id_number" value="$${outbound_caller_id}"/>
+      <variable name="callgroup" value="techsupport"/>
+    </variables>
+  </user>
+</include>

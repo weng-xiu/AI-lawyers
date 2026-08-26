@@ -86,6 +86,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <insert id="insertAiCallAgentStatus" parameterType="AiCallAgentStatus">
         insert into ai_call_agent_status
         <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="agentId != null">agent_id,</if>
             <if test="userId != null">user_id,</if>
             <if test="agentName != null and agentName != ''">agent_name,</if>
             <if test="status != null">status,</if>
@@ -103,6 +104,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             create_time
          </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="agentId != null">#{agentId},</if>
             <if test="userId != null">#{userId},</if>
             <if test="agentName != null and agentName != ''">#{agentName},</if>
             <if test="status != null">#{status},</if>
@@ -161,4 +163,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{agentId}
         </foreach>
     </delete>
+
+    <update id="releaseUserIdByUserId" parameterType="Long">
+        update ai_call_agent_status
+        set user_id = null
+        where user_id = #{userId}
+    </update>
+
+    <update id="releaseUserIdByAgentId" parameterType="Long">
+        update ai_call_agent_status
+        set user_id = null
+        where agent_id = #{agentId} and user_id is not null
+    </update>
 </mapper>

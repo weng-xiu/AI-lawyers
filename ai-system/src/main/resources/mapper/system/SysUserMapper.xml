@@ -26,6 +26,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="specialty"      column="specialty"       />
         <result property="practiceYears"  column="practice_years"  />
         <result property="lawyerIntro"    column="lawyer_intro"    />
+        <result property="agentId"        column="agent_id"        />
+        <result property="sipExtension"   column="sip_extension"   />
+        <result property="callMode"       column="call_mode"       />
         <result property="createBy"      column="create_by"       />
         <result property="createTime"    column="create_time"     />
         <result property="updateBy"      column="update_by"       />
@@ -55,7 +58,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 	
 	<sql id="selectUserVo">
-        select u.user_id, u.dept_id, u.user_name, u.nick_name, u.email, u.avatar, u.phonenumber, u.password, u.sex, u.status, u.del_flag, u.login_ip, u.login_date, u.pwd_update_date, u.user_type, u.lawyer_flag, u.lawyer_license, u.law_firm, u.specialty, u.practice_years, u.lawyer_intro, u.create_by, u.create_time, u.remark, 
+        select u.user_id, u.dept_id, u.user_name, u.nick_name, u.email, u.avatar, u.phonenumber, u.password, u.sex, u.status, u.del_flag, u.login_ip, u.login_date, u.pwd_update_date, u.user_type, u.lawyer_flag, u.lawyer_license, u.law_firm, u.specialty, u.practice_years, u.lawyer_intro, u.agent_id, u.sip_extension, u.call_mode, u.create_by, u.create_time, u.remark, 
         d.dept_id, d.parent_id, d.ancestors, d.dept_name, d.order_num, d.leader, d.status as dept_status,
         r.role_id, r.role_name, r.role_key, r.role_sort, r.data_scope, r.status as role_status
         from sys_user u
@@ -65,7 +68,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </sql>
     
     <select id="selectUserList" parameterType="SysUser" resultMap="SysUserResult">
-		select u.user_id, u.dept_id, u.nick_name, u.user_name, u.email, u.avatar, u.phonenumber, u.sex, u.status, u.del_flag, u.login_ip, u.login_date, u.user_type, u.lawyer_flag, u.lawyer_license, u.law_firm, u.specialty, u.practice_years, u.lawyer_intro, u.create_by, u.create_time, u.remark, d.dept_name, d.leader from sys_user u
+		select u.user_id, u.dept_id, u.nick_name, u.user_name, u.email, u.avatar, u.phonenumber, u.sex, u.status, u.del_flag, u.login_ip, u.login_date, u.user_type, u.lawyer_flag, u.lawyer_license, u.law_firm, u.specialty, u.practice_years, u.lawyer_intro, u.agent_id, u.sip_extension, u.call_mode, u.create_by, u.create_time, u.remark, d.dept_name, d.leader from sys_user u
 		left join sys_dept d on u.dept_id = d.dept_id
 		where u.del_flag = '0'
 		<if test="userId != null and userId != 0">
@@ -176,6 +179,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
  			<if test="specialty != null and specialty != ''">specialty,</if>
  			<if test="practiceYears != null">practice_years,</if>
  			<if test="lawyerIntro != null and lawyerIntro != ''">lawyer_intro,</if>
+ 			<if test="agentId != null">agent_id,</if>
+ 			<if test="sipExtension != null and sipExtension != ''">sip_extension,</if>
+ 			<if test="callMode != null and callMode != ''">call_mode,</if>
  			<if test="createBy != null and createBy != ''">create_by,</if>
  			<if test="remark != null and remark != ''">remark,</if>
  			create_time
@@ -198,6 +204,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
  			<if test="specialty != null and specialty != ''">#{specialty},</if>
  			<if test="practiceYears != null">#{practiceYears},</if>
  			<if test="lawyerIntro != null and lawyerIntro != ''">#{lawyerIntro},</if>
+ 			<if test="agentId != null">#{agentId},</if>
+ 			<if test="sipExtension != null and sipExtension != ''">#{sipExtension},</if>
+ 			<if test="callMode != null and callMode != ''">#{callMode},</if>
  			<if test="createBy != null and createBy != ''">#{createBy},</if>
  			<if test="remark != null and remark != ''">#{remark},</if>
  			sysdate()
@@ -228,6 +237,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
  			<if test="remark != null">remark = #{remark},</if>
  			update_time = sysdate()
  		</set>
+ 		where user_id = #{userId}
+	</update>
+
+	<update id="updateUserAgentConfig" parameterType="SysUser">
+ 		update sys_user
+ 		set agent_id = #{agentId},
+ 		    sip_extension = #{sipExtension},
+ 		    call_mode = #{callMode},
+ 		    update_time = sysdate()
  		where user_id = #{userId}
 	</update>
 	

@@ -57,4 +57,24 @@ public interface IAiCallAgentStatusService
     public int updateCallMode(Long agentId, String callMode);
 
     public java.util.List<java.util.Map<String, Object>> selectTodayRecordsByAgentId(Long agentId);
+
+    /**
+     * 根据系统用户的坐席配置同步 ai_call_agent_status 记录。
+     * <p>当用户配置了 agentId（坐席工号）时，确保该工号记录存在并绑定到该用户；
+     * 当用户未配置 agentId 但之前有绑定时，清除旧绑定。</p>
+     *
+     * @param userId  用户ID
+     * @param agentId 坐席工号（可为空）
+     * @param agentName 坐席名称（可为空，为空时使用用户昵称）
+     * @param sipExtension SIP分机号（可为空）
+     * @param callMode 应答模式（可为空，默认0自动）
+     * @param operator 操作人
+     */
+    public void syncAgentFromUser(Long userId, Long agentId, String agentName,
+                                   String sipExtension, String callMode, String operator);
+
+    /**
+     * 删除用户时清理其坐席绑定（将 ai_call_agent_status.user_id 置空，不删运行记录）。
+     */
+    public void releaseAgentByUserId(Long userId);
 }
