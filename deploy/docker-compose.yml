@@ -1,0 +1,147 @@
+# =====================================================================
+# 广东12348公共法律服务热线 —— 全容器化一键部署
+#
+# 组件：
+#   mysql      数据库（ai-law）
+#   redis      缓存/Token
+#   freeswitch SIP/VoIP 软交换（含律师分机 1003-1006）
+#   backend    Spring Boot 后端（:8080）
+#   frontend   Nginx + Vue 前端（:80）
+#
+# 启动：  docker compose up -d --build
+# 停止：  docker compose down
+# 说明：  RTP/SIP UDP 端口范围较大，仅在需要真实通话时映射。
+# =====================================================================
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: ai12348-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ai-law
+      TZ: Asia/Shanghai
+      # MySQL8 兼容参数
+      MYSQL_INITDB_SKIP_TZINFO: 1
+    command:
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_general_ci
+      --default-authentication-plugin=mysql_native_password
+      --lower_case_table_names=1
+      --max_connections=1000
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 首次启动自动导入（仅当数据目录为空）：
+      #   01-init.sql   业务库结构+基础数据（由部署脚本 mysqldump 生成）
+      #   99-*.sql      容器环境线路主机名修正
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [ccnet]
+
+  redis:
+    image: redis:7-alpine
+    container_name: ai12348-redis
+    restart: always
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks: [ccnet]
+
+  freeswitch:
+    image: registry.cn-hangzhou.aliyuncs.com/voice9-x86/freeswitch-debian:1.10.10
+    container_name: ai12348-freeswitch
+    restart: always
+    tty: true
+    environment:
+      - TZ=Asia/Shanghai
+    ports:
+      # SIP UDP/TCP
+      - "5060:5060/tcp"
+      - "5060:5060/udp"
+      - "5080:5080/tcp"
+      - "5080:5080/udp"
+      # WebRTC WebSocket（浏览器软电话 / Nginx 反代也会用到）
+      - "5066:5066"
+      # ESL（后端事件监听）
+      - "8021:8021/tcp"
+      # RTP 媒体端口范围
+      - "16384-16484:16384-16484/udp"
+    volumes:
+      # 律师坐席分机（覆盖默认同名文件，设置中文来电显示）
+      - ../freeswitch-conf/directory/default/1003.xml:/usr/local/freeswitch/conf/directory/default/1003.xml:ro
+      - ../freeswitch-conf/directory/default/1004.xml:/usr/local/freeswitch/conf/directory/default/1004.xml:ro
+      - ../freeswitch-conf/directory/default/1005.xml:/usr/local/freeswitch/conf/directory/default/1005.xml:ro
+      - ../freeswitch-conf/directory/default/1006.xml:/usr/local/freeswitch/conf/directory/default/1006.xml:ro
+      # 录音/日志持久化（目录由镜像自带 conf 运行时生成）
+      - fs-log:/usr/local/freeswitch/log
+      - fs-record:/usr/local/freeswitch/recordings
+    networks: [ccnet]
+
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/docker/backend/Dockerfile
+    image: ai12348-backend:latest
+    container_name: ai12348-backend
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      TZ: Asia/Shanghai
+      # —— 数据库（覆盖 application-druid.yml）——
+      SPRING_DATASOURCE_DRUID_MASTER_URL: jdbc:mysql://mysql:3306/ai-law?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=GMT%2B8
+      SPRING_DATASOURCE_DRUID_MASTER_USERNAME: root
+      SPRING_DATASOURCE_DRUID_MASTER_PASSWORD: root
+      # —— Redis（覆盖 application.yml）——
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: ""
+      # —— 上传路径（容器内）——
+      RUOYI_PROFILE: /ruoyi/uploadPath
+      FILE_PATH: /ruoyi/uploadPath
+    volumes:
+      - backend-upload:/ruoyi/uploadPath
+    ports:
+      - "8080:8080"
+    networks: [ccnet]
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: deploy/docker/frontend/Dockerfile
+    image: ai12348-frontend:latest
+    container_name: ai12348-frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks: [ccnet]
+
+networks:
+  ccnet:
+    driver: bridge
+
+volumes:
+  mysql-data:
+  redis-data:
+  fs-log:
+  fs-record:
+  backend-upload:

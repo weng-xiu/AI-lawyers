@@ -10,7 +10,6 @@
       <variable name="toll_allow" value="domestic,international,local"/>
       <variable name="accountcode" value="1003"/>
       <variable name="user_context" value="default"/>
-      <!-- 来电显示姓名：弹屏/话单显示律师姓名 -->
       <variable name="effective_caller_id_name" value="张律师(婚姻)"/>
       <variable name="effective_caller_id_number" value="1003"/>
       <variable name="outbound_caller_id_name" value="$${outbound_caller_name}"/>

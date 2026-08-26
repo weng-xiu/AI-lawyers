@@ -1,0 +1,20 @@
+# 构建上下文忽略项（加速 docker build）
+**/node_modules
+**/dist
+**/target
+**/.git
+**/*.log
+ai-ui/node_modules
+aiuser-ui/node_modules
+# 本地数据库/缓存数据
+dump.rdb
+.fs-run
+# 部署脚本本身不影响构建
+deploy/data
+backend-out.log
+backend-err.log
+frontend-out.log
+frontend-err.log
+# IDE
+.idea
+.vscode
