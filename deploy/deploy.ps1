@@ -1,4 +1,4 @@
-# =====================================================================
+﻿# =====================================================================
 # 12348 公共法律服务热线 —— 全容器化一键部署（Windows / Docker Desktop）
 #
 # 完成动作：
@@ -20,7 +20,9 @@ param(
     [switch]$NoBuild
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
+# 让原生命令（docker/mysqldump）写到 stderr 的内容不被当成终止错误
+$global:NativeCommandUseErrorActionPreference = $false
 $DeployDir   = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $DeployDir
 $InitSqlDir  = Join-Path $DeployDir "docker\mysql\init"
@@ -33,13 +35,19 @@ function Step($m){ Write-Host "`n========== $m ==========" -ForegroundColor Cyan
 function Ok($m){ Write-Host "[OK] $m" -ForegroundColor Green }
 function Warn($m){ Write-Host "[!] $m" -ForegroundColor Yellow }
 function Die($m){ Write-Host "[X] $m" -ForegroundColor Red; exit 1 }
+# 执行原生命令并合并 stderr，仅按退出码判断成败
+function Invoke-Native { param([scriptblock]$Block)
+    $out = & $Block 2>&1
+    return [pscustomobject]@{ Code = $LASTEXITCODE; Out = ($out | Out-String) }
+}
 
 # ---- 1. 检查 Docker ----
 Step "1/6 检查 Docker 环境"
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { Die "未找到 docker，请先安装并启动 Docker Desktop。" }
-docker info *> $null
-if ($LASTEXITCODE -ne 0) { Die "Docker 未运行，请先启动 Docker Desktop 后重试。" }
-$compose = if (docker compose version *> $null) { "docker compose" } else { Die "需要 Docker Compose v2（docker compose）。" }
+$r = Invoke-Native { docker info }
+if ($r.Code -ne 0) { Die "Docker 未运行，请先启动 Docker Desktop 后重试。`n$($r.Out)" }
+$r = Invoke-Native { docker compose version }
+if ($r.Code -ne 0) { Die "需要 Docker Compose v2（docker compose）。" }
 Ok "Docker 与 Compose 可用"
 
 # ---- 2. 导出数据库 ----
@@ -66,14 +74,25 @@ if ($SkipDump -and (Test-Path $dumpFile)) {
         }
     } else {
         Write-Host "正在导出 $DbName ..."
-        # 导出结构+数据，排除会冲突的会话/日志大表可选；这里全量导出
+        # 用 --result-file 直接落盘，避免 PowerShell 管道改写编码/换行（MySQL 容器需无 BOM UTF-8）
         $env:MYSQL_PWD = $DbPass
-        mysqldump -u$DbUser --default-character-set=utf8mb4 `
+        if (Test-Path $dumpFile) { Remove-Item $dumpFile -Force }
+        & mysqldump -u$DbUser --default-character-set=utf8mb4 `
             --single-transaction --routines --triggers --events `
             --column-statistics=0 `
-            $DbName 2>$null | Out-File -FilePath $dumpFile -Encoding utf8
+            --result-file="$dumpFile" $DbName 2>&1 | Out-Null
+        $dumpCode = $LASTEXITCODE
         $env:MYSQL_PWD = ""
-        if (-not (Test-Path $dumpFile)) { Die "数据库导出失败。" }
+        if ($dumpCode -ne 0 -or -not (Test-Path $dumpFile)) {
+            # MySQL 5.7 客户端不支持 --column-statistics，去掉重试
+            $env:MYSQL_PWD = $DbPass
+            & mysqldump -u$DbUser --default-character-set=utf8mb4 `
+                --single-transaction --routines --triggers --events `
+                --result-file="$dumpFile" $DbName 2>&1 | Out-Null
+            $dumpCode = $LASTEXITCODE
+            $env:MYSQL_PWD = ""
+        }
+        if ($dumpCode -ne 0 -or -not (Test-Path $dumpFile)) { Die "数据库导出失败（mysqldump 退出码 $dumpCode）。" }
         $size = [math]::Round((Get-Item $dumpFile).Length/1KB,1)
         Ok "数据库已导出：$dumpFile（${size} KB）"
     }
@@ -81,11 +100,12 @@ if ($SkipDump -and (Test-Path $dumpFile)) {
 
 # ---- 3. 构建镜像 ----
 if (-not $NoBuild) {
-    Step "3/6 构建后端/前端镜像（首次较慢）"
+    Step "3/6 构建后端/前端镜像（首次较慢，Maven + npm，可能需数分钟）"
     Push-Location $DeployDir
-    docker compose build
-    if ($LASTEXITCODE -ne 0) { Pop-Location; Die "镜像构建失败。" }
+    $r = Invoke-Native { docker compose build }
+    Write-Host $r.Out
     Pop-Location
+    if ($r.Code -ne 0) { Die "镜像构建失败，请查看上方日志。" }
     Ok "镜像构建完成"
 } else {
     Step "3/6 跳过镜像构建（-NoBuild）"
@@ -94,9 +114,10 @@ if (-not $NoBuild) {
 # ---- 4. 启动服务 ----
 Step "4/6 启动全部容器"
 Push-Location $DeployDir
-docker compose up -d
-if ($LASTEXITCODE -ne 0) { Pop-Location; Die "容器启动失败。" }
+$r = Invoke-Native { docker compose up -d }
+Write-Host $r.Out
 Pop-Location
+if ($r.Code -ne 0) { Die "容器启动失败，请查看上方日志。" }
 Ok "已下发启动命令"
 
 # ---- 5. 等待服务就绪 ----

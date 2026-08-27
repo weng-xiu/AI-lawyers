@@ -30,8 +30,9 @@ services:
       --default-authentication-plugin=mysql_native_password
       --lower_case_table_names=1
       --max_connections=1000
-    ports:
-      - "3306:3306"
+    # 仅容器内网访问，不映射宿主 3306，避免与宿主已运行的 MySQL 冲突
+    expose:
+      - "3306"
     volumes:
       - mysql-data:/var/lib/mysql
       # 首次启动自动导入（仅当数据目录为空）：
@@ -50,8 +51,9 @@ services:
     container_name: ai12348-redis
     restart: always
     command: redis-server --appendonly yes
-    ports:
-      - "6379:6379"
+    # 仅容器内网访问，不映射宿主 6379，避免与宿主已运行的 Redis 冲突
+    expose:
+      - "6379"
     volumes:
       - redis-data:/data
     healthcheck:
