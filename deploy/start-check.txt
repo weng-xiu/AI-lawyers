@@ -1,0 +1,17 @@
+﻿=== ports ===
+8080 LISTENING
+80 LISTENING
+=== backend-out tail ===
+21:30:52.978 [esl-inbound-127.0.0.1:8021] WARN  a.l.s.s.l.t.g.e.FreeSwitchEslInboundClient - [runLoop,130] - [ESL-127.0.0.1] 杩炴帴寮傚父: Connection refused: connect锛?000ms 鍚庨噸杩?
+21:31:00.012 [esl-inbound-127.0.0.1:8021] WARN  a.l.s.s.l.t.g.e.FreeSwitchEslInboundClient - [runLoop,130] - [ESL-127.0.0.1] 杩炴帴寮傚父: Connection refused: connect锛?000ms 鍚庨噸杩?
+21:31:05.004 [schedule-pool-6] DEBUG a.l.s.m.l.t.A.aggregateByTrunk - [debug,135] - ==>  Preparing: select trunk_id as trunkId, max(trunk_code) as trunkCode, max(trunk_carrier) as carrier, count(1) as totalCalls, sum(case when is_connected = '1' then 1 else 0 end) as connectedCalls, sum(case when is_connected = '1' then 0 else 1 end) as failedCalls, round(sum(case when is_connected = '1' then 1 else 0 end) * 100 / count(1), 2) as connectRate, ifnull(sum(talk_duration), 0) as totalDuration, ifnull(round(sum(talk_duration) / nullif(sum(case when is_connected = '1' then 1 else 0 end), 0)), 0) as acd, ifnull(round(avg(ring_duration)), 0) as avgRingDuration, ifnull(round(avg(nullif(mos, 0)), 2), 0) as avgMos, ifnull(round(avg(packet_loss), 2), 0) as avgPacketLoss from ai_call_dial_log where trunk_id is not null and dial_time >= ? and dial_time < ? group by trunk_id
+21:31:05.010 [schedule-pool-6] DEBUG a.l.s.m.l.t.A.aggregateByTrunk - [debug,135] - ==> Parameters: 2026-08-27 21:30:00.0(Timestamp), 2026-08-27 21:31:00.0(Timestamp)
+21:31:05.014 [schedule-pool-6] DEBUG a.l.s.m.l.t.A.aggregateByTrunk - [debug,135] - <==      Total: 0
+21:31:07.041 [esl-inbound-127.0.0.1:8021] WARN  a.l.s.s.l.t.g.e.FreeSwitchEslInboundClient - [runLoop,130] - [ESL-127.0.0.1] 杩炴帴寮傚父: Connection refused: connect锛?000ms 鍚庨噸杩?
+21:31:07.714 [schedule-pool-13] DEBUG a.l.s.m.l.o.A.selectRunningTasks - [debug,135] - ==>  Preparing: select task_id, task_name, task_no, task_type, caller_number, ivr_flow_id, ivr_flow_name, start_time, end_time, total_count, completed_count, answered_count, failed_count, no_answer_count, status, priority, retry_count, retry_interval, max_concurrent, caller_name, caller_dept_id, description, create_by, create_time, update_by, update_time, remark from ai_outbound_task where status = '1' order by priority desc, create_time asc
+21:31:07.715 [schedule-pool-13] DEBUG a.l.s.m.l.o.A.selectRunningTasks - [debug,135] - ==> Parameters: 
+21:31:07.717 [schedule-pool-13] DEBUG a.l.s.m.l.o.A.selectRunningTasks - [debug,135] - <==      Total: 0
+21:31:07.814 [schedule-pool-7] DEBUG a.l.s.m.l.t.A.selectAllEnabledTrunks - [debug,135] - ==>  Preparing: select trunk_id, trunk_code, trunk_name, carrier, line_type, vendor, protocol, gateway_host, gateway_port, transport, api_base_url, auth_user, auth_password, realm, caller_prefix, caller_display, strip_digits, add_prefix, max_concurrent, current_concurrent, cps_limit, priority, weight, is_backup, health_status, enable_flag, last_check_time, last_success_time, last_fail_time, fail_count, circuit_open_time, connect_rate, asr, acd, mos, total_calls, success_calls, total_duration, alarm_connect_rate, alarm_fail_times, del_flag, create_by, create_time, update_by, update_time, remark from ai_call_trunk where del_flag = '0' and enable_flag = '1' order by carrier asc, priority asc
+21:31:07.816 [schedule-pool-7] DEBUG a.l.s.m.l.t.A.selectAllEnabledTrunks - [debug,135] - ==> Parameters: 
+21:31:07.821 [schedule-pool-7] DEBUG a.l.s.m.l.t.A.selectAllEnabledTrunks - [debug,135] - <==      Total: 5
+=== backend-err tail ===

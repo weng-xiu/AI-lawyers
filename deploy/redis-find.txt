@@ -1,0 +1,11 @@
+﻿=== where redis ===
+
+=== redis windows service ===
+
+Name                    Status StartType
+----                    ------ ---------
+GameInputRedistService Running Automatic
+
+
+
+=== common dirs ===

@@ -54,3 +54,4 @@ nbdist/
 /third_party/
 /.m2-repo/
 /.fs/
+/doc/*.md

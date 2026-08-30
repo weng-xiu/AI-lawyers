@@ -1,0 +1,9 @@
+﻿=== 6379 listen ===
+PID 28384: redis-server Path=D:\websever\redis-6.2.6-win(not_pwd)\redis-server.exe
+PID 28384: redis-server Path=D:\websever\redis-6.2.6-win(not_pwd)\redis-server.exe
+=== deep search redis-server.exe ===
+D:\project\CjluJwc\CjluJwc\bin\redis\redis-server.exe
+D:\project_material\云尚办公\资料\3-工具包\Redis-x64-3.0.502\redis-server.exe
+D:\websever\redis-6.2.6-win(not_pwd)\redis-server.exe
+D:\websever\redis-6.2.6-win(pwd)\redis-server.exe
+D:\websever\Redis-x64-3.2.100\redis-server.exe

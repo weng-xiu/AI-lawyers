@@ -1,0 +1,35 @@
+﻿
+FullName                                    Length
+--------                                    ------
+D:\project_job\AI-lawyers\frontend-out.log     352
+D:\project_job\AI-lawyers\frontend-err.log 1601996
+
+
+=== fe-out tail ===
+Active code page: 65001
+
+> ruoyi@3.9.0 dev
+> vue-cli-service serve
+
+ INFO  Starting development server...
+ DONE  Compiled successfully in 36998ms21:30:39
+
+
+  App running at:
+  - Local:   http://localhost:80/ 
+  - Network: http://10.52.204.90:80/
+
+  Note that the development build is not optimized.
+  To create a production build, run npm run build.
+
+=== fe-err ===
+<s> [webpack.Progress] 94% after asset optimization
+<s> [webpack.Progress] 94% after seal
+<s> [webpack.Progress] 95% emitting
+<s> [webpack.Progress] 95% emitting HtmlWebpackPlugin
+<s> [webpack.Progress] 95% emitting CopyPlugin
+<s> [webpack.Progress] 95% emitting CompressionPlugin
+<s> [webpack.Progress] 98% after emitting
+<s> [webpack.Progress] 98% after emitting CopyPlugin
+<s> [webpack.Progress] 100% 
+
