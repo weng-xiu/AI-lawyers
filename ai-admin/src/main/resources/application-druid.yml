@@ -4,11 +4,11 @@ spring:
         type: com.alibaba.druid.pool.DruidDataSource
         driverClassName: com.mysql.cj.jdbc.Driver
         druid:
-            # 主库数据源
+            # 主库数据源：生产环境必须通过环境变量注入连接信息，禁止使用 root/root 弱口令
             master:
-                url: jdbc:mysql://localhost:3306/ai-law?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
-                username: root
-                password: root
+                url: ${DB_URL:jdbc:mysql://localhost:3306/ai-law?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8}
+                username: ${DB_USERNAME:root}
+                password: ${DB_PASSWORD:root}
             # 从库数据源
             slave:
                 # 从数据源开关/默认关闭
@@ -17,11 +17,11 @@ spring:
                 username: 
                 password: 
             # 初始连接数
-            initialSize: 5
+            initialSize: 10
             # 最小连接池数量
             minIdle: 10
-            # 最大连接池数量
-            maxActive: 20
+            # 最大连接池数量（与Tomcat线程数200匹配，消除容量倒挂）
+            maxActive: 50
             # 配置获取连接等待超时的时间
             maxWait: 60000
             # 配置连接超时时间
@@ -42,13 +42,14 @@ spring:
             webStatFilter: 
                 enabled: true
             statViewServlet:
-                enabled: true
-                # 设置白名单，不填则允许所有访问
-                allow:
+                # Druid 监控台：生产环境建议关闭（DRUID_CONSOLE_ENABLED=false），开启时仅限本机/内网访问
+                enabled: ${DRUID_CONSOLE_ENABLED:true}
+                # IP白名单：默认仅本机，生产通过环境变量 DRUID_CONSOLE_ALLOW 配置内网网段（如 10.0.0.0/8）
+                allow: ${DRUID_CONSOLE_ALLOW:127.0.0.1,0:0:0:0:0:0:0:1}
                 url-pattern: /druid/*
-                # 控制台管理用户名和密码
-                login-username: ruoyi
-                login-password: 123456
+                # 控制台管理用户名和密码：生产必须通过环境变量注入强口令，禁止 ruoyi/123456
+                login-username: ${DRUID_CONSOLE_USER:admin}
+                login-password: ${DRUID_CONSOLE_PASSWORD:Druid@2026!ChangeMe}
             filter:
                 stat:
                     enabled: true
@@ -58,4 +59,5 @@ spring:
                     merge-sql: true
                 wall:
                     config:
-                        multi-statement-allow: true
+                        # 禁止 SQL 堆叠（多语句），降低 SQL 注入被放大利用的风险
+                        multi-statement-allow: false

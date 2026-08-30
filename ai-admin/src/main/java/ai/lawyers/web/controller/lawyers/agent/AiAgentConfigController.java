@@ -18,6 +18,7 @@ import ai.lawyers.common.core.domain.AjaxResult;
 import ai.lawyers.common.core.page.TableDataInfo;
 import ai.lawyers.common.enums.BusinessType;
 import ai.lawyers.common.utils.poi.ExcelUtil;
+import ai.lawyers.common.utils.sign.SecretCryptoUtils;
 import ai.lawyers.system.domain.lawyers.agent.AiAgentConfig;
 import ai.lawyers.system.service.lawyers.agent.IAiAgentConfigService;
 
@@ -39,6 +40,8 @@ public class AiAgentConfigController extends BaseController
     {
         startPage();
         List<AiAgentConfig> list = aiAgentConfigService.selectAiAgentConfigList(aiAgentConfig);
+        // S6：apiKey 回显脱敏
+        list.forEach(c -> c.setApiKey(SecretCryptoUtils.mask(c.getApiKey())));
         return getDataTable(list);
     }
 
@@ -48,6 +51,8 @@ public class AiAgentConfigController extends BaseController
     public void export(HttpServletResponse response, AiAgentConfig aiAgentConfig)
     {
         List<AiAgentConfig> list = aiAgentConfigService.selectAiAgentConfigList(aiAgentConfig);
+        // S6：导出脱敏
+        list.forEach(c -> c.setApiKey(SecretCryptoUtils.mask(c.getApiKey())));
         ExcelUtil<AiAgentConfig> util = new ExcelUtil<AiAgentConfig>(AiAgentConfig.class);
         util.exportExcel(response, list, "AI智能体配置数据");
     }
@@ -56,7 +61,13 @@ public class AiAgentConfigController extends BaseController
     @GetMapping(value = "/{agentId}")
     public AjaxResult getInfo(@PathVariable("agentId") Long agentId)
     {
-        return success(aiAgentConfigService.selectAiAgentConfigByAgentId(agentId));
+        AiAgentConfig config = aiAgentConfigService.selectAiAgentConfigByAgentId(agentId);
+        // S6：详情回显脱敏
+        if (config != null)
+        {
+            config.setApiKey(SecretCryptoUtils.mask(config.getApiKey()));
+        }
+        return success(config);
     }
 
     @PreAuthorize("@ss.hasPermi('lawyers:agent:config:add')")
@@ -92,7 +103,10 @@ public class AiAgentConfigController extends BaseController
     @GetMapping("/active")
     public AjaxResult active()
     {
-        return success(aiAgentConfigService.selectActiveAgentConfigs());
+        List<AiAgentConfig> list = aiAgentConfigService.selectActiveAgentConfigs();
+        // S6：下拉选项脱敏
+        list.forEach(c -> c.setApiKey(SecretCryptoUtils.mask(c.getApiKey())));
+        return success(list);
     }
 
     /**

@@ -93,16 +93,16 @@ public class AgentChatServiceImpl implements IAgentChatService
             return result;
         }
 
+        // 2. 检索知识（提到 try 外，R3：模型故障时用知识库话术兜底，避免一律转人工打爆人工坐席）
+        String knowledgeRefs = null;
+        String knowledgeContext = buildKnowledgeContext(userMessage, config, isUseKnowledge(config));
+        if (StringUtils.isNotEmpty(config.getKnowledgeIds()))
+        {
+            knowledgeRefs = config.getKnowledgeIds();
+        }
+
         try
         {
-            // 2. 检索知识
-            String knowledgeRefs = null;
-            String knowledgeContext = buildKnowledgeContext(userMessage, config, isUseKnowledge(config));
-            if (StringUtils.isNotEmpty(config.getKnowledgeIds()))
-            {
-                knowledgeRefs = config.getKnowledgeIds();
-            }
-
             // 3. 组装提示词（含多轮历史）
             int contextRounds = config.getContextRounds() == null ? 5 : config.getContextRounds();
             String history = loadHistoryText(sessionId, contextRounds);
@@ -135,8 +135,12 @@ public class AgentChatServiceImpl implements IAgentChatService
         }
         catch (Exception e)
         {
-            log.error("智能体对话异常 agentId={} sessionId={}: {}", agentId, sessionId, e.getMessage(), e);
-            AgentChatResult result = fallback("抱歉，智能助手暂时无法服务，正在为您转接人工。", true, "服务异常：" + e.getMessage());
+            log.warn("智能体大模型调用异常，进入分级降级 agentId={} sessionId={}: {}",
+                    agentId, sessionId, e.getMessage());
+            // R3 分级降级：模型故障时优先用已检索到的知识库话术兜底（不转人工），
+            // 避免大模型抖动导致全部来电压向人工造成雪崩；确无知识可用时才有序转人工。
+            AgentChatResult result = buildDegradedReply(knowledgeContext, e.getMessage());
+            result.setKnowledgeRefs(knowledgeRefs);
             // 异常也尽量落库留痕
             try
             {
@@ -396,6 +400,34 @@ public class AgentChatServiceImpl implements IAgentChatService
     private AgentChatResult fallback(String reply, boolean handoff, String reason)
     {
         return new AgentChatResult(reply, handoff, reason);
+    }
+
+    /**
+     * R3 分级降级：大模型不可用时，用已检索的知识库内容组织兜底答复（不转人工）；
+     * 无可用知识时才转人工，避免模型抖动引发人工坐席雪崩。
+     *
+     * @param knowledgeContext 检索到的知识上下文（buildKnowledgeContext 产物）
+     */
+    private AgentChatResult buildDegradedReply(String knowledgeContext, String errorMsg)
+    {
+        if (StringUtils.isNotEmpty(knowledgeContext))
+        {
+            // 取第一条知识作为参考答复（知识上下文格式："序号. 标题：内容（法条：…）"）
+            String firstLine = knowledgeContext.trim();
+            int nl = firstLine.indexOf('\n');
+            if (nl > 0)
+            {
+                firstLine = firstLine.substring(0, nl);
+            }
+            // 去掉前导 "1. " 序号
+            firstLine = firstLine.replaceFirst("^\\d+\\.\\s*", "");
+            String reply = "智能助手当前响应较慢，先为您提供相关法律参考：" + firstLine
+                    + "。如未能解决您的问题，可随时要求转接人工律师。";
+            AgentChatResult result = new AgentChatResult(reply, false, "模型故障，知识库话术兜底");
+            return result;
+        }
+        return new AgentChatResult("抱歉，智能助手暂时无法服务，正在为您转接人工坐席，请稍候。",
+                true, "模型故障且无知识库可兜底：" + errorMsg);
     }
 
     private String safe(String s)

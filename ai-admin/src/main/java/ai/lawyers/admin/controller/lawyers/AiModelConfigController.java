@@ -16,6 +16,7 @@ import ai.lawyers.common.annotation.Log;
 import ai.lawyers.common.core.controller.BaseController;
 import ai.lawyers.common.core.domain.AjaxResult;
 import ai.lawyers.common.enums.BusinessType;
+import ai.lawyers.common.utils.sign.SecretCryptoUtils;
 import ai.lawyers.system.domain.lawyers.AiModelConfig;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 import ai.lawyers.common.utils.poi.ExcelUtil;
@@ -43,6 +44,8 @@ public class AiModelConfigController extends BaseController
     {
         startPage();
         List<AiModelConfig> list = aiModelConfigService.selectAiModelConfigList(aiModelConfig);
+        // S6：列表回显脱敏，禁止明文 apiKey 下发前端
+        list.forEach(c -> c.setApiKey(SecretCryptoUtils.mask(c.getApiKey())));
         return getDataTable(list);
     }
 
@@ -55,6 +58,8 @@ public class AiModelConfigController extends BaseController
     public void export(HttpServletResponse response, AiModelConfig aiModelConfig)
     {
         List<AiModelConfig> list = aiModelConfigService.selectAiModelConfigList(aiModelConfig);
+        // S6：导出同样脱敏
+        list.forEach(c -> c.setApiKey(SecretCryptoUtils.mask(c.getApiKey())));
         ExcelUtil<AiModelConfig> util = new ExcelUtil<AiModelConfig>(AiModelConfig.class);
         util.exportExcel(response, list, "AI模型参数配置数据");
     }
@@ -66,7 +71,13 @@ public class AiModelConfigController extends BaseController
     @GetMapping(value = "/{configId}")
     public AjaxResult getInfo(@PathVariable("configId") Long configId)
     {
-        return success(aiModelConfigService.selectAiModelConfigByConfigId(configId));
+        AiModelConfig config = aiModelConfigService.selectAiModelConfigByConfigId(configId);
+        // S6：详情回显脱敏（前端未修改时回传 ******，后端保留原密钥）
+        if (config != null)
+        {
+            config.setApiKey(SecretCryptoUtils.mask(config.getApiKey()));
+        }
+        return success(config);
     }
 
     /**

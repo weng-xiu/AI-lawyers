@@ -22,6 +22,12 @@ public interface AiOutboundCalleeMapper
 
     public int updateCalleeStatus(AiOutboundCallee aiOutboundCallee);
 
+    /**
+     * 号码原子领取：仅当号码处于待呼叫(0)时抢占置为呼叫中(1)。
+     * 多实例/多线程并发扫描时，影响行数=1 表示领取成功，=0 表示已被其他实例领取。
+     */
+    public int claimCallee(@Param("calleeId") Long calleeId, @Param("updateBy") String updateBy);
+
     public int deleteAiOutboundCalleeByCalleeId(Long calleeId);
 
     public int deleteAiOutboundCalleeByTaskId(Long taskId);

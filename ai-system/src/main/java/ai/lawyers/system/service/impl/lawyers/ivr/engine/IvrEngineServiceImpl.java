@@ -15,23 +15,28 @@ import java.util.regex.Pattern;
 
 import javax.script.Bindings;
 import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.InetAddress;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.expression.MapAccessor;
 import org.springframework.expression.Expression;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
-import org.springframework.expression.spel.support.StandardEvaluationContext;
+import org.springframework.expression.spel.support.SimpleEvaluationContext;
 import org.springframework.stereotype.Service;
+
+import jdk.nashorn.api.scripting.ClassFilter;
+import jdk.nashorn.api.scripting.NashornScriptEngineFactory;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -933,6 +938,15 @@ public class IvrEngineServiceImpl implements IIvrEngineService
             result.getSteps().add(step);
             return nextNode(current, nodeMap, edges, variables, null);
         }
+        // 安全收口(S5)：SSRF 防护，仅允许 http/https 且目标不得为内网/回环/保留地址
+        String ssrfError = checkUrlAllowed(url);
+        if (ssrfError != null)
+        {
+            variables.put("serviceError", ssrfError);
+            step.setDetail("HTTP调用被安全策略拦截：" + ssrfError);
+            result.getSteps().add(step);
+            return nextNode(current, nodeMap, edges, variables, null);
+        }
         try
         {
             String responseText = httpCall(url, method, headers, body, timeoutMs);
@@ -979,15 +993,8 @@ public class IvrEngineServiceImpl implements IIvrEngineService
         }
         try
         {
-            ScriptEngine engine = new ScriptEngineManager().getEngineByName("nashorn");
-            if (engine == null)
-            {
-                engine = new ScriptEngineManager().getEngineByName("js");
-            }
-            if (engine == null)
-            {
-                engine = new ScriptEngineManager().getEngineByName("JavaScript");
-            }
+            // 安全收口(S4)：Nashorn 加 ClassFilter 沙箱，禁止脚本访问任意 Java 类（防 Java.type 逃逸 RCE）
+            ScriptEngine engine = createSandboxScriptEngine();
             if (engine == null)
             {
                 throw new IllegalStateException("当前JDK未提供JavaScript脚本引擎");
@@ -1079,6 +1086,79 @@ public class IvrEngineServiceImpl implements IIvrEngineService
         return nextNode(current, nodeMap, edges, variables, null);
     }
 
+    /**
+     * 安全收口(S4)：创建带 ClassFilter 沙箱的 Nashorn 引擎。
+     * ClassFilter.exposeToScripts 恒返回 false，脚本无法通过 Java.type/反射访问任何 Java 类，
+     * 仅能使用 JS 内置对象与注入的流程变量（变量值均为字符串/数字）。
+     */
+    private ScriptEngine createSandboxScriptEngine()
+    {
+        try
+        {
+            NashornScriptEngineFactory factory = new NashornScriptEngineFactory();
+            // --no-java 禁止 Java 包访问；ClassFilter 双重兜底拒绝所有类暴露
+            return factory.getScriptEngine(new String[] { "--no-java" },
+                    Thread.currentThread().getContextClassLoader(),
+                    new ClassFilter()
+                    {
+                        @Override
+                        public boolean exposeToScripts(String className)
+                        {
+                            log.warn("IVR脚本尝试访问Java类已被沙箱拦截：{}", className);
+                            return false;
+                        }
+                    });
+        }
+        catch (Throwable t)
+        {
+            // 极端情况下 Nashorn 不可用（如裁剪版 JRE），返回 null 由上层降级
+            log.warn("创建Nashorn沙箱脚本引擎失败：{}", t.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * 安全收口(S5)：校验 service 节点目标 URL，防 SSRF。
+     * 仅允许 http/https；解析目标 IP 后拒绝回环/内网/链路本地/保留地址及云元数据地址。
+     *
+     * @return 非 null 表示拦截原因；null 表示放行
+     */
+    private String checkUrlAllowed(String url)
+    {
+        try
+        {
+            URI uri = new URI(url.trim());
+            String scheme = uri.getScheme();
+            if (scheme == null || (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme)))
+            {
+                return "仅允许 http/https 协议";
+            }
+            String host = uri.getHost();
+            if (StringUtils.isEmpty(host))
+            {
+                return "URL缺少主机名";
+            }
+            // 云元数据地址显式拦截
+            String lowerHost = host.toLowerCase();
+            if (lowerHost.startsWith("169.254.") || lowerHost.contains("metadata.google.internal"))
+            {
+                return "禁止访问云元数据地址";
+            }
+            InetAddress address = InetAddress.getByName(host);
+            if (address.isLoopbackAddress() || address.isAnyLocalAddress()
+                    || address.isSiteLocalAddress() || address.isLinkLocalAddress()
+                    || address.isMulticastAddress())
+            {
+                return "禁止访问内网/回环/保留地址：" + host;
+            }
+            return null;
+        }
+        catch (Exception e)
+        {
+            return "URL解析失败：" + e.getMessage();
+        }
+    }
+
     private String httpCall(String url, String method, Map<String, String> headers, String body,
                             int timeoutMs) throws Exception
     {
@@ -1090,6 +1170,8 @@ public class IvrEngineServiceImpl implements IIvrEngineService
             connection.setConnectTimeout(timeoutMs);
             connection.setReadTimeout(timeoutMs);
             connection.setDoOutput(body != null);
+            // 安全收口(S5)：禁止自动跟随重定向，防止 302 跳转绕过 SSRF 校验指向内网
+            connection.setInstanceFollowRedirects(false);
             for (Map.Entry<String, String> entry : headers.entrySet())
             {
                 connection.setRequestProperty(entry.getKey(), entry.getValue());
@@ -1214,7 +1296,10 @@ public class IvrEngineServiceImpl implements IIvrEngineService
     {
         try
         {
-            StandardEvaluationContext context = new StandardEvaluationContext();
+            // 安全收口(S3)：只读数据绑定上下文，禁止类型引用(T(...))/构造器/方法调用/赋值，杜绝 RCE；
+            // 追加 MapAccessor 以支持 ${#var} 之外的 Map 键属性式访问
+            SimpleEvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding().build();
+            context.getPropertyAccessors().add(0, new MapAccessor());
             if (variables != null)
             {
                 variables.forEach(context::setVariable);
@@ -1329,7 +1414,11 @@ public class IvrEngineServiceImpl implements IIvrEngineService
         try
         {
             Expression expression = SPEL_PARSER.parseExpression(expr);
-            StandardEvaluationContext context = new StandardEvaluationContext(variables);
+            // 安全收口(S3)：只读数据绑定上下文，禁止 T(...) 类型表达式与任意方法调用；
+            // 追加 MapAccessor 并以变量 Map 为根对象，支持 root 键属性式访问
+            SimpleEvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding().build();
+            context.getPropertyAccessors().add(0, new MapAccessor());
+            context.setRootObject(variables == null ? new HashMap<>() : variables);
             if (variables != null)
             {
                 variables.forEach(context::setVariable);

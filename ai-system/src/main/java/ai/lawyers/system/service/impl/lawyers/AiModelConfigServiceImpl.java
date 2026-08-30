@@ -10,10 +10,16 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ThreadLocalRandom;
+
+import javax.annotation.PostConstruct;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -22,6 +28,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import ai.lawyers.common.utils.StringUtils;
+import ai.lawyers.common.utils.sign.SecretCryptoUtils;
 import ai.lawyers.system.domain.lawyers.AiModelConfig;
 import ai.lawyers.system.mapper.lawyers.AiModelConfigMapper;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
@@ -51,6 +58,45 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
     @Autowired
     private AiModelConfigMapper aiModelConfigMapper;
 
+    /**
+     * R1 舱壁：限制在途大模型调用并发数，防止慢响应耗尽 Tomcat 线程后雪崩传导到全系统。
+     * 默认 32，可经 ai.model.max-inflight 调整（应与 DB/Redis 连接池、模型侧限流匹配）。
+     */
+    @Value("${ai.model.max-inflight:32}")
+    private int maxInflight;
+
+    /** R1 舱壁：获取在途许可的最长等待时间（毫秒），超时快速失败，避免请求无限排队 */
+    @Value("${ai.model.acquire-timeout-ms:3000}")
+    private long acquireTimeoutMs;
+
+    private Semaphore inflightSemaphore;
+
+    @PostConstruct
+    public void initBulkhead()
+    {
+        int permits = maxInflight > 0 ? maxInflight : 32;
+        inflightSemaphore = new Semaphore(permits, true);
+        log.info("大模型调用舱壁初始化 maxInflight={} acquireTimeoutMs={}", permits, acquireTimeoutMs);
+    }
+
+    /** 携带 HTTP 状态码的模型调用异常，用于判断是否可重试 */
+    private static class ModelHttpException extends Exception
+    {
+        private static final long serialVersionUID = 1L;
+        private final int httpStatus;
+
+        ModelHttpException(int httpStatus, String message)
+        {
+            super(message);
+            this.httpStatus = httpStatus;
+        }
+
+        int getHttpStatus()
+        {
+            return httpStatus;
+        }
+    }
+
     @Override
     public AiModelConfig selectAiModelConfigByConfigId(Long configId)
     {
@@ -66,6 +112,8 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
     @Override
     public int insertAiModelConfig(AiModelConfig aiModelConfig)
     {
+        // S6：apiKey 加密落库
+        aiModelConfig.setApiKey(SecretCryptoUtils.encrypt(aiModelConfig.getApiKey()));
         if ("1".equals(aiModelConfig.getIsDefault()))
         {
             aiModelConfigMapper.updateDefaultConfig(aiModelConfig.getConfigId());
@@ -76,6 +124,15 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
     @Override
     public int updateAiModelConfig(AiModelConfig aiModelConfig)
     {
+        // S6：回显占位符 ****** 表示未修改密钥，保留库中旧值；否则加密新值落库
+        if (SecretCryptoUtils.isMaskPlaceholder(aiModelConfig.getApiKey()))
+        {
+            aiModelConfig.setApiKey(null);
+        }
+        else
+        {
+            aiModelConfig.setApiKey(SecretCryptoUtils.encrypt(aiModelConfig.getApiKey()));
+        }
         if ("1".equals(aiModelConfig.getIsDefault()))
         {
             aiModelConfigMapper.updateDefaultConfig(aiModelConfig.getConfigId());
@@ -176,15 +233,30 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
     /**
      * 真实 HTTP 调用。失败按配置重试，最终抛出异常由上层兜底。
      */
-    private String chat(AiModelConfig config, String systemPrompt, String userMessage, boolean jsonMode)
+    private String chat(AiModelConfig rawConfig, String systemPrompt, String userMessage, boolean jsonMode)
     {
+        // S6：库中 apiKey 为密文，调用前解密（复制对象避免污染缓存对象）
+        AiModelConfig config = rawConfig;
+        if (StringUtils.isNotEmpty(rawConfig.getApiKey()))
+        {
+            config = rawConfig;
+            config.setApiKey(SecretCryptoUtils.decrypt(rawConfig.getApiKey()));
+        }
         String modelType = normalizeModelType(config.getModelType());
         int attempts = Math.max(1, config.getRetryCount() == null ? 1 : config.getRetryCount() + 1);
         Exception lastError = null;
         for (int attempt = 1; attempt <= attempts; attempt++)
         {
+            // R1 舱壁：获取在途许可，限制并发模型调用数；获取不到快速失败，避免 Tomcat 线程被慢调用占满
+            boolean acquired = false;
             try
             {
+                acquired = inflightSemaphore.tryAcquire(acquireTimeoutMs, TimeUnit.MILLISECONDS);
+                if (!acquired)
+                {
+                    throw new RuntimeException("AI模型调用繁忙（在途并发已达上限 " + maxInflight
+                            + "），请稍后再试");
+                }
                 return "Claude".equalsIgnoreCase(modelType)
                         ? callClaude(config, systemPrompt, userMessage)
                         : callOpenAiCompatible(config, modelType, systemPrompt, userMessage, jsonMode);
@@ -192,15 +264,47 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
             catch (Exception e)
             {
                 lastError = e;
-                log.warn("AI模型调用失败 configId={} attempt={}/{} error={}",
-                        config.getConfigId(), attempt, attempts, e.getMessage());
-                if (attempt < attempts)
+                boolean retryable = isRetryable(e);
+                log.warn("AI模型调用失败 configId={} attempt={}/{} retryable={} error={}",
+                        config.getConfigId(), attempt, attempts, retryable, e.getMessage());
+                // R2：仅对 429/5xx/网络超时等可重试错误重试；400/401/403 等立即失败，避免重试风暴
+                if (!retryable || attempt >= attempts)
                 {
-                    sleepBeforeRetry(attempt);
+                    break;
+                }
+                sleepBeforeRetry(attempt);
+            }
+            finally
+            {
+                if (acquired)
+                {
+                    inflightSemaphore.release();
                 }
             }
         }
         throw new RuntimeException("调用AI模型失败：" + lastError.getMessage(), lastError);
+    }
+
+    /**
+     * R2：判断异常是否值得重试。
+     * 可重试：429（限流）、5xx（服务端错误）、网络 IO/超时（SocketTimeout/ConnectException 等）。
+     * 不可重试：400/401/403/404 等客户端错误、响应格式错误。
+     */
+    private boolean isRetryable(Exception e)
+    {
+        if (e instanceof ModelHttpException)
+        {
+            int status = ((ModelHttpException) e).getHttpStatus();
+            return status == 429 || (status >= 500 && status < 600);
+        }
+        if (e instanceof java.net.SocketTimeoutException
+                || e instanceof java.net.ConnectException
+                || e instanceof java.io.IOException)
+        {
+            return true;
+        }
+        // 舱壁繁忙属于瞬时过载，允许重试
+        return e.getMessage() != null && e.getMessage().contains("在途并发已达上限");
     }
 
     private String callOpenAiCompatible(AiModelConfig config, String modelType, String systemPrompt,
@@ -314,18 +418,24 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
     private JsonNode httpPost(String endpoint, Map<String, String> headers, String payload,
                               AiModelConfig config) throws Exception
     {
-        int timeoutMs = (config.getTimeout() == null || config.getTimeout() <= 0
-                ? 60 : config.getTimeout()) * 1000;
+        // R1：连接超时与读超时分开，连接超时短（快速发现不可达），读超时按模型生成耗时配置
+        int readTimeoutSec = (config.getTimeout() == null || config.getTimeout() <= 0
+                ? 60 : config.getTimeout());
+        int connectTimeoutMs = 10 * 1000;
+        int readTimeoutMs = readTimeoutSec * 1000;
         HttpURLConnection connection = null;
+        boolean reusable = false;
         try
         {
             URL url = new URL(endpoint);
             connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("POST");
-            connection.setConnectTimeout(timeoutMs);
-            connection.setReadTimeout(timeoutMs);
+            connection.setConnectTimeout(connectTimeoutMs);
+            connection.setReadTimeout(readTimeoutMs);
             connection.setDoOutput(true);
             connection.setUseCaches(false);
+            // 复用底层 Keep-Alive 连接（HttpURLConnection 内置连接池），避免每次新建 TCP/TLS
+            connection.setRequestProperty("Connection", "Keep-Alive");
             for (Map.Entry<String, String> entry : headers.entrySet())
             {
                 connection.setRequestProperty(entry.getKey(), entry.getValue());
@@ -343,16 +453,21 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
             {
                 if (StringUtils.isEmpty(responseText))
                 {
-                    throw new IllegalStateException("模型返回空响应");
+                    throw new ModelHttpException(status, "模型返回空响应");
                 }
+                // 响应体已完整读取，连接可安全放回 Keep-Alive 池复用
+                reusable = true;
                 return MAPPER.readTree(responseText);
             }
             String errorMsg = extractError(responseText);
-            throw new IllegalStateException("HTTP " + status + (StringUtils.isEmpty(errorMsg) ? "" : "：" + errorMsg));
+            // R2：抛出带状态码异常，由上层按 429/5xx 判定是否重试
+            throw new ModelHttpException(status,
+                    "HTTP " + status + (StringUtils.isEmpty(errorMsg) ? "" : "：" + errorMsg));
         }
         finally
         {
-            if (connection != null)
+            // 成功且响应已读完时不 disconnect，交由 JDK Keep-Alive 缓存复用连接；失败则关闭
+            if (connection != null && !reusable)
             {
                 connection.disconnect();
             }
@@ -467,11 +582,19 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
         return StringUtils.isNotEmpty(config.getModelName()) ? config.getModelName() : fallback;
     }
 
+    /**
+     * R2：指数退避 + 抖动。基础间隔 500ms，每次翻倍（500ms→1s→2s→4s...，上限 8s），
+     * 并叠加 0~基础间隔的随机抖动，避免大量请求在同一时刻重试形成"重试风暴"。
+     */
     private void sleepBeforeRetry(int attempt)
     {
+        long base = Math.min(8000L, 500L * (1L << Math.min(attempt - 1, 4)));
+        long jitter = ThreadLocalRandom.current().nextLong(0, Math.max(1L, base / 2));
+        long sleepMs = base + jitter;
         try
         {
-            Thread.sleep(Math.min(2000, attempt * 500L));
+            log.info("AI模型调用将在 {}ms 后重试（第{}次）", sleepMs, attempt);
+            Thread.sleep(sleepMs);
         }
         catch (InterruptedException e)
         {

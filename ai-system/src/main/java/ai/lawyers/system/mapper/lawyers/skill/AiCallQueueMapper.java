@@ -47,5 +47,16 @@ public interface AiCallQueueMapper
     public int expireQueued(@Param("groupId") Long groupId, @Param("beforeTime") Date beforeTime,
                             @Param("status") String status);
 
+    /**
+     * 查询排队中（queue_status='0'）且入队时间已超过所属技能组 max_wait（秒）的记录
+     */
+    public List<AiCallQueue> selectTimeoutQueuing();
+
+    /**
+     * 幂等地将单条排队记录置为超时溢出（queue_status='2'）并写出队时间/等待时长。
+     * 仅当该记录仍为排队中('0')时生效，返回影响行数；影响行数 0 表示已被其他流程处理。
+     */
+    public int markTimeoutOverflow(@Param("queueId") Long queueId);
+
     public int deleteAiCallQueueByQueueIds(Long[] queueIds);
 }

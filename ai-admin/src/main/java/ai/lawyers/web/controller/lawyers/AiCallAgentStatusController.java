@@ -1,9 +1,13 @@
 package ai.lawyers.web.controller.lawyers;
 
 import java.util.List;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -19,7 +23,9 @@ import ai.lawyers.common.core.controller.BaseController;
 import ai.lawyers.common.core.domain.AjaxResult;
 import ai.lawyers.common.core.page.TableDataInfo;
 import ai.lawyers.common.enums.BusinessType;
+import ai.lawyers.common.utils.SecurityUtils;
 import ai.lawyers.common.utils.poi.ExcelUtil;
+import ai.lawyers.common.utils.sign.CallbackSignUtils;
 import ai.lawyers.system.domain.lawyers.AiCallAgentStatus;
 import ai.lawyers.system.service.lawyers.IAiCallAgentStatusService;
 
@@ -27,8 +33,17 @@ import ai.lawyers.system.service.lawyers.IAiCallAgentStatusService;
 @RequestMapping("/lawyers/call/agent")
 public class AiCallAgentStatusController extends BaseController
 {
+    private static final Logger log = LoggerFactory.getLogger(AiCallAgentStatusController.class);
+
     @Autowired
     private IAiCallAgentStatusService aiCallAgentStatusService;
+
+    /** S7：回调签名开关与密钥（生产环境必须开启并注入强密钥） */
+    @Value("${call.callback.sign-enabled:false}")
+    private boolean callbackSignEnabled;
+
+    @Value("${call.callback.sign-secret:}")
+    private String callbackSignSecret;
 
     @PreAuthorize("@ss.hasPermi('lawyers:call:agent:list')")
     @GetMapping("/list")
@@ -124,14 +139,38 @@ public class AiCallAgentStatusController extends BaseController
 
     /**
      * 浏览器关闭/页面卸载时的自动签出接口。
-     * <p>通过 navigator.sendBeacon 调用，无需鉴权（@Anonymous），
-     * 仅依据前端传入的 agentId/userId 执行签出，属于"尽力而为"的兜底操作。</p>
+     * <p>通过 navigator.sendBeacon 调用（@Anonymous 以便页面卸载时仍可发出）。
+     * S7 安全收口：已登录会话（携带有效 JWT）直接放行；匿名请求在签名开关开启时
+     * 必须携带 X-Callback-Timestamp / X-Callback-Sign（内容为 agentId|userId），
+     * 防止匿名调用方恶意强退任意坐席。</p>
      */
     @Anonymous
     @PostMapping("/autoLogout")
     public AjaxResult autoLogout(@RequestParam(value = "agentId", required = false) Long agentId,
-                                 @RequestParam(value = "userId", required = false) Long userId)
+                                 @RequestParam(value = "userId", required = false) Long userId,
+                                 HttpServletRequest request)
     {
+        boolean authenticated;
+        try
+        {
+            authenticated = SecurityUtils.getLoginUser() != null;
+        }
+        catch (Exception e)
+        {
+            authenticated = false;
+        }
+        if (!authenticated && callbackSignEnabled)
+        {
+            String timestamp = request.getHeader("X-Callback-Timestamp");
+            String signature = request.getHeader("X-Callback-Sign");
+            String content = agentId + "|" + userId;
+            if (!CallbackSignUtils.verify(callbackSignSecret, content, timestamp, signature))
+            {
+                log.warn("自动签出回调签名校验失败 agentId={} userId={} ip={}",
+                        agentId, userId, request.getRemoteAddr());
+                return AjaxResult.error(403, "回调签名校验失败");
+            }
+        }
         int result = aiCallAgentStatusService.agentLogout(agentId, userId);
         return result > 0 ? success() : error("无在线坐席需要签出");
     }

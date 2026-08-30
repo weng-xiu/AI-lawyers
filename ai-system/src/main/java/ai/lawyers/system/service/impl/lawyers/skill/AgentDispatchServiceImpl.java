@@ -1,5 +1,6 @@
 package ai.lawyers.system.service.impl.lawyers.skill;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
@@ -37,7 +38,8 @@ public class AgentDispatchServiceImpl implements IAgentDispatchService
 {
     private static final Logger log = LoggerFactory.getLogger(AgentDispatchServiceImpl.class);
 
-    private static final String RR_KEY_PREFIX = "skill:rr:";
+    /** 轮询计数器 key（原子自增，对候选坐席数取模） */
+    private static final String RR_SEQ_KEY_PREFIX = "skill:rr:seq:";
 
     @Autowired
     private AiSkillGroupMapper skillGroupMapper;
@@ -72,14 +74,20 @@ public class AgentDispatchServiceImpl implements IAgentDispatchService
             return DispatchResult.failed("技能组不存在或已停用");
         }
 
-        // 1. 取可用坐席
+        // 1. 取可用坐席（已按技能等级、优先级排序）
         List<AiSkillGroupMember> available = memberMapper.selectAvailableByGroupId(groupId);
         if (available != null && !available.isEmpty())
         {
-            AiSkillGroupMember chosen = chooseByStrategy(group, available);
-            if (chosen != null)
+            // 按策略排定候选顺序，逐个原子抢占：抢占失败（已被并发来电抢先）则尝试下一位
+            List<AiSkillGroupMember> candidates = orderCandidates(group, new ArrayList<>(available));
+            for (AiSkillGroupMember candidate : candidates)
             {
-                return assignToAgent(group, chosen, ctx);
+                DispatchResult result = assignToAgent(group, candidate, ctx);
+                if (result != null)
+                {
+                    return result;
+                }
+                log.info("坐席[{}]已被并发抢占，尝试下一位候选", candidate.getAgentId());
             }
         }
 
@@ -115,9 +123,9 @@ public class AgentDispatchServiceImpl implements IAgentDispatchService
     }
 
     /**
-     * 按策略选择一个坐席
+     * 按策略排定候选坐席顺序（首个为首选，后续为抢占失败后的备选）
      */
-    private AiSkillGroupMember chooseByStrategy(AiSkillGroup group, List<AiSkillGroupMember> available)
+    private List<AiSkillGroupMember> orderCandidates(AiSkillGroup group, List<AiSkillGroupMember> available)
     {
         // available 已按 skill_level desc, priority desc 排序
         String strategy = group.getStrategy() == null ? "round_robin" : group.getStrategy();
@@ -125,59 +133,79 @@ public class AgentDispatchServiceImpl implements IAgentDispatchService
         {
             case "least_recent":
                 // 最久未通话：call_start_time 最早（含从未通话者，为 null 排最前）
-                return available.stream().min(Comparator.comparing(
+                available.sort(Comparator.comparing(
                         m -> {
                             Date t = memberMapper.selectLastCallStartTime(m.getAgentId());
                             return t == null ? new Date(0) : t;
-                        })).orElse(available.get(0));
+                        }));
+                break;
             case "least_calls":
                 // 今日完成通话最少
-                return available.stream().min(Comparator.comparingInt(
+                available.sort(Comparator.comparingInt(
                         m -> {
                             Integer c = memberMapper.countTodayCompletedByAgent(m.getAgentId());
                             return c == null ? 0 : c;
-                        })).orElse(available.get(0));
+                        }));
+                break;
             case "all_ring":
-                // 全员振铃：真实 PBX 会并行呼叫所有成员；无 PBX 环境取等级最高者（列表首位）
-                return available.get(0);
+                // 全员振铃：真实 PBX 会并行呼叫所有成员；无 PBX 环境按等级优先级顺序（保持列表原序）
+                break;
             case "round_robin":
             default:
-                return roundRobin(group.getGroupId(), available);
-        }
-    }
-
-    /**
-     * 轮询：用 Redis 记录上次分配的成员ID，从其后开始取下一个可用者
-     */
-    private AiSkillGroupMember roundRobin(Long groupId, List<AiSkillGroupMember> available)
-    {
-        String key = RR_KEY_PREFIX + groupId;
-        Long lastId = redisCache.getCacheObject(key);
-        if (lastId == null)
-        {
-            AiSkillGroupMember first = available.get(0);
-            redisCache.setCacheObject(key, first.getAgentId(), 24, TimeUnit.HOURS);
-            return first;
-        }
-        int startIdx = 0;
-        for (int i = 0; i < available.size(); i++)
-        {
-            if (lastId.equals(available.get(i).getAgentId()))
-            {
-                startIdx = (i + 1) % available.size();
+                rotateRoundRobin(group.getGroupId(), available);
                 break;
-            }
         }
-        AiSkillGroupMember chosen = available.get(startIdx);
-        redisCache.setCacheObject(key, chosen.getAgentId(), 24, TimeUnit.HOURS);
-        return chosen;
+        return available;
     }
 
     /**
-     * 执行分配：写流水、置坐席忙碌
+     * 轮询：Redis INCR 原子自增计数器，对候选坐席数取模旋转候选列表。
+     * 原子自增避免并发来电取到同一指针、把同一坐席分给两通电话。
+     */
+    private void rotateRoundRobin(Long groupId, List<AiSkillGroupMember> available)
+    {
+        int size = available.size();
+        if (size <= 1)
+        {
+            return;
+        }
+        String key = RR_SEQ_KEY_PREFIX + groupId;
+        // opsForValue().increment 为原子操作（Redis INCR），首次自增返回 1
+        Long seq = redisCache.redisTemplate.opsForValue().increment(key);
+        if (seq != null && seq == 1L)
+        {
+            redisCache.expire(key, 24, TimeUnit.HOURS);
+        }
+        long current = seq == null ? 0L : seq;
+        int startIdx = (int) Math.floorMod(current, (long) size);
+        if (startIdx == 0)
+        {
+            return;
+        }
+        List<AiSkillGroupMember> rotated = new ArrayList<>(size);
+        for (int i = 0; i < size; i++)
+        {
+            rotated.add(available.get((startIdx + i) % size));
+        }
+        for (int i = 0; i < size; i++)
+        {
+            available.set(i, rotated.get(i));
+        }
+    }
+
+    /**
+     * 执行分配：原子抢占坐席 → 写流水 → 补充坐席通话信息。
+     *
+     * @return 分配结果；返回 null 表示该坐席已被并发来电抢占（call_status 已非空闲），调用方应换下一位候选
      */
     private DispatchResult assignToAgent(AiSkillGroup group, AiSkillGroupMember member, DispatchContext ctx)
     {
+        // 原子抢占：条件更新 call_status 0→1，影响行数 0 说明已被并发来电抢占，交由上层换下一位候选
+        if (agentStatusMapper.occupyAgentIfFree(member.getAgentId()) == 0)
+        {
+            return null;
+        }
+
         AiCallAgentStatus agent = agentStatusMapper.selectAiCallAgentStatusByAgentId(member.getAgentId());
         String agentName = agent != null ? agent.getAgentName() : ("坐席" + member.getAgentId());
 
@@ -276,6 +304,11 @@ public class AgentDispatchServiceImpl implements IAgentDispatchService
         if (agent == null || !"1".equals(agent.getStatus()) || !"0".equals(agent.getCallStatus()))
         {
             return DispatchResult.failed("目标坐席不存在或当前不空闲");
+        }
+        // 原子抢占，防止并发手动分配/自动分配同时命中该坐席
+        if (agentStatusMapper.occupyAgentIfFree(agentId) == 0)
+        {
+            return DispatchResult.failed("目标坐席已被其他来电占用");
         }
         Date now = new Date();
         queue.setAgentId(agentId);

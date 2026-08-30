@@ -157,6 +157,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where callee_id = #{calleeId}
     </update>
 
+    <update id="claimCallee">
+        update ai_outbound_callee
+        set call_status = '1', call_time = sysdate(),
+            update_by = #{updateBy}, update_time = sysdate()
+        where callee_id = #{calleeId} and call_status = '0'
+    </update>
+
     <delete id="deleteAiOutboundCalleeByCalleeId" parameterType="Long">
         delete from ai_outbound_callee where callee_id = #{calleeId}
     </delete>

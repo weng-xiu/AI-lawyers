@@ -6,8 +6,8 @@ ruoyi:
   version: 3.9.0
   # 版权年份
   copyrightYear: 2025
-  # 文件路径 示例（ Windows配置D:/ruoyi/uploadPath，Linux配置 /home/ruoyi/uploadPath）
-  profile: D:/ruoyi/uploadPath
+  # 文件路径：生产环境必须通过环境变量 RUOYI_PROFILE 显式指定挂载目录（如 /data/ai-lawyers/uploadPath）
+  profile: ${RUOYI_PROFILE:./data/uploadPath}
   # 获取ip地址开关
   addressEnabled: false
   # 验证码类型 math 数字计算 char 字符验证
@@ -15,7 +15,7 @@ ruoyi:
 
 # 文件上传路径配置
 file:
-  path: D:/ruoyi/uploadPath
+  path: ${RUOYI_PROFILE:./data/uploadPath}
 
 # 开发环境配置
 server:
@@ -27,18 +27,18 @@ server:
   tomcat:
     # tomcat的URI编码
     uri-encoding: UTF-8
-    # 连接数满后的排队数，默认为100
-    accept-count: 1000
+    # 连接数满后的排队数（与下游DB/Redis连接池容量匹配，避免容量倒挂）
+    accept-count: 200
     threads:
-      # tomcat最大线程数，默认为200
-      max: 800
+      # tomcat最大线程数：按下游容量反推（DB连接池50），勿盲目调大
+      max: 200
       # Tomcat启动初始化的线程数，默认值10
-      min-spare: 100
+      min-spare: 20
 
-# 日志配置
+# 日志配置：生产环境保持 info，debug 会记录咨询文本等隐私内容（合规风险）
 logging:
   level:
-    ai.lawyers: debug
+    ai.lawyers: info
     org.springframework: warn
 
 # 用户配置
@@ -64,40 +64,40 @@ spring:
       max-file-size: 10MB
       # 设置总上传的文件大小
       max-request-size: 20MB
-  # 服务模块
+  # 服务模块：生产环境必须关闭热部署（已存在 ai-admin/ai-system 同包同名类，restart 会引发类加载冲突）
   devtools:
     restart:
       # 热部署开关
-      enabled: true
+      enabled: false
   # redis 配置
   redis:
     # 地址
-    host: localhost
+    host: ${REDIS_HOST:localhost}
     # 端口，默认为6379
-    port: 6379
+    port: ${REDIS_PORT:6379}
     # 数据库索引
     database: 0
-    # 密码
-    password:
+    # 密码：生产环境必须通过环境变量 REDIS_PASSWORD 注入强密码
+    password: ${REDIS_PASSWORD:}
     # 连接超时时间
     timeout: 10s
     lettuce:
       pool:
         # 连接池中的最小空闲连接
-        min-idle: 0
+        min-idle: 4
         # 连接池中的最大空闲连接
-        max-idle: 8
-        # 连接池的最大数据库连接数
-        max-active: 8
+        max-idle: 16
+        # 连接池的最大数据库连接数（与Tomcat线程数匹配，消除容量倒挂）
+        max-active: 32
         # #连接池最大阻塞等待时间（使用负值表示没有限制）
-        max-wait: -1ms
+        max-wait: 3000ms
 
 # token配置
 token:
   # 令牌自定义标识
   header: Authorization
-  # 令牌密钥
-  secret: abcdefghijklmnopqrstuvwxyz
+  # 令牌密钥：生产环境必须通过环境变量 TOKEN_SECRET 注入 >=32字节随机密钥，禁止使用默认值入库入git
+  secret: ${TOKEN_SECRET:Z2xwLWExMmwtbGF3eWVycy1qd3Qtc2VjcmV0LWtleS0yMDI2LWNoYW5nZS1tZS1pbi1wcm9kLTA5ODc2NTQz}
   # 令牌有效期（默认30分钟）
   expireTime: 30
 
@@ -116,10 +116,10 @@ pagehelper:
   supportMethodsArguments: true
   params: count=countSql
 
-# Swagger配置
+# Swagger配置：生产环境必须关闭（通过环境变量 SWAGGER_ENABLED=true 仅在开发环境开启）
 swagger:
   # 是否开启swagger
-  enabled: true
+  enabled: ${SWAGGER_ENABLED:false}
   # 请求前缀
   pathMapping: /dev-api
 
@@ -129,8 +129,8 @@ xss:
   enabled: true
   # 排除链接（多个用逗号分隔）
   excludes: /system/notice
-  # 匹配链接
-  urlPatterns: /system/*,/monitor/*,/tool/*
+  # 匹配链接：覆盖业务接口 /lawyers/**（IVR脚本/知识库等富文本内容由后端按需转义）
+  urlPatterns: /system/*,/monitor/*,/tool/*,/lawyers/*
 
 # ============================================================
 # 运营商线路对接与外呼调度配置
@@ -179,7 +179,8 @@ call:
     # 定时扫描间隔(ms)
     scanIntervalMs: 15000
     # 模拟接通：无真实语音网关时，下发成功后直接模拟接通并进入IVR全链路
-    simulateAnswer: true
+    # 仅限开发/测试联调使用，生产环境必须通过环境变量 CALL_OUTBOUND_SIMULATEANSWER=false 关闭（启动会强告警）
+    simulateAnswer: ${CALL_OUTBOUND_SIMULATEANSWER:true}
     # 模拟接通后的通话时长(秒)，仅模拟模式生效
     simulateTalkSeconds: 45
     # 回访类任务或转人工类外呼接通后自动创建工单
@@ -198,17 +199,17 @@ call:
     # 部署真实 FreeSWITCH 时置为 true，并在“资源管理-运营商线路”中配置 vendor=FREESWITCH 的线路
     esl:
       enabled: true
-    # FreeSWITCH ESL
+    # FreeSWITCH ESL：生产环境通过环境变量注入强口令，禁止使用默认 ClueCon
     freeswitch:
-      eslPort: 8021
-      eslPassword: ClueCon
+      eslPort: ${ESL_PORT:8021}
+      eslPassword: ${ESL_PASSWORD:ClueCon}
       timeout: 5000
       context: default
-    # Asterisk AMI
+    # Asterisk AMI：生产环境通过环境变量注入强口令，禁止使用默认 admin/amp111
     asterisk:
-      amiPort: 5038
-      amiUser: admin
-      amiPassword: amp111
+      amiPort: ${AMI_PORT:5038}
+      amiUser: ${AMI_USER:admin}
+      amiPassword: ${AMI_PASSWORD:amp111}
       timeout: 5000
       context: from-internal
     # 通用 HTTP OpenAPI 网关（云 CTI / SBC 北向接口）
@@ -221,3 +222,10 @@ call:
     # 模拟网关（无真实网关时兜底，successRate 可用于验证故障切换）
     simulator:
       successRate: 100
+
+  # ---------- 网关/内部回调签名校验（S7 安全收口） ----------
+  callback:
+    # 生产环境必须置为 true，对网关事件回调强制 HMAC-SHA256 签名+时间戳窗口校验
+    sign-enabled: ${CALLBACK_SIGN_ENABLED:false}
+    # 签名密钥：生产必须通过环境变量 CALLBACK_SIGN_SECRET 注入 >=32 字节随机串
+    sign-secret: ${CALLBACK_SIGN_SECRET:ai-lawyers-callback-dev-secret-change-me-2026}

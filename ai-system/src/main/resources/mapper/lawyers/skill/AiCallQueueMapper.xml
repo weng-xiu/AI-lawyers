@@ -123,6 +123,23 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where group_id = #{groupId} and queue_status = '0' and enqueue_time &lt; #{beforeTime}
     </update>
 
+    <!-- 超时排队记录：排队中且入队时间超过技能组配置的 max_wait（秒） -->
+    <select id="selectTimeoutQueuing" resultMap="AiCallQueueResult">
+        <include refid="selectQueueVo"/>
+        where q.queue_status = '0'
+          and g.max_wait is not null and g.max_wait &gt; 0
+          and q.enqueue_time &lt; date_sub(now(), interval g.max_wait second)
+        order by q.enqueue_time asc
+    </select>
+
+    <!-- 幂等超时溢出：仅 queue_status='0' 时置为 '2' 并写出队信息，受影响行数 0 表示已被处理 -->
+    <update id="markTimeoutOverflow" parameterType="Long">
+        update ai_call_queue
+        set queue_status = '2', dequeue_time = sysdate(),
+            wait_duration = timestampdiff(second, enqueue_time, sysdate())
+        where queue_id = #{queueId} and queue_status = '0'
+    </update>
+
     <delete id="deleteAiCallQueueByQueueIds" parameterType="String">
         delete from ai_call_queue where queue_id in
         <foreach item="queueId" collection="array" open="(" separator="," close=")">#{queueId}</foreach>

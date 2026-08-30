@@ -31,6 +31,9 @@ public class DialRequest implements Serializable
     /** 关联外呼任务ID（批量外呼场景） */
     private Long taskId;
 
+    /** 关联外呼被叫号码ID（批量外呼场景，用于事件回调精确定位被叫） */
+    private Long calleeId;
+
     /** 指定线路编码（人工强制指定，为空则自动选路） */
     private String assignTrunkCode;
 
@@ -95,6 +98,10 @@ public class DialRequest implements Serializable
     public Long getTaskId() { return taskId; }
 
     public void setTaskId(Long taskId) { this.taskId = taskId; }
+
+    public Long getCalleeId() { return calleeId; }
+
+    public void setCalleeId(Long calleeId) { this.calleeId = calleeId; }
 
     public String getAssignTrunkCode() { return assignTrunkCode; }
 

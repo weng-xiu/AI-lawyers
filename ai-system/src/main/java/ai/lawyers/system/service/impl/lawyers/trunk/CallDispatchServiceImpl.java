@@ -464,6 +464,7 @@ public class CallDispatchServiceImpl implements ICallDispatchService
         dialLog.setCallUuid("PENDING-" + System.nanoTime() + "-" + trunk.getTrunkId());
         dialLog.setRecordId(request.getRecordId());
         dialLog.setTaskId(request.getTaskId());
+        dialLog.setCalleeId(request.getCalleeId());
         dialLog.setAgentId(request.getAgentId());
         dialLog.setCallerNumber(NumberTransformUtils.resolveCaller(request.getCallerNumber(), trunk));
         dialLog.setCalleeNumber(NumberTransformUtils.normalize(request.getCalleeNumber()));

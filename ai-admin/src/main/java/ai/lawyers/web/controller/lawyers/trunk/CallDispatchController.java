@@ -2,8 +2,12 @@ package ai.lawyers.web.controller.lawyers.trunk;
 
 import java.util.List;
 import java.util.Map;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -18,6 +22,7 @@ import ai.lawyers.common.core.page.TableDataInfo;
 import ai.lawyers.common.enums.BusinessType;
 import ai.lawyers.common.utils.SecurityUtils;
 import ai.lawyers.common.utils.poi.ExcelUtil;
+import ai.lawyers.common.utils.sign.CallbackSignUtils;
 import ai.lawyers.system.domain.lawyers.trunk.AiCallDialLog;
 import ai.lawyers.system.domain.lawyers.trunk.DialRequest;
 import ai.lawyers.system.domain.lawyers.trunk.DialResult;
@@ -33,11 +38,20 @@ import ai.lawyers.system.service.lawyers.trunk.ICallDispatchService;
 @RequestMapping("/lawyers/call")
 public class CallDispatchController extends BaseController
 {
+    private static final Logger log = LoggerFactory.getLogger(CallDispatchController.class);
+
     @Autowired
     private ICallDispatchService callDispatchService;
 
     @Autowired
     private AiCallDialLogMapper dialLogMapper;
+
+    /** S7：回调签名开关与密钥（生产环境必须开启并注入强密钥） */
+    @Value("${call.callback.sign-enabled:false}")
+    private boolean callbackSignEnabled;
+
+    @Value("${call.callback.sign-secret:}")
+    private String callbackSignSecret;
 
     /**
      * 发起外呼（自动识别运营商并选路，线路满载时进入排队）
@@ -100,13 +114,25 @@ public class CallDispatchController extends BaseController
      */
     @Anonymous
     @PostMapping("/event")
-    public AjaxResult event(@RequestBody Map<String, Object> param)
+    public AjaxResult event(@RequestBody Map<String, Object> param, HttpServletRequest request)
     {
         Object uuid = param.get("callUuid");
         Object event = param.get("event");
         if (uuid == null || event == null)
         {
             return AjaxResult.error("callUuid 与 event 不能为空");
+        }
+        // S7：生产开启签名校验后，网关必须携带 X-Callback-Timestamp / X-Callback-Sign
+        if (callbackSignEnabled)
+        {
+            String timestamp = request.getHeader("X-Callback-Timestamp");
+            String signature = request.getHeader("X-Callback-Sign");
+            String content = uuid.toString() + "|" + event.toString();
+            if (!CallbackSignUtils.verify(callbackSignSecret, content, timestamp, signature))
+            {
+                log.warn("网关事件回调签名校验失败 uuid={} ip={}", uuid, request.getRemoteAddr());
+                return AjaxResult.error(403, "回调签名校验失败");
+            }
         }
         callDispatchService.onCallEvent(uuid.toString(), event.toString(), param);
         return success();

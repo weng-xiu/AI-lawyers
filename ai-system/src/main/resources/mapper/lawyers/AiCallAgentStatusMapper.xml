@@ -145,6 +145,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where agent_id = #{agentId}
     </update>
 
+    <!-- 原子抢占空闲坐席：仅 call_status='0'（空闲）时才置为通话中，并发下影响行数 0 即已被抢占 -->
+    <update id="occupyAgentIfFree" parameterType="Long">
+        update ai_call_agent_status
+        set call_status = '1', update_time = sysdate()
+        where agent_id = #{agentId} and call_status = '0'
+    </update>
+
     <update id="clearCurrentCall" parameterType="Long">
         update ai_call_agent_status
         set current_call_id = null,

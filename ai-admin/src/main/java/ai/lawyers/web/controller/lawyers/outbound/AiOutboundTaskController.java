@@ -2,9 +2,13 @@ package ai.lawyers.web.controller.lawyers.outbound;
 
 import java.util.Map;
 import java.util.List;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -20,6 +24,7 @@ import ai.lawyers.common.core.domain.AjaxResult;
 import ai.lawyers.common.core.page.TableDataInfo;
 import ai.lawyers.common.enums.BusinessType;
 import ai.lawyers.common.utils.poi.ExcelUtil;
+import ai.lawyers.common.utils.sign.CallbackSignUtils;
 import ai.lawyers.system.domain.lawyers.outbound.AiOutboundTask;
 import ai.lawyers.system.service.lawyers.outbound.IAiOutboundTaskService;
 import ai.lawyers.system.service.lawyers.outbound.IOutboundExecutionService;
@@ -28,11 +33,20 @@ import ai.lawyers.system.service.lawyers.outbound.IOutboundExecutionService;
 @RequestMapping("/lawyers/outbound/task")
 public class AiOutboundTaskController extends BaseController
 {
+    private static final Logger log = LoggerFactory.getLogger(AiOutboundTaskController.class);
+
     @Autowired
     private IAiOutboundTaskService aiOutboundTaskService;
 
     @Autowired
     private IOutboundExecutionService outboundExecutionService;
+
+    /** S7：回调签名开关与密钥（生产环境必须开启并注入强密钥） */
+    @Value("${call.callback.sign-enabled:false}")
+    private boolean callbackSignEnabled;
+
+    @Value("${call.callback.sign-secret:}")
+    private String callbackSignSecret;
 
     @PreAuthorize("@ss.hasPermi('lawyers:outbound:task:list')")
     @GetMapping("/list")
@@ -138,13 +152,25 @@ public class AiOutboundTaskController extends BaseController
      */
     @Anonymous
     @PostMapping("/event")
-    public AjaxResult event(@RequestBody Map<String, Object> param)
+    public AjaxResult event(@RequestBody Map<String, Object> param, HttpServletRequest request)
     {
         Object uuid = param.get("callUuid");
         Object event = param.get("event");
         if (uuid == null || event == null)
         {
             return AjaxResult.error("callUuid 与 event 不能为空");
+        }
+        // S7：生产开启签名校验后，网关必须携带 X-Callback-Timestamp / X-Callback-Sign
+        if (callbackSignEnabled)
+        {
+            String timestamp = request.getHeader("X-Callback-Timestamp");
+            String signature = request.getHeader("X-Callback-Sign");
+            String content = uuid.toString() + "|" + event.toString();
+            if (!CallbackSignUtils.verify(callbackSignSecret, content, timestamp, signature))
+            {
+                log.warn("外呼事件回调签名校验失败 uuid={} ip={}", uuid, request.getRemoteAddr());
+                return AjaxResult.error(403, "回调签名校验失败");
+            }
         }
         outboundExecutionService.onCallEvent(uuid.toString(), event.toString(), param);
         return success();

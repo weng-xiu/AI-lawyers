@@ -31,6 +31,9 @@ public class AiCallDialLog extends BaseEntity
     /** 关联外呼任务ID */
     private Long taskId;
 
+    /** 关联外呼被叫号码ID（用于事件回调精确定位被叫） */
+    private Long calleeId;
+
     /** 发起坐席ID */
     private Long agentId;
 
@@ -157,6 +160,10 @@ public class AiCallDialLog extends BaseEntity
     public void setTaskId(Long taskId) { this.taskId = taskId; }
 
     public Long getTaskId() { return taskId; }
+
+    public void setCalleeId(Long calleeId) { this.calleeId = calleeId; }
+
+    public Long getCalleeId() { return calleeId; }
 
     public void setAgentId(Long agentId) { this.agentId = agentId; }
 

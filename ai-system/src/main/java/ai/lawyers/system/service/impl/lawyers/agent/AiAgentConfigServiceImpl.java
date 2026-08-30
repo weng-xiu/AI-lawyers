@@ -3,6 +3,7 @@ package ai.lawyers.system.service.impl.lawyers.agent;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import ai.lawyers.common.utils.sign.SecretCryptoUtils;
 import ai.lawyers.system.domain.lawyers.agent.AiAgentConfig;
 import ai.lawyers.system.mapper.lawyers.agent.AiAgentConfigMapper;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
@@ -43,12 +44,23 @@ public class AiAgentConfigServiceImpl implements IAiAgentConfigService
     @Override
     public int insertAiAgentConfig(AiAgentConfig aiAgentConfig)
     {
+        // S6：apiKey 加密落库
+        aiAgentConfig.setApiKey(SecretCryptoUtils.encrypt(aiAgentConfig.getApiKey()));
         return aiAgentConfigMapper.insertAiAgentConfig(aiAgentConfig);
     }
 
     @Override
     public int updateAiAgentConfig(AiAgentConfig aiAgentConfig)
     {
+        // S6：回显占位符 ****** 表示未修改，置空由动态 SQL 跳过；否则加密新值
+        if (SecretCryptoUtils.isMaskPlaceholder(aiAgentConfig.getApiKey()))
+        {
+            aiAgentConfig.setApiKey(null);
+        }
+        else
+        {
+            aiAgentConfig.setApiKey(SecretCryptoUtils.encrypt(aiAgentConfig.getApiKey()));
+        }
         return aiAgentConfigMapper.updateAiAgentConfig(aiAgentConfig);
     }
 

@@ -16,6 +16,7 @@ import ai.lawyers.common.core.controller.BaseController;
 import ai.lawyers.common.core.domain.AjaxResult;
 import ai.lawyers.common.core.page.TableDataInfo;
 import ai.lawyers.common.enums.BusinessType;
+import ai.lawyers.common.utils.sign.SecretCryptoUtils;
 import ai.lawyers.system.domain.lawyers.sms.AiSmsConfig;
 import ai.lawyers.system.mapper.lawyers.sms.AiSmsConfigMapper;
 
@@ -36,14 +37,19 @@ public class AiSmsConfigController extends BaseController
     public TableDataInfo list(AiSmsConfig query)
     {
         startPage();
-        return getDataTable(aiSmsConfigMapper.selectAiSmsConfigList(query));
+        List<AiSmsConfig> list = aiSmsConfigMapper.selectAiSmsConfigList(query);
+        // S6：密钥回显脱敏
+        list.forEach(this::maskSecrets);
+        return getDataTable(list);
     }
 
     @PreAuthorize("@ss.hasPermi('lawyers:smsConfig:view')")
     @GetMapping("/{configId}")
     public AjaxResult getInfo(@PathVariable Long configId)
     {
-        return success(aiSmsConfigMapper.selectAiSmsConfigByConfigId(configId));
+        AiSmsConfig config = aiSmsConfigMapper.selectAiSmsConfigByConfigId(configId);
+        maskSecrets(config);
+        return success(config);
     }
 
     @Log(title = "短信通道", businessType = BusinessType.INSERT)
@@ -51,6 +57,8 @@ public class AiSmsConfigController extends BaseController
     public AjaxResult add(@RequestBody AiSmsConfig config)
     {
         config.setCreateBy(getUsername());
+        // S6：密钥加密落库
+        config.setAccessKeySecret(SecretCryptoUtils.encrypt(config.getAccessKeySecret()));
         return toAjax(aiSmsConfigMapper.insertAiSmsConfig(config));
     }
 
@@ -59,7 +67,25 @@ public class AiSmsConfigController extends BaseController
     public AjaxResult edit(@RequestBody AiSmsConfig config)
     {
         config.setUpdateBy(getUsername());
+        // S6：回显占位符 ****** 表示未修改，置空由 XML 动态 SQL 跳过更新；否则加密新值
+        if (SecretCryptoUtils.isMaskPlaceholder(config.getAccessKeySecret()))
+        {
+            config.setAccessKeySecret(null);
+        }
+        else
+        {
+            config.setAccessKeySecret(SecretCryptoUtils.encrypt(config.getAccessKeySecret()));
+        }
         return toAjax(aiSmsConfigMapper.updateAiSmsConfig(config));
+    }
+
+    /** S6：accessKeySecret 脱敏回显（accessKeyId 为账号标识不脱敏） */
+    private void maskSecrets(AiSmsConfig config)
+    {
+        if (config != null)
+        {
+            config.setAccessKeySecret(SecretCryptoUtils.mask(config.getAccessKeySecret()));
+        }
     }
 
     @Log(title = "短信通道", businessType = BusinessType.DELETE)
@@ -78,6 +104,8 @@ public class AiSmsConfigController extends BaseController
         AiSmsConfig query = new AiSmsConfig();
         query.setStatus("1");
         List<AiSmsConfig> list = aiSmsConfigMapper.selectAiSmsConfigList(query);
+        // S6：下拉选项不需要密钥，脱敏
+        list.forEach(this::maskSecrets);
         return success(list);
     }
 }

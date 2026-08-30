@@ -9,6 +9,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="callUuid"       column="call_uuid"       />
         <result property="recordId"       column="record_id"       />
         <result property="taskId"         column="task_id"         />
+        <result property="calleeId"       column="callee_id"       />
         <result property="agentId"        column="agent_id"        />
         <result property="callerNumber"   column="caller_number"   />
         <result property="calleeNumber"   column="callee_number"   />
@@ -49,7 +50,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectAiCallDialLogVo">
-        select log_id, call_uuid, record_id, task_id, agent_id, caller_number, callee_number,
+        select log_id, call_uuid, record_id, task_id, callee_id, agent_id, caller_number, callee_number,
                callee_carrier, callee_province, callee_city, trunk_id, trunk_code, trunk_carrier,
                line_type, route_strategy, failover_count, failover_trunks, queue_wait_ms,
                dial_status, hangup_cause, sip_code, fail_reason,
@@ -101,6 +102,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="callUuid != null">call_uuid,</if>
             <if test="recordId != null">record_id,</if>
             <if test="taskId != null">task_id,</if>
+            <if test="calleeId != null">callee_id,</if>
             <if test="agentId != null">agent_id,</if>
             <if test="callerNumber != null">caller_number,</if>
             <if test="calleeNumber != null">callee_number,</if>
@@ -141,6 +143,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="callUuid != null">#{callUuid},</if>
             <if test="recordId != null">#{recordId},</if>
             <if test="taskId != null">#{taskId},</if>
+            <if test="calleeId != null">#{calleeId},</if>
             <if test="agentId != null">#{agentId},</if>
             <if test="callerNumber != null">#{callerNumber},</if>
             <if test="calleeNumber != null">#{calleeNumber},</if>
@@ -208,6 +211,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="rtt != null">rtt = #{rtt},</if>
             <if test="recordFile != null">record_file = #{recordFile},</if>
             <if test="recordId != null">record_id = #{recordId},</if>
+            <if test="calleeId != null">callee_id = #{calleeId},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="remark != null">remark = #{remark},</if>
             update_time = sysdate()
