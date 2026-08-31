@@ -38,4 +38,14 @@ public interface DashboardMapper
 
     /** 满意度汇总 */
     Map<String, Object> selectSatisfactionSummary(@Param("beginTime") Date beginTime, @Param("endTime") Date endTime);
+
+    /**
+     * T4-3 SLA 汇总（基于 ai_call_queue）：
+     * 分配总量 / X 秒内接听量 / 放弃量 / 平均等待 / 平均振铃。
+     *
+     * @param thresholdSeconds 服务水平阈值秒数（技能组 service_level_threshold，默认 20）
+     */
+    Map<String, Object> selectSlaSummary(@Param("beginTime") Date beginTime,
+                                         @Param("endTime") Date endTime,
+                                         @Param("thresholdSeconds") int thresholdSeconds);
 }

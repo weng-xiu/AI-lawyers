@@ -52,6 +52,10 @@ public class AiOutboundCallee extends BaseEntity
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date lastRetryTime;
 
+    /** T2-2 下次可重试时间（指数退避窗口，null 表示立即可呼叫） */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date nextRetryTime;
+
     @Excel(name = "失败原因")
     private String failReason;
 
@@ -99,6 +103,9 @@ public class AiOutboundCallee extends BaseEntity
 
     public void setLastRetryTime(Date lastRetryTime) { this.lastRetryTime = lastRetryTime; }
     public Date getLastRetryTime() { return lastRetryTime; }
+
+    public void setNextRetryTime(Date nextRetryTime) { this.nextRetryTime = nextRetryTime; }
+    public Date getNextRetryTime() { return nextRetryTime; }
 
     public void setFailReason(String failReason) { this.failReason = failReason; }
     public String getFailReason() { return failReason; }

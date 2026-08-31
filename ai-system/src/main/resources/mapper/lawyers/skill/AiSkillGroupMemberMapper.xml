@@ -64,6 +64,23 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where agent_id = #{agentId}
     </select>
 
+    <!-- T1-5 批量聚合候选坐席负载：最近通话开始时间 + 今日完成通话数，一条 SQL 替代逐坐席 N+1 查询 -->
+    <resultMap id="AgentLoadStatResult" type="ai.lawyers.system.domain.lawyers.skill.AgentLoadStat">
+        <result property="agentId"           column="agent_id"           />
+        <result property="lastCallStartTime" column="last_call_start_time" />
+        <result property="todayCompleted"    column="today_completed"    />
+    </resultMap>
+    <select id="selectLoadStatsByAgentIds" resultMap="AgentLoadStatResult">
+        select a.agent_id,
+               a.call_start_time as last_call_start_time,
+               (select count(1) from ai_call_record r
+                 where r.agent_id = a.agent_id and r.status = '1'
+                   and date(r.create_time) = curdate()) as today_completed
+        from ai_call_agent_status a
+        where a.agent_id in
+        <foreach item="id" collection="agentIds" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
     <insert id="insertMember" parameterType="AiSkillGroupMember" useGeneratedKeys="true" keyProperty="id">
         insert into ai_skill_group_member
         <trim prefix="(" suffix=")" suffixOverrides=",">

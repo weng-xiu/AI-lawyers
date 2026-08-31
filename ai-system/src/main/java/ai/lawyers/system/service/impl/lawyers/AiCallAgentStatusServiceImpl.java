@@ -16,6 +16,7 @@ import ai.lawyers.system.service.lawyers.IAiAiCallSessionService;
 import ai.lawyers.system.service.lawyers.IAiCallAgentStatusService;
 import ai.lawyers.system.service.lawyers.IAiCallRecordService;
 import ai.lawyers.system.service.lawyers.CallEventPublisher;
+import ai.lawyers.system.service.lawyers.queue.StatusLogDispatcher;
 import ai.lawyers.system.service.lawyers.trunk.ICallDispatchService;
 
 @Service
@@ -47,6 +48,30 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
 
     @Autowired(required = false)
     private CallEventPublisher callEventPublisher;
+
+    /** T4-3 坐席状态流水（异步落库，Stream 不可用时内部同步降级） */
+    @Autowired(required = false)
+    private StatusLogDispatcher statusLogDispatcher;
+
+    /** T4-3 记录一条状态变更流水（失败不影响主流程） */
+    private void logStatus(String fromStatus, String fromCallStatus,
+                           AiCallAgentStatus after, String eventType, Long recordId)
+    {
+        if (statusLogDispatcher == null || after == null)
+        {
+            return;
+        }
+        try
+        {
+            statusLogDispatcher.log(after.getAgentId(), after.getUserId(), eventType,
+                    fromStatus, after.getStatus(), fromCallStatus, after.getCallStatus(),
+                    recordId, new Date());
+        }
+        catch (Exception e)
+        {
+            log.warn("记录坐席状态流水失败 agentId={} event={}", after.getAgentId(), eventType);
+        }
+    }
 
     /** 推送坐席状态变更（推送失败不影响业务） */
     private void publishStatus(AiCallAgentStatus agent, String type)
@@ -128,6 +153,8 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
             {
                 return -1;
             }
+            String beforeStatus = agent.getStatus();
+            String beforeCall = agent.getCallStatus();
             agent.setStatus("1");
             agent.setLoginTime(new Date());
             agent.setLogoutTime(null);
@@ -139,7 +166,11 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
             }
             aiCallAgentStatusMapper.clearCurrentCall(agent.getAgentId());
             int rc = aiCallAgentStatusMapper.updateAiCallAgentStatus(agent) > 0 ? 1 : 0;
-            if (rc > 0) publishStatus(agent, "AGENT_LOGIN");
+            if (rc > 0)
+            {
+                publishStatus(agent, "AGENT_LOGIN");
+                logStatus(beforeStatus, beforeCall, agent, "LOGIN", null);
+            }
             return rc;
         }
         return 0;
@@ -158,12 +189,18 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
             agent = aiCallAgentStatusMapper.selectAiCallAgentStatusByUserId(userId);
         }
         if (agent != null) {
+            String beforeStatus = agent.getStatus();
+            String beforeCall = agent.getCallStatus();
             agent.setStatus("0");
             agent.setLogoutTime(new Date());
             agent.setCallStatus("0");
             aiCallAgentStatusMapper.clearCurrentCall(agent.getAgentId());
             int rc = aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
-            if (rc > 0) publishStatus(agent, "AGENT_LOGOUT");
+            if (rc > 0)
+            {
+                publishStatus(agent, "AGENT_LOGOUT");
+                logStatus(beforeStatus, beforeCall, agent, "LOGOUT", null);
+            }
             return rc;
         }
         return 0;
@@ -174,6 +211,8 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
     {
         AiCallAgentStatus agent = aiCallAgentStatusMapper.selectAiCallAgentStatusByAgentId(agentId);
         if (agent != null) {
+            String beforeStatus = agent.getStatus();
+            String beforeCall = agent.getCallStatus();
             agent.setStatus(status);
             if ("0".equals(status)) {
                 agent.setLogoutTime(new Date());
@@ -184,7 +223,11 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
                 agent.setLogoutTime(null);
             }
             int rc = aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
-            if (rc > 0) publishStatus(agent, "AGENT_STATUS");
+            if (rc > 0)
+            {
+                publishStatus(agent, "AGENT_STATUS");
+                logStatus(beforeStatus, beforeCall, agent, "STATUS", null);
+            }
             return rc;
         }
         return 0;
@@ -197,6 +240,8 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
         if (agent == null) {
             return null;
         }
+        String beforeStatus = agent.getStatus();
+        String beforeCall = agent.getCallStatus();
         // 创建外呼记录
         AiCallRecord record = new AiCallRecord();
         record.setCallerNumber(phone);
@@ -214,6 +259,7 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
         agent.setStatus("2");
         aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
         publishStatus(agent, "CALL_START");
+        logStatus(beforeStatus, beforeCall, agent, "MAKE_CALL", record.getRecordId());
 
         // 解耦触发：人工接听后异步启动 AI 辅助会话（独立链路，不影响人工状态机）
         triggerAiAssistAsync(record.getRecordId(), agentId, phone, agent.getAgentName());
@@ -244,26 +290,32 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
             if (result == null || !result.isSuccess())
             {
                 // 无可用线路或下发失败：回滚人工链路状态机，避免座席"假忙"
-                agent.setCallStatus("0");
-                agent.setCurrentCallId(null);
-                agent.setCurrentCallPhone(null);
-                agent.setCallStartTime(null);
-                agent.setStatus("1");
-                aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
-                log.warn("[makeCall] 运营商线路下发失败，已回滚座席状态 recordId={} reason={}",
-                        record.getRecordId(), result == null ? "null" : result.getMessage());
+                rollbackAfterDispatchFail(agent, record,
+                        result == null ? "null" : result.getMessage());
             }
         }
         catch (Exception e)
         {
             log.error("[makeCall] 运营商线路下发异常 recordId={}", record.getRecordId(), e);
-            agent.setCallStatus("0");
-            agent.setCurrentCallId(null);
-            agent.setCurrentCallPhone(null);
-            agent.setCallStartTime(null);
-            agent.setStatus("1");
-            aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+            rollbackAfterDispatchFail(agent, record, e.getMessage());
         }
+    }
+
+    /** 外呼下发失败/异常：回滚座席状态机并记录回滚流水 */
+    private void rollbackAfterDispatchFail(AiCallAgentStatus agent, AiCallRecord record, String reason)
+    {
+        String beforeStatus = agent.getStatus();
+        String beforeCall = agent.getCallStatus();
+        agent.setCallStatus("0");
+        agent.setCurrentCallId(null);
+        agent.setCurrentCallPhone(null);
+        agent.setCallStartTime(null);
+        agent.setStatus("1");
+        aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+        logStatus(beforeStatus, beforeCall, agent, "DISPATCH_FAIL_ROLLBACK",
+                record != null ? record.getRecordId() : null);
+        log.warn("[makeCall] 运营商线路下发失败，已回滚座席状态 recordId={} reason={}",
+                record != null ? record.getRecordId() : null, reason);
     }
 
     /**
@@ -291,8 +343,12 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
         if (agent == null || !"1".equals(agent.getCallStatus())) {
             return 0;
         }
+        String beforeStatus = agent.getStatus();
+        String beforeCall = agent.getCallStatus();
         agent.setCallStatus("2");
-        return aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+        int rc = aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+        if (rc > 0) logStatus(beforeStatus, beforeCall, agent, "HOLD", agent.getCurrentCallId());
+        return rc;
     }
 
     @Override
@@ -302,8 +358,12 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
         if (agent == null || !"2".equals(agent.getCallStatus())) {
             return 0;
         }
+        String beforeStatus = agent.getStatus();
+        String beforeCall = agent.getCallStatus();
         agent.setCallStatus("1");
-        return aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+        int rc = aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+        if (rc > 0) logStatus(beforeStatus, beforeCall, agent, "RESUME", agent.getCurrentCallId());
+        return rc;
     }
 
     @Override
@@ -313,6 +373,8 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
         if (agent == null || agent.getCurrentCallId() == null) {
             return 0;
         }
+        String beforeStatus = agent.getStatus();
+        String beforeCall = agent.getCallStatus();
         // 更新当前通话记录状态为已转接
         AiCallRecord record = aiCallRecordService.selectAiCallRecordByRecordId(agent.getCurrentCallId());
         if (record != null) {
@@ -330,7 +392,9 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
             agent.setRemark("转接给座席[" + toAgentId + "]：" + remark);
         }
         aiCallAgentStatusMapper.clearCurrentCall(agentId);
-        return aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+        int rc = aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+        if (rc > 0) logStatus(beforeStatus, beforeCall, agent, "TRANSFER", agent.getCurrentCallId());
+        return rc;
     }
 
     @Override
@@ -340,9 +404,13 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
         if (agent == null || !"1".equals(agent.getCallStatus())) {
             return 0;
         }
+        String beforeStatus = agent.getStatus();
+        String beforeCall = agent.getCallStatus();
         agent.setCallStatus("3");
         agent.setRemark("咨询座席[" + toAgentId + "]");
-        return aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+        int rc = aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+        if (rc > 0) logStatus(beforeStatus, beforeCall, agent, "CONSULT", agent.getCurrentCallId());
+        return rc;
     }
 
     @Override
@@ -352,9 +420,13 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
         if (agent == null || !"1".equals(agent.getCallStatus())) {
             return 0;
         }
+        String beforeStatus = agent.getStatus();
+        String beforeCall = agent.getCallStatus();
         agent.setCallStatus("4");
         agent.setRemark("三方通话加入座席[" + toAgentId + "]");
-        return aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+        int rc = aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+        if (rc > 0) logStatus(beforeStatus, beforeCall, agent, "THREE_WAY", agent.getCurrentCallId());
+        return rc;
     }
 
     @Override
@@ -364,9 +436,13 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
         if (agent == null) {
             return 0;
         }
+        String beforeStatus = agent.getStatus();
+        String beforeCall = agent.getCallStatus();
         agent.setCallStatus("5");
         agent.setStatus("2");
-        return aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+        int rc = aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+        if (rc > 0) logStatus(beforeStatus, beforeCall, agent, "AFTER_WORK", agent.getCurrentCallId());
+        return rc;
     }
 
     @Override
@@ -376,6 +452,8 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
         if (agent == null) {
             return 0;
         }
+        String beforeStatus = agent.getStatus();
+        String beforeCall = agent.getCallStatus();
         // 结束当前通话记录
         if (agent.getCurrentCallId() != null) {
             AiCallRecord record = aiCallRecordService.selectAiCallRecordByRecordId(agent.getCurrentCallId());
@@ -388,11 +466,16 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
                 aiCallRecordService.updateAiCallRecord(record);
             }
         }
+        Long recordId = agent.getCurrentCallId();
         agent.setCallStatus("0");
         agent.setStatus("1");
         aiCallAgentStatusMapper.clearCurrentCall(agentId);
         int rc = aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
-        if (rc > 0) publishStatus(agent, "CALL_END");
+        if (rc > 0)
+        {
+            publishStatus(agent, "CALL_END");
+            logStatus(beforeStatus, beforeCall, agent, "HANGUP", recordId);
+        }
         return rc;
     }
 
@@ -403,6 +486,8 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
         if (agent == null || agent.getCurrentCallId() == null) {
             return 0;
         }
+        String beforeStatus = agent.getStatus();
+        String beforeCall = agent.getCallStatus();
         // 机器人接管：在当前通话记录备注，并释放座席
         AiCallRecord record = aiCallRecordService.selectAiCallRecordByRecordId(agent.getCurrentCallId());
         if (record != null) {
@@ -410,10 +495,13 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
             record.setRemark(oldRemark + "；座席[" + agentId + "]已转交机器人接管");
             aiCallRecordService.updateAiCallRecord(record);
         }
+        Long recordId = agent.getCurrentCallId();
         agent.setCallStatus("0");
         agent.setStatus("1");
         aiCallAgentStatusMapper.clearCurrentCall(agentId);
-        return aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+        int rc = aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+        if (rc > 0) logStatus(beforeStatus, beforeCall, agent, "ROBOT_TAKEOVER", recordId);
+        return rc;
     }
 
     @Override
@@ -423,6 +511,8 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
         if (agent == null || agent.getCurrentCallId() == null) {
             return 0;
         }
+        String beforeStatus = agent.getStatus();
+        String beforeCall = agent.getCallStatus();
         AiCallRecord record = aiCallRecordService.selectAiCallRecordByRecordId(agent.getCurrentCallId());
         if (record != null) {
             record.setStatus("2");
@@ -434,10 +524,13 @@ public class AiCallAgentStatusServiceImpl implements IAiCallAgentStatusService
             record.setRemark(oldRemark + "；转IVR节点[" + ivrNodeId + "]");
             aiCallRecordService.updateAiCallRecord(record);
         }
+        Long recordId = agent.getCurrentCallId();
         agent.setCallStatus("0");
         agent.setStatus("1");
         aiCallAgentStatusMapper.clearCurrentCall(agentId);
-        return aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+        int rc = aiCallAgentStatusMapper.updateAiCallAgentStatus(agent);
+        if (rc > 0) logStatus(beforeStatus, beforeCall, agent, "IVR_TRANSFER", recordId);
+        return rc;
     }
 
     @Override

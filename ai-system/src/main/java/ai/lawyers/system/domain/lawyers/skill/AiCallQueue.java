@@ -57,6 +57,17 @@ public class AiCallQueue extends BaseEntity
     /** 排队优先级 */
     private Integer priority;
 
+    /** 应答时间（坐席接听时刻，T4-3 SLA：X 秒内接听占比） */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date answerTime;
+
+    /** 振铃时长（秒，分配到接听的振铃耗时） */
+    private Integer ringDuration;
+
+    /** 放弃时间（来电者放弃排队/踢除时刻，配合 queue_status=3） */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date abandonTime;
+
     /** 技能组名称（关联查询） */
     @Excel(name = "技能组")
     private String groupName;
@@ -100,6 +111,15 @@ public class AiCallQueue extends BaseEntity
 
     public Integer getPriority() { return priority; }
     public void setPriority(Integer priority) { this.priority = priority; }
+
+    public Date getAnswerTime() { return answerTime; }
+    public void setAnswerTime(Date answerTime) { this.answerTime = answerTime; }
+
+    public Integer getRingDuration() { return ringDuration; }
+    public void setRingDuration(Integer ringDuration) { this.ringDuration = ringDuration; }
+
+    public Date getAbandonTime() { return abandonTime; }
+    public void setAbandonTime(Date abandonTime) { this.abandonTime = abandonTime; }
 
     public String getGroupName() { return groupName; }
     public void setGroupName(String groupName) { this.groupName = groupName; }

@@ -2,8 +2,8 @@
 <configuration>
     <!-- 日志存放路径 -->
 	<property name="log.path" value="${LOG_PATH:-/home/ruoyi/logs}" />
-    <!-- 日志输出格式 -->
-	<property name="log.pattern" value="%d{HH:mm:ss.SSS} [%thread] %-5level %logger{20} - [%method,%line] - %msg%n" />
+    <!-- 日志输出格式。T5-1：%X{traceId} 输出 MDC 中的全链路追踪ID，串联「来电—IVR—AI—坐席—工单」 -->
+	<property name="log.pattern" value="%d{HH:mm:ss.SSS} [%thread] [traceId:%X{traceId:-}] %-5level %logger{20} - [%method,%line] - %msg%n" />
 
 	<!-- 控制台输出 -->
 	<appender name="console" class="ch.qos.logback.core.ConsoleAppender">

@@ -1,12 +1,6 @@
 package ai.lawyers.system.service.impl.lawyers;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,11 +21,20 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import okhttp3.ConnectionPool;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
+
 import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.common.utils.sign.SecretCryptoUtils;
 import ai.lawyers.system.domain.lawyers.AiModelConfig;
 import ai.lawyers.system.mapper.lawyers.AiModelConfigMapper;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
+import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
 
 /**
  * AI模型参数配置Service业务层处理。
@@ -58,6 +61,10 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
     @Autowired
     private AiModelConfigMapper aiModelConfigMapper;
 
+    /** T5-1：AI 调用指标上报（未引入 micrometer 时内部静默） */
+    @Autowired(required = false)
+    private HotlineMetrics metrics;
+
     /**
      * R1 舱壁：限制在途大模型调用并发数，防止慢响应耗尽 Tomcat 线程后雪崩传导到全系统。
      * 默认 32，可经 ai.model.max-inflight 调整（应与 DB/Redis 连接池、模型侧限流匹配）。
@@ -71,12 +78,58 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
 
     private Semaphore inflightSemaphore;
 
+    /** T2-1/R1 连接池：最大空闲连接数（与在途舱壁匹配，默认 32） */
+    @Value("${ai.model.http.maxIdleConnections:32}")
+    private int maxIdleConnections;
+
+    /** T2-1/R1 连接池中空闲连接保活时长（秒），超时关闭回收 */
+    @Value("${ai.model.http.keepAliveSeconds:300}")
+    private long keepAliveSeconds;
+
+    /** T2-1/R1 建立 TCP/TLS 连接超时（毫秒），连接不可达快速失败 */
+    @Value("${ai.model.http.connectTimeoutMs:10000}")
+    private int connectTimeoutMs;
+
+    /**
+     * T3 RAG：embedding 专用模型配置ID（在 ai_model_config 中配置一条指向 /v1/embeddings
+     * 兼容端点的记录，如本地/内网部署的 bge-small-zh）。配置后优先使用。
+     */
+    @Value("${ai.rag.embedding-config-id:0}")
+    private Long embeddingConfigId;
+
+    /** T3 RAG：embedding 模型名（configId 未配置时，用默认模型的 apiUrl/apiKey + 此模型名调用） */
+    @Value("${ai.rag.embedding-model:}")
+    private String embeddingModel;
+
+    /** T2-1/R1 共享 OkHttp 客户端（连接池单例），所有模型调用复用，避免每次新建 TCP/TLS 握手 */
+    private OkHttpClient sharedHttpClient;
+
+    private static final MediaType JSON_MEDIA_TYPE =
+            MediaType.parse("application/json; charset=utf-8");
+
     @PostConstruct
     public void initBulkhead()
     {
         int permits = maxInflight > 0 ? maxInflight : 32;
         inflightSemaphore = new Semaphore(permits, true);
-        log.info("大模型调用舱壁初始化 maxInflight={} acquireTimeoutMs={}", permits, acquireTimeoutMs);
+        // T2-1/R1：连接池单例 + 共享客户端。读超时按各模型 config.timeout 用 newBuilder() 派生，
+        // 连接池/调度资源仍共享，兼顾"不同模型不同生成超时"与"连接复用"。
+        ConnectionPool pool = new ConnectionPool(
+                maxIdleConnections > 0 ? maxIdleConnections : 32,
+                keepAliveSeconds > 0 ? keepAliveSeconds : 300L, TimeUnit.SECONDS);
+        sharedHttpClient = new OkHttpClient.Builder()
+                .connectionPool(pool)
+                .connectTimeout(connectTimeoutMs, TimeUnit.MILLISECONDS)
+                .retryOnConnectionFailure(true)
+                .build();
+        // T5-1：AI 在途并发 gauge（= 已发放且未归还的许可数）
+        if (metrics != null)
+        {
+            metrics.gaugeAiInflight(inflightSemaphore,
+                    s -> (double) (permits - ((Semaphore) s).availablePermits()));
+        }
+        log.info("大模型调用舱壁初始化 maxInflight={} acquireTimeoutMs={}；OkHttp连接池 maxIdle={} keepAlive={}s",
+                permits, acquireTimeoutMs, maxIdleConnections, keepAliveSeconds);
     }
 
     /** 携带 HTTP 状态码的模型调用异常，用于判断是否可重试 */
@@ -231,6 +284,156 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
     }
 
     /**
+     * T3 RAG：批量生成文本向量（OpenAI 兼容 /embeddings）。
+     * 模型选择：优先 embeddingConfigId 指定的专用配置（推荐，endpoint 指向 bge 等向量化服务）；
+     * 否则用默认对话模型的 apiUrl/apiKey + embeddingModel 模型名（要求该平台同时提供 embeddings 端点）。
+     * 任一条件不满足或调用失败均抛异常，由 RAG 检索方降级到关键词路，不影响问答主流程。
+     */
+    @Override
+    public List<float[]> embedTexts(List<String> texts)
+    {
+        if (texts == null || texts.isEmpty())
+        {
+            return java.util.Collections.emptyList();
+        }
+        AiModelConfig rawConfig = resolveEmbeddingConfig();
+        if (rawConfig == null)
+        {
+            throw new IllegalStateException("未配置可用的 embedding 模型（请配置 ai.rag.embedding-config-id 或 ai.rag.embedding-model）");
+        }
+        // 复制对象后再解密 apiKey，避免明文密钥污染 MyBatis/调用方持有的原始对象
+        AiModelConfig config = cloneConfig(rawConfig);
+        if (StringUtils.isNotEmpty(rawConfig.getApiKey()))
+        {
+            config.setApiKey(SecretCryptoUtils.decrypt(rawConfig.getApiKey()));
+        }
+        boolean acquired = false;
+        long start = System.currentTimeMillis();
+        try
+        {
+            acquired = inflightSemaphore.tryAcquire(acquireTimeoutMs, TimeUnit.MILLISECONDS);
+            if (!acquired)
+            {
+                // T5-1：舱壁拒绝（embedding）
+                if (metrics != null)
+                {
+                    metrics.incrementAi("embed", "reject");
+                }
+                throw new RuntimeException("embedding 服务繁忙（在途并发已达上限 " + maxInflight + "）");
+            }
+            List<float[]> vectors = callEmbeddings(config, texts);
+            // T5-1：embedding 成功 + 首响（调用耗时）
+            if (metrics != null)
+            {
+                metrics.incrementAi("embed", "success");
+                metrics.recordAiFirstResponse(System.currentTimeMillis() - start);
+            }
+            return vectors;
+        }
+        catch (Exception e)
+        {
+            // T5-1：舱壁拒绝已单独计 reject，此处不重复计 fail
+            if (metrics != null && acquired)
+            {
+                metrics.incrementAi("embed", "fail");
+            }
+            throw new RuntimeException("生成文本向量失败：" + e.getMessage(), e);
+        }
+        finally
+        {
+            if (acquired)
+            {
+                inflightSemaphore.release();
+            }
+        }
+    }
+
+    /** 浅拷贝配置对象，避免解密 apiKey 污染 MyBatis/缓存中的原始对象 */
+    private AiModelConfig cloneConfig(AiModelConfig src)
+    {
+        AiModelConfig c = new AiModelConfig();
+        c.setConfigId(src.getConfigId());
+        c.setConfigName(src.getConfigName());
+        c.setModelType(src.getModelType());
+        c.setModelName(src.getModelName());
+        c.setApiKey(src.getApiKey());
+        c.setApiUrl(src.getApiUrl());
+        c.setMaxTokens(src.getMaxTokens());
+        c.setTemperature(src.getTemperature());
+        c.setTopP(src.getTopP());
+        c.setFrequencyPenalty(src.getFrequencyPenalty());
+        c.setPresencePenalty(src.getPresencePenalty());
+        c.setTimeout(src.getTimeout());
+        c.setRetryCount(src.getRetryCount());
+        c.setStatus(src.getStatus());
+        c.setIsDefault(src.getIsDefault());
+        return c;
+    }
+
+    private AiModelConfig resolveEmbeddingConfig()
+    {
+        if (embeddingConfigId != null && embeddingConfigId > 0)
+        {
+            return aiModelConfigMapper.selectAiModelConfigByConfigId(embeddingConfigId);
+        }
+        if (StringUtils.isNotEmpty(embeddingModel))
+        {
+            AiModelConfig base = getDefaultAiModelConfig();
+            if (base != null)
+            {
+                AiModelConfig c = cloneConfig(base);
+                c.setModelName(embeddingModel);
+                return c;
+            }
+        }
+        return null;
+    }
+
+    /** 调用 OpenAI 兼容 POST {apiUrl}/embeddings，解析 data[].embedding */
+    private List<float[]> callEmbeddings(AiModelConfig config, List<String> texts) throws Exception
+    {
+        String endpoint = endpointOf(config, "/embeddings");
+        ObjectNode body = MAPPER.createObjectNode();
+        body.put("model", StringUtils.isNotEmpty(config.getModelName()) ? config.getModelName()
+                : (StringUtils.isNotEmpty(embeddingModel) ? embeddingModel : "bge-small-zh-v1.5"));
+        ArrayNode input = body.putArray("input");
+        for (String t : texts)
+        {
+            input.add(t == null ? "" : t);
+        }
+
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Content-Type", "application/json; charset=UTF-8");
+        if (StringUtils.isNotEmpty(config.getApiKey()))
+        {
+            headers.put("Authorization", "Bearer " + config.getApiKey());
+        }
+
+        JsonNode root = httpPost(endpoint, headers, MAPPER.writeValueAsString(body), config);
+        JsonNode data = root.path("data");
+        if (!data.isArray() || data.size() != texts.size())
+        {
+            throw new IllegalStateException("embedding 响应 data 数量与入参不一致");
+        }
+        List<float[]> vectors = new java.util.ArrayList<>(data.size());
+        for (JsonNode item : data)
+        {
+            JsonNode emb = item.path("embedding");
+            if (!emb.isArray() || emb.size() == 0)
+            {
+                throw new IllegalStateException("embedding 响应缺少 embedding 向量字段");
+            }
+            float[] vec = new float[emb.size()];
+            for (int i = 0; i < emb.size(); i++)
+            {
+                vec[i] = (float) emb.get(i).asDouble();
+            }
+            vectors.add(vec);
+        }
+        return vectors;
+    }
+
+    /**
      * 真实 HTTP 调用。失败按配置重试，最终抛出异常由上层兜底。
      */
     private String chat(AiModelConfig rawConfig, String systemPrompt, String userMessage, boolean jsonMode)
@@ -245,6 +448,8 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
         String modelType = normalizeModelType(config.getModelType());
         int attempts = Math.max(1, config.getRetryCount() == null ? 1 : config.getRetryCount() + 1);
         Exception lastError = null;
+        // T5-1：chat 首响计时（含重试等待，反映调用方真实等待）
+        long start = System.currentTimeMillis();
         for (int attempt = 1; attempt <= attempts; attempt++)
         {
             // R1 舱壁：获取在途许可，限制并发模型调用数；获取不到快速失败，避免 Tomcat 线程被慢调用占满
@@ -254,12 +459,24 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
                 acquired = inflightSemaphore.tryAcquire(acquireTimeoutMs, TimeUnit.MILLISECONDS);
                 if (!acquired)
                 {
+                    // T5-1：舱壁拒绝（chat）
+                    if (metrics != null)
+                    {
+                        metrics.incrementAi("chat", "reject");
+                    }
                     throw new RuntimeException("AI模型调用繁忙（在途并发已达上限 " + maxInflight
                             + "），请稍后再试");
                 }
-                return "Claude".equalsIgnoreCase(modelType)
+                String answer = "Claude".equalsIgnoreCase(modelType)
                         ? callClaude(config, systemPrompt, userMessage)
                         : callOpenAiCompatible(config, modelType, systemPrompt, userMessage, jsonMode);
+                // T5-1：chat 成功 + 首响耗时
+                if (metrics != null)
+                {
+                    metrics.incrementAi("chat", "success");
+                    metrics.recordAiFirstResponse(System.currentTimeMillis() - start);
+                }
+                return answer;
             }
             catch (Exception e)
             {
@@ -270,7 +487,17 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
                 // R2：仅对 429/5xx/网络超时等可重试错误重试；400/401/403 等立即失败，避免重试风暴
                 if (!retryable || attempt >= attempts)
                 {
+                    // T5-1：终态失败（舱壁拒绝已在抛出前计 reject，不重复计 fail）
+                    if (metrics != null && acquired)
+                    {
+                        metrics.incrementAi("chat", "fail");
+                    }
                     break;
+                }
+                // T5-1：可重试错误计 retry（重试率 = retry / success+fail）
+                if (metrics != null)
+                {
+                    metrics.incrementAi("chat", "retry");
                 }
                 sleepBeforeRetry(attempt);
             }
@@ -415,48 +642,40 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
         throw new IllegalStateException("Claude响应缺少content字段");
     }
 
+    /**
+     * T2-1/R1：基于 OkHttp 连接池的 POST。共享客户端复用 TCP/TLS 连接；
+     * 读超时按各模型 config.timeout 用 newBuilder() 派生（连接池/调度器仍共享）。
+     * 响应体必须读完并关闭，连接才会被回收复用。
+     */
     private JsonNode httpPost(String endpoint, Map<String, String> headers, String payload,
                               AiModelConfig config) throws Exception
     {
-        // R1：连接超时与读超时分开，连接超时短（快速发现不可达），读超时按模型生成耗时配置
         int readTimeoutSec = (config.getTimeout() == null || config.getTimeout() <= 0
                 ? 60 : config.getTimeout());
-        int connectTimeoutMs = 10 * 1000;
-        int readTimeoutMs = readTimeoutSec * 1000;
-        HttpURLConnection connection = null;
-        boolean reusable = false;
-        try
-        {
-            URL url = new URL(endpoint);
-            connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("POST");
-            connection.setConnectTimeout(connectTimeoutMs);
-            connection.setReadTimeout(readTimeoutMs);
-            connection.setDoOutput(true);
-            connection.setUseCaches(false);
-            // 复用底层 Keep-Alive 连接（HttpURLConnection 内置连接池），避免每次新建 TCP/TLS
-            connection.setRequestProperty("Connection", "Keep-Alive");
-            for (Map.Entry<String, String> entry : headers.entrySet())
-            {
-                connection.setRequestProperty(entry.getKey(), entry.getValue());
-            }
-            byte[] bytes = payload.getBytes(StandardCharsets.UTF_8);
-            try (OutputStream out = connection.getOutputStream())
-            {
-                out.write(bytes);
-                out.flush();
-            }
+        OkHttpClient client = sharedHttpClient.newBuilder()
+                .readTimeout(readTimeoutSec, TimeUnit.SECONDS)
+                .build();
 
-            int status = connection.getResponseCode();
-            String responseText = readBody(connection, status >= 200 && status < 300);
-            if (status >= 200 && status < 300)
+        Request.Builder builder = new Request.Builder()
+                .url(endpoint)
+                .post(RequestBody.create(JSON_MEDIA_TYPE, payload.getBytes(StandardCharsets.UTF_8)));
+        for (Map.Entry<String, String> entry : headers.entrySet())
+        {
+            builder.header(entry.getKey(), entry.getValue());
+        }
+
+        // try-with-resources 保证 Response/ResponseBody 关闭，连接归还连接池
+        try (Response response = client.newCall(builder.build()).execute())
+        {
+            ResponseBody body = response.body();
+            String responseText = body == null ? "" : body.string();
+            int status = response.code();
+            if (response.isSuccessful())
             {
                 if (StringUtils.isEmpty(responseText))
                 {
                     throw new ModelHttpException(status, "模型返回空响应");
                 }
-                // 响应体已完整读取，连接可安全放回 Keep-Alive 池复用
-                reusable = true;
                 return MAPPER.readTree(responseText);
             }
             String errorMsg = extractError(responseText);
@@ -464,30 +683,6 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
             throw new ModelHttpException(status,
                     "HTTP " + status + (StringUtils.isEmpty(errorMsg) ? "" : "：" + errorMsg));
         }
-        finally
-        {
-            // 成功且响应已读完时不 disconnect，交由 JDK Keep-Alive 缓存复用连接；失败则关闭
-            if (connection != null && !reusable)
-            {
-                connection.disconnect();
-            }
-        }
-    }
-
-    private String readBody(HttpURLConnection connection, boolean successStream) throws Exception
-    {
-        StringBuilder sb = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(
-                successStream ? connection.getInputStream() : connection.getErrorStream(),
-                StandardCharsets.UTF_8)))
-        {
-            String line;
-            while ((line = reader.readLine()) != null)
-            {
-                sb.append(line);
-            }
-        }
-        return sb.toString();
     }
 
     private String extractError(String responseText)

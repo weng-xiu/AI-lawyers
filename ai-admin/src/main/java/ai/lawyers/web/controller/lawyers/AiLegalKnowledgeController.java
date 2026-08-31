@@ -22,6 +22,7 @@ import ai.lawyers.common.enums.BusinessType;
 import ai.lawyers.common.utils.poi.ExcelUtil;
 import ai.lawyers.system.domain.lawyers.AiLegalKnowledge;
 import ai.lawyers.system.service.lawyers.IAiLegalKnowledgeService;
+import ai.lawyers.system.service.lawyers.rag.IRagIndexService;
 
 /**
  * 法律知识库Controller
@@ -34,6 +35,9 @@ public class AiLegalKnowledgeController extends BaseController
 {
     @Autowired
     private IAiLegalKnowledgeService aiLegalKnowledgeService;
+
+    @Autowired
+    private IRagIndexService ragIndexService;
 
     /**
      * 查询法律知识库列表
@@ -163,5 +167,30 @@ public class AiLegalKnowledgeController extends BaseController
         aiLegalKnowledge.setAuditBy(getUsername());
         aiLegalKnowledge.setAuditTime(new Date());
         return toAjax(aiLegalKnowledgeService.auditAiLegalKnowledge(aiLegalKnowledge));
+    }
+
+    /**
+     * T3 RAG：手动全量重建知识分块与向量索引（异步执行，立即返回）。
+     * 新增/修改/审核知识会自动增量重建，此接口用于初始化导入或 embedding 服务恢复后的补建。
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:knowledge:edit')")
+    @Log(title = "法律知识库-RAG重建索引", businessType = BusinessType.UPDATE)
+    @PostMapping("/rag/rebuild")
+    public AjaxResult rebuildRagIndex()
+    {
+        ragIndexService.rebuildAllAsync();
+        return success("RAG 索引重建任务已提交，正在后台执行");
+    }
+
+    /**
+     * T3 RAG：查询当前内存向量索引条目数（供运维确认向量化是否就绪）。
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:knowledge:list')")
+    @GetMapping("/rag/indexInfo")
+    public AjaxResult ragIndexInfo()
+    {
+        java.util.Map<String, Object> info = new java.util.HashMap<>();
+        info.put("vectorCount", ragIndexService.indexedVectorCount());
+        return success(info);
     }
 }

@@ -114,6 +114,22 @@ public class IvrEngineServiceImpl implements IIvrEngineService
     private static final int MAX_CHILD_DEPTH = 3;
     private static final String CHILD_DEPTH_KEY = "__childDepth";
 
+    /** T1-1 执行日志节流落库间隔（毫秒）：间隔内的节点只更新内存，到时或关键节点才落库 */
+    @org.springframework.beans.factory.annotation.Value("${ivr.log.flush-ms:1000}")
+    private long logFlushIntervalMs;
+
+    /** T1-2 单次流程总超时（毫秒），超时走兜底挂断，防止 AI 节点慢响应拖死呼叫线程 */
+    @org.springframework.beans.factory.annotation.Value("${ivr.flow.timeout-ms:180000}")
+    private long flowTimeoutMs;
+
+    /** 单线程日志落库执行器：把每步全量序列化/UPDATE 从呼叫主链路剥离（T1-1，消除 O(N²) 主链路开销） */
+    private final java.util.concurrent.ExecutorService logWriter =
+            java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "ivr-log-writer");
+                t.setDaemon(true);
+                return t;
+            });
+
     @Autowired
     private IAiIvrFlowService flowService;
 
@@ -216,8 +232,23 @@ public class IvrEngineServiceImpl implements IIvrEngineService
 
         AiIvrNode current = startNode;
         int stepCount = 0;
+        // T1-2 流程总超时截止时间
+        final long deadline = System.currentTimeMillis() + flowTimeoutMs;
+        // T1-1 节流落库：最近一次落库时间，间隔内只更新内存，到时/终止节点异步落库
+        long lastFlush = System.currentTimeMillis();
+        boolean timedOut = false;
         while (current != null && stepCount < MAX_STEPS)
         {
+            // T1-2 总超时控制：超时则记录兜底步骤并终止，避免长流程/慢 AI 拖死呼叫线程
+            if (System.currentTimeMillis() > deadline)
+            {
+                IvrNodeStep timeoutStep = new IvrNodeStep(current.getNodeId(),
+                        current.getNodeType() == null ? "" : current.getNodeType().toLowerCase(),
+                        current.getNodeName(), "TIMEOUT", "流程总超时(" + flowTimeoutMs + "ms)，兜底挂断");
+                result.getSteps().add(timeoutStep);
+                timedOut = true;
+                break;
+            }
             stepCount++;
             String type = current.getNodeType() == null ? "" : current.getNodeType().toLowerCase();
             IvrNodeStep step = new IvrNodeStep(current.getNodeId(), type, current.getNodeName(), "", "");
@@ -255,7 +286,22 @@ public class IvrEngineServiceImpl implements IIvrEngineService
                 case NODE_DTMF:
                     String rawInput = pollInput(inputs, variables);
                     String dtmf = rawInput == null ? "" : rawInput.trim();
-                    if (dtmf.length() > 1)
+                    // T1-4 menu/dtmf 支持多位按键（maxDigits 默认 1 保持旧行为；endKey 结束键默认 #）
+                    JsonNode menuCfg = config(current);
+                    String menuEndKey = menuCfg.path("endKey").asText(menuCfg.path("end").asText("#"));
+                    if (StringUtils.isNotEmpty(menuEndKey) && dtmf.endsWith(menuEndKey))
+                    {
+                        dtmf = dtmf.substring(0, dtmf.length() - menuEndKey.length());
+                    }
+                    int menuMaxDigits = menuCfg.path("maxDigits").asInt(1);
+                    if (menuMaxDigits > 1)
+                    {
+                        if (dtmf.length() > menuMaxDigits)
+                        {
+                            dtmf = dtmf.substring(0, menuMaxDigits);
+                        }
+                    }
+                    else if (dtmf.length() > 1)
                     {
                         dtmf = dtmf.substring(0, 1);
                     }
@@ -407,6 +453,8 @@ public class IvrEngineServiceImpl implements IIvrEngineService
                     step.setAction("TRANSFER");
                     step.setDetail((NODE_AGENT.equals(type) ? "转人工坐席：" : "转外线：") + target);
                     result.getSteps().add(step);
+                    // T1-3 标记终止原因，供子流程冒泡判断
+                    variables.put("__terminated", "transfer");
                     current = null;
                     break;
 
@@ -414,6 +462,8 @@ public class IvrEngineServiceImpl implements IIvrEngineService
                     step.setAction("HANGUP");
                     step.setDetail("挂断" + (StringUtils.isNotEmpty(current.getNodeName()) ? "（" + current.getNodeName() + "）" : ""));
                     result.getSteps().add(step);
+                    // T1-3 标记终止原因，供子流程冒泡判断
+                    variables.put("__terminated", "hangup");
                     current = null;
                     break;
 
@@ -466,22 +516,31 @@ public class IvrEngineServiceImpl implements IIvrEngineService
             result.setCurrentNodeName(current == null ? null : current.getNodeName());
             result.setVariables(variables);
 
-            // 每步回写执行日志（当前节点 + 变量快照）
-            try
+            // T1-1 执行日志节流 + 异步落库：
+            //  - 终止节点（hangup/transfer，current=null）或到达节流间隔才落库，其余步骤仅更新内存；
+            //  - 序列化与 UPDATE 投递到单线程 logWriter，呼叫主链路不再每步同步全量序列化。
+            boolean terminal = current == null;
+            long nowMs = System.currentTimeMillis();
+            if (terminal || nowMs - lastFlush >= logFlushIntervalMs)
             {
-                AiIvrExecutionLog update = new AiIvrExecutionLog();
-                update.setExecId(execLog.getExecId());
-                update.setCurrentNodeId(current == null ? null : current.getNodeId());
-                update.setCurrentNodeType(current == null ? null : current.getNodeType());
-                update.setCurrentNodeName(current == null ? null : current.getNodeName());
-                update.setVariables(MAPPER.writeValueAsString(variables));
-                update.setExecuteResult(MAPPER.writeValueAsString(result.getSteps()));
-                executionLogService.updateAiIvrExecutionLog(update);
+                lastFlush = nowMs;
+                final AiIvrNode snapshotNode = current;
+                final IvrExecuteResult snapshotResult = result;
+                final Map<String, Object> snapshotVars = variables;
+                queueLogWrite(execLog.getExecId(), snapshotNode, snapshotResult, snapshotVars);
             }
-            catch (Exception e)
-            {
-                log.debug("IVR执行日志回写失败: {}", e.getMessage());
-            }
+        }
+
+        if (timedOut)
+        {
+            result.setSuccess(false);
+            result.setCode("FLOW_TIMEOUT");
+            result.setMessage("流程执行超过总超时(" + flowTimeoutMs + "ms)，已兜底终止");
+            result.setStatus("2");
+            flushLogSync(execLog, result);
+            finishLog(execLog, result, "2", result.getMessage());
+            updateRecord(flow, result);
+            return result;
         }
 
         if (stepCount >= MAX_STEPS)
@@ -490,14 +549,84 @@ public class IvrEngineServiceImpl implements IIvrEngineService
             result.setCode("LOOP_LIMIT");
             result.setMessage("流程超过最大执行步数限制(" + MAX_STEPS + ")，疑似存在循环");
             result.setStatus("2");
+            flushLogSync(execLog, result);
             finishLog(execLog, result, "2", result.getMessage());
             updateRecord(flow, result);
             return result;
         }
 
+        flushLogSync(execLog, result);
         finishLog(execLog, result, "1", null);
         updateRecord(flow, result);
         return result;
+    }
+
+    /**
+     * T1-1：异步落库一条执行日志快照。队列满/异常时降级为同步落库，保证不丢日志。
+     */
+    private void queueLogWrite(Long execId, AiIvrNode current, IvrExecuteResult result,
+                               Map<String, Object> variables)
+    {
+        try
+        {
+            final String varsJson = MAPPER.writeValueAsString(variables);
+            final String stepsJson = MAPPER.writeValueAsString(result.getSteps());
+            final Long nodeId = current == null ? null : current.getNodeId();
+            final String nodeType = current == null ? null : current.getNodeType();
+            final String nodeName = current == null ? null : current.getNodeName();
+            logWriter.submit(() -> {
+                try
+                {
+                    AiIvrExecutionLog update = new AiIvrExecutionLog();
+                    update.setExecId(execId);
+                    update.setCurrentNodeId(nodeId);
+                    update.setCurrentNodeType(nodeType);
+                    update.setCurrentNodeName(nodeName);
+                    update.setVariables(varsJson);
+                    update.setExecuteResult(stepsJson);
+                    executionLogService.updateAiIvrExecutionLog(update);
+                }
+                catch (Exception e)
+                {
+                    log.debug("IVR执行日志异步回写失败: {}", e.getMessage());
+                }
+            });
+        }
+        catch (Exception e)
+        {
+            // 提交失败（如线程池已关闭）则同步兜底
+            try
+            {
+                AiIvrExecutionLog update = new AiIvrExecutionLog();
+                update.setExecId(execId);
+                update.setCurrentNodeId(current == null ? null : current.getNodeId());
+                update.setCurrentNodeType(current == null ? null : current.getNodeType());
+                update.setCurrentNodeName(current == null ? null : current.getNodeName());
+                update.setVariables(MAPPER.writeValueAsString(variables));
+                update.setExecuteResult(MAPPER.writeValueAsString(result.getSteps()));
+                executionLogService.updateAiIvrExecutionLog(update);
+            }
+            catch (Exception ex)
+            {
+                log.debug("IVR执行日志同步兜底回写失败: {}", ex.getMessage());
+            }
+        }
+    }
+
+    /**
+     * T1-1：流程结束时等待已排队的日志落库完成，保证最终态（变量/步骤完整）可见。
+     */
+    private void flushLogSync(AiIvrExecutionLog execLog, IvrExecuteResult result)
+    {
+        try
+        {
+            java.util.concurrent.Future<?> last = logWriter.submit(() -> { });
+            last.get(5, java.util.concurrent.TimeUnit.SECONDS);
+        }
+        catch (Exception e)
+        {
+            log.debug("IVR执行日志收尾等待失败: {}", e.getMessage());
+        }
     }
 
     @Override
@@ -1067,15 +1196,39 @@ public class IvrEngineServiceImpl implements IIvrEngineService
             IvrExecuteResult subResult = executeFlow(subRequest);
             if (subResult.getVariables() != null)
             {
+                // T1-3 子流程冒泡：先取回终止标记，合并变量后清除内部标记，再决定是否终止父流程
+                Object subTerminated = subResult.getVariables().get("__terminated");
                 variables.putAll(subResult.getVariables());
+                variables.remove("__terminated");
+                if (subResult.getTransferTarget() != null)
+                {
+                    result.setTransferTarget(subResult.getTransferTarget());
+                }
+                if (subResult.getMatchedIntention() != null)
+                {
+                    result.setMatchedIntention(subResult.getMatchedIntention());
+                    result.setMatchedIntentionName(subResult.getMatchedIntentionName());
+                    result.setMatchMethod(subResult.getMatchMethod());
+                    result.setCategoryId(subResult.getCategoryId());
+                    result.setCategoryName(subResult.getCategoryName());
+                }
+                variables.remove(CHILD_DEPTH_KEY);
+                variables.put("childResult", "flowName=" + subResult.getFlowName()
+                        + ",success=" + subResult.isSuccess()
+                        + ",terminated=" + (subTerminated == null ? "" : subTerminated)
+                        + ",intention=" + (subResult.getMatchedIntention() == null
+                        ? "" : subResult.getMatchedIntention()));
+                step.setDetail("子流程[" + childFlow.getFlowName() + "]执行"
+                        + (subResult.isSuccess() ? "成功" : "失败：" + subResult.getMessage())
+                        + (subTerminated != null ? "；子流程" + ("hangup".equals(subTerminated) ? "挂断" : "转接") + "，冒泡终止父流程" : ""));
+                result.getSteps().add(step);
+                // 子流程以挂断/转接结束时，父流程必须立即终止并上抛语义（L1 修复）
+                if (subTerminated != null)
+                {
+                    return null;
+                }
+                return nextNode(current, nodeMap, edges, variables, null);
             }
-            variables.remove(CHILD_DEPTH_KEY);
-            variables.put("childResult", "flowName=" + subResult.getFlowName()
-                    + ",success=" + subResult.isSuccess()
-                    + ",intention=" + (subResult.getMatchedIntention() == null
-                    ? "" : subResult.getMatchedIntention()));
-            step.setDetail("子流程[" + childFlow.getFlowName() + "]执行"
-                    + (subResult.isSuccess() ? "成功" : "失败：" + subResult.getMessage()));
         }
         catch (Exception e)
         {
@@ -1415,10 +1568,12 @@ public class IvrEngineServiceImpl implements IIvrEngineService
         {
             Expression expression = SPEL_PARSER.parseExpression(expr);
             // 安全收口(S3)：只读数据绑定上下文，禁止 T(...) 类型表达式与任意方法调用；
-            // 追加 MapAccessor 并以变量 Map 为根对象，支持 root 键属性式访问
-            SimpleEvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding().build();
+            // 追加 MapAccessor 并以变量 Map 为根对象，支持 root 键属性式访问。
+            // Spring 5.2.x 的 SimpleEvaluationContext 无 setRootObject，根对象须在 builder 阶段 withRootObject 传入
+            SimpleEvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding()
+                    .withRootObject(variables == null ? new HashMap<>() : variables)
+                    .build();
             context.getPropertyAccessors().add(0, new MapAccessor());
-            context.setRootObject(variables == null ? new HashMap<>() : variables);
             if (variables != null)
             {
                 variables.forEach(context::setVariable);

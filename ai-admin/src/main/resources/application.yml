@@ -41,6 +41,32 @@ logging:
     ai.lawyers: info
     org.springframework: warn
 
+# ============================================================
+# T5-1 监控暴露：actuator + micrometer-prometheus
+# 仅暴露 prometheus/health/info；生产建议经内网/网关 ACL 限制抓取源，
+# 或通过 management.server.port 使用独立管理端口
+# ============================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: prometheus,health,info
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+    prometheus:
+      access: read-only
+  metrics:
+    tags:
+      application: ai-lawyers-hotline
+    distribution:
+      # 百分位直方图，供 Prometheus histogram_quantile 计算 P95/P99
+      percentiles-histogram:
+        http.server.requests: true
+      sla:
+        http.server.requests: 50ms,100ms,200ms,500ms,1s,2s,5s
+
 # 用户配置
 user:
   password:
@@ -64,11 +90,6 @@ spring:
       max-file-size: 10MB
       # 设置总上传的文件大小
       max-request-size: 20MB
-  # 服务模块：生产环境必须关闭热部署（已存在 ai-admin/ai-system 同包同名类，restart 会引发类加载冲突）
-  devtools:
-    restart:
-      # 热部署开关
-      enabled: false
   # redis 配置
   redis:
     # 地址
@@ -100,6 +121,64 @@ token:
   secret: ${TOKEN_SECRET:Z2xwLWExMmwtbGF3eWVycy1qd3Qtc2VjcmV0LWtleS0yMDI2LWNoYW5nZS1tZS1pbi1wcm9kLTA5ODc2NTQz}
   # 令牌有效期（默认30分钟）
   expireTime: 30
+
+# ============================================================
+# AI 大模型调用与 RAG 检索配置（T2-1 连接池 / T3 RAG 混合检索）
+# ============================================================
+ai:
+  model:
+    # 在途大模型调用并发舱壁（与 DB/Redis 连接池、模型侧限流匹配）
+    max-inflight: ${AI_MODEL_MAX_INFLIGHT:32}
+    # 获取在途许可最长等待（毫秒），超时快速失败
+    acquire-timeout-ms: ${AI_MODEL_ACQUIRE_TIMEOUT_MS:3000}
+    http:
+      # OkHttp 共享连接池：最大空闲连接、保活秒数、建连超时毫秒
+      maxIdleConnections: ${AI_HTTP_MAX_IDLE:32}
+      keepAliveSeconds: ${AI_HTTP_KEEPALIVE_SECONDS:300}
+      connectTimeoutMs: ${AI_HTTP_CONNECT_TIMEOUT_MS:10000}
+  rag:
+    # RAG 总开关：关闭后智能体不检索知识、退回纯模型对话；分块/向量索引不重建
+    enabled: ${AI_RAG_ENABLED:true}
+    # embedding 专用模型配置ID（ai_model_config 中指向 /v1/embeddings 兼容端点，如 bge-small-zh）
+    embedding-config-id: ${AI_RAG_EMBEDDING_CONFIG_ID:0}
+    # embedding 模型名（config-id 未配置时，用默认模型的 apiUrl/apiKey + 此模型名）
+    embedding-model: ${AI_RAG_EMBEDDING_MODEL:}
+    # 最终拼 Prompt 的知识条数
+    top-k: ${AI_RAG_TOP_K:3}
+    # 每路召回候选数（融合池大小）
+    candidate-size: ${AI_RAG_CANDIDATE_SIZE:20}
+    # 单块拼入 Prompt 的最大字符数
+    chunk-max-len: ${AI_RAG_CHUNK_MAX_LEN:500}
+    # Cross-Encoder rerank 精排（需部署 rerank 服务，默认关闭）
+    rerank-enabled: ${AI_RAG_RERANK_ENABLED:false}
+    rerank-url: ${AI_RAG_RERANK_URL:}
+    rerank-model: ${AI_RAG_RERANK_MODEL:bge-reranker-base}
+    rerank-api-key: ${AI_RAG_RERANK_API_KEY:}
+  # T4-1 智能质检
+  quality:
+    # 质检总开关：关闭则不投递/不消费质检任务
+    enabled: ${AI_QUALITY_ENABLED:true}
+    # 录音就绪后是否自动入检
+    auto-on-hangup: ${AI_QUALITY_AUTO_ON_HANGUP:true}
+    # 采样率：1.0 全量质检；可按坐席规模调为 0.1~0.5 抽检
+    sample-rate: ${AI_QUALITY_SAMPLE_RATE:1.0}
+
+# ============================================================
+# 语音引擎配置（TTS / ASR）。ASR 为 OpenAI/Whisper 兼容端点
+# （faster-whisper-server、vLLM 等），T4-1 质检转写复用该配置
+# ============================================================
+voice:
+  # 默认语音引擎：mock（未配置时返回空串占位）/ ali / dianxin / dashscope
+  engine: ${VOICE_ENGINE:mock}
+  dashscope-api-key: ${VOICE_DASHSCOPE_API_KEY:}
+  dashscope-base-url: ${VOICE_DASHSCOPE_BASE_URL:https://dashscope.aliyuncs.com/api/v1}
+  dashscope-tts-model: ${VOICE_DASHSCOPE_TTS_MODEL:cosyvoice-v1}
+  dashscope-voice: ${VOICE_DASHSCOPE_VOICE:longxiaochun}
+  # ASR（Whisper 兼容 /audio/transcriptions）：质检转写依赖，未部署时质检转写为空置失败
+  asr-base-url: ${VOICE_ASR_BASE_URL:http://localhost:8000/v1}
+  asr-api-key: ${VOICE_ASR_API_KEY:}
+  asr-model: ${VOICE_ASR_MODEL:whisper-1}
+  asr-language: ${VOICE_ASR_LANGUAGE:zh}
 
 # MyBatis配置
 mybatis:
@@ -136,6 +215,11 @@ xss:
 # 运营商线路对接与外呼调度配置
 # ============================================================
 call:
+  # ---------- 录音文件（T4-1 质检读取本地录音） ----------
+  recording:
+    # 录音文件基础路径（对应 FreeSWITCH recordings_dir）
+    base-path: ${CALL_RECORDING_BASE_PATH:C:/Program Files/FreeSWITCH/recordings}
+
   # ---------- 呼叫调度 ----------
   dispatch:
     # 全局最大并发呼叫数（应小于所有线路 max_concurrent 之和）

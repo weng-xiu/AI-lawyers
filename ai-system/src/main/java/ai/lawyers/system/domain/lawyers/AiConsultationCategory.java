@@ -1,5 +1,6 @@
 package ai.lawyers.system.domain.lawyers;
 
+import java.util.List;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.Size;
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -59,6 +60,19 @@ public class AiConsultationCategory extends BaseEntity
     /** 删除标志（0代表存在 2代表删除） */
     @Excel(name = "删除标志", readConverterExp = "0=存在,2=删除")
     private String delFlag;
+
+    /** 子分类（树形结构，非表字段） */
+    private List<AiConsultationCategory> children;
+
+    public List<AiConsultationCategory> getChildren()
+    {
+        return children;
+    }
+
+    public void setChildren(List<AiConsultationCategory> children)
+    {
+        this.children = children;
+    }
 
     public Long getCategoryId()
     {

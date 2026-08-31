@@ -2,9 +2,12 @@ package ai.lawyers.framework.config;
 
 import ai.lawyers.common.utils.Threads;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
+import org.slf4j.MDC;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.task.TaskDecorator;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -37,9 +40,50 @@ public class ThreadPoolConfig
         executor.setCorePoolSize(corePoolSize);
         executor.setQueueCapacity(queueCapacity);
         executor.setKeepAliveSeconds(keepAliveSeconds);
+        // T5-1：@Async 任务透传调用方 MDC（含 traceId），异步日志与主链路同 traceId 可串联
+        executor.setTaskDecorator(mdcTaskDecorator());
         // 线程池对拒绝任务(无线程可用)的处理策略
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         return executor;
+    }
+
+    /**
+     * T5-1：MDC 任务装饰器。提交任务时快照当前线程 MDC，执行线程恢复该上下文，
+     * 执行完还原/清理，保证 traceId 跨 @Async 线程传递且无线程池串号。
+     */
+    private TaskDecorator mdcTaskDecorator()
+    {
+        return runnable ->
+        {
+            Map<String, String> context = MDC.getCopyOfContextMap();
+            return () ->
+            {
+                Map<String, String> previous = MDC.getCopyOfContextMap();
+                if (context != null)
+                {
+                    MDC.setContextMap(context);
+                }
+                else
+                {
+                    MDC.clear();
+                }
+                try
+                {
+                    runnable.run();
+                }
+                finally
+                {
+                    if (previous != null)
+                    {
+                        MDC.setContextMap(previous);
+                    }
+                    else
+                    {
+                        MDC.clear();
+                    }
+                }
+            };
+        };
     }
 
     /**

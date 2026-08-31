@@ -4,9 +4,11 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import ai.lawyers.common.utils.StringUtils;
+import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
 
 /**
  * 语音引擎统一入口：按 {@link VoiceModelEnum} 选择 ASR/TTS 实现，
@@ -24,6 +26,10 @@ public class VoiceEngineManager
     private final OpenAiCompatibleAsrEngine openAiCompatibleAsrEngine;
 
     private final MockVoiceEngine mockVoiceEngine;
+
+    /** T5-1：ASR 调用指标（未引入 micrometer 时内部静默） */
+    @Autowired(required = false)
+    private HotlineMetrics metrics;
 
     public VoiceEngineManager(VoiceProperties properties,
                               DashScopeTtsEngine dashScopeTtsEngine,
@@ -61,13 +67,26 @@ public class VoiceEngineManager
                              Map<String, Object> options)
     {
         AsrEngine asrEngine = resolveAsr(engine);
+        // T5-1：走到 Mock（未配置 ASR 或显式 mock 引擎）不计外部调用指标，避免污染成功率
+        boolean realEngine = asrEngine != mockVoiceEngine;
+        long start = System.currentTimeMillis();
         try
         {
             String result = asrEngine.transcribe(audio, format, sampleRate, options);
+            if (metrics != null && realEngine)
+            {
+                metrics.incrementAi("asr", "success");
+                metrics.recordAiFirstResponse(System.currentTimeMillis() - start);
+            }
             return result == null ? "" : result;
         }
         catch (Exception e)
         {
+            // T5-1：真实 ASR 失败降级 Mock，计 fallback（降级率）
+            if (metrics != null && realEngine)
+            {
+                metrics.incrementAi("asr", "fallback");
+            }
             log.warn("语音识别失败，降级到Mock引擎 engine={} error={}", engine, e.getMessage());
             return mockVoiceEngine.transcribe(audio, format, sampleRate, options);
         }

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.quality.AiAgentStatusLogMapper">
+
+    <resultMap type="AiAgentStatusLog" id="AiAgentStatusLogResult">
+        <result property="logId"         column="log_id"          />
+        <result property="agentId"       column="agent_id"        />
+        <result property="userId"        column="user_id"         />
+        <result property="eventType"     column="event_type"      />
+        <result property="fromStatus"    column="from_status"     />
+        <result property="toStatus"      column="to_status"       />
+        <result property="fromCallStatus" column="from_call_status" />
+        <result property="toCallStatus"  column="to_call_status"  />
+        <result property="duration"      column="duration"        />
+        <result property="recordId"      column="record_id"       />
+        <result property="logTime"       column="log_time"        />
+        <result property="createTime"    column="create_time"     />
+    </resultMap>
+
+    <insert id="insertAiAgentStatusLog" parameterType="AiAgentStatusLog" useGeneratedKeys="true" keyProperty="logId">
+        insert into ai_agent_status_log
+        (agent_id, user_id, event_type, from_status, to_status, from_call_status, to_call_status,
+         record_id, log_time, create_time)
+        values
+        (#{agentId}, #{userId}, #{eventType}, #{fromStatus}, #{toStatus}, #{fromCallStatus}, #{toCallStatus},
+         #{recordId}, #{logTime}, sysdate())
+    </insert>
+
+    <select id="selectLatestLog" resultMap="AiAgentStatusLogResult">
+        select log_id, agent_id, user_id, event_type, from_status, to_status, from_call_status,
+               to_call_status, duration, record_id, log_time, create_time
+        from ai_agent_status_log
+        where agent_id = #{agentId}
+        order by log_time desc, log_id desc
+        limit 1
+    </select>
+
+    <update id="updateDuration">
+        update ai_agent_status_log
+        set duration = #{duration}
+        where log_id = #{logId}
+    </update>
+
+    <!--
+      按时间区间汇总各"目标状态"停留秒数。
+      duration 由下一条流水回填，因此区间末尾未闭合的一条 duration=0，不计入；
+      SLA/效能按 log_time 落在区间内统计。
+    -->
+    <select id="sumStatusDuration" resultType="java.util.Map">
+        select to_status       as toStatus,
+               to_call_status  as toCallStatus,
+               coalesce(sum(case when duration is null then 0 else duration end), 0) as durationSum,
+               count(1)        as eventCount
+        from ai_agent_status_log
+        where log_time &gt;= #{beginTime} and log_time &lt;= #{endTime}
+        group by to_status, to_call_status
+    </select>
+</mapper>

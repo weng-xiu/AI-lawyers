@@ -118,4 +118,26 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where del_flag = '0' and create_time &gt;= #{beginTime} and create_time &lt; #{endTime}
     </select>
 
+    <!--
+      T4-3 SLA 汇总（基于排队/分配流水 ai_call_queue）：
+      - totalQueued    区间内入队总量（进入排队的来话）
+      - answeredCount  已分配接听量（queue_status=1）
+      - withinThreshold X 秒阈值内接听量（wait_duration &lt;= 阈值）
+      - abandonedCount 放弃量（queue_status=3，含超时踢除/来电放弃）
+      - avgWaitSec     已接听来电平均排队等待秒数
+      服务水平 = withinThreshold / answeredCount；放弃率 = abandonedCount / totalQueued
+    -->
+    <select id="selectSlaSummary" resultType="map">
+        select count(1) as totalQueued,
+               sum(case when queue_status = '1' then 1 else 0 end) as answeredCount,
+               sum(case when queue_status = '1' and wait_duration is not null
+                             and wait_duration &lt;= #{thresholdSeconds}
+                        then 1 else 0 end) as withinThreshold,
+               sum(case when queue_status = '3' then 1 else 0 end) as abandonedCount,
+               ifnull(round(avg(case when queue_status = '1' then wait_duration end), 1), 0) as avgWaitSec,
+               #{thresholdSeconds} as thresholdSeconds
+        from ai_call_queue
+        where enqueue_time &gt;= #{beginTime} and enqueue_time &lt; #{endTime}
+    </select>
+
 </mapper>

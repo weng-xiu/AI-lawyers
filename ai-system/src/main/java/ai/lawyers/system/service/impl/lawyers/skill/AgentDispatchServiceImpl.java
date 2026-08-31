@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,12 +17,15 @@ import ai.lawyers.system.domain.lawyers.AiCallAgentStatus;
 import ai.lawyers.system.domain.lawyers.skill.AiCallQueue;
 import ai.lawyers.system.domain.lawyers.skill.AiSkillGroup;
 import ai.lawyers.system.domain.lawyers.skill.AiSkillGroupMember;
+import ai.lawyers.system.domain.lawyers.skill.AgentLoadStat;
 import ai.lawyers.system.domain.lawyers.skill.DispatchContext;
 import ai.lawyers.system.domain.lawyers.skill.DispatchResult;
 import ai.lawyers.system.mapper.lawyers.AiCallAgentStatusMapper;
 import ai.lawyers.system.mapper.lawyers.skill.AiCallQueueMapper;
 import ai.lawyers.system.mapper.lawyers.skill.AiSkillGroupMapper;
 import ai.lawyers.system.mapper.lawyers.skill.AiSkillGroupMemberMapper;
+import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
+import ai.lawyers.system.service.lawyers.queue.StatusLogDispatcher;
 import ai.lawyers.system.service.lawyers.skill.IAiSkillGroupService;
 import ai.lawyers.system.service.lawyers.skill.IAgentDispatchService;
 
@@ -59,11 +63,30 @@ public class AgentDispatchServiceImpl implements IAgentDispatchService
     @Autowired
     private RedisCache redisCache;
 
+    /** T4-3 坐席状态流水（异步落库） */
+    @Autowired(required = false)
+    private StatusLogDispatcher statusLogDispatcher;
+
+    /** T5-1 业务指标埋点 */
+    @Autowired(required = false)
+    private HotlineMetrics metrics;
+
     @Override
     @Transactional
     public DispatchResult dispatch(Long groupId, DispatchContext ctx)
     {
-        return doDispatch(groupId, ctx, true);
+        long start = System.currentTimeMillis();
+        try
+        {
+            return doDispatch(groupId, ctx, true);
+        }
+        finally
+        {
+            if (metrics != null)
+            {
+                metrics.recordAcdAssign(System.currentTimeMillis() - start);
+            }
+        }
     }
 
     private DispatchResult doDispatch(Long groupId, DispatchContext ctx, boolean allowOverflow)
@@ -132,20 +155,43 @@ public class AgentDispatchServiceImpl implements IAgentDispatchService
         switch (strategy)
         {
             case "least_recent":
-                // 最久未通话：call_start_time 最早（含从未通话者，为 null 排最前）
-                available.sort(Comparator.comparing(
-                        m -> {
-                            Date t = memberMapper.selectLastCallStartTime(m.getAgentId());
-                            return t == null ? new Date(0) : t;
-                        }));
-                break;
             case "least_calls":
-                // 今日完成通话最少
-                available.sort(Comparator.comparingInt(
-                        m -> {
-                            Integer c = memberMapper.countTodayCompletedByAgent(m.getAgentId());
-                            return c == null ? 0 : c;
-                        }));
+                // T1-5 消除 N+1：一条聚合 SQL 取回所有候选的最近通话时间/今日完成数，排序时查内存 Map
+                List<Long> agentIds = new ArrayList<>();
+                for (AiSkillGroupMember m : available)
+                {
+                    agentIds.add(m.getAgentId());
+                }
+                Map<Long, AgentLoadStat> statMap = new java.util.HashMap<>();
+                if (!agentIds.isEmpty())
+                {
+                    List<AgentLoadStat> stats = memberMapper.selectLoadStatsByAgentIds(agentIds);
+                    if (stats != null)
+                    {
+                        for (AgentLoadStat s : stats)
+                        {
+                            statMap.put(s.getAgentId(), s);
+                        }
+                    }
+                }
+                if ("least_recent".equals(strategy))
+                {
+                    // 最久未通话：call_start_time 最早（含从未通话者，为 null 排最前）
+                    available.sort(Comparator.comparing(m -> {
+                        AgentLoadStat s = statMap.get(m.getAgentId());
+                        Date t = s == null ? null : s.getLastCallStartTime();
+                        return t == null ? new Date(0) : t;
+                    }));
+                }
+                else
+                {
+                    // 今日完成通话最少
+                    available.sort(Comparator.comparingInt(m -> {
+                        AgentLoadStat s = statMap.get(m.getAgentId());
+                        Integer c = s == null ? null : s.getTodayCompleted();
+                        return c == null ? 0 : c;
+                    }));
+                }
                 break;
             case "all_ring":
                 // 全员振铃：真实 PBX 会并行呼叫所有成员；无 PBX 环境按等级优先级顺序（保持列表原序）
@@ -194,6 +240,27 @@ public class AgentDispatchServiceImpl implements IAgentDispatchService
     }
 
     /**
+     * T4-3 记录 ACD 分配流水：抢占前坐席空闲（call_status=0），分配后进入通话（call_status=1）。
+     * 抢占已由 occupyAgentIfFree 原子完成，故 from 状态固定为 "0"。
+     */
+    private void logAgentAssigned(AiCallAgentStatus agent, String toCallStatus, Long recordId, String eventType)
+    {
+        if (statusLogDispatcher == null || agent == null)
+        {
+            return;
+        }
+        try
+        {
+            statusLogDispatcher.log(agent.getAgentId(), agent.getUserId(), eventType,
+                    agent.getStatus(), agent.getStatus(), "0", toCallStatus, recordId, new Date());
+        }
+        catch (Exception e)
+        {
+            log.warn("记录ACD分配流水失败 agentId={} event={}", agent.getAgentId(), eventType);
+        }
+    }
+
+    /**
      * 执行分配：原子抢占坐席 → 写流水 → 补充坐席通话信息。
      *
      * @return 分配结果；返回 null 表示该坐席已被并发来电抢占（call_status 已非空闲），调用方应换下一位候选
@@ -203,6 +270,10 @@ public class AgentDispatchServiceImpl implements IAgentDispatchService
         // 原子抢占：条件更新 call_status 0→1，影响行数 0 说明已被并发来电抢占，交由上层换下一位候选
         if (agentStatusMapper.occupyAgentIfFree(member.getAgentId()) == 0)
         {
+            if (metrics != null)
+            {
+                metrics.incrementAcdOccupyFail();
+            }
             return null;
         }
 
@@ -219,6 +290,7 @@ public class AgentDispatchServiceImpl implements IAgentDispatchService
             existQueue.setQueueStatus("1");
             existQueue.setStrategyUsed(group.getStrategy());
             existQueue.setDequeueTime(now);
+            existQueue.setAnswerTime(now);
             existQueue.setWaitDuration((int) ((now.getTime() - existQueue.getEnqueueTime().getTime()) / 1000));
             queueMapper.updateAiCallQueue(existQueue);
         }
@@ -232,6 +304,7 @@ public class AgentDispatchServiceImpl implements IAgentDispatchService
             q.setAgentId(member.getAgentId());
             q.setEnqueueTime(now);
             q.setDequeueTime(now);
+            q.setAnswerTime(now);
             q.setWaitDuration(0);
             q.setQueueStatus("1");
             q.setStrategyUsed(group.getStrategy());
@@ -242,6 +315,8 @@ public class AgentDispatchServiceImpl implements IAgentDispatchService
         // 置坐席为忙碌（status 在线，call_status 通话中）。真实 PBX 桥接由网关层完成。
         if (agent != null)
         {
+            // T4-3 流水：抢占前 call_status=0 空闲 → 1 通话中
+            logAgentAssigned(agent, "1", ctx.getRecordId(), "ACD_ASSIGN");
             agent.setCallStatus("1");
             agent.setCurrentCallPhone(ctx.getCallerNumber());
             agent.setCallStartTime(now);
@@ -253,6 +328,10 @@ public class AgentDispatchServiceImpl implements IAgentDispatchService
         result.setQueueId(existQueue != null ? existQueue.getQueueId() : null);
         log.info("分配成功：会话[{}] 主叫[{}] -> 坐席[{}] 技能组[{}] 策略[{}]",
                 ctx.getSessionId(), ctx.getCallerNumber(), agentName, group.getGroupName(), group.getStrategy());
+        if (metrics != null)
+        {
+            metrics.incrementCall("answered");
+        }
         return result;
     }
 
@@ -286,6 +365,10 @@ public class AgentDispatchServiceImpl implements IAgentDispatchService
         int queueSize = queueMapper.countQueuingByGroupId(group.getGroupId());
         log.info("入队：会话[{}] 主叫[{}] 技能组[{}] 位置[{}]",
                 ctx.getSessionId(), ctx.getCallerNumber(), group.getGroupName(), before + 1);
+        if (metrics != null)
+        {
+            metrics.incrementCall("queued");
+        }
         return DispatchResult.queued(queue.getQueueId(), before + 1, queueSize,
                 group.getGroupId(), group.getGroupName());
     }
@@ -315,9 +398,12 @@ public class AgentDispatchServiceImpl implements IAgentDispatchService
         queue.setQueueStatus("1");
         queue.setStrategyUsed("manual");
         queue.setDequeueTime(now);
+        queue.setAnswerTime(now);
         queue.setWaitDuration((int) ((now.getTime() - queue.getEnqueueTime().getTime()) / 1000));
         queueMapper.updateAiCallQueue(queue);
 
+        // T4-3 流水：手动分配抢占（抢占前 call_status=0 空闲）
+        logAgentAssigned(agent, "1", queue.getRecordId(), "MANUAL_ASSIGN");
         agent.setCallStatus("1");
         agent.setCurrentCallPhone(queue.getCallerNumber());
         agent.setCallStartTime(now);
@@ -351,9 +437,15 @@ public class AgentDispatchServiceImpl implements IAgentDispatchService
         }
         queue.setQueueStatus("3");
         queue.setDequeueTime(new Date());
+        queue.setAbandonTime(new Date());
         queue.setWaitDuration((int) ((System.currentTimeMillis() - queue.getEnqueueTime().getTime()) / 1000));
         log.info("踢除排队：queueId={} sessionId={} reason={}", queueId, queue.getSessionId(), reason);
-        return queueMapper.updateAiCallQueue(queue);
+        int rc = queueMapper.updateAiCallQueue(queue);
+        if (rc > 0 && metrics != null)
+        {
+            metrics.incrementCall("abandoned");
+        }
+        return rc;
     }
 
     @Override

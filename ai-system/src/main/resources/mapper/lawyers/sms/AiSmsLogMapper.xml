@@ -84,4 +84,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where phone = #{phone} and send_status = '1' and create_time >= curdate()
     </select>
 
+    <!-- T1-7 发送结果幂等回写：仅待发(0)日志可被更新，已终态日志重复回写影响 0 行 -->
+    <update id="updateSendResult">
+        update ai_sms_log
+        set send_status = #{sendStatus},
+            <if test="providerMsgId != null">provider_msg_id = #{providerMsgId},</if>
+            <if test="failReason != null">fail_reason = #{failReason},</if>
+            update_time = sysdate()
+        where log_id = #{logId} and send_status = '0'
+    </update>
+
 </mapper>

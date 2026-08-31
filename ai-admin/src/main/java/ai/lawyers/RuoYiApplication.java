@@ -18,8 +18,6 @@ public class RuoYiApplication
 {
     public static void main(String[] args)
     {
-        // 多模块同包同名类场景下，devtools RestartClassLoader 会导致 Bean 类型不一致，禁用重启类加载器
-        System.setProperty("spring.devtools.restart.enabled", "false");
         SpringApplication.run(RuoYiApplication.class, args);
         System.out.println("(♥◠‿◠)ﾉﾞ  若依启动成功   ლ(´ڡ`ლ)ﾞ  \n" +
                 " .-------.       ____     __        \n" +

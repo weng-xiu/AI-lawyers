@@ -25,6 +25,7 @@ import ai.lawyers.system.mapper.lawyers.trunk.AiCallTrunkMapper;
 import ai.lawyers.system.service.lawyers.CallEventPublisher;
 import ai.lawyers.system.service.lawyers.IAiCallAgentStatusService;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
+import ai.lawyers.system.service.lawyers.queue.QualityTranscribeDispatcher;
 import ai.lawyers.system.service.lawyers.trunk.ICallDispatchService;
 
 /**
@@ -88,6 +89,9 @@ public class EslEventBridgeService implements EslEventListener
 
     @Autowired
     private AiCallTicketMapper callTicketMapper;
+
+    @Autowired(required = false)
+    private QualityTranscribeDispatcher qualityTranscribeDispatcher;
 
     /** host:port -> client */
     private final Map<String, FreeSwitchEslInboundClient> clients = new ConcurrentHashMap<>();
@@ -454,6 +458,18 @@ public class EslEventBridgeService implements EslEventListener
             callRecordMapper.updateRecordingInfo(update);
             log.info("[ESL-Bridge] 已回写录音信息: recordId={} file={} duration={}s",
                     recordId, recordPath, recordSeconds);
+            // T4-1 录音文件已就绪，投递质检转写队列（队列不可用时内部同步降级）
+            if (qualityTranscribeDispatcher != null && StringUtils.isNotEmpty(recordPath))
+            {
+                try
+                {
+                    qualityTranscribeDispatcher.enqueue(recordId);
+                }
+                catch (Exception ex)
+                {
+                    log.warn("[ESL-Bridge] 投递质检任务失败 recordId={}: {}", recordId, ex.getMessage());
+                }
+            }
         }
         catch (Exception e)
         {

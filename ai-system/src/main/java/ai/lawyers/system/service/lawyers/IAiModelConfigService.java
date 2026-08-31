@@ -108,4 +108,13 @@ public interface IAiModelConfigService
      * @return 模型返回的 JSON 文本
      */
     public String chatJson(String systemPrompt, String userMessage);
+
+    /**
+     * T3 RAG：批量生成文本向量（OpenAI 兼容 /embeddings 协议，如 bge-small-zh 部署的兼容端点）。
+     * 模型由 ai.rag.embedding-model（优先）或 ai.rag.embedding-config-id 指定，未配置则抛异常。
+     *
+     * @param texts 待向量化文本（单条调用时长度为 1）
+     * @return 与入参顺序一一对应的向量；服务不可用/未配置时抛异常，由调用方降级到关键词路
+     */
+    public List<float[]> embedTexts(List<String> texts);
 }

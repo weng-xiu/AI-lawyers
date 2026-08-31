@@ -23,6 +23,36 @@
             <artifactId>ai-common</artifactId>
         </dependency>
 
+        <!-- T2-1/R1：大模型 HTTP 客户端连接池化。锁定 3.14.x（Java8 兼容的最后一个大版本，4.x 要求 Kotlin/Java8+ 高特性） -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>3.14.9</version>
+        </dependency>
+
+        <!-- T5-1：指标埋点门面依赖 micrometer-core（版本由 Spring Boot parent 管理）。
+             optional=true：仅编译期/本模块需要，运行期由 ai-admin 引入的 micrometer-registry-prometheus 提供实现；
+             未引入注册表时 HotlineMetrics 内部 Noop 兜底，业务代码不感知。 -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- T5-2：单元/并发测试（版本由 Spring Boot parent 统一管理，含 JUnit5/Mockito/AssertJ/spring-test） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+            <exclusions>
+                <!-- 本模块测试无需 spring-boot 自动装配与日志门面冲突，排除以加速测试启动 -->
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
     </dependencies>
 
 </project>

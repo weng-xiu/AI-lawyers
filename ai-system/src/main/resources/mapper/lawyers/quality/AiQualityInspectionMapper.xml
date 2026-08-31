@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.quality.AiQualityInspectionMapper">
+
+    <resultMap type="AiQualityInspection" id="AiQualityInspectionResult">
+        <result property="inspectionId"   column="inspection_id"   />
+        <result property="sourceType"     column="source_type"     />
+        <result property="recordId"       column="record_id"       />
+        <result property="sessionId"      column="session_id"      />
+        <result property="agentId"        column="agent_id"        />
+        <result property="callerNumber"   column="caller_number"   />
+        <result property="transcript"     column="transcript"      />
+        <result property="totalScore"     column="total_score"     />
+        <result property="dimensionJson"  column="dimension_json"  />
+        <result property="violationJson"  column="violation_json"  />
+        <result property="aiStatus"       column="ai_status"       />
+        <result property="aiRemark"       column="ai_remark"       />
+        <result property="reviewStatus"   column="review_status"   />
+        <result property="reviewerId"     column="reviewer_id"     />
+        <result property="reviewerName"   column="reviewer_name"   />
+        <result property="reviewRemark"   column="review_remark"   />
+        <result property="reviewTime"     column="review_time"     />
+        <result property="riskWarningId"  column="risk_warning_id" />
+        <result property="createBy"       column="create_by"       />
+        <result property="createTime"     column="create_time"     />
+        <result property="updateBy"       column="update_by"       />
+        <result property="updateTime"     column="update_time"     />
+        <result property="agentName"      column="agent_name"      />
+    </resultMap>
+
+    <sql id="selectInspectionVo">
+        select q.inspection_id, q.source_type, q.record_id, q.session_id, q.agent_id, q.caller_number,
+               q.transcript, q.total_score, q.dimension_json, q.violation_json, q.ai_status, q.ai_remark,
+               q.review_status, q.reviewer_id, q.reviewer_name, q.review_remark, q.review_time,
+               q.risk_warning_id, q.create_by, q.create_time, q.update_by, q.update_time,
+               a.agent_name
+        from ai_quality_inspection q
+        left join ai_call_agent_status a on a.agent_id = q.agent_id
+    </sql>
+
+    <select id="selectAiQualityInspectionByInspectionId" parameterType="Long" resultMap="AiQualityInspectionResult">
+        <include refid="selectInspectionVo"/>
+        where q.inspection_id = #{inspectionId}
+    </select>
+
+    <select id="selectByRecordId" resultMap="AiQualityInspectionResult">
+        <include refid="selectInspectionVo"/>
+        where q.record_id = #{recordId}
+        order by q.inspection_id desc
+        limit 1
+    </select>
+
+    <select id="selectAiQualityInspectionList" parameterType="AiQualityInspection" resultMap="AiQualityInspectionResult">
+        <include refid="selectInspectionVo"/>
+        <where>
+            <if test="sourceType != null and sourceType != ''"> and q.source_type = #{sourceType}</if>
+            <if test="recordId != null"> and q.record_id = #{recordId}</if>
+            <if test="agentId != null"> and q.agent_id = #{agentId}</if>
+            <if test="callerNumber != null and callerNumber != ''"> and q.caller_number like concat('%', #{callerNumber}, '%')</if>
+            <if test="aiStatus != null and aiStatus != ''"> and q.ai_status = #{aiStatus}</if>
+            <if test="reviewStatus != null and reviewStatus != ''"> and q.review_status = #{reviewStatus}</if>
+            <if test="riskWarningId != null"> and q.risk_warning_id = #{riskWarningId}</if>
+            <if test="params.beginTime != null and params.beginTime != ''">
+                and date_format(q.create_time,'%Y%m%d') &gt;= date_format(#{params.beginTime},'%Y%m%d')
+            </if>
+            <if test="params.endTime != null and params.endTime != ''">
+                and date_format(q.create_time,'%Y%m%d') &lt;= date_format(#{params.endTime},'%Y%m%d')
+            </if>
+        </where>
+        order by q.create_time desc
+    </select>
+
+    <insert id="insertAiQualityInspection" parameterType="AiQualityInspection" useGeneratedKeys="true" keyProperty="inspectionId">
+        insert into ai_quality_inspection
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="sourceType != null and sourceType != ''">source_type,</if>
+            <if test="recordId != null">record_id,</if>
+            <if test="sessionId != null">session_id,</if>
+            <if test="agentId != null">agent_id,</if>
+            <if test="callerNumber != null">caller_number,</if>
+            <if test="transcript != null">transcript,</if>
+            <if test="aiStatus != null and aiStatus != ''">ai_status,</if>
+            <if test="createBy != null">create_by,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="sourceType != null and sourceType != ''">#{sourceType},</if>
+            <if test="recordId != null">#{recordId},</if>
+            <if test="sessionId != null">#{sessionId},</if>
+            <if test="agentId != null">#{agentId},</if>
+            <if test="callerNumber != null">#{callerNumber},</if>
+            <if test="transcript != null">#{transcript},</if>
+            <if test="aiStatus != null and aiStatus != ''">#{aiStatus},</if>
+            <if test="createBy != null">#{createBy},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateAiQualityInspection" parameterType="AiQualityInspection">
+        update ai_quality_inspection
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="transcript != null">transcript = #{transcript},</if>
+            <if test="totalScore != null">total_score = #{totalScore},</if>
+            <if test="dimensionJson != null">dimension_json = #{dimensionJson},</if>
+            <if test="violationJson != null">violation_json = #{violationJson},</if>
+            <if test="aiStatus != null and aiStatus != ''">ai_status = #{aiStatus},</if>
+            <if test="aiRemark != null">ai_remark = #{aiRemark},</if>
+            <if test="riskWarningId != null">risk_warning_id = #{riskWarningId},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = sysdate()
+        </trim>
+        where inspection_id = #{inspectionId}
+    </update>
+
+    <update id="casAiStatus">
+        update ai_quality_inspection
+        set ai_status = #{toStatus}, update_time = sysdate()
+        where inspection_id = #{inspectionId}
+        <if test="fromStatus != null and fromStatus != ''">
+            and ai_status = #{fromStatus}
+        </if>
+    </update>
+
+    <update id="reviewAiQualityInspection" parameterType="AiQualityInspection">
+        update ai_quality_inspection
+        set review_status = #{reviewStatus},
+            reviewer_id = #{reviewerId},
+            reviewer_name = #{reviewerName},
+            review_remark = #{reviewRemark},
+            review_time = sysdate(),
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where inspection_id = #{inspectionId}
+    </update>
+
+    <update id="updateRiskWarningId">
+        update ai_quality_inspection
+        set risk_warning_id = #{riskWarningId}, update_time = sysdate()
+        where inspection_id = #{inspectionId} and risk_warning_id is null
+    </update>
+</mapper>

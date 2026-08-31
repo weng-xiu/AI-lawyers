@@ -87,27 +87,56 @@ public class SmsServiceImpl implements ISmsService
         request.setTemplateCode(template.getProviderTemplateCode());
         request.setContent(content);
 
+        // T1-7（L4）先落「待发(0)」日志再调供应商：保证任何发送动作都有留痕，
+        // 发送后按 logId 幂等回写结果/供应商 msgId；进程在发送中途崩溃也会留下待发记录供对账补发/判失败。
+        AiSmsLog pendingLog = insertLog(phone, templateId, config.getConfigId(), params, content,
+                "0", null, null, sessionId, recordId);
+        Long logId = pendingLog == null ? null : pendingLog.getLogId();
         try
         {
-            // 选择供应商并发送（resolveProvider 在供应商缺失时抛 ServiceException，一并留痕）
+            // 选择供应商并发送（resolveProvider 在供应商缺失时抛 ServiceException，一并回写失败留痕）
             ISmsProvider provider = resolveProvider(config.getProvider());
             SmsResult result = provider.send(request);
             if (result == null)
             {
                 result = SmsResult.fail("供应商返回空结果");
             }
-            insertLog(phone, templateId, config.getConfigId(), params, content,
-                    result.isSuccess() ? "1" : "2",
-                    result.getMsgId(), result.getMessage(), sessionId, recordId);
+            writeBackResult(logId, result.isSuccess() ? "1" : "2",
+                    result.isSuccess() ? result.getMsgId() : null,
+                    result.isSuccess() ? null : result.getMessage());
             result.setContent(content);
             return result;
         }
         catch (Exception e)
         {
             log.warn("短信发送异常 phone={} error={}", phone, e.getMessage());
-            insertLog(phone, templateId, config.getConfigId(), params, content,
-                    "2", null, e.getMessage(), sessionId, recordId);
+            writeBackResult(logId, "2", null, e.getMessage());
             return SmsResult.fail(e.getMessage());
+        }
+    }
+
+    /**
+     * T1-7 幂等回写发送结果：仅待发(0)日志可更新（updateSendResult 带 send_status='0' 条件），
+     * 供应商回执/对账任务与本处回写并发时只有一方生效，避免重复处理。回写本身失败仅告警，不影响发送结果返回。
+     */
+    private void writeBackResult(Long logId, String sendStatus, String providerMsgId, String failReason)
+    {
+        if (logId == null)
+        {
+            return;
+        }
+        try
+        {
+            int rows = logMapper.updateSendResult(logId, sendStatus, providerMsgId,
+                    failReason == null ? null : (failReason.length() > 500 ? failReason.substring(0, 500) : failReason));
+            if (rows == 0)
+            {
+                log.info("短信日志已被回执/对账处理，跳过重复回写 logId={}", logId);
+            }
+        }
+        catch (Exception e)
+        {
+            log.error("短信发送结果回写失败 logId={} status={}: {}", logId, sendStatus, e.getMessage());
         }
     }
 
@@ -192,7 +221,7 @@ public class SmsServiceImpl implements ISmsService
         return SmsResult.fail(reason);
     }
 
-    private void insertLog(String phone, Long templateId, Long configId, Map<String, String> params,
+    private AiSmsLog insertLog(String phone, Long templateId, Long configId, Map<String, String> params,
                            String content, String sendStatus, String msgId, String failReason,
                            String sessionId, Long recordId)
     {
@@ -207,7 +236,16 @@ public class SmsServiceImpl implements ISmsService
         smsLog.setFailReason(failReason);
         smsLog.setSessionId(sessionId);
         smsLog.setRecordId(recordId);
-        logMapper.insertAiSmsLog(smsLog);
+        try
+        {
+            logMapper.insertAiSmsLog(smsLog);
+        }
+        catch (Exception e)
+        {
+            // 留痕失败不应阻断发送主流程；待发日志落库失败时 logId 为 null，后续回写将跳过
+            log.error("短信日志落库失败 phone={} status={}: {}", phone, sendStatus, e.getMessage());
+        }
+        return smsLog;
     }
 
     private String toJson(Map<String, String> params)

@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiLegalKnowledgeChunkMapper">
+
+    <resultMap type="AiLegalKnowledgeChunk" id="AiLegalKnowledgeChunkResult">
+        <result property="chunkId"       column="chunk_id"      />
+        <result property="knowledgeId"   column="knowledge_id"  />
+        <result property="title"         column="title"         />
+        <result property="chunkIndex"    column="chunk_index"   />
+        <result property="chunkContent"  column="chunk_content" />
+        <result property="lawArticle"    column="law_article"   />
+        <result property="source"        column="source"        />
+        <result property="categoryId"    column="category_id"   />
+        <result property="embedding"     column="embedding"     />
+        <result property="embeddingDim"  column="embedding_dim" />
+        <result property="status"        column="status"        />
+        <result property="createBy"      column="create_by"     />
+        <result property="createTime"    column="create_time"   />
+        <result property="updateTime"    column="update_time"   />
+    </resultMap>
+
+    <!-- 不含 embedding 大字段的轻量列（关键词召回/列表用） -->
+    <sql id="lightColumns">
+        chunk_id, knowledge_id, title, chunk_index, chunk_content, law_article, source,
+        category_id, embedding_dim, status, create_by, create_time, update_time
+    </sql>
+
+    <select id="selectAllChunksForIndex" resultMap="AiLegalKnowledgeChunkResult">
+        select <include refid="lightColumns"/>, embedding
+        from ai_legal_knowledge_chunk
+        where status = '0'
+    </select>
+
+    <!-- 关键词路：FULLTEXT ngram 自然语言模式，按相关度打分排序 -->
+    <select id="searchByFulltext" resultMap="AiLegalKnowledgeChunkResult">
+        select <include refid="lightColumns"/>,
+               match(chunk_content) against(#{keyword} in natural language mode) as ft_score
+        from ai_legal_knowledge_chunk
+        where status = '0'
+          and match(chunk_content) against(#{keyword} in natural language mode)
+        <if test="knowledgeIds != null and knowledgeIds.size() > 0">
+            and knowledge_id in
+            <foreach item="kid" collection="knowledgeIds" open="(" separator="," close=")">
+                #{kid}
+            </foreach>
+        </if>
+        order by ft_score desc
+        limit #{limit}
+    </select>
+
+    <!-- 关键词路：LIKE 兜底（FULLTEXT 不可用/无结果时） -->
+    <select id="searchByLike" resultMap="AiLegalKnowledgeChunkResult">
+        select <include refid="lightColumns"/>
+        from ai_legal_knowledge_chunk
+        where status = '0'
+          and (chunk_content like concat('%', #{keyword}, '%')
+               or title like concat('%', #{keyword}, '%'))
+        <if test="knowledgeIds != null and knowledgeIds.size() > 0">
+            and knowledge_id in
+            <foreach item="kid" collection="knowledgeIds" open="(" separator="," close=")">
+                #{kid}
+            </foreach>
+        </if>
+        order by chunk_id
+        limit #{limit}
+    </select>
+
+    <insert id="insertChunk" parameterType="AiLegalKnowledgeChunk" useGeneratedKeys="true" keyProperty="chunkId">
+        insert into ai_legal_knowledge_chunk
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="knowledgeId != null">knowledge_id,</if>
+            <if test="title != null">title,</if>
+            <if test="chunkIndex != null">chunk_index,</if>
+            <if test="chunkContent != null">chunk_content,</if>
+            <if test="lawArticle != null">law_article,</if>
+            <if test="source != null">source,</if>
+            <if test="categoryId != null">category_id,</if>
+            <if test="embedding != null">embedding,</if>
+            <if test="embeddingDim != null">embedding_dim,</if>
+            <if test="status != null">status,</if>
+            <if test="createBy != null">create_by,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="knowledgeId != null">#{knowledgeId},</if>
+            <if test="title != null">#{title},</if>
+            <if test="chunkIndex != null">#{chunkIndex},</if>
+            <if test="chunkContent != null">#{chunkContent},</if>
+            <if test="lawArticle != null">#{lawArticle},</if>
+            <if test="source != null">#{source},</if>
+            <if test="categoryId != null">#{categoryId},</if>
+            <if test="embedding != null">#{embedding,jdbcType=BLOB},</if>
+            <if test="embeddingDim != null">#{embeddingDim},</if>
+            <if test="status != null">#{status},</if>
+            <if test="createBy != null">#{createBy},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateChunkEmbedding">
+        update ai_legal_knowledge_chunk
+        set embedding = #{embedding,jdbcType=BLOB}, embedding_dim = #{dim}, update_time = sysdate()
+        where chunk_id = #{chunkId}
+    </update>
+
+    <delete id="deleteByKnowledgeId">
+        delete from ai_legal_knowledge_chunk where knowledge_id = #{knowledgeId}
+    </delete>
+
+    <delete id="deleteByKnowledgeIds">
+        delete from ai_legal_knowledge_chunk where knowledge_id in
+        <foreach item="kid" collection="knowledgeIds" open="(" separator="," close=")">
+            #{kid}
+        </foreach>
+    </delete>
+
+    <delete id="deleteAll">
+        delete from ai_legal_knowledge_chunk
+    </delete>
+
+    <select id="countVectorized" resultType="int">
+        select count(1) from ai_legal_knowledge_chunk where status = '0' and embedding_dim &gt; 0
+    </select>
+</mapper>

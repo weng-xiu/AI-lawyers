@@ -17,6 +17,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="queueStatus"   column="queue_status"   />
         <result property="strategyUsed"  column="strategy_used"  />
         <result property="priority"      column="priority"       />
+        <result property="answerTime"    column="answer_time"    />
+        <result property="ringDuration"  column="ring_duration"  />
+        <result property="abandonTime"   column="abandon_time"   />
         <result property="createTime"    column="create_time"    />
         <result property="updateTime"    column="update_time"    />
         <result property="groupName"     column="group_name"     />
@@ -26,6 +29,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <sql id="selectQueueVo">
         select q.queue_id, q.session_id, q.record_id, q.caller_number, q.group_id, q.enqueue_time,
                q.dequeue_time, q.agent_id, q.wait_duration, q.queue_status, q.strategy_used, q.priority,
+               q.answer_time, q.ring_duration, q.abandon_time,
                q.create_time, q.update_time,
                g.group_name, a.agent_name
         from ai_call_queue q
@@ -87,6 +91,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="agentId != null">agent_id,</if>
             <if test="waitDuration != null">wait_duration,</if>
             <if test="dequeueTime != null">dequeue_time,</if>
+            <if test="answerTime != null">answer_time,</if>
+            <if test="ringDuration != null">ring_duration,</if>
+            <if test="abandonTime != null">abandon_time,</if>
         </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="sessionId != null and sessionId != ''">#{sessionId},</if>
@@ -100,6 +107,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="agentId != null">#{agentId},</if>
             <if test="waitDuration != null">#{waitDuration},</if>
             <if test="dequeueTime != null">#{dequeueTime},</if>
+            <if test="answerTime != null">#{answerTime},</if>
+            <if test="ringDuration != null">#{ringDuration},</if>
+            <if test="abandonTime != null">#{abandonTime},</if>
         </trim>
     </insert>
 
@@ -111,6 +121,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="strategyUsed != null and strategyUsed != ''">strategy_used = #{strategyUsed},</if>
             <if test="waitDuration != null">wait_duration = #{waitDuration},</if>
             <if test="dequeueTime != null">dequeue_time = #{dequeueTime},</if>
+            <if test="answerTime != null">answer_time = #{answerTime},</if>
+            <if test="ringDuration != null">ring_duration = #{ringDuration},</if>
+            <if test="abandonTime != null">abandon_time = #{abandonTime},</if>
             <if test="priority != null">priority = #{priority},</if>
         </trim>
         where queue_id = #{queueId}

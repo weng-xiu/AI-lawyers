@@ -11,6 +11,7 @@ import ai.lawyers.common.exception.ServiceException;
 import ai.lawyers.system.domain.lawyers.AiLegalKnowledge;
 import ai.lawyers.system.mapper.lawyers.AiLegalKnowledgeMapper;
 import ai.lawyers.system.service.lawyers.IAiLegalKnowledgeService;
+import ai.lawyers.system.service.lawyers.rag.IRagIndexService;
 
 /**
  * 法律知识库 服务层实现
@@ -22,6 +23,10 @@ public class AiLegalKnowledgeServiceImpl implements IAiLegalKnowledgeService
 {
     @Autowired
     private AiLegalKnowledgeMapper aiLegalKnowledgeMapper;
+
+    /** T3 RAG：知识增删改/审核后异步重建该知识的分块向量索引 */
+    @Autowired
+    private IRagIndexService ragIndexService;
 
     /**
      * 查询法律知识库
@@ -82,7 +87,13 @@ public class AiLegalKnowledgeServiceImpl implements IAiLegalKnowledgeService
     {
         aiLegalKnowledge.setCreateTime(DateUtils.getNowDate());
         aiLegalKnowledge.setViewCount(0L); // 初始化浏览次数为0
-        return aiLegalKnowledgeMapper.insertAiLegalKnowledge(aiLegalKnowledge);
+        int rows = aiLegalKnowledgeMapper.insertAiLegalKnowledge(aiLegalKnowledge);
+        // T3 RAG：新增后异步建分块索引（仅审核通过且启用才会真正入索引）
+        if (rows > 0)
+        {
+            ragIndexService.rebuildKnowledgeAsync(aiLegalKnowledge.getKnowledgeId());
+        }
+        return rows;
     }
 
     /**
@@ -95,7 +106,13 @@ public class AiLegalKnowledgeServiceImpl implements IAiLegalKnowledgeService
     public int updateAiLegalKnowledge(AiLegalKnowledge aiLegalKnowledge)
     {
         aiLegalKnowledge.setUpdateTime(DateUtils.getNowDate());
-        return aiLegalKnowledgeMapper.updateAiLegalKnowledge(aiLegalKnowledge);
+        int rows = aiLegalKnowledgeMapper.updateAiLegalKnowledge(aiLegalKnowledge);
+        // T3 RAG：内容/状态变更后异步重建分块索引（停用/未过审会在重建时清理旧分块）
+        if (rows > 0 && aiLegalKnowledge.getKnowledgeId() != null)
+        {
+            ragIndexService.rebuildKnowledgeAsync(aiLegalKnowledge.getKnowledgeId());
+        }
+        return rows;
     }
 
     /**
@@ -107,7 +124,13 @@ public class AiLegalKnowledgeServiceImpl implements IAiLegalKnowledgeService
     @Override
     public int deleteAiLegalKnowledgeByKnowledgeIds(Long[] knowledgeIds)
     {
-        return aiLegalKnowledgeMapper.deleteAiLegalKnowledgeByIds(knowledgeIds);
+        int rows = aiLegalKnowledgeMapper.deleteAiLegalKnowledgeByIds(knowledgeIds);
+        // T3 RAG：知识删除后异步清理其分块并刷新向量索引
+        if (rows > 0)
+        {
+            ragIndexService.onKnowledgeDeleted(knowledgeIds);
+        }
+        return rows;
     }
 
     /**
@@ -119,7 +142,13 @@ public class AiLegalKnowledgeServiceImpl implements IAiLegalKnowledgeService
     @Override
     public int deleteAiLegalKnowledgeByKnowledgeId(Long knowledgeId)
     {
-        return aiLegalKnowledgeMapper.deleteAiLegalKnowledgeById(knowledgeId);
+        int rows = aiLegalKnowledgeMapper.deleteAiLegalKnowledgeById(knowledgeId);
+        // T3 RAG：知识删除后异步清理其分块并刷新向量索引
+        if (rows > 0 && knowledgeId != null)
+        {
+            ragIndexService.onKnowledgeDeleted(new Long[]{knowledgeId});
+        }
+        return rows;
     }
 
     /**

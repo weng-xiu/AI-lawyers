@@ -17,11 +17,14 @@
 
     <dependencies>
 
-        <!-- spring-boot-devtools -->
+        <!-- T5-1 监控暴露：actuator + prometheus 注册表（/actuator/prometheus） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-devtools</artifactId>
-            <optional>true</optional> <!-- 表示依赖不会传递 -->
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
 
         <!-- swagger3-->

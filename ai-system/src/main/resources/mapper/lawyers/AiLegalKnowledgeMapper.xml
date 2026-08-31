@@ -9,6 +9,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="title"           column="title"            />
         <result property="content"         column="content"          />
         <result property="categoryId"      column="category_id"      />
+        <result property="lawArticle"      column="law_article"      />
+        <result property="source"          column="source"           />
         <result property="keywords"        column="keywords"         />
         <result property="viewCount"       column="view_count"       />
         <result property="status"           column="status"           />
@@ -24,7 +26,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectAiLegalKnowledgeVo">
-        select knowledge_id, title, content, category_id, keywords, view_count, status, audit_status, audit_by, audit_time, audit_remark, create_by, create_time, update_by, update_time, remark 
+        select knowledge_id, title, content, category_id, law_article, source, keywords, view_count, status, audit_status, audit_by, audit_time, audit_remark, create_by, create_time, update_by, update_time, remark 
         from ai_legal_knowledge
     </sql>
     
@@ -35,6 +37,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="categoryId != null "> and category_id = #{categoryId}</if>
             <if test="keywords != null  and keywords != ''"> and keywords like concat('%', #{keywords}, '%')</if>
             <if test="status != null  and status != ''"> and status = #{status}</if>
+            <if test="auditStatus != null and auditStatus != ''"> and audit_status = #{auditStatus}</if>
             <if test="params.beginTime != null and params.beginTime != ''"><!-- 开始时间检索 -->
                 and date_format(create_time,'%Y%m%d') &gt;= date_format(#{params.beginTime},'%Y%m%d')
             </if>
@@ -42,6 +45,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 and date_format(create_time,'%Y%m%d') &lt;= date_format(#{params.endTime},'%Y%m%d')
             </if>
         </where>
+        order by create_time desc
     </select>
     
     <select id="selectAiLegalKnowledgeById" parameterType="Long" resultMap="AiLegalKnowledgeResult">
@@ -63,9 +67,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     
     <select id="searchAiLegalKnowledge" parameterType="String" resultMap="AiLegalKnowledgeResult">
         <include refid="selectAiLegalKnowledgeVo"/>
-        where status = '0'
+        where status = '0' and audit_status = '1'
         and (title like concat('%', #{keyword}, '%') or keywords like concat('%', #{keyword}, '%') or content like concat('%', #{keyword}, '%'))
         order by view_count desc
+    </select>
+
+    <!-- T3：加载启用且审核通过的知识（供分块/向量化） -->
+    <select id="selectIndexableKnowledge" resultMap="AiLegalKnowledgeResult">
+        <include refid="selectAiLegalKnowledgeVo"/>
+        where status = '0' and audit_status = '1'
     </select>
         
     <insert id="insertAiLegalKnowledge" parameterType="AiLegalKnowledge" useGeneratedKeys="true" keyProperty="knowledgeId">
@@ -74,9 +84,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="title != null and title != ''">title,</if>
             <if test="content != null and content != ''">content,</if>
             <if test="categoryId != null">category_id,</if>
+            <if test="lawArticle != null and lawArticle != ''">law_article,</if>
+            <if test="source != null and source != ''">source,</if>
             <if test="keywords != null and keywords != ''">keywords,</if>
             <if test="viewCount != null">view_count,</if>
             <if test="status != null">status,</if>
+            <if test="auditStatus != null">audit_status,</if>
+            <if test="auditBy != null">audit_by,</if>
+            <if test="auditTime != null">audit_time,</if>
+            <if test="auditRemark != null">audit_remark,</if>
             <if test="createBy != null">create_by,</if>
             <if test="remark != null">remark,</if>
             create_time
@@ -85,9 +101,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="title != null and title != ''">#{title},</if>
             <if test="content != null and content != ''">#{content},</if>
             <if test="categoryId != null">#{categoryId},</if>
+            <if test="lawArticle != null and lawArticle != ''">#{lawArticle},</if>
+            <if test="source != null and source != ''">#{source},</if>
             <if test="keywords != null and keywords != ''">#{keywords},</if>
             <if test="viewCount != null">#{viewCount},</if>
             <if test="status != null">#{status},</if>
+            <if test="auditStatus != null">#{auditStatus},</if>
+            <if test="auditBy != null">#{auditBy},</if>
+            <if test="auditTime != null">#{auditTime},</if>
+            <if test="auditRemark != null">#{auditRemark},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="remark != null">#{remark},</if>
             sysdate()
@@ -100,9 +122,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="title != null and title != ''">title = #{title},</if>
             <if test="content != null and content != ''">content = #{content},</if>
             <if test="categoryId != null">category_id = #{categoryId},</if>
+            <if test="lawArticle != null">law_article = #{lawArticle},</if>
+            <if test="source != null">source = #{source},</if>
             <if test="keywords != null and keywords != ''">keywords = #{keywords},</if>
             <if test="viewCount != null">view_count = #{viewCount},</if>
-            <if test="status != null">status = #{status},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="auditStatus != null and auditStatus != ''">audit_status = #{auditStatus},</if>
+            <if test="auditBy != null">audit_by = #{auditBy},</if>
+            <if test="auditTime != null">audit_time = #{auditTime},</if>
+            <if test="auditRemark != null">audit_remark = #{auditRemark},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="remark != null">remark = #{remark},</if>
             update_time = sysdate()

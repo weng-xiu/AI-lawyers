@@ -51,6 +51,13 @@ public interface AiLegalKnowledgeMapper
     public List<AiLegalKnowledge> searchAiLegalKnowledge(String keyword);
 
     /**
+     * T3：加载启用且审核通过的知识（供分块/向量化建索引）
+     *
+     * @return 可建索引的知识集合
+     */
+    public List<AiLegalKnowledge> selectIndexableKnowledge();
+
+    /**
      * 新增法律知识库
      * 
      * @param aiLegalKnowledge 法律知识库

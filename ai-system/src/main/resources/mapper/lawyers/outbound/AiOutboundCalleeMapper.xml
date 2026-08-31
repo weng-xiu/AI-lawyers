@@ -20,6 +20,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="agentId"         column="agent_id"         />
         <result property="retryTimes"      column="retry_times"      />
         <result property="lastRetryTime"   column="last_retry_time"  />
+        <result property="nextRetryTime"   column="next_retry_time"  />
         <result property="failReason"      column="fail_reason"      />
         <result property="createBy"        column="create_by"        />
         <result property="createTime"      column="create_time"      />
@@ -31,7 +32,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <sql id="selectAiOutboundCalleeVo">
         select callee_id, task_id, callee_number, callee_name, callee_gender, callee_age, callee_address,
                callee_params, call_status, call_time, call_duration, record_id, agent_id, retry_times,
-               last_retry_time, fail_reason, create_by, create_time, update_by, update_time, remark
+               last_retry_time, next_retry_time, fail_reason, create_by, create_time, update_by, update_time, remark
         from ai_outbound_callee
     </sql>
 
@@ -162,6 +163,38 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         set call_status = '1', call_time = sysdate(),
             update_by = #{updateBy}, update_time = sysdate()
         where callee_id = #{calleeId} and call_status = '0'
+    </update>
+
+    <!-- T2-2 待呼叫（含重试退避窗口）：未到 next_retry_time 的不捞取 -->
+    <select id="selectDialableCallees" resultMap="AiOutboundCalleeResult">
+        <include refid="selectAiOutboundCalleeVo"/>
+        where task_id = #{taskId} and call_status = '0'
+          and (next_retry_time is null or next_retry_time &lt;= sysdate())
+        order by callee_id asc
+        limit #{limit}
+    </select>
+
+    <!-- T1-6 单 SQL 快照：是否存在未终态号码（0待呼叫/1呼叫中/2已接通） -->
+    <select id="countUnfinishedByTaskId" resultType="int">
+        select count(1) from ai_outbound_callee
+        where task_id = #{taskId} and call_status in ('0','1','2')
+    </select>
+
+    <!-- T1-6 对账：卡在呼叫中(1)超过指定分钟数的号码（网关事件丢失兜底） -->
+    <select id="selectStaleCallingCallees" resultMap="AiOutboundCalleeResult">
+        <include refid="selectAiOutboundCalleeVo"/>
+        where call_status = '1'
+          and call_time is not null
+          and call_time &lt; date_sub(sysdate(), interval #{staleMinutes} minute)
+        order by call_time asc
+    </select>
+
+    <!-- T2-2 设置下次重试时间（指数退避） -->
+    <update id="updateNextRetryTime">
+        update ai_outbound_callee
+        set next_retry_time = #{nextRetryTime},
+            update_by = #{updateBy}, update_time = sysdate()
+        where callee_id = #{calleeId}
     </update>
 
     <delete id="deleteAiOutboundCalleeByCalleeId" parameterType="Long">
