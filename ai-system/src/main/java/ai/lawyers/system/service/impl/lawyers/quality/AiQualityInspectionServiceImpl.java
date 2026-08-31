@@ -17,17 +17,20 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import ai.lawyers.common.utils.StringUtils;
+import ai.lawyers.system.domain.lawyers.AiCallAgentStatus;
 import ai.lawyers.system.domain.lawyers.AiCallRecord;
 import ai.lawyers.system.domain.lawyers.AiRiskWarning;
 import ai.lawyers.system.domain.lawyers.AiRiskWarningRule;
 import ai.lawyers.system.domain.lawyers.quality.AiQualityInspection;
 import ai.lawyers.system.mapper.lawyers.AiCallRecordMapper;
 import ai.lawyers.system.mapper.lawyers.quality.AiQualityInspectionMapper;
+import ai.lawyers.system.service.lawyers.IAiCallAgentStatusService;
 import ai.lawyers.system.service.lawyers.IAiRiskWarningRuleService;
 import ai.lawyers.system.service.lawyers.IAiRiskWarningService;
 import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 import ai.lawyers.system.service.lawyers.quality.IAiQualityInspectionService;
+import ai.lawyers.system.service.lawyers.queue.MessageNotifyDispatcher;
 import ai.lawyers.system.service.lawyers.voice.VoiceEngineManager;
 import ai.lawyers.system.service.lawyers.voice.VoiceModelEnum;
 
@@ -71,6 +74,13 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
     /** T5-1：质检指标（未引入 micrometer 时内部静默） */
     @Autowired(required = false)
     private HotlineMetrics metrics;
+
+    /** T5-3：质检驳回等事件投递站内信 */
+    @Autowired(required = false)
+    private MessageNotifyDispatcher messageNotifyDispatcher;
+
+    @Autowired
+    private IAiCallAgentStatusService agentStatusService;
 
     /** 质检总开关 */
     @Value("${ai.quality.enabled:true}")
@@ -437,7 +447,50 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
     public int review(AiQualityInspection inspection)
     {
         inspection.setReviewTime(new Date());
-        return inspectionMapper.reviewAiQualityInspection(inspection);
+        int rows = inspectionMapper.reviewAiQualityInspection(inspection);
+        // T5-3：复核驳回时给被检坐席发站内信，通知整改（reviewStatus 2=驳回整改）
+        if (rows > 0 && "2".equals(inspection.getReviewStatus()) && messageNotifyDispatcher != null)
+        {
+            try
+            {
+                AiQualityInspection full = inspectionMapper
+                        .selectAiQualityInspectionByInspectionId(inspection.getInspectionId());
+                Long receiver = resolveAgentUserId(full == null ? null : full.getAgentId());
+                if (receiver != null)
+                {
+                    String remark = inspection.getReviewRemark();
+                    messageNotifyDispatcher.notify(receiver, "4",
+                            "质检结果驳回，请整改",
+                            "您有一条通话质检被复核驳回（质检ID " + inspection.getInspectionId()
+                                    + (StringUtils.isNotEmpty(remark) ? "）：" + remark : "），请查看并整改。"),
+                            "quality", inspection.getInspectionId(),
+                            inspection.getReviewerName());
+                }
+            }
+            catch (Exception e)
+            {
+                log.warn("质检驳回站内信投递失败 inspectionId={}: {}", inspection.getInspectionId(), e.getMessage());
+            }
+        }
+        return rows;
+    }
+
+    /** agentId → 绑定 userId（未绑定坐席查不到时返回 null） */
+    private Long resolveAgentUserId(Long agentId)
+    {
+        if (agentId == null)
+        {
+            return null;
+        }
+        try
+        {
+            AiCallAgentStatus agent = agentStatusService.selectAiCallAgentStatusByAgentId(agentId);
+            return agent == null ? null : agent.getUserId();
+        }
+        catch (Exception e)
+        {
+            return null;
+        }
     }
 
     private String cleanJson(String raw)

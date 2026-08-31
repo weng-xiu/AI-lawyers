@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiMessageMapper">
+
+    <resultMap type="AiMessage" id="AiMessageResult">
+        <result property="messageId"       column="message_id"        />
+        <result property="receiverUserId"  column="receiver_user_id"  />
+        <result property="msgType"         column="msg_type"          />
+        <result property="title"           column="title"             />
+        <result property="content"         column="content"           />
+        <result property="bizType"         column="biz_type"          />
+        <result property="bizId"           column="biz_id"            />
+        <result property="isRead"          column="is_read"           />
+        <result property="readTime"        column="read_time"         />
+        <result property="sender"          column="sender"            />
+        <result property="priority"        column="priority"          />
+        <result property="createBy"        column="create_by"         />
+        <result property="createTime"      column="create_time"       />
+        <result property="updateBy"        column="update_by"         />
+        <result property="updateTime"      column="update_time"       />
+        <result property="remark"          column="remark"            />
+    </resultMap>
+
+    <sql id="selectAiMessageVo">
+        select message_id, receiver_user_id, msg_type, title, content, biz_type, biz_id,
+               is_read, read_time, sender, priority, create_by, create_time, update_by, update_time, remark
+        from ai_message
+    </sql>
+
+    <select id="selectAiMessageList" parameterType="AiMessage" resultMap="AiMessageResult">
+        <include refid="selectAiMessageVo"/>
+        <where>
+            <if test="receiverUserId != null"> and receiver_user_id = #{receiverUserId}</if>
+            <if test="msgType != null and msgType != ''"> and msg_type = #{msgType}</if>
+            <if test="isRead != null and isRead != ''"> and is_read = #{isRead}</if>
+            <if test="bizType != null and bizType != ''"> and biz_type = #{bizType}</if>
+            <if test="title != null and title != ''"> and title like concat('%', #{title}, '%')</if>
+            <if test="params.beginTime != null and params.beginTime != ''"><!-- 开始时间检索 -->
+                and date_format(create_time,'%y%m%d') &gt;= date_format(#{params.beginTime},'%y%m%d')
+            </if>
+            <if test="params.endTime != null and params.endTime != ''"><!-- 结束时间检索 -->
+                and date_format(create_time,'%y%m%d') &lt;= date_format(#{params.endTime},'%y%m%d')
+            </if>
+        </where>
+        order by is_read asc, field(priority,'1','2','3'), create_time desc
+    </select>
+
+    <select id="selectAiMessageByMessageId" parameterType="Long" resultMap="AiMessageResult">
+        <include refid="selectAiMessageVo"/>
+        where message_id = #{messageId}
+    </select>
+
+    <select id="countUnread" parameterType="Long" resultType="int">
+        select count(1) from ai_message
+        where receiver_user_id = #{userId} and is_read = '0'
+    </select>
+
+    <insert id="insertAiMessage" parameterType="AiMessage" useGeneratedKeys="true" keyProperty="messageId">
+        insert into ai_message
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="receiverUserId != null">receiver_user_id,</if>
+            <if test="msgType != null">msg_type,</if>
+            <if test="title != null and title != ''">title,</if>
+            <if test="content != null">content,</if>
+            <if test="bizType != null">biz_type,</if>
+            <if test="bizId != null">biz_id,</if>
+            <if test="isRead != null">is_read,</if>
+            <if test="readTime != null">read_time,</if>
+            <if test="sender != null">sender,</if>
+            <if test="priority != null">priority,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="receiverUserId != null">#{receiverUserId},</if>
+            <if test="msgType != null">#{msgType},</if>
+            <if test="title != null and title != ''">#{title},</if>
+            <if test="content != null">#{content},</if>
+            <if test="bizType != null">#{bizType},</if>
+            <if test="bizId != null">#{bizId},</if>
+            <if test="isRead != null">#{isRead},</if>
+            <if test="readTime != null">#{readTime},</if>
+            <if test="sender != null">#{sender},</if>
+            <if test="priority != null">#{priority},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="markRead">
+        update ai_message
+        set is_read = '1', read_time = sysdate(), update_time = sysdate()
+        where message_id = #{messageId} and receiver_user_id = #{userId} and is_read = '0'
+    </update>
+
+    <update id="markAllRead">
+        update ai_message
+        set is_read = '1', read_time = sysdate(), update_time = sysdate()
+        where receiver_user_id = #{userId} and is_read = '0'
+    </update>
+
+    <delete id="deleteAiMessageByMessageIds">
+        delete from ai_message where receiver_user_id = #{userId} and message_id in
+        <foreach item="messageId" collection="ids" open="(" separator="," close=")">
+            #{messageId}
+        </foreach>
+    </delete>
+</mapper>

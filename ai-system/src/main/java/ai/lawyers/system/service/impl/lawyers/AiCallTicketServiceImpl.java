@@ -10,15 +10,23 @@ import org.springframework.stereotype.Service;
 import ai.lawyers.common.utils.DateUtils;
 import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.common.utils.uuid.IdUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import ai.lawyers.system.domain.lawyers.AiCallTicket;
 import ai.lawyers.system.mapper.lawyers.AiCallTicketMapper;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
+import ai.lawyers.system.service.lawyers.queue.MessageNotifyDispatcher;
 
 @Service
 public class AiCallTicketServiceImpl implements IAiCallTicketService 
 {
+    private static final Logger log = LoggerFactory.getLogger(AiCallTicketServiceImpl.class);
+
     @Autowired
     private AiCallTicketMapper aiCallTicketMapper;
+
+    @Autowired(required = false)
+    private MessageNotifyDispatcher messageNotifyDispatcher;
 
     @Override
     public AiCallTicket selectAiCallTicketByTicketId(Long ticketId)
@@ -83,7 +91,27 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
     @Override
     public int updateTicketProcess(Long ticketId, String processContent, Long assignUserId, String assignUserName)
     {
-        return aiCallTicketMapper.updateTicketProcess(ticketId, processContent, assignUserId, assignUserName);
+        int rows = aiCallTicketMapper.updateTicketProcess(ticketId, processContent, assignUserId, assignUserName);
+        // 分配给坐席成功后投递站内信（T5-3 消息中心）
+        if (rows > 0 && assignUserId != null && messageNotifyDispatcher != null)
+        {
+            try
+            {
+                AiCallTicket ticket = aiCallTicketMapper.selectAiCallTicketByTicketId(ticketId);
+                String title = ticket != null && StringUtils.isNotEmpty(ticket.getTitle())
+                        ? ticket.getTitle() : String.valueOf(ticketId);
+                String content = "您有新的工单待处理：" + title
+                        + (StringUtils.isNotEmpty(assignUserName) ? "（处理人：" + assignUserName + "）" : "")
+                        + "，请及时跟进。";
+                messageNotifyDispatcher.notify(assignUserId, "5", "工单分配提醒：" + title,
+                        content, "ticket", ticketId, "system");
+            }
+            catch (Exception e)
+            {
+                log.warn("工单分配站内信投递失败, ticketId={}, assignUserId={}", ticketId, assignUserId, e);
+            }
+        }
+        return rows;
     }
 
     @Override

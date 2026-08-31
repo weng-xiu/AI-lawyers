@@ -24,6 +24,9 @@ public final class QueueNames
     /** 坐席状态流水批量落库（T4-3） */
     public static final String STATUS_LOG = "status-log";
 
+    /** 消息中心站内信异步落库 + 实时推送（T5-3） */
+    public static final String MESSAGE_NOTIFY = "message-notify";
+
     /** Stream key 前缀 */
     public static final String STREAM_KEY_PREFIX = "stream:";
 
