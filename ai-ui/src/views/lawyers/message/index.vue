@@ -41,11 +41,12 @@
           <el-tag size="mini" :type="msgTagType(scope.row.msgType)">{{ msgTypeText(scope.row.msgType) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="标题" align="left" prop="title" :class-name="''" show-overflow-tooltip>
+      <el-table-column label="标题" align="left" prop="title" show-overflow-tooltip>
         <template slot-scope="scope">
-          <span :style="{ fontWeight: scope.row.isRead === '0' ? 'bold' : 'normal', color: scope.row.isRead === '0' ? '#303133' : '#909399' }">
+          <el-link :underline="false" @click="handleDetail(scope.row)"
+            :style="{ fontWeight: scope.row.isRead === '0' ? 'bold' : 'normal', color: scope.row.isRead === '0' ? '#303133' : '#909399' }">
             <i v-if="scope.row.isRead === '0'" class="el-icon-chat-dot-round" style="color:#F56C6C; margin-right:4px"></i>{{ scope.row.title }}
-          </span>
+          </el-link>
         </template>
       </el-table-column>
       <el-table-column label="优先级" align="center" prop="priority" width="90">
@@ -89,13 +90,14 @@
         <el-descriptions-item label="发送方">{{ detailForm.sender }}</el-descriptions-item>
         <el-descriptions-item label="发送时间">{{ detailForm.createTime }}</el-descriptions-item>
         <el-descriptions-item label="阅读时间">{{ detailForm.readTime || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="关联业务">{{ detailForm.bizType || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="关联业务">{{ bizTypeText(detailForm.bizType) }}</el-descriptions-item>
         <el-descriptions-item label="消息内容" :span="2">
           <div style="white-space: pre-wrap; line-height: 1.7;">{{ detailForm.content }}</div>
         </el-descriptions-item>
       </el-descriptions>
       <div slot="footer" class="dialog-footer">
-        <el-button type="primary" @click="detailOpen = false">关 闭</el-button>
+        <el-button v-if="bizRoute(detailForm.bizType)" type="primary" @click="goBusiness(detailForm)">前往处理</el-button>
+        <el-button @click="detailOpen = false">关 闭</el-button>
       </div>
     </el-dialog>
   </div>
@@ -199,6 +201,28 @@ export default {
     msgTagType(type) {
       const map = { '1': 'info', '2': 'primary', '3': 'danger', '4': 'warning', '5': 'success', '9': 'info' };
       return map[type] || 'info';
+    },
+    // 业务类型 → 页面路由（与菜单一致：质检顶级 /quality；工单/风险预警/外呼挂话务系统目录）
+    bizRoute(bizType) {
+      const map = {
+        'quality': '/quality',
+        'ticket': '/lawyers/callCenter/callTicket',
+        'warning': '/lawyers/callCenter/riskWarning',
+        'outbound': '/lawyers/callCenter/outbound/task'
+      };
+      return map[bizType] || '';
+    },
+    bizTypeText(bizType) {
+      const map = { 'quality': '智能质检', 'ticket': '工单', 'warning': '风险预警', 'outbound': '外呼任务' };
+      return map[bizType] || bizType || '-';
+    },
+    // 跳转业务页面处理
+    goBusiness(row) {
+      const route = this.bizRoute(row.bizType);
+      this.detailOpen = false;
+      if (route) {
+        this.$router.push(route);
+      }
     }
   }
 };

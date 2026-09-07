@@ -158,7 +158,19 @@ export default {
       })
     },
     handleOpenMessage(row) {
-      this.$router.push('/lawyers/message')
+      // 有关联业务则直达业务页面，否则进入消息中心
+      const map = {
+        'quality': '/quality',
+        'ticket': '/lawyers/callCenter/callTicket',
+        'warning': '/lawyers/callCenter/riskWarning',
+        'outbound': '/lawyers/callCenter/outbound/task'
+      };
+      const route = map[row.bizType];
+      if (route) {
+        this.$router.push(route);
+      } else {
+        this.$router.push('/lawyers/message');
+      }
     },
     goMessageCenter() {
       this.$router.push('/lawyers/message')

@@ -25,6 +25,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import ai.lawyers.common.core.domain.entity.SysUser;
 import ai.lawyers.common.core.redis.RedisCache;
 import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.system.domain.lawyers.AiCallRecord;
@@ -40,11 +41,13 @@ import ai.lawyers.system.domain.lawyers.ivr.IvrExecuteResult;
 import ai.lawyers.system.mapper.lawyers.outbound.AiOutboundCalleeMapper;
 import ai.lawyers.system.mapper.lawyers.outbound.AiOutboundTaskMapper;
 import ai.lawyers.system.mapper.lawyers.trunk.AiCallDialLogMapper;
+import ai.lawyers.system.service.ISysUserService;
 import ai.lawyers.system.service.lawyers.IAiCallRecordService;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
 import ai.lawyers.system.service.lawyers.outbound.IAiOutboundResultService;
 import ai.lawyers.system.service.lawyers.outbound.IAiOutboundTaskService;
 import ai.lawyers.system.service.lawyers.outbound.IOutboundExecutionService;
+import ai.lawyers.system.service.lawyers.queue.MessageNotifyDispatcher;
 import ai.lawyers.system.service.lawyers.trunk.ICallDispatchService;
 import ai.lawyers.system.service.lawyers.ivr.engine.IIvrEngineService;
 import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
@@ -103,6 +106,14 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
     /** T5-1：外呼指标（未引入 micrometer 时内部静默） */
     @Autowired(required = false)
     private HotlineMetrics metrics;
+
+    /** T5-3 消息中心：任务完成站内信投递（队列不可用时内部降级，不影响外呼主流程） */
+    @Autowired(required = false)
+    private MessageNotifyDispatcher messageNotifyDispatcher;
+
+    /** createBy（登录名）反查 userId，用于确定站内信接收人 */
+    @Autowired
+    private ISysUserService userService;
 
     /** 多步写库（号码状态 + 结果 + 任务计数）统一在此事务模板内提交，保证一致性 */
     private TransactionTemplate transactionTemplate;
@@ -940,6 +951,41 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
             upd.setUpdateBy("outbound-executor");
             taskService.updateAiOutboundTask(upd);
             log.info("外呼任务全部执行完成 taskId={}", taskId);
+            notifyTaskCompleted(task);
+        }
+    }
+
+    /**
+     * T5-3 消息中心：任务全部完成后向创建人投递站内信。
+     * 消费/定时线程无 HTTP 上下文，接收人经 createBy（登录名）反查 userId；
+     * 投递失败仅告警，不影响外呼主流程。
+     */
+    private void notifyTaskCompleted(AiOutboundTask task)
+    {
+        if (messageNotifyDispatcher == null || task == null || StringUtils.isEmpty(task.getCreateBy()))
+        {
+            return;
+        }
+        try
+        {
+            SysUser creator = userService.selectUserByUserName(task.getCreateBy());
+            if (creator == null || creator.getUserId() == null)
+            {
+                log.debug("外呼任务完成通知跳过：创建人不存在 createBy={}", task.getCreateBy());
+                return;
+            }
+            String name = StringUtils.isNotEmpty(task.getTaskName()) ? task.getTaskName() : String.valueOf(task.getTaskId());
+            String content = "外呼任务「" + name + "」已全部执行完成：计划 "
+                    + (task.getTotalCount() == null ? 0 : task.getTotalCount()) + " 个号码，接通 "
+                    + (task.getAnsweredCount() == null ? 0 : task.getAnsweredCount()) + "，未接听 "
+                    + (task.getNoAnswerCount() == null ? 0 : task.getNoAnswerCount()) + "，失败 "
+                    + (task.getFailedCount() == null ? 0 : task.getFailedCount()) + "，请查看外呼结果。";
+            messageNotifyDispatcher.notify(creator.getUserId(), "1", "外呼任务已完成：" + name,
+                    content, "outbound", task.getTaskId(), "system");
+        }
+        catch (Exception e)
+        {
+            log.warn("外呼任务完成站内信投递失败, taskId={}", task.getTaskId(), e);
         }
     }
 

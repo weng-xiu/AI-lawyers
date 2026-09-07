@@ -91,8 +91,10 @@ public class StreamQueueService
             log.info("T2-3 Redis Stream 队列已禁用（queue.stream.enabled=false），所有异步场景走同步直写");
             return;
         }
-        int n = Math.max(1, handlers.size());
-        listenerPool = Executors.newFixedThreadPool(n, new ThreadFactory()
+        // @PostConstruct 执行顺序不可控：本 bean 的 init() 可能先于各 Dispatcher 的 init() 执行，
+        // 此时 handlers 为空。使用 CachedThreadPool（每个队列一个常驻消费线程），避免 FixedThreadPool
+        // 大小不足导致后注册的队列消费者排队永远得不到执行。
+        listenerPool = Executors.newCachedThreadPool(new ThreadFactory()
         {
             @Override
             public Thread newThread(Runnable r)
@@ -102,7 +104,7 @@ public class StreamQueueService
                 return t;
             }
         });
-        // 注册时 init 可能尚未执行（handler 先于本 bean 的 @PostConstruct 注入），这里统一启动
+        // init() 时 handlers 可能为空（注册顺序问题），后续 registerHandler 会自行调 startConsumer
         for (String queue : handlers.keySet())
         {
             startConsumer(queue);

@@ -1,12 +1,17 @@
 package ai.lawyers.system.service.lawyers.queue;
 
 import javax.annotation.PostConstruct;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import ai.lawyers.common.core.domain.entity.SysUser;
 import ai.lawyers.system.domain.lawyers.AiMessage;
+import ai.lawyers.system.service.ISysUserService;
 import ai.lawyers.system.service.lawyers.CallEventPublisher;
 import ai.lawyers.system.service.lawyers.IAiMessageService;
 
@@ -36,6 +41,10 @@ public class MessageNotifyDispatcher
     @Autowired
     private IAiMessageService messageService;
 
+    /** 广播时查询全部在职用户（selectUserList 无 @DataScope 切面时数据范围为空，线程上下文安全） */
+    @Autowired
+    private ISysUserService userService;
+
     /** 实时推送通道：框架模块提供 WebSocket 实现，未引入时静默（站内信仍落库） */
     @Autowired(required = false)
     private CallEventPublisher callEventPublisher;
@@ -61,15 +70,7 @@ public class MessageNotifyDispatcher
         {
             return;
         }
-        AiMessage msg = new AiMessage();
-        msg.setReceiverUserId(receiverUserId);
-        msg.setMsgType(msgType);
-        msg.setTitle(truncate(title, 200));
-        msg.setContent(truncate(content, 1000));
-        msg.setBizType(bizType);
-        msg.setBizId(bizId);
-        msg.setSender(sender == null ? "system" : sender);
-        msg.setIsRead("0");
+        AiMessage msg = buildMessage(receiverUserId, msgType, title, content, bizType, bizId, sender);
         try
         {
             if (streamQueueService.enqueue(QueueNames.MESSAGE_NOTIFY, MAPPER.writeValueAsString(msg)))
@@ -83,6 +84,60 @@ public class MessageNotifyDispatcher
                     receiverUserId, title, e.getMessage());
         }
         persist(msg);
+    }
+
+    /**
+     * 广播一条站内信（异步）：发送给全部状态正常的用户。
+     * 适用于无明确接收人的业务事件（如风险预警生成）。
+     */
+    public void broadcast(String msgType, String title, String content,
+                          String bizType, Long bizId, String sender)
+    {
+        Set<Long> receiverIds = new LinkedHashSet<>();
+        try
+        {
+            SysUser query = new SysUser();
+            query.setStatus("0");
+            List<SysUser> users = userService.selectUserList(query);
+            if (users != null)
+            {
+                for (SysUser u : users)
+                {
+                    if (u.getUserId() != null)
+                    {
+                        receiverIds.add(u.getUserId());
+                    }
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            log.warn("站内信广播查询接收人失败 title={}: {}", title, e.getMessage());
+            return;
+        }
+        for (Long receiverId : receiverIds)
+        {
+            notify(receiverId, msgType, title, content, bizType, bizId, sender);
+        }
+        if (receiverIds.isEmpty())
+        {
+            log.warn("站内信广播无有效接收人 title={}", title);
+        }
+    }
+
+    private AiMessage buildMessage(Long receiverUserId, String msgType, String title, String content,
+                                   String bizType, Long bizId, String sender)
+    {
+        AiMessage msg = new AiMessage();
+        msg.setReceiverUserId(receiverUserId);
+        msg.setMsgType(msgType);
+        msg.setTitle(truncate(title, 200));
+        msg.setContent(truncate(content, 1000));
+        msg.setBizType(bizType);
+        msg.setBizId(bizId);
+        msg.setSender(sender == null ? "system" : sender);
+        msg.setIsRead("0");
+        return msg;
     }
 
     /** 落库 + WebSocket 实时推送（消费端与同步降级共用） */
