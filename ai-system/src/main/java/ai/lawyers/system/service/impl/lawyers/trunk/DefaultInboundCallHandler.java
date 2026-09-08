@@ -26,6 +26,8 @@ import ai.lawyers.system.service.lawyers.skill.IAgentDispatchService;
 import ai.lawyers.system.service.lawyers.skill.IAiSkillGroupService;
 import ai.lawyers.system.service.lawyers.trunk.gateway.CallGatewayFactory;
 import ai.lawyers.system.service.lawyers.trunk.gateway.ICallGatewayAdapter;
+import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
+import ai.lawyers.system.service.lawyers.queue.CallEventDispatcher;
 import ai.lawyers.system.service.lawyers.trunk.gateway.esl.EslEventBridgeService;
 import ai.lawyers.system.service.lawyers.trunk.gateway.esl.InboundCallHandler;
 
@@ -83,6 +85,12 @@ public class DefaultInboundCallHandler implements InboundCallHandler
     @Autowired(required = false)
     private CallEventPublisher callEventPublisher;
 
+    @Autowired
+    private CallEventDispatcher callEventDispatcher;
+
+    @Autowired(required = false)
+    private HotlineMetrics metrics;
+
     @Override
     public void handleIncomingCall(Map<String, Object> ctx)
     {
@@ -99,6 +107,12 @@ public class DefaultInboundCallHandler implements InboundCallHandler
         String host = str(ctx.get("host"));
 
         log.info("[Inbound] 收到来话 uuid={} caller={} dnis={} host={}", uuid, caller, dnis, host);
+
+        // T5-1：话务计数（inbound）
+        if (metrics != null)
+        {
+            metrics.incrementCall("inbound");
+        }
 
         // 黑名单拦截：命中生效中的黑名单号码，直接挂断且不落话单
         if (StringUtils.isNotEmpty(caller) && blacklistService.isBlacklisted(caller))
@@ -148,6 +162,10 @@ public class DefaultInboundCallHandler implements InboundCallHandler
             {
                 log.info("[Inbound] 暂无空闲坐席，进入排队 groupId={} queueId={} position={}",
                         groupId, result.getQueueId(), result.getQueuePosition());
+                if (metrics != null)
+                {
+                    metrics.incrementCall("queued");
+                }
                 broadcastEvent("QUEUED", buildData(uuid, recordId, null, caller, dnis,
                         result.getQueueId(), result.getQueuePosition(), result.getMessage()));
             }
@@ -165,12 +183,12 @@ public class DefaultInboundCallHandler implements InboundCallHandler
     {
         Long agentId = result.getAgentId();
 
-        // 更新话单归属坐席
+        // 更新话单归属坐席（异步，非终态更新）
         AiCallRecord update = new AiCallRecord();
         update.setRecordId(recordId);
         update.setAgentId(agentId);
         update.setStatus("0");
-        callRecordMapper.updateAiCallRecord(update);
+        callEventDispatcher.updateCallRecordAsync(update);
 
         // 加载坐席记录（用于拿 userId 和绑定的 SIP 分机号）
         AiCallAgentStatus agent = agentStatusService.selectAiCallAgentStatusByAgentId(agentId);

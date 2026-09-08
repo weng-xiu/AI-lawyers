@@ -22,6 +22,7 @@ import ai.lawyers.system.mapper.lawyers.sms.AiSmsConfigMapper;
 import ai.lawyers.system.mapper.lawyers.sms.AiSmsLogMapper;
 import ai.lawyers.system.mapper.lawyers.sms.AiSmsTemplateMapper;
 import ai.lawyers.system.service.lawyers.sms.ISmsProvider;
+import ai.lawyers.system.service.lawyers.compliance.ComplianceGuard;
 import ai.lawyers.system.service.lawyers.sms.ISmsService;
 
 /**
@@ -50,6 +51,9 @@ public class SmsServiceImpl implements ISmsService
     @Autowired
     private RedisCache redisCache;
 
+    @Autowired(required = false)
+    private ComplianceGuard complianceGuard;
+
     /** Redis 单号码日限流 key 前缀 */
     private static final String DAILY_LIMIT_KEY_PREFIX = "sms:limit:";
 
@@ -76,6 +80,13 @@ public class SmsServiceImpl implements ISmsService
         {
             return fail(phone, templateId, config.getConfigId(),
                     "超过单号码日发送上限(" + dailyLimit + ")", params, sessionId, recordId);
+        }
+
+        // W4：退订名单拦截——已回复"T"退订的号码拒绝发送
+        if (complianceGuard != null && !complianceGuard.isSmsAllowed(phone))
+        {
+            return fail(phone, templateId, config.getConfigId(),
+                    "号码已退订，拒绝发送", params, sessionId, recordId);
         }
 
         // 渲染模板变量

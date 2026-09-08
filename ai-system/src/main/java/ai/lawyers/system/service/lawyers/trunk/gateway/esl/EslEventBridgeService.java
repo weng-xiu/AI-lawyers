@@ -25,6 +25,7 @@ import ai.lawyers.system.mapper.lawyers.trunk.AiCallTrunkMapper;
 import ai.lawyers.system.service.lawyers.CallEventPublisher;
 import ai.lawyers.system.service.lawyers.IAiCallAgentStatusService;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
+import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
 import ai.lawyers.system.service.lawyers.queue.QualityTranscribeDispatcher;
 import ai.lawyers.system.service.lawyers.trunk.ICallDispatchService;
 
@@ -92,6 +93,9 @@ public class EslEventBridgeService implements EslEventListener
 
     @Autowired(required = false)
     private QualityTranscribeDispatcher qualityTranscribeDispatcher;
+
+    @Autowired(required = false)
+    private HotlineMetrics metrics;
 
     /** host:port -> client */
     private final Map<String, FreeSwitchEslInboundClient> clients = new ConcurrentHashMap<>();
@@ -270,6 +274,10 @@ public class EslEventBridgeService implements EslEventListener
     private void onChannelAnswer(String uuid, EslEvent event)
     {
         log.info("[ESL] 通道接通: uuid={}", uuid);
+        if (metrics != null)
+        {
+            metrics.incrementCall("answered");
+        }
         // 外呼场景：通过拨号日志找到关联坐席并推送
         pushEventToAgent(uuid, "ANSWERED", event, null);
         // 通知调度服务更新状态
@@ -306,6 +314,12 @@ public class EslEventBridgeService implements EslEventListener
         params.put("hangupCause", cause);
         params.put("talkDuration", talkDuration);
         callDispatchService.onCallEvent(uuid, "HANGUP", params);
+
+        // T5-1：未接/丢弃（无通话时长）计数
+        if (metrics != null && talkDuration == 0)
+        {
+            metrics.incrementCall("abandoned");
+        }
 
         // 推送挂断事件给坐席
         pushEventToAgent(uuid, "HANGUP", event, cause);

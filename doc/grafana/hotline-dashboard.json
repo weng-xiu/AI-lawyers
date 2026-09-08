@@ -1,0 +1,158 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "话务总览（inbound/answered/abandoned/queued）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum by (result) (rate(hotline_call_total{result=~\"inbound|answered|abandoned|queued\"}[$__rate_interval]))",
+          "legendFormat": "{{result}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" } }
+    },
+    {
+      "title": "接通率 (%)",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(hotline_call_total{result=\"answered\"}[$__rate_interval])) / sum(rate(hotline_call_total{result=\"inbound\"}[$__rate_interval])) * 100"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent", "thresholds": { "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 80 }, { "color": "green", "value": 90 }] } } }
+    },
+    {
+      "title": "ACD 分配耗时 p95 (ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(hotline_acd_assign_seconds_bucket[$__rate_interval]))) * 1000"
+        }
+      ]
+    },
+    {
+      "title": "ACD 抢占失败速率（超卖信号）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "rate(hotline_acd_occupy_fail_total[$__rate_interval])",
+          "legendFormat": "occupy_fail"
+        }
+      ]
+    },
+    {
+      "title": "AI 调用 by kind/result",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum by (kind,result) (rate(hotline_ai_call_total[$__rate_interval]))",
+          "legendFormat": "{{kind}}-{{result}}"
+        }
+      ]
+    },
+    {
+      "title": "AI 首响 p95 (s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(hotline_ai_first_response_seconds_bucket[$__rate_interval])))"
+        }
+      ]
+    },
+    {
+      "title": "AI 在途并发（舱壁占用）",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 16 },
+      "targets": [
+        {
+          "expr": "hotline_ai_inflight"
+        }
+      ],
+      "fieldConfig": { "defaults": { "max": 32, "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 24 }, { "color": "red", "value": 32 }] } } }
+    },
+    {
+      "title": "RAG 命中路由分布",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum by (route) (increase(hotline_rag_hit_total[$__range]))",
+          "legendFormat": "{{route}}"
+        }
+      ]
+    },
+    {
+      "title": "外呼结果分布",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum by (result) (rate(hotline_outbound_total[$__rate_interval]))",
+          "legendFormat": "{{result}}"
+        }
+      ]
+    },
+    {
+      "title": "队列积压 by queue",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "hotline_queue_size",
+          "legendFormat": "{{queue}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 100 }, { "color": "red", "value": 1000 }] } } }
+    },
+    {
+      "title": "队列死信速率（数据丢失风险）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "targets": [
+        {
+          "expr": "rate(hotline_queue_dead_total[$__rate_interval])",
+          "legendFormat": "{{queue}}"
+        }
+      ]
+    },
+    {
+      "title": "质检结果 (success/fail)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
+      "targets": [
+        {
+          "expr": "sum by (result) (rate(hotline_quality_total[$__rate_interval]))",
+          "legendFormat": "{{result}}"
+        }
+      ]
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["ai-lawyers", "hotline", "phase2-closure"],
+  "templating": {
+    "list": []
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "Asia/Shanghai",
+  "title": "AI律师话务系统 - 二期收尾监控看板",
+  "uid": "hotline-phase2-closure",
+  "version": 1,
+  "weekStart": ""
+}

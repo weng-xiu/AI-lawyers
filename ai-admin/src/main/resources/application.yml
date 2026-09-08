@@ -269,6 +269,14 @@ call:
     simulateTalkSeconds: 45
     # 回访类任务或转人工类外呼接通后自动创建工单
     autoCreateTicket: true
+    # ---------- W4 外呼合规 ----------
+    compliance:
+      # 合规总开关（时段+退订拦截），生产保持 true
+      enabled: true
+      # 允许外呼时段，格式 HH:mm-HH:mm，多段逗号分隔（如 09:00-12:00,14:00-21:00）
+      allowed-hours: ${CALL_OUTBOUND_ALLOWED_HOURS:09:00-21:00}
+      # 时区
+      timezone: Asia/Shanghai
 
   # ---------- 入站呼叫（PSTN/分机来电 → 排队 → 坐席） ----------
   inbound:

@@ -27,6 +27,7 @@ import ai.lawyers.system.enums.DialStatusEnum;
 import ai.lawyers.system.enums.TrunkHealthEnum;
 import ai.lawyers.system.mapper.lawyers.trunk.AiCallDialLogMapper;
 import ai.lawyers.system.mapper.lawyers.trunk.AiCallTrunkMapper;
+import ai.lawyers.system.service.lawyers.queue.CallEventDispatcher;
 import ai.lawyers.system.service.lawyers.trunk.ICallDispatchService;
 import ai.lawyers.system.service.lawyers.trunk.ICarrierRouteService;
 import ai.lawyers.system.service.lawyers.trunk.ITrunkMonitorService;
@@ -69,6 +70,9 @@ public class CallDispatchServiceImpl implements ICallDispatchService
 
     @Autowired
     private AiCallDialLogMapper dialLogMapper;
+
+    @Autowired
+    private CallEventDispatcher callEventDispatcher;
 
     @Autowired
     private ITrunkMonitorService trunkMonitorService;
@@ -229,7 +233,7 @@ public class CallDispatchServiceImpl implements ICallDispatchService
             case "RINGING":
                 update.setDialStatus(DialStatusEnum.RINGING.getCode());
                 update.setRingTime(now);
-                dialLogMapper.updateAiCallDialLog(update);
+                callEventDispatcher.updateDialLogAsync(update);
                 break;
 
             case "ANSWERED":
@@ -240,7 +244,7 @@ public class CallDispatchServiceImpl implements ICallDispatchService
                 {
                     update.setRingDuration(diffSeconds(dialLog.getRingTime(), now));
                 }
-                dialLogMapper.updateAiCallDialLog(update);
+                callEventDispatcher.updateDialLogAsync(update);
                 break;
 
             case "HANGUP":

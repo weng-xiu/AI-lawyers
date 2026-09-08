@@ -47,6 +47,7 @@ import ai.lawyers.system.service.lawyers.IAiCallTicketService;
 import ai.lawyers.system.service.lawyers.outbound.IAiOutboundResultService;
 import ai.lawyers.system.service.lawyers.outbound.IAiOutboundTaskService;
 import ai.lawyers.system.service.lawyers.outbound.IOutboundExecutionService;
+import ai.lawyers.system.service.lawyers.queue.CallEventDispatcher;
 import ai.lawyers.system.service.lawyers.queue.MessageNotifyDispatcher;
 import ai.lawyers.system.service.lawyers.trunk.ICallDispatchService;
 import ai.lawyers.system.service.lawyers.ivr.engine.IIvrEngineService;
@@ -110,6 +111,12 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
     /** T5-3 消息中心：任务完成站内信投递（队列不可用时内部降级，不影响外呼主流程） */
     @Autowired(required = false)
     private MessageNotifyDispatcher messageNotifyDispatcher;
+
+    @Autowired
+    private CallEventDispatcher callEventDispatcher;
+
+    @Autowired(required = false)
+    private ai.lawyers.system.service.lawyers.compliance.ComplianceGuard complianceGuard;
 
     /** createBy（登录名）反查 userId，用于确定站内信接收人 */
     @Autowired
@@ -306,6 +313,12 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
             if (!locked)
             {
                 log.debug("外呼扫描锁被其他实例持有，本轮跳过");
+                return;
+            }
+            // W4：非允许外呼时段，整批跳过不拨号（仅释放锁，下轮扫描再判断）
+            if (complianceGuard != null && !complianceGuard.isCallingAllowed())
+            {
+                log.info("当前为非外呼服务时段，本轮扫描跳过");
                 return;
             }
             List<AiOutboundTask> running = taskMapper.selectRunningTasks();
@@ -549,8 +562,37 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
 
     // ------------------------------------------------------------------ 内部实现
 
+    /**
+     * W4：合规拦截（退订/非时段）时标记被叫为已跳过，不重试、不计失败，仅计入完成数避免任务卡死。
+     */
+    private void markCalleeSkipped(AiOutboundCallee callee, String reason)
+    {
+        try
+        {
+            AiOutboundCallee upd = new AiOutboundCallee();
+            upd.setCalleeId(callee.getCalleeId());
+            upd.setCallStatus("4");
+            upd.setCallTime(new Date());
+            upd.setFailReason(truncate("合规拦截:" + reason, 500));
+            upd.setUpdateBy("outbound-executor");
+            calleeMapper.updateCalleeStatus(upd);
+            taskMapper.incrementCompletedCount(callee.getTaskId());
+        }
+        catch (Exception e)
+        {
+            log.warn("标记被叫跳过失败 calleeId={} reason={}: {}", callee.getCalleeId(), reason, e.getMessage());
+        }
+    }
+
     private void dialCallee(AiOutboundTask task, AiOutboundCallee callee)
     {
+        // W4：退订号码拦截（已回复"T"退订的号码禁止外呼）
+        if (complianceGuard != null && complianceGuard.isUnsubscribed(callee.getCalleeNumber()))
+        {
+            log.info("外呼号码已退订，跳过拨号 taskId={} calleeId={}", task.getTaskId(), callee.getCalleeId());
+            markCalleeSkipped(callee, "UNSUBSCRIBED");
+            return;
+        }
         Date dialTime = new Date();
         // 号码已由 executeTask 通过 claimCallee 原子置为呼叫中(1)，此处不再重复置状态
 
@@ -780,7 +822,7 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
             update.setRemark("【IVR】流程[" + flowResult.getFlowName() + "] 意图="
                     + flowResult.getMatchedIntentionName() + "(" + flowResult.getMatchedIntention() + ")"
                     + " 分类=" + flowResult.getCategoryName());
-            callRecordService.updateAiCallRecord(update);
+            callEventDispatcher.updateCallRecordAsync(update);
         }
         catch (Exception e)
         {
