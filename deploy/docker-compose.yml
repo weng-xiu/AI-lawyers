@@ -107,14 +107,42 @@ services:
         condition: service_healthy
     environment:
       TZ: Asia/Shanghai
-      # —— 数据库（覆盖 application-druid.yml）——
-      SPRING_DATASOURCE_DRUID_MASTER_URL: jdbc:mysql://mysql:3306/ai-law?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=GMT%2B8
-      SPRING_DATASOURCE_DRUID_MASTER_USERNAME: root
-      SPRING_DATASOURCE_DRUID_MASTER_PASSWORD: root
-      # —— Redis（覆盖 application.yml）——
-      SPRING_REDIS_HOST: redis
-      SPRING_REDIS_PORT: 6379
-      SPRING_REDIS_PASSWORD: ""
+      # ============ W5 上线配置收口：环境变量透传（${VAR:-默认}，生产用 .env/export 覆盖，无需改本文件） ============
+      # 变量名与后端 application*.yml 占位符一一对应，核对表见《上线部署操作手册_W4退订与W5上线_20260912.md》第 3 节
+      # —— 数据库（application-druid.yml：DB_URL/DB_USERNAME/DB_PASSWORD，生产禁 root）——
+      DB_URL: ${DB_URL:-jdbc:mysql://mysql:3306/ai-law?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=GMT%2B8}
+      DB_USERNAME: ${DB_USERNAME:-root}
+      DB_PASSWORD: ${DB_PASSWORD:-root}
+      # —— Redis（application.yml：REDIS_HOST/REDIS_PORT/REDIS_PASSWORD，生产注入强密码）——
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      # —— JWT 密钥（生产必须注入 >=32 字节随机串，禁止默认值）——
+      TOKEN_SECRET: ${TOKEN_SECRET:-Z2xwLWExMmwtbGF3eWVycy1qd3Qtc2VjcmV0LWtleS0yMDI2LWNoYW5nZS1tZS1pbi1wcm9kLTA5ODc2NTQz}
+      # —— 网关/短信上行回调签名（S7 收口：生产 CALLBACK_SIGN_ENABLED=true + CALLBACK_SIGN_SECRET 强随机）——
+      CALLBACK_SIGN_ENABLED: ${CALLBACK_SIGN_ENABLED:-false}
+      CALLBACK_SIGN_SECRET: ${CALLBACK_SIGN_SECRET:-ai-lawyers-callback-dev-secret-change-me-2026}
+      # —— 短信上行退订回调（W4：签名/token 任配其一即可；同配时签名优先、token 兜底，任一通过即放行）——
+      SMS_UPSTREAM_ENABLED: ${SMS_UPSTREAM_ENABLED:-true}
+      SMS_UPSTREAM_TOKEN: ${SMS_UPSTREAM_TOKEN:-}
+      SMS_UPSTREAM_RATE_LIMIT: ${SMS_UPSTREAM_RATE_LIMIT:-10}
+      # —— 外呼合规（W4：模拟接通生产必须 false；时段按业务配置）——
+      CALL_OUTBOUND_SIMULATEANSWER: ${CALL_OUTBOUND_SIMULATEANSWER:-true}
+      CALL_OUTBOUND_ALLOWED_HOURS: ${CALL_OUTBOUND_ALLOWED_HOURS:-09:00-21:00}
+      # —— FreeSWITCH/Asterisk 网关口令（生产注入强口令，禁止 ClueCon/amp111）——
+      ESL_PASSWORD: ${ESL_PASSWORD:-ClueCon}
+      AMI_USER: ${AMI_USER:-admin}
+      AMI_PASSWORD: ${AMI_PASSWORD:-amp111}
+      # —— Druid 控制台（生产 DRUID_CONSOLE_ENABLED=false 或限内网+强口令）——
+      DRUID_CONSOLE_ENABLED: ${DRUID_CONSOLE_ENABLED:-true}
+      DRUID_CONSOLE_ALLOW: ${DRUID_CONSOLE_ALLOW:-127.0.0.1,0:0:0:0:0:0:0:1}
+      DRUID_CONSOLE_USER: ${DRUID_CONSOLE_USER:-admin}
+      DRUID_CONSOLE_PASSWORD: ${DRUID_CONSOLE_PASSWORD:-Druid@2026!ChangeMe}
+      # —— Swagger（生产关闭）——
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
+      # —— AI 并发舱壁（与模型侧限流匹配）——
+      AI_MODEL_MAX_INFLIGHT: ${AI_MODEL_MAX_INFLIGHT:-32}
+      AI_MODEL_ACQUIRE_TIMEOUT_MS: ${AI_MODEL_ACQUIRE_TIMEOUT_MS:-3000}
       # —— 上传路径（容器内）——
       RUOYI_PROFILE: /ruoyi/uploadPath
       FILE_PATH: /ruoyi/uploadPath

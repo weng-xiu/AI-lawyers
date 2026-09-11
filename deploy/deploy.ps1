@@ -1,4 +1,4 @@
-﻿# =====================================================================
+# =====================================================================
 # 12348 公共法律服务热线 —— 全容器化一键部署（Windows / Docker Desktop）
 #
 # 完成动作：
@@ -157,7 +157,7 @@ Write-Host ""
 Write-Host "访问入口：" -ForegroundColor White
 Write-Host "  管理后台/工作台 : http://localhost" -ForegroundColor Green
 Write-Host "  后端接口       : http://localhost:8080" -ForegroundColor Gray
-Write-Host "  Druid 监控     : http://localhost:8080/druid (ruoyi/123456)" -ForegroundColor Gray
+Write-Host "  Druid 监控     : http://localhost:8080/druid (生产关闭；开发默认 admin/Druid@2026!ChangeMe)" -ForegroundColor Gray
 Write-Host ""
 Write-Host "常用命令（在 deploy 目录执行）：" -ForegroundColor White
 Write-Host "  docker compose logs -f backend     # 查看后端日志" -ForegroundColor Gray

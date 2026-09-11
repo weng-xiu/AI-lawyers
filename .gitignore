@@ -55,4 +55,5 @@ nbdist/
 /.m2-repo/
 /.fs/
 /doc/*.md
+/doc/archive/*.md
 /tmp-verify/

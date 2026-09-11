@@ -16,8 +16,8 @@ import ai.lawyers.common.core.controller.BaseController;
 import ai.lawyers.common.core.domain.AjaxResult;
 import ai.lawyers.common.core.redis.RedisCache;
 import ai.lawyers.common.utils.StringUtils;
-import ai.lawyers.common.utils.sign.CallbackSignUtils;
 import ai.lawyers.system.service.lawyers.IAiCallBlacklistService;
+import ai.lawyers.system.service.lawyers.sms.UpstreamAuthVerifier;
 
 /**
  * W4：短信上行回调——用户回复"T/TD/退订"自动写入退订名单（list_type=3），
@@ -117,37 +117,22 @@ public class SmsUpstreamController extends BaseController
     }
 
     /**
-     * 安全校验：生产必须开启 HMAC 签名或配置 token 二者其一。
+     * 安全校验：生产必须开启 HMAC 签名或配置 token 二者其一（双配时任一通道通过即放行）。
+     * 决策逻辑见 {@link UpstreamAuthVerifier}，本方法仅负责请求参数提取与未配置告警。
      *
      * @return true 校验通过
      */
     private boolean verify(HttpServletRequest request, Map<String, Object> body, String phone, String content)
     {
-        // 1) HMAC 签名（与网关回调一致，content 指纹 = phone|content）
-        if (signEnabled && StringUtils.isNotEmpty(signSecret))
+        if (!signEnabled && StringUtils.isEmpty(upstreamToken))
         {
-            String timestamp = request.getHeader("X-Callback-Timestamp");
-            String signature = request.getHeader("X-Callback-Sign");
-            return CallbackSignUtils.verify(signSecret, phone + "|" + content, timestamp, signature);
+            log.warn("短信上行回调未配置签名/令牌校验，生产环境必须设置 CALLBACK_SIGN_ENABLED=true 或 SMS_UPSTREAM_TOKEN");
+            return true;
         }
-        // 2) token 校验（header / query / body 三通道）
-        if (StringUtils.isNotEmpty(upstreamToken))
-        {
-            String token = request.getHeader("X-Upstream-Token");
-            if (StringUtils.isEmpty(token))
-            {
-                token = request.getParameter("token");
-            }
-            if (StringUtils.isEmpty(token))
-            {
-                Object bodyToken = body.get("token");
-                token = bodyToken == null ? null : String.valueOf(bodyToken);
-            }
-            return upstreamToken.equals(token);
-        }
-        // 3) 生产未配置校验项：告警（不阻断，便于开发联调）
-        log.warn("短信上行回调未配置签名/令牌校验，生产环境必须设置 CALLBACK_SIGN_ENABLED=true 或 SMS_UPSTREAM_TOKEN");
-        return true;
+        return UpstreamAuthVerifier.verify(signEnabled, signSecret, upstreamToken,
+                request.getHeader("X-Upstream-Token"), request.getParameter("token"), body.get("token"),
+                request.getHeader("X-Callback-Timestamp"), request.getHeader("X-Callback-Sign"),
+                phone, content);
     }
 
     /** 同号码退订频控（Redis INCR + 60s 过期；Redis 故障放行并告警） */
