@@ -20,6 +20,8 @@ public class AiCallBlacklistServiceImpl implements IAiCallBlacklistService
     private static final int LIST_TYPE_BLACK = 1;
     /** 名单类型：白名单 */
     private static final int LIST_TYPE_WHITE = 2;
+    /** 名单类型：退订名单（W4，"一处退订，呼叫+短信均禁止"） */
+    private static final int LIST_TYPE_UNSUBSCRIBE = 3;
     /** 状态：启用 */
     private static final int STATUS_ENABLED = 1;
 
@@ -100,5 +102,49 @@ public class AiCallBlacklistServiceImpl implements IAiCallBlacklistService
             return true;
         }
         return false;
+    }
+
+    @Override
+    public boolean addUnsubscribe(String phoneNumber, String reason)
+    {
+        if (StringUtils.isEmpty(phoneNumber))
+        {
+            return false;
+        }
+        AiCallBlacklist exist = findUnsubscribeRecord(phoneNumber);
+        if (exist != null)
+        {
+            // 幂等恢复：置启用、清空生效区间，不产生重复记录
+            AiCallBlacklist upd = new AiCallBlacklist();
+            upd.setId(exist.getId());
+            upd.setReason(StringUtils.isEmpty(reason) ? "短信回复T退订" : reason);
+            upd.setUpdateBy("SMS_UPSTREAM");
+            return blacklistMapper.updateUnsubscribeActive(upd) > 0;
+        }
+        AiCallBlacklist entity = new AiCallBlacklist();
+        entity.setPhoneNumber(phoneNumber);
+        entity.setListType(LIST_TYPE_UNSUBSCRIBE);
+        entity.setStatus(STATUS_ENABLED);
+        entity.setReason(StringUtils.isEmpty(reason) ? "短信回复T退订" : reason);
+        entity.setCreateBy("SMS_UPSTREAM");
+        return blacklistMapper.insert(entity) > 0;
+    }
+
+    /** 查询该号码已有的退订名单记录（含停用/过期），用于幂等恢复 */
+    private AiCallBlacklist findUnsubscribeRecord(String phoneNumber)
+    {
+        List<AiCallBlacklist> records = blacklistMapper.selectByPhone(phoneNumber);
+        if (records == null || records.isEmpty())
+        {
+            return null;
+        }
+        for (AiCallBlacklist r : records)
+        {
+            if (r != null && r.getListType() != null && r.getListType() == LIST_TYPE_UNSUBSCRIBE)
+            {
+                return r;
+            }
+        }
+        return null;
     }
 }

@@ -89,6 +89,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where id = #{id}
     </update>
 
+    <!-- W4：退订名单幂等恢复——置启用、清空生效区间、更新原因（上行回调/管理端恢复复用） -->
+    <update id="updateUnsubscribeActive" parameterType="AiCallBlacklist">
+        update ai_call_blacklist
+        set status = 1, effective_start = null, effective_end = null,
+            reason = #{reason},
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where id = #{id}
+    </update>
+
     <delete id="deleteByIds" parameterType="String">
         delete from ai_call_blacklist where id in
         <foreach item="id" collection="array" open="(" separator="," close=")">

@@ -2,9 +2,9 @@
   <div class="app-container blacklist-page">
     <el-card class="search-card" shadow="never">
       <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" label-width="80px">
-        <el-form-item label="电话号码" prop="phone">
+        <el-form-item label="电话号码" prop="phoneNumber">
           <el-input
-            v-model="queryParams.phone"
+            v-model="queryParams.phoneNumber"
             placeholder="请输入电话号码"
             clearable
             style="width: 180px"
@@ -15,6 +15,7 @@
           <el-select v-model="queryParams.listType" placeholder="全部" clearable style="width: 140px">
             <el-option label="黑名单" value="1" />
             <el-option label="白名单" value="2" />
+            <el-option label="退订名单" value="3" />
           </el-select>
         </el-form-item>
         <el-form-item label="状态" prop="status">
@@ -42,11 +43,11 @@
 
       <el-table v-loading="loading" :data="blacklistList" border size="small">
         <el-table-column label="ID" align="center" prop="id" width="80" />
-        <el-table-column label="电话号码" align="center" prop="phone" width="150" />
+        <el-table-column label="电话号码" align="center" prop="phoneNumber" width="150" />
         <el-table-column label="名单类型" align="center" width="100">
           <template slot-scope="scope">
-            <el-tag :type="scope.row.listType === '1' ? 'danger' : 'success'" size="mini">
-              {{ scope.row.listType === '1' ? '黑名单' : '白名单' }}
+            <el-tag :type="listTypeTagType(scope.row.listType)" size="mini">
+              {{ listTypeText(scope.row.listType) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -92,13 +93,14 @@
     <!-- 新增/编辑对话框 -->
     <el-dialog :title="title" :visible.sync="open" width="560px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="100px" size="small">
-        <el-form-item label="电话号码" prop="phone">
-          <el-input v-model="form.phone" placeholder="请输入电话号码" maxlength="20" />
+        <el-form-item label="电话号码" prop="phoneNumber">
+          <el-input v-model="form.phoneNumber" placeholder="请输入电话号码" maxlength="20" />
         </el-form-item>
         <el-form-item label="名单类型" prop="listType">
           <el-radio-group v-model="form.listType">
             <el-radio label="1">黑名单</el-radio>
             <el-radio label="2">白名单</el-radio>
+            <el-radio label="3">退订名单</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="原因" prop="reason">
@@ -147,7 +149,7 @@
           show-icon
         />
         <div class="check-detail">
-          <p v-if="checkResult.listType">名单类型：<b>{{ checkResult.listType === '1' ? '黑名单' : '白名单' }}</b></p>
+          <p v-if="checkResult.listType">名单类型：<b>{{ listTypeText(checkResult.listType) }}</b></p>
           <p v-if="checkResult.status != null">状态：<b>{{ checkResult.status === '1' ? '启用' : '停用' }}</b></p>
           <p v-if="checkResult.reason">原因：{{ checkResult.reason }}</p>
           <p v-if="checkResult.effectiveStart">生效时间：{{ parseTime(checkResult.effectiveStart) }} ~ {{ checkResult.effectiveEnd ? parseTime(checkResult.effectiveEnd) : '永久' }}</p>
@@ -180,13 +182,13 @@ export default {
       queryParams: {
         pageNum: 1,
         pageSize: 10,
-        phone: undefined,
+        phoneNumber: undefined,
         listType: undefined,
         status: undefined
       },
       form: {},
       rules: {
-        phone: [{ required: true, message: '电话号码不能为空', trigger: 'blur' }],
+        phoneNumber: [{ required: true, message: '电话号码不能为空', trigger: 'blur' }],
         listType: [{ required: true, message: '请选择名单类型', trigger: 'change' }]
       }
     }
@@ -195,20 +197,34 @@ export default {
     checkResultTitle() {
       if (!this.checkResult) return ''
       if (this.checkResult.listed) {
-        return this.checkResult.listType === '1' ? '该号码在黑名单中' : '该号码在白名单中'
+        return '该号码在' + this.listTypeText(this.checkResult.listType) + '中'
       }
       return '该号码未在名单中'
     },
     checkResultType() {
       if (!this.checkResult) return 'info'
       if (!this.checkResult.listed) return 'success'
-      return this.checkResult.listType === '1' ? 'error' : 'success'
+      return String(this.checkResult.listType) === '1' ? 'error' : 'warning'
     }
   },
   created() {
     this.getList()
   },
   methods: {
+    listTypeText(listType) {
+      const t = String(listType)
+      if (t === '1') return '黑名单'
+      if (t === '2') return '白名单'
+      if (t === '3') return '退订名单'
+      return '未知'
+    },
+    listTypeTagType(listType) {
+      const t = String(listType)
+      if (t === '1') return 'danger'
+      if (t === '2') return 'success'
+      if (t === '3') return 'warning'
+      return 'info'
+    },
     getList() {
       this.loading = true
       listBlacklist(this.queryParams).then(res => {
@@ -223,13 +239,13 @@ export default {
     },
     resetQuery() {
       this.resetForm('queryForm')
-      this.queryParams = { pageNum: 1, pageSize: 10, phone: undefined, listType: undefined, status: undefined }
+      this.queryParams = { pageNum: 1, pageSize: 10, phoneNumber: undefined, listType: undefined, status: undefined }
       this.handleQuery()
     },
     reset() {
       this.form = {
         id: undefined,
-        phone: undefined,
+        phoneNumber: undefined,
         listType: '1',
         reason: undefined,
         status: '1',

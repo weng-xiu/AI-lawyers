@@ -21,5 +21,10 @@ public interface AiCallBlacklistMapper
 
     public int update(AiCallBlacklist entity);
 
+    /**
+     * 退订名单幂等恢复：置为启用并清空生效区间（W4 上行退订复用）。
+     */
+    public int updateUnsubscribeActive(AiCallBlacklist entity);
+
     public int deleteByIds(Long[] ids);
 }
