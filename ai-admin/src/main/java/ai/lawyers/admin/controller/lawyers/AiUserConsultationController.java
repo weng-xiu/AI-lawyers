@@ -40,9 +40,11 @@ public class AiUserConsultationController extends BaseController
 
     /**
      * 提交法律咨询
+     *
+     * <p>G4 复核（2026-09-12 止血包二期）：移除 @Anonymous——匿名开放存在垃圾提交/文件存储滥用风险，
+     * 且唯一使用方（ai-ui 管理端）始终携带 JWT；公众端开放提交时应走用户端令牌鉴权。</p>
      */
     @Log(title = "用户咨询", businessType = BusinessType.INSERT)
-    @Anonymous
     @PostMapping("/submit")
     public AjaxResult submitConsultation(HttpServletRequest request)
     {
@@ -65,8 +67,10 @@ public class AiUserConsultationController extends BaseController
 
     /**
      * 获取咨询结果
+     *
+     * <p>G4 复核（2026-09-12 止血包二期）：移除 @Anonymous——自增 ID 匿名可读构成 IDOR，
+     * 可遍历拉取他人法律咨询内容（含 PII）；管理端调用本就携带 JWT。</p>
      */
-    @Anonymous
     @GetMapping("/result/{id}")
     public AjaxResult getConsultationResult(@PathVariable("id") Long id)
     {

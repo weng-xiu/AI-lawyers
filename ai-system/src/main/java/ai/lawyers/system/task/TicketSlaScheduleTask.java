@@ -1,5 +1,6 @@
 package ai.lawyers.system.task;
 
+import java.time.Duration;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Component;
 import ai.lawyers.system.domain.lawyers.AiCallTicket;
 import ai.lawyers.system.mapper.lawyers.AiCallTicketMapper;
 import ai.lawyers.system.service.lawyers.CallEventPublisher;
+import ai.lawyers.system.service.lawyers.cluster.RedisLeaderLock;
 
 /**
  * 工单 SLA 超时提醒定时任务
@@ -24,8 +26,8 @@ import ai.lawyers.system.service.lawyers.CallEventPublisher;
  *   <li>无事件发布器时至少记录 warn 日志。</li>
  * </ol>
  *
- * <p>主程序已开启 @EnableScheduling，多实例部署时建议只在一个实例执行，
- * 或改造为分布式锁调度。</p>
+ * <p>N7：多实例部署时通过 {@link RedisLeaderLock} 单次单主锁保证全组仅一个实例执行
+ * （cluster.lock.enabled=false 可回退为各实例各自执行）。</p>
  *
  * @author ai-lawyers
  */
@@ -34,17 +36,29 @@ public class TicketSlaScheduleTask
 {
     private static final Logger log = LoggerFactory.getLogger(TicketSlaScheduleTask.class);
 
+    /** 分布式单主锁名（TTL 10 分钟，须大于单次扫描最坏耗时） */
+    private static final String LOCK_NAME = "job:ticket-sla";
+    private static final Duration LOCK_TTL = Duration.ofMinutes(10);
+
     @Autowired
     private AiCallTicketMapper aiCallTicketMapper;
 
     @Autowired(required = false)
     private CallEventPublisher callEventPublisher;
 
+    @Autowired
+    private RedisLeaderLock leaderLock;
+
     /**
-     * 每 5 分钟扫描一次超时工单。
+     * 每 5 分钟扫描一次超时工单（N7：集群内单实例执行）。
      */
     @Scheduled(fixedDelayString = "${call.ticket.slaScanIntervalMs:300000}", initialDelay = 60000)
     public void scanOvertimeTickets()
+    {
+        leaderLock.tryRun(LOCK_NAME, LOCK_TTL, this::doScanOvertimeTickets);
+    }
+
+    private void doScanOvertimeTickets()
     {
         try
         {

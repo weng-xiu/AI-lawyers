@@ -1,5 +1,6 @@
 package ai.lawyers.system.service.impl.lawyers.skill;
 
+import java.time.Duration;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +13,7 @@ import ai.lawyers.system.domain.lawyers.skill.DispatchContext;
 import ai.lawyers.system.domain.lawyers.skill.DispatchResult;
 import ai.lawyers.system.mapper.lawyers.skill.AiCallQueueMapper;
 import ai.lawyers.system.mapper.lawyers.skill.AiSkillGroupMapper;
+import ai.lawyers.system.service.lawyers.cluster.RedisLeaderLock;
 import ai.lawyers.system.service.lawyers.skill.IAgentDispatchService;
 
 /**
@@ -22,12 +24,19 @@ import ai.lawyers.system.service.lawyers.skill.IAgentDispatchService;
  * 若技能组配置了溢出技能组 overflow_group_id，则向溢出组重新分配一次（不再链式溢出、
  * 不再入队），无可用坐席则保持超时溢出终态。</p>
  *
+ * <p>N7：多实例通过 {@link RedisLeaderLock} 单主锁保证全组仅一个实例扫描
+ * （markTimeoutOverflow 本身幂等，锁为第一道防线）。</p>
+ *
  * @author ai-lawyers
  */
 @Component
 public class QueueTimeoutScheduleTask
 {
     private static final Logger log = LoggerFactory.getLogger(QueueTimeoutScheduleTask.class);
+
+    /** TTL 60s：大于单轮最坏耗时，崩溃后下一轮自动恢复 */
+    private static final String LOCK_NAME = "job:queue-timeout";
+    private static final Duration LOCK_TTL = Duration.ofSeconds(60);
 
     @Autowired
     private AiCallQueueMapper queueMapper;
@@ -38,11 +47,19 @@ public class QueueTimeoutScheduleTask
     @Autowired
     private IAgentDispatchService agentDispatchService;
 
+    @Autowired
+    private RedisLeaderLock leaderLock;
+
     /**
-     * 排队超时扫描：每 30 秒一次
+     * 排队超时扫描：每 30 秒一次（N7：集群内单实例执行）
      */
     @Scheduled(cron = "*/30 * * * * ?")
     public void scanTimeoutQueues()
+    {
+        leaderLock.tryRun(LOCK_NAME, LOCK_TTL, this::doScanTimeoutQueues);
+    }
+
+    private void doScanTimeoutQueues()
     {
         List<AiCallQueue> timeouts;
         try

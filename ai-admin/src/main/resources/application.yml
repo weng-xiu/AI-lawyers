@@ -127,6 +127,10 @@ token:
 websocket:
   auth:
     enabled: ${WEBSOCKET_AUTH_ENABLED:true}
+  # N4 多实例跨实例推送：多实例（>1 个后端）部署时置 true，经 Redis Pub/Sub 把推送扇出到
+  # 持有目标连接的实例，并在 Redis 维护全局在线注册表；单机保持 false（零行为变化）
+  cluster:
+    enabled: ${WEBSOCKET_CLUSTER_ENABLED:false}
 
 # N1 Redis Stream 消费重试（PEL 重读 + 真实投递计数 + 死消费者接管）
 # 应急可置 queue.stream.retry-enabled=false 恢复旧行为（失败即转死信）
@@ -135,6 +139,33 @@ queue:
     enabled: ${QUEUE_STREAM_ENABLED:true}
     retry-enabled: ${QUEUE_STREAM_RETRY_ENABLED:true}
     reclaim-min-idle-ms: ${QUEUE_STREAM_RECLAIM_MIN_IDLE_MS:60000}
+
+# N7/N3/N12 集群单主协调（Redis SET NX + Lua CAS 释放）
+# 定时任务、ESL 竞选、数据清理均经此组件保证多实例只一个执行者；
+# 单机或应急排障可置 CLUSTER_LOCK_ENABLED=false 回退为每实例各自执行
+cluster:
+  lock:
+    enabled: ${CLUSTER_LOCK_ENABLED:true}
+    key-prefix: ${CLUSTER_LOCK_KEY_PREFIX:ai-law:lock:}
+
+# N12 数据生命周期清理（默认 enabled=false + dry-run=true 双保险，不删任何数据）
+# 经合规确认保留期后：先置 enabled=true 观察试运行日志，再置 dry-run=false 实际删除
+data:
+  retention:
+    enabled: ${DATA_RETENTION_ENABLED:false}
+    dry-run: ${DATA_RETENTION_DRY_RUN:true}
+    cron: ${DATA_RETENTION_CRON:0 30 3 * * ?}
+    batch-size: ${DATA_RETENTION_BATCH_SIZE:1000}
+    max-batches: ${DATA_RETENTION_MAX_BATCHES:100}
+    dial-log-months: ${DATA_RETENTION_DIAL_LOG_MONTHS:3}
+    agent-status-log-months: ${DATA_RETENTION_AGENT_STATUS_LOG_MONTHS:6}
+    sms-log-months: ${DATA_RETENTION_SMS_LOG_MONTHS:6}
+    video-consult-log-months: ${DATA_RETENTION_VIDEO_LOG_MONTHS:6}
+    ivr-execution-log-months: ${DATA_RETENTION_IVR_EXEC_LOG_MONTHS:1}
+    ivr-intention-log-months: ${DATA_RETENTION_IVR_INTENTION_LOG_MONTHS:1}
+    # 话单+录音默认保留 36 个月，调整前必须确认当地政务热线归档合规要求
+    call-record-months: ${DATA_RETENTION_CALL_RECORD_MONTHS:36}
+    delete-recording-file: ${DATA_RETENTION_DELETE_RECORDING_FILE:true}
 
 # ============================================================
 # AI 大模型调用与 RAG 检索配置（T2-1 连接池 / T3 RAG 混合检索）
@@ -305,6 +336,12 @@ call:
     # 部署真实 FreeSWITCH 时置为 true，并在“资源管理-运营商线路”中配置 vendor=FREESWITCH 的线路
     esl:
       enabled: true
+      # N3 单主竞选：多实例时仅领导者建立 ESL 入站连接消费事件，崩溃后 TTL 到期自动切换
+      # 单机/应急可置 false 恢复各实例各自建连（多实例会重复消费事件）
+      leader-election:
+        enabled: ${ESL_LEADER_ELECTION_ENABLED:true}
+        key: ${ESL_LEADER_ELECTION_KEY:ai-law:leader:esl-bridge}
+        ttl-seconds: ${ESL_LEADER_ELECTION_TTL_SECONDS:30}
     # FreeSWITCH ESL：生产环境通过环境变量注入强口令，禁止使用默认 ClueCon
     freeswitch:
       eslPort: ${ESL_PORT:8021}

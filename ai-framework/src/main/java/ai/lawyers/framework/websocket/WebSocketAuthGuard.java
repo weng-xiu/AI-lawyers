@@ -3,6 +3,7 @@ package ai.lawyers.framework.websocket;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.regex.Pattern;
 import javax.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +36,10 @@ import ai.lawyers.framework.web.service.TokenService;
 public class WebSocketAuthGuard
 {
     private static final Logger log = LoggerFactory.getLogger(WebSocketAuthGuard.class);
+
+    /** 异常文本/URL 中误带的 query token 掩码（防 Tomcat WS 异常消息泄露 JWT） */
+    private static final Pattern TOKEN_IN_TEXT =
+            Pattern.compile("([?&](?:token|access_token)=)[^&\\s\"<>]*");
 
     @Value("${websocket.auth.enabled:true}")
     private boolean authEnabled;
@@ -117,6 +122,19 @@ public class WebSocketAuthGuard
             log.warn("WebSocket 握手令牌解析异常: {}", e.getMessage());
             return null;
         }
+    }
+
+    /**
+     * 将任意文本中 query 形式的令牌替换为 ***（供 WS onError 等日志出口兜底，
+     * 防止容器异常消息携带完整握手 URI 而泄露 JWT）。
+     */
+    public static String maskQueryToken(String text)
+    {
+        if (text == null)
+        {
+            return null;
+        }
+        return TOKEN_IN_TEXT.matcher(text).replaceAll("$1***");
     }
 
     /**

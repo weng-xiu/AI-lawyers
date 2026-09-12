@@ -79,13 +79,30 @@ public class ChatWebSocketServer
     @OnError
     public void onError(Session session, Throwable error)
     {
-        log.error("ChatWS error: connId={}, msg={}", session == null ? "" : session.getId(), error.getMessage());
+        log.error("ChatWS error: connId={}, msg={}", session == null ? "" : session.getId(),
+                WebSocketAuthGuard.maskQueryToken(error.getMessage()));
     }
 
     /**
-     * 向指定会话房间广播消息（供 REST 控制器调用）
+     * 向指定会话房间广播消息（供 REST 控制器调用）。
+     * N4：先发本机房间连接，再经 Redis 频道扇出给其他实例。
      */
     public static void broadcast(String sessionId, String message)
+    {
+        if (sessionId == null) {
+            return;
+        }
+        broadcastLocal(sessionId, message);
+        WsClusterRelay relay = WsClusterRelay.getInstance();
+        if (relay != null) {
+            relay.publishChat(sessionId, message);
+        }
+    }
+
+    /**
+     * 仅向本机持有的房间连接广播（供集群订阅回调使用，避免回环）。
+     */
+    static void broadcastLocal(String sessionId, String message)
     {
         if (sessionId == null) {
             return;

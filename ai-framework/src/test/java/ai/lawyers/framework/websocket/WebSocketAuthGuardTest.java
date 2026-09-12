@@ -117,6 +117,28 @@ class WebSocketAuthGuardTest
         assertThat(guard.authorizeChat(null)).isFalse();
     }
 
+    // ---------- maskQueryToken：日志出口兜底掩码 ----------
+
+    @Test
+    void maskQueryToken_nullPassThrough()
+    {
+        assertThat(WebSocketAuthGuard.maskQueryToken(null)).isNull();
+    }
+
+    @Test
+    void maskQueryToken_masksTokenAndKeepsRest()
+    {
+        assertThat(WebSocketAuthGuard.maskQueryToken(
+                "ws upgrade error /ws/call/100?token=eyJhbGciOi.JzdWIiOiIx.MjY"))
+                .isEqualTo("ws upgrade error /ws/call/100?token=***");
+        // 别名 + 后续参数：只掩码令牌段
+        assertThat(WebSocketAuthGuard.maskQueryToken(
+                "/ws/chat/s1?foo=1&access_token=abc.def.ghi&bar=2"))
+                .isEqualTo("/ws/chat/s1?foo=1&access_token=***&bar=2");
+        // 无令牌原样返回
+        assertThat(WebSocketAuthGuard.maskQueryToken("/ws/call/100")).isEqualTo("/ws/call/100");
+    }
+
     // ---------- 应急回退开关 ----------
 
     @Test

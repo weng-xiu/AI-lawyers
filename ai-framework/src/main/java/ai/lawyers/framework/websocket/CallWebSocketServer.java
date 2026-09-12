@@ -66,6 +66,12 @@ public class CallWebSocketServer
         session.getUserProperties().put("userId", userId);
         log.info("CallWS connect: userId={}, connId={}, online={}",
                 userId, session.getId(), AGENTS.get(userId).size());
+        // N4：登记到集群在线注册表（集群关闭时为空操作）
+        WsClusterRelay relay = WsClusterRelay.getInstance();
+        if (relay != null)
+        {
+            relay.registerCallUser(userId);
+        }
         send(session, "{\"type\":\"CONNECTED\",\"data\":{\"userId\":" + userId + "}}");
     }
 
@@ -76,12 +82,26 @@ public class CallWebSocketServer
         if (!(userIdObj instanceof Long)) return;
         Long userId = (Long) userIdObj;
         CopyOnWriteArraySet<Session> conns = AGENTS.get(userId);
+        boolean localEmpty = true;
         if (conns != null)
         {
             conns.remove(session);
             if (conns.isEmpty())
             {
                 AGENTS.remove(userId);
+            }
+            else
+            {
+                localEmpty = false;
+            }
+        }
+        // N4：本实例该坐席最后一条连接关闭时注销全局在线标记
+        if (localEmpty)
+        {
+            WsClusterRelay relay = WsClusterRelay.getInstance();
+            if (relay != null)
+            {
+                relay.unregisterCallUser(userId);
             }
         }
         log.info("CallWS close: userId={}, connId={}", userId, session.getId());
@@ -91,13 +111,41 @@ public class CallWebSocketServer
     public void onError(Session session, Throwable error)
     {
         log.error("CallWS error: connId={}, msg={}",
-                session == null ? "" : session.getId(), error.getMessage());
+                session == null ? "" : session.getId(),
+                WebSocketAuthGuard.maskQueryToken(error.getMessage()));
     }
 
     /**
-     * 推送给指定坐席。
+     * 推送给指定坐席。N4：先发本机连接，再经 Redis 频道扇出给其他实例。
      */
     public static void sendToUser(Long userId, String json)
+    {
+        if (userId == null) return;
+        sendToUserLocal(userId, json);
+        WsClusterRelay relay = WsClusterRelay.getInstance();
+        if (relay != null)
+        {
+            relay.publishCallUser(userId, json);
+        }
+    }
+
+    /**
+     * 广播给所有在线坐席。N4：本机广播 + Redis 频道跨实例广播。
+     */
+    public static void broadcast(String json)
+    {
+        broadcastLocal(json);
+        WsClusterRelay relay = WsClusterRelay.getInstance();
+        if (relay != null)
+        {
+            relay.publishCallBroadcast(json);
+        }
+    }
+
+    /**
+     * 仅投递给本机持有的指定坐席连接（供集群订阅回调使用，避免再次发布造成回环）。
+     */
+    static void sendToUserLocal(Long userId, String json)
     {
         if (userId == null) return;
         CopyOnWriteArraySet<Session> conns = AGENTS.get(userId);
@@ -109,9 +157,9 @@ public class CallWebSocketServer
     }
 
     /**
-     * 广播给所有在线坐席。
+     * 仅向本机全部坐席连接广播（供集群订阅回调使用）。
      */
-    public static void broadcast(String json)
+    static void broadcastLocal(String json)
     {
         for (CopyOnWriteArraySet<Session> conns : AGENTS.values())
         {
@@ -123,11 +171,19 @@ public class CallWebSocketServer
     }
 
     /**
-     * 当前在线坐席数。
+     * 当前本机在线坐席数。
      */
     public static int onlineCount()
     {
         return AGENTS.size();
+    }
+
+    /**
+     * N4：本实例当前持有连接的坐席ID快照，供集群在线注册表心跳续期使用。
+     */
+    static java.util.Set<Long> localUserIds()
+    {
+        return new java.util.HashSet<>(AGENTS.keySet());
     }
 
     private static void send(Session session, String json)

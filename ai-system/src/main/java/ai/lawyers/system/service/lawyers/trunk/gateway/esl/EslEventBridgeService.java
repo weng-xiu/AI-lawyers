@@ -1,5 +1,6 @@
 package ai.lawyers.system.service.lawyers.trunk.gateway.esl;
 
+import java.time.Duration;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -13,6 +14,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import ai.lawyers.common.utils.StringUtils;
+import ai.lawyers.system.service.lawyers.cluster.LeaderElector;
+import ai.lawyers.system.service.lawyers.cluster.RedisLeaderLock;
 import ai.lawyers.system.domain.lawyers.AiCallAgentStatus;
 import ai.lawyers.system.domain.lawyers.AiCallRecord;
 import ai.lawyers.system.domain.lawyers.AiCallTicket;
@@ -64,6 +67,27 @@ public class EslEventBridgeService implements EslEventListener
     @Value("${call.gateway.freeswitch.context:default}")
     private String defaultContext;
 
+    /**
+     * N3：ESL 单主竞选开关。true（默认）时全集群仅领导者实例建立入站 ESL 长连接消费事件，
+     * 领导者崩溃后租约 TTL 到期自动故障切换；false 恢复旧行为（每实例各自建连，多实例重复消费）。
+     */
+    @Value("${call.gateway.esl.leader-election.enabled:true}")
+    private boolean leaderElectionEnabled;
+
+    /** N3：ESL 领导者租约在 Redis 中的锁键 */
+    @Value("${call.gateway.esl.leader-election.key:ai-law:leader:esl-bridge}")
+    private String leaderLockKey;
+
+    /** N3：领导者租约 TTL（秒），心跳约为 TTL/3 */
+    @Value("${call.gateway.esl.leader-election.ttl-seconds:30}")
+    private long leaderTtlSeconds;
+
+    @Autowired
+    private RedisLeaderLock leaderLock;
+
+    /** 单主竞选器；非竞选模式（或 ESL 关闭）时为 null */
+    private volatile LeaderElector elector;
+
     @Autowired
     private AiCallTrunkMapper trunkMapper;
 
@@ -108,7 +132,25 @@ public class EslEventBridgeService implements EslEventListener
             log.info("[ESL-Bridge] call.gateway.esl.enabled=false，跳过 FreeSWITCH 事件监听启动");
             return;
         }
-        // 启动连接由调度线程异步执行，避免阻塞应用启动
+        if (leaderElectionEnabled)
+        {
+            // N3：先竞选再建连，仅领导者持有入站 ESL 长连接；崩溃后租约到期自动故障切换
+            Duration ttl = Duration.ofSeconds(leaderTtlSeconds);
+            elector = new LeaderElector(leaderLock, leaderLockKey, ttl,
+                    ttl.dividedBy(3), this::startAsyncConnectAll, this::disconnectAll);
+            elector.start();
+        }
+        else
+        {
+            log.warn("[ESL-Bridge] 单主竞选已关闭（call.gateway.esl.leader-election.enabled=false），"
+                    + "多实例将各自建连并重复消费事件，仅限单机/应急");
+            startAsyncConnectAll();
+        }
+    }
+
+    /** 建连放到独立 daemon 线程，避免阻塞竞选心跳线程/应用启动 */
+    private void startAsyncConnectAll()
+    {
         Thread starter = new Thread(this::connectAll, "esl-bridge-starter");
         starter.setDaemon(true);
         starter.start();
@@ -117,18 +159,36 @@ public class EslEventBridgeService implements EslEventListener
     @PreDestroy
     public void destroy()
     {
+        // 先停止心跳并主动放弃领导权（加速对端接管），再断连
+        if (elector != null)
+        {
+            elector.stop();
+        }
+        disconnectAll();
+    }
+
+    /** 断开并清空全部 ESL 入站连接（丢失领导权/停机时调用） */
+    public synchronized void disconnectAll()
+    {
         for (FreeSwitchEslInboundClient c : clients.values())
         {
             try { c.stop(); } catch (Exception ignored) {}
         }
         clients.clear();
+        log.info("[ESL-Bridge] 已断开全部 FreeSWITCH 入站连接（非领导者/停机）");
     }
 
     /**
      * 连接/重连所有 FreeSWITCH 类型的中继。供管理界面在新增/修改线路后手动刷新调用。
+     * N3：竞选模式下非领导者直接跳过，避免跟随者建立重复事件连接。
      */
     public synchronized void connectAll()
     {
+        if (elector != null && !elector.isLeader())
+        {
+            log.info("[ESL-Bridge] 本实例非领导者，跳过建连（由当前领导者消费 ESL 事件）");
+            return;
+        }
         AiCallTrunk query = new AiCallTrunk();
         query.setVendor("FREESWITCH");
         List<AiCallTrunk> trunks = trunkMapper.selectAiCallTrunkList(query);

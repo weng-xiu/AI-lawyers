@@ -1,5 +1,6 @@
 package ai.lawyers.system.service.impl.lawyers.outbound;
 
+import java.time.Duration;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -26,7 +27,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import ai.lawyers.common.core.domain.entity.SysUser;
-import ai.lawyers.common.core.redis.RedisCache;
 import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.system.domain.lawyers.AiCallRecord;
 import ai.lawyers.system.domain.lawyers.AiCallTicket;
@@ -42,6 +42,7 @@ import ai.lawyers.system.mapper.lawyers.outbound.AiOutboundCalleeMapper;
 import ai.lawyers.system.mapper.lawyers.outbound.AiOutboundTaskMapper;
 import ai.lawyers.system.mapper.lawyers.trunk.AiCallDialLogMapper;
 import ai.lawyers.system.service.ISysUserService;
+import ai.lawyers.system.service.lawyers.cluster.RedisLeaderLock;
 import ai.lawyers.system.service.lawyers.IAiCallRecordService;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
 import ai.lawyers.system.service.lawyers.outbound.IAiOutboundResultService;
@@ -162,11 +163,13 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
     /** T2-2 并发拨号线程池（有界，daemon） */
     private ExecutorService dialPool;
 
-    /** T2-2 扫描分布式锁 key（多实例全局唯一扫描） */
-    private static final String SCAN_LOCK_KEY = "outbound:scan:lock";
+    /** N7：扫描/对账任务的集群单主锁（Lua CAS 释放，替代原裸 delete 锁） */
+    private static final String SCAN_LOCK_NAME = "job:outbound-scan";
+    private static final String RECONCILE_LOCK_NAME = "job:outbound-reconcile";
+    private static final Duration RECONCILE_LOCK_TTL = Duration.ofMinutes(10);
 
     @Autowired
-    private RedisCache redisCache;
+    private RedisLeaderLock leaderLock;
 
     /**
      * R11 防护：模拟接通开关仅允许在开发/测试环境开启。
@@ -301,21 +304,24 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
     @Scheduled(fixedDelayString = "${call.outbound.scanIntervalMs:15000}")
     public void scanRunningTasks()
     {
-        if (!scanEnabled || !scanning.compareAndSet(false, true))
+        if (!scanEnabled)
         {
             return;
         }
-        // T2-2 多实例分布式锁：同一时刻全局只一个实例执行扫描，避免多实例重复扫描/重复拨号
-        boolean locked = false;
+        // N7：统一走 RedisLeaderLock 单次单主锁（Lua CAS 释放，修复旧实现裸 delete 误删风险；
+        // Redis 异常时跳过本轮防多实例重复拨号，cluster.lock.enabled=false 可回退旧行为）
+        leaderLock.tryRun(SCAN_LOCK_NAME, Duration.ofSeconds(scanLockSeconds), this::doScanRunningTasks);
+    }
+
+    private void doScanRunningTasks()
+    {
+        if (!scanning.compareAndSet(false, true))
+        {
+            return;
+        }
         try
         {
-            locked = tryAcquireScanLock();
-            if (!locked)
-            {
-                log.debug("外呼扫描锁被其他实例持有，本轮跳过");
-                return;
-            }
-            // W4：非允许外呼时段，整批跳过不拨号（仅释放锁，下轮扫描再判断）
+            // W4：非允许外呼时段，整批跳过不拨号（下轮扫描再判断）
             if (complianceGuard != null && !complianceGuard.isCallingAllowed())
             {
                 log.info("当前为非外呼服务时段，本轮扫描跳过");
@@ -340,40 +346,6 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
         finally
         {
             scanning.set(false);
-            if (locked)
-            {
-                releaseScanLock();
-            }
-        }
-    }
-
-    /**
-     * T2-2 基于 Redis SET NX EX 的扫描分布式锁；Redis 不可用时降级为本实例执行（不阻断业务）。
-     */
-    private boolean tryAcquireScanLock()
-    {
-        try
-        {
-            String token = "outbound-scanner-" + java.util.UUID.randomUUID();
-            Boolean ok = redisCache.redisTemplate.opsForValue()
-                    .setIfAbsent(SCAN_LOCK_KEY, token, scanLockSeconds, TimeUnit.SECONDS);
-            return Boolean.TRUE.equals(ok);
-        }
-        catch (Exception e)
-        {
-            log.warn("外呼扫描分布式锁获取异常，降级为本实例执行: {}", e.getMessage());
-            return true;
-        }
-    }
-
-    private void releaseScanLock()
-    {
-        try
-        {
-            redisCache.redisTemplate.delete(SCAN_LOCK_KEY);
-        }
-        catch (Exception ignored)
-        {
         }
     }
 
@@ -389,6 +361,12 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
         {
             return;
         }
+        // N7：对账兜底全组仅一个实例执行，避免重复重试/重复置失败
+        leaderLock.tryRun(RECONCILE_LOCK_NAME, RECONCILE_LOCK_TTL, this::doReconcileStaleCalls);
+    }
+
+    private void doReconcileStaleCalls()
+    {
         try
         {
             List<AiOutboundCallee> stale = calleeMapper.selectStaleCallingCallees(staleMinutes);
