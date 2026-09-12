@@ -1,5 +1,9 @@
 package ai.lawyers.framework.websocket;
 
+import java.io.IOException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
+import javax.websocket.CloseReason;
 import javax.websocket.OnClose;
 import javax.websocket.OnError;
 import javax.websocket.OnOpen;
@@ -9,9 +13,7 @@ import javax.websocket.server.ServerEndpoint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArraySet;
+import ai.lawyers.common.utils.spring.SpringUtils;
 
 /**
  * 图文对话WebSocket服务端
@@ -33,6 +35,25 @@ public class ChatWebSocketServer
     public void onOpen(Session session, @PathParam("sessionId") String sessionId)
     {
         if (sessionId == null) {
+            closeQuietly(session, CloseReason.CloseCodes.VIOLATED_POLICY, "missing sessionId");
+            return;
+        }
+        // N5：握手期 JWT 鉴权（query 传 token；websocket.auth.enabled=false 时应急放行）
+        WebSocketAuthGuard authGuard;
+        try
+        {
+            authGuard = SpringUtils.getBean(WebSocketAuthGuard.class);
+        }
+        catch (Exception e)
+        {
+            log.warn("ChatWS 鉴权守卫不可用，拒绝连接 connId={}: {}", session.getId(), e.getMessage());
+            closeQuietly(session, CloseReason.CloseCodes.TRY_AGAIN_LATER, "auth unavailable");
+            return;
+        }
+        if (!authGuard.authorizeChat(session.getQueryString()))
+        {
+            log.warn("ChatWS 拒绝未授权连接 sessionId={}, connId={}", sessionId, session.getId());
+            closeQuietly(session, CloseReason.CloseCodes.VIOLATED_POLICY, "unauthorized");
             return;
         }
         ROOMS.computeIfAbsent(sessionId, k -> new CopyOnWriteArraySet<>()).add(session);
@@ -88,5 +109,18 @@ public class ChatWebSocketServer
     {
         CopyOnWriteArraySet<Session> room = ROOMS.get(sessionId);
         return room == null ? 0 : room.size();
+    }
+
+    /** N5：鉴权失败以策略违例关闭握手连接，异常不外抛 */
+    private static void closeQuietly(Session session, CloseReason.CloseCode code, String reason)
+    {
+        try
+        {
+            session.close(new CloseReason(code, reason));
+        }
+        catch (IOException | IllegalStateException e)
+        {
+            // 连接可能已关闭，忽略
+        }
     }
 }

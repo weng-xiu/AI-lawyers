@@ -82,14 +82,22 @@ public class SysConfigServiceImpl implements ISysConfigService
 
     /**
      * 获取验证码开关
-     * 
+     *
+     * <p>N11 安全收口：恢复若依标准实现，由参数 {@code sys.account.captchaEnabled} 驱动
+     * （种子数据默认 true）；参数缺失时按开启处理（安全默认值），需要临时关闭验证码
+     * 应在 sys_config 中显式置 false，禁止硬编码。</p>
+     *
      * @return true开启，false关闭
      */
     @Override
     public boolean selectCaptchaEnabled()
     {
-        // [临时调试用] 关闭验证码
-        return false;
+        String captchaEnabled = selectConfigByKey("sys.account.captchaEnabled");
+        if (StringUtils.isEmpty(captchaEnabled))
+        {
+            return true;
+        }
+        return Convert.toBool(captchaEnabled);
     }
 
     /**

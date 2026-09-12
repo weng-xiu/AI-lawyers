@@ -122,6 +122,20 @@ token:
   # 令牌有效期（默认30分钟）
   expireTime: 30
 
+# N5 WebSocket 握手鉴权（/ws/call、/ws/chat 必须携带有效 JWT，?token= 或 ?access_token=）
+# 生产保持 true；仅联调/紧急排障可经环境变量 WEBSOCKET_AUTH_ENABLED=false 临时关闭
+websocket:
+  auth:
+    enabled: ${WEBSOCKET_AUTH_ENABLED:true}
+
+# N1 Redis Stream 消费重试（PEL 重读 + 真实投递计数 + 死消费者接管）
+# 应急可置 queue.stream.retry-enabled=false 恢复旧行为（失败即转死信）
+queue:
+  stream:
+    enabled: ${QUEUE_STREAM_ENABLED:true}
+    retry-enabled: ${QUEUE_STREAM_RETRY_ENABLED:true}
+    reclaim-min-idle-ms: ${QUEUE_STREAM_RECLAIM_MIN_IDLE_MS:60000}
+
 # ============================================================
 # AI 大模型调用与 RAG 检索配置（T2-1 连接池 / T3 RAG 混合检索）
 # ============================================================

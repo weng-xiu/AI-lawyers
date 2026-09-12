@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import ai.lawyers.common.utils.DesensitizedUtil;
 import ai.lawyers.system.service.lawyers.sms.ISmsService;
 
 /**
@@ -66,7 +67,7 @@ public class SmsAsyncDispatcher
         }
         catch (Exception e)
         {
-            log.warn("短信异步投递失败，降级同步发送 phone={}: {}", phone, e.getMessage());
+            log.warn("短信异步投递失败，降级同步发送 phone={}: {}", DesensitizedUtil.mobilePhone(phone), e.getMessage());
         }
         // 降级：同步直写
         try
@@ -75,7 +76,7 @@ public class SmsAsyncDispatcher
         }
         catch (Exception e)
         {
-            log.error("短信同步降级发送失败 phone={}: {}", phone, e.getMessage());
+            log.error("短信同步降级发送失败 phone={}: {}", DesensitizedUtil.mobilePhone(phone), e.getMessage());
         }
     }
 

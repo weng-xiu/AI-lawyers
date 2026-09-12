@@ -123,7 +123,9 @@ public class SecurityConfig
                     .antMatchers("/swagger-ui.html", "/swagger-resources/**", "/webjars/**", "/*/api-docs", "/druid/**").permitAll()
                     // T5-1 监控端点：仅放行 prometheus 抓取与 health/info，生产需经内网/网关 ACL 限制抓取源
                     .antMatchers("/actuator/prometheus", "/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
-                    // WebSocket（呼叫事件 / 图文对话）握手放行，业务鉴权在通道层按 userId 处理
+                    // WebSocket（呼叫事件 / 图文对话）：JSR-356 握手无法携带 Authorization 头，
+                    // Security 层放行握手，N5 鉴权由 WebSocketAuthGuard 在 @OnOpen 期校验 query token
+                    // （JWT 有效 + /ws/call 的 userId 归属一致），应急可置 websocket.auth.enabled=false
                     .antMatchers("/ws/**").permitAll()
                     // 除上面外的所有请求全部需要鉴权认证
                     .anyRequest().authenticated();

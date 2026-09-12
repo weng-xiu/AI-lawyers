@@ -3,6 +3,7 @@ package ai.lawyers.framework.websocket;
 import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
+import javax.websocket.CloseReason;
 import javax.websocket.OnClose;
 import javax.websocket.OnError;
 import javax.websocket.OnOpen;
@@ -12,6 +13,7 @@ import javax.websocket.server.ServerEndpoint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import ai.lawyers.common.utils.spring.SpringUtils;
 
 /**
  * 呼叫事件 WebSocket 服务端
@@ -38,7 +40,26 @@ public class CallWebSocketServer
     {
         if (userId == null)
         {
-            try { session.close(); } catch (IOException ignored) {}
+            closeQuietly(session, CloseReason.CloseCodes.VIOLATED_POLICY, "missing userId");
+            return;
+        }
+        // N5：握手期 JWT 鉴权 + userId 归属校验（query 传 token；websocket.auth.enabled=false 时应急放行）
+        WebSocketAuthGuard authGuard;
+        try
+        {
+            authGuard = SpringUtils.getBean(WebSocketAuthGuard.class);
+        }
+        catch (Exception e)
+        {
+            // Spring 容器未就绪（极端启动时序）时保守拒绝，避免无鉴权裸奔
+            log.warn("CallWS 鉴权守卫不可用，拒绝连接 connId={}: {}", session.getId(), e.getMessage());
+            closeQuietly(session, CloseReason.CloseCodes.TRY_AGAIN_LATER, "auth unavailable");
+            return;
+        }
+        if (!authGuard.authorizeCall(userId, session.getQueryString()))
+        {
+            log.warn("CallWS 拒绝未授权连接 userId={}, connId={}", userId, session.getId());
+            closeQuietly(session, CloseReason.CloseCodes.VIOLATED_POLICY, "unauthorized");
             return;
         }
         AGENTS.computeIfAbsent(userId, k -> new CopyOnWriteArraySet<>()).add(session);
@@ -121,6 +142,19 @@ public class CallWebSocketServer
         catch (Exception e)
         {
             log.error("CallWS send fail: connId={}", session == null ? "" : session.getId(), e);
+        }
+    }
+
+    /** N5：鉴权失败以策略违例关闭握手连接，异常不外抛 */
+    private static void closeQuietly(Session session, CloseReason.CloseCode code, String reason)
+    {
+        try
+        {
+            session.close(new CloseReason(code, reason));
+        }
+        catch (IOException | IllegalStateException e)
+        {
+            // 连接可能已关闭，忽略
         }
     }
 }

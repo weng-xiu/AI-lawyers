@@ -46,4 +46,26 @@ public class DesensitizedUtil
         }
         return carLicense;
     }
+
+    /**
+     * 手机号脱敏：保留前 3 位与后 4 位，中间以 * 代替，如 138****8000。
+     *
+     * <p>N10/G1：日志中禁止明文打印手机号（PII）。长度不足 7 位时整体掩码，避免短号泄露；
+     * 长度超过 11 位（含区号/异常字符）时同样保留前 3 后 4。</p>
+     *
+     * @param phone 原始手机号
+     * @return 脱敏后的手机号；入参为空返回空串
+     */
+    public static String mobilePhone(String phone)
+    {
+        if (StringUtils.isBlank(phone))
+        {
+            return StringUtils.EMPTY;
+        }
+        if (phone.length() < 7)
+        {
+            return StringUtils.repeat('*', phone.length());
+        }
+        return StringUtils.hide(phone, 3, phone.length() - 4);
+    }
 }

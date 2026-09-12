@@ -15,6 +15,7 @@ import ai.lawyers.common.annotation.Anonymous;
 import ai.lawyers.common.core.controller.BaseController;
 import ai.lawyers.common.core.domain.AjaxResult;
 import ai.lawyers.common.core.redis.RedisCache;
+import ai.lawyers.common.utils.DesensitizedUtil;
 import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.system.service.lawyers.IAiCallBlacklistService;
 import ai.lawyers.system.service.lawyers.sms.UpstreamAuthVerifier;
@@ -96,7 +97,7 @@ public class SmsUpstreamController extends BaseController
         // 安全校验：签名优先，其次 token
         if (!verify(request, body, phone, content))
         {
-            log.warn("短信上行回调校验失败 phone={} ip={}", phone, request.getRemoteAddr());
+            log.warn("短信上行回调校验失败 phone={} ip={}", DesensitizedUtil.mobilePhone(phone), request.getRemoteAddr());
             return AjaxResult.error(403, "上行回调校验失败");
         }
         // 仅退订指令才处理；其他上行内容（如关键字查询）直接成功忽略
@@ -107,11 +108,11 @@ public class SmsUpstreamController extends BaseController
         // 同号码频控，防恶意刷退订
         if (rateLimitPerMin > 0 && !tryAcquire(phone))
         {
-            log.warn("短信上行退订触发频控 phone={}", phone);
+            log.warn("短信上行退订触发频控 phone={}", DesensitizedUtil.mobilePhone(phone));
             return AjaxResult.error(429, "退订频率超限");
         }
         boolean ok = blacklistService != null && blacklistService.addUnsubscribe(phone, "短信回复T退订");
-        log.info("短信上行退订结果 phone={} success={}", phone, ok);
+        log.info("短信上行退订结果 phone={} success={}", DesensitizedUtil.mobilePhone(phone), ok);
         // 无论结果如何均返回成功，避免服务商重试造成重复退订
         return success();
     }
@@ -150,7 +151,7 @@ public class SmsUpstreamController extends BaseController
         }
         catch (Exception e)
         {
-            log.warn("退订频控 Redis 异常，本次放行 phone={} error={}", phone, e.getMessage());
+            log.warn("退订频控 Redis 异常，本次放行 phone={} error={}", DesensitizedUtil.mobilePhone(phone), e.getMessage());
             return true;
         }
     }

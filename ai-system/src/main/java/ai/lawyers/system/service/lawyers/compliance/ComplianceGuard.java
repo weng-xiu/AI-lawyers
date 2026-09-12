@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import ai.lawyers.common.utils.DesensitizedUtil;
 import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.system.domain.lawyers.AiCallBlacklist;
 import ai.lawyers.system.mapper.lawyers.AiCallBlacklistMapper;
@@ -120,7 +121,7 @@ public class ComplianceGuard
         }
         catch (Exception e)
         {
-            log.warn("退订名单查询异常，默认放行 phone={}: {}", phone, e.getMessage());
+            log.warn("退订名单查询异常，默认放行 phone={}: {}", DesensitizedUtil.mobilePhone(phone), e.getMessage());
             return false;
         }
     }

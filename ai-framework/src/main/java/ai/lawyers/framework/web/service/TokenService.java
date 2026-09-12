@@ -63,8 +63,24 @@ public class TokenService
     {
         // 获取请求携带的令牌
         String token = getToken(request);
+        return getLoginUserByToken(token);
+    }
+
+    /**
+     * 按令牌字符串获取登录态（N5：WebSocket 握手只能通过 query 参数传 token，
+     * 无法走 HTTP 头过滤器；{@code /ws/**} 端点在握手期调用本方法完成 JWT 鉴权）。
+     *
+     * @param token 原始令牌（可带/不带 Bearer 前缀）
+     * @return 登录用户；令牌为空、非法或已过期返回 null
+     */
+    public LoginUser getLoginUserByToken(String token)
+    {
         if (StringUtils.isNotEmpty(token))
         {
+            if (token.startsWith(Constants.TOKEN_PREFIX))
+            {
+                token = token.replace(Constants.TOKEN_PREFIX, "");
+            }
             try
             {
                 Claims claims = parseToken(token);
@@ -76,7 +92,7 @@ public class TokenService
             }
             catch (Exception e)
             {
-                log.error("获取用户信息异常'{}'", e.getMessage());
+                log.warn("令牌解析登录态失败: {}", e.getMessage());
             }
         }
         return null;

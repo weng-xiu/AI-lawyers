@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ai.lawyers.common.core.redis.RedisCache;
 import ai.lawyers.common.exception.ServiceException;
+import ai.lawyers.common.utils.DesensitizedUtil;
 import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.system.domain.lawyers.sms.AiSmsConfig;
 import ai.lawyers.system.domain.lawyers.sms.AiSmsLog;
@@ -120,7 +121,7 @@ public class SmsServiceImpl implements ISmsService
         }
         catch (Exception e)
         {
-            log.warn("短信发送异常 phone={} error={}", phone, e.getMessage());
+            log.warn("短信发送异常 phone={} error={}", DesensitizedUtil.mobilePhone(phone), e.getMessage());
             writeBackResult(logId, "2", null, e.getMessage());
             return SmsResult.fail(e.getMessage());
         }
@@ -173,7 +174,7 @@ public class SmsServiceImpl implements ISmsService
         }
         catch (Exception e)
         {
-            log.warn("Redis 日限流计数失败，降级为 DB 当日计数兜底 phone={} error={}", phone, e.getMessage());
+            log.warn("Redis 日限流计数失败，降级为 DB 当日计数兜底 phone={} error={}", DesensitizedUtil.mobilePhone(phone), e.getMessage());
             try
             {
                 int todayCount = logMapper.selectTodayCountByPhone(phone);
@@ -182,7 +183,7 @@ public class SmsServiceImpl implements ISmsService
             catch (Exception ex)
             {
                 // Redis 与 DB 均不可用时，为不阻断业务放行（宁可漏限不可误停），但需留痕告警
-                log.error("短信限流降级兜底也失败，本次放行 phone={} error={}", phone, ex.getMessage());
+                log.error("短信限流降级兜底也失败，本次放行 phone={} error={}", DesensitizedUtil.mobilePhone(phone), ex.getMessage());
                 return true;
             }
         }
@@ -254,7 +255,7 @@ public class SmsServiceImpl implements ISmsService
         catch (Exception e)
         {
             // 留痕失败不应阻断发送主流程；待发日志落库失败时 logId 为 null，后续回写将跳过
-            log.error("短信日志落库失败 phone={} status={}: {}", phone, sendStatus, e.getMessage());
+            log.error("短信日志落库失败 phone={} status={}: {}", DesensitizedUtil.mobilePhone(phone), sendStatus, e.getMessage());
         }
         return smsLog;
     }

@@ -140,6 +140,11 @@ services:
       DRUID_CONSOLE_PASSWORD: ${DRUID_CONSOLE_PASSWORD:-Druid@2026!ChangeMe}
       # —— Swagger（生产关闭）——
       SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
+      # —— N5 WebSocket 握手 JWT 鉴权（生产保持 true；联调应急可关）——
+      WEBSOCKET_AUTH_ENABLED: ${WEBSOCKET_AUTH_ENABLED:-true}
+      # —— N1 Stream 重试开关与死消费者接管阈值（默认重试启用，PEL 空闲 60s 可被接管）——
+      QUEUE_STREAM_RETRY_ENABLED: ${QUEUE_STREAM_RETRY_ENABLED:-true}
+      QUEUE_STREAM_RECLAIM_MIN_IDLE_MS: ${QUEUE_STREAM_RECLAIM_MIN_IDLE_MS:-60000}
       # —— AI 并发舱壁（与模型侧限流匹配）——
       AI_MODEL_MAX_INFLIGHT: ${AI_MODEL_MAX_INFLIGHT:-32}
       AI_MODEL_ACQUIRE_TIMEOUT_MS: ${AI_MODEL_ACQUIRE_TIMEOUT_MS:-3000}

@@ -65,6 +65,19 @@
             <artifactId>ai-system</artifactId>
         </dependency>
 
+        <!-- N5：WebSocket 握手鉴权单元测试（版本由 Spring Boot parent 统一管理，test 作用域不进产物） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
     </dependencies>
 
 </project>

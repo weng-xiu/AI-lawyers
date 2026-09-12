@@ -13,6 +13,8 @@
  * 通过 on(type, handler) 注册业务回调，断线自动重连。
  */
 
+import { getToken } from '@/utils/auth'
+
 const RECONNECT_DELAY = 3000
 
 class CallSocket {
@@ -33,7 +35,10 @@ class CallSocket {
     this.userId = userId
     this.manualClose = false
     const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
-    const url = `${proto}://${window.location.host}/ws/call/${userId}`
+    // N5：握手期 JWT 鉴权，浏览器 WebSocket 无法自定义头，token 走 query 参数
+    const token = getToken()
+    const url = `${proto}://${window.location.host}/ws/call/${userId}` +
+      (token ? `?token=${encodeURIComponent(token)}` : '')
     try {
       this.ws = new WebSocket(url)
     } catch (e) {
