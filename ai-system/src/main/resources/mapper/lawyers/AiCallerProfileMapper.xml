@@ -23,6 +23,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="emotionStatus"      column="emotion_status"      />
         <result property="emotionWarning"     column="emotion_warning"     />
         <result property="lastCallTime"       column="last_call_time"      />
+        <result property="languagePreference" column="language_preference" />
+        <result property="careMode"           column="care_mode"           />
         <result property="createBy"           column="create_by"           />
         <result property="createTime"         column="create_time"         />
         <result property="updateBy"           column="update_by"           />
@@ -34,6 +36,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select profile_id, caller_number, caller_name, caller_gender, caller_age, caller_id_card, caller_address,
                customer_level, tags, intent_prediction, intent_confidence, consult_preference, high_freq_problem,
                freq_mention_count, risk_level, emotion_status, emotion_warning, last_call_time,
+               language_preference, care_mode,
                create_by, create_time, update_by, update_time, remark
         from ai_caller_profile
     </sql>
@@ -79,6 +82,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="emotionStatus != null">emotion_status,</if>
             <if test="emotionWarning != null">emotion_warning,</if>
             <if test="lastCallTime != null">last_call_time,</if>
+            <if test="languagePreference != null">language_preference,</if>
+            <if test="careMode != null">care_mode,</if>
             <if test="createBy != null">create_by,</if>
             <if test="remark != null">remark,</if>
             create_time
@@ -101,6 +106,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="emotionStatus != null">#{emotionStatus},</if>
             <if test="emotionWarning != null">#{emotionWarning},</if>
             <if test="lastCallTime != null">#{lastCallTime},</if>
+            <if test="languagePreference != null">#{languagePreference},</if>
+            <if test="careMode != null">#{careMode},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="remark != null">#{remark},</if>
             sysdate()
@@ -127,10 +134,21 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="emotionStatus != null">emotion_status = #{emotionStatus},</if>
             <if test="emotionWarning != null">emotion_warning = #{emotionWarning},</if>
             <if test="lastCallTime != null">last_call_time = #{lastCallTime},</if>
+            <if test="languagePreference != null and languagePreference != ''">language_preference = #{languagePreference},</if>
+            <if test="careMode != null">care_mode = #{careMode},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="remark != null">remark = #{remark},</if>
             update_time = sysdate()
         </trim>
+        where profile_id = #{profileId}
+    </update>
+
+    <!-- F1/F2：更新语种偏好与适老关怀模式（弹屏手动切换） -->
+    <update id="updatePreference">
+        update ai_caller_profile
+        set language_preference = #{languagePreference},
+            care_mode = #{careMode},
+            update_time = sysdate()
         where profile_id = #{profileId}
     </update>
 

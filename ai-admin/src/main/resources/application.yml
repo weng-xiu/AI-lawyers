@@ -277,6 +277,10 @@ call:
     queueTimeoutMs: 60000
     # 调度线程轮询间隔(ms)
     scanIntervalMs: 200
+    # [N2] 多实例集群调度开关：true 时全局并发/CPS/呼叫占用/排队队列外置到 Redis，
+    #       实现跨实例一致的并发限速与负载分发；false（默认）走原 JVM 内存态，单实例零变化。
+    cluster:
+      enabled: ${CALL_DISPATCH_CLUSTER_ENABLED:false}
 
   # ---------- 线路监控与告警 ----------
   monitor:

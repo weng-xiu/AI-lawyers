@@ -46,6 +46,18 @@ public class VoiceProperties
 
     private String asrLanguage = "zh";
 
+    /**
+     * F1 粤语（yue-CN）TTS 发音人，未配置时粤语路由回退默认发音人。
+     * 真实粤语 Provider 接入前为预留配置（POC 桩）。
+     */
+    private String cantoneseVoice = "";
+
+    /** F1 粤语 TTS 模型（部分 Provider 粤语需独立模型） */
+    private String cantoneseTtsModel = "";
+
+    /** F1 粤语 ASR 语种码（Whisper 协议用 yue，供应商私有协议按其文档调整） */
+    private String cantoneseAsrLanguage = "yue";
+
     public String getEngine()
     {
         return engine;
@@ -154,5 +166,35 @@ public class VoiceProperties
     public void setAsrLanguage(String asrLanguage)
     {
         this.asrLanguage = asrLanguage;
+    }
+
+    public String getCantoneseVoice()
+    {
+        return cantoneseVoice;
+    }
+
+    public void setCantoneseVoice(String cantoneseVoice)
+    {
+        this.cantoneseVoice = cantoneseVoice;
+    }
+
+    public String getCantoneseTtsModel()
+    {
+        return cantoneseTtsModel;
+    }
+
+    public void setCantoneseTtsModel(String cantoneseTtsModel)
+    {
+        this.cantoneseTtsModel = cantoneseTtsModel;
+    }
+
+    public String getCantoneseAsrLanguage()
+    {
+        return cantoneseAsrLanguage;
+    }
+
+    public void setCantoneseAsrLanguage(String cantoneseAsrLanguage)
+    {
+        this.cantoneseAsrLanguage = cantoneseAsrLanguage;
     }
 }

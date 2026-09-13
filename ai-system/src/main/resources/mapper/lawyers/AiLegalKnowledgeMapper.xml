@@ -18,6 +18,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="auditBy"          column="audit_by"         />
         <result property="auditTime"        column="audit_time"       />
         <result property="auditRemark"      column="audit_remark"     />
+        <result property="lawName"          column="law_name"         />
+        <result property="articleNo"        column="article_no"       />
+        <result property="issuingAuthority" column="issuing_authority"/>
+        <result property="effectiveDate"    column="effective_date"   />
+        <result property="validStatus"      column="valid_status"     />
+        <result property="sourceUrl"        column="source_url"       />
+        <result property="publishVersion"   column="publish_version"  />
         <result property="createBy"         column="create_by"        />
         <result property="createTime"       column="create_time"      />
         <result property="updateBy"         column="update_by"        />
@@ -26,7 +33,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectAiLegalKnowledgeVo">
-        select knowledge_id, title, content, category_id, law_article, source, keywords, view_count, status, audit_status, audit_by, audit_time, audit_remark, create_by, create_time, update_by, update_time, remark 
+        select knowledge_id, title, content, category_id, law_article, law_name, article_no,
+               issuing_authority, effective_date, valid_status, source_url, publish_version,
+               source, keywords, view_count, status, audit_status, audit_by, audit_time, audit_remark,
+               create_by, create_time, update_by, update_time, remark
         from ai_legal_knowledge
     </sql>
     
@@ -38,6 +48,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="keywords != null  and keywords != ''"> and keywords like concat('%', #{keywords}, '%')</if>
             <if test="status != null  and status != ''"> and status = #{status}</if>
             <if test="auditStatus != null and auditStatus != ''"> and audit_status = #{auditStatus}</if>
+            <if test="validStatus != null and validStatus != ''"> and valid_status = #{validStatus}</if>
             <if test="params.beginTime != null and params.beginTime != ''"><!-- 开始时间检索 -->
                 and date_format(create_time,'%Y%m%d') &gt;= date_format(#{params.beginTime},'%Y%m%d')
             </if>
@@ -68,14 +79,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="searchAiLegalKnowledge" parameterType="String" resultMap="AiLegalKnowledgeResult">
         <include refid="selectAiLegalKnowledgeVo"/>
         where status = '0' and audit_status = '1'
+        and (valid_status is null or valid_status = '1')
         and (title like concat('%', #{keyword}, '%') or keywords like concat('%', #{keyword}, '%') or content like concat('%', #{keyword}, '%'))
         order by view_count desc
     </select>
 
-    <!-- T3：加载启用且审核通过的知识（供分块/向量化） -->
+    <!-- T3：加载启用、审核通过且现行有效的知识（供分块/向量化；F7 失效法条过滤） -->
     <select id="selectIndexableKnowledge" resultMap="AiLegalKnowledgeResult">
         <include refid="selectAiLegalKnowledgeVo"/>
         where status = '0' and audit_status = '1'
+        and (valid_status is null or valid_status = '1')
     </select>
         
     <insert id="insertAiLegalKnowledge" parameterType="AiLegalKnowledge" useGeneratedKeys="true" keyProperty="knowledgeId">
@@ -93,6 +106,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="auditBy != null">audit_by,</if>
             <if test="auditTime != null">audit_time,</if>
             <if test="auditRemark != null">audit_remark,</if>
+            <if test="lawName != null">law_name,</if>
+            <if test="articleNo != null">article_no,</if>
+            <if test="issuingAuthority != null">issuing_authority,</if>
+            <if test="effectiveDate != null">effective_date,</if>
+            <if test="validStatus != null">valid_status,</if>
+            <if test="sourceUrl != null">source_url,</if>
+            <if test="publishVersion != null">publish_version,</if>
             <if test="createBy != null">create_by,</if>
             <if test="remark != null">remark,</if>
             create_time
@@ -110,6 +130,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="auditBy != null">#{auditBy},</if>
             <if test="auditTime != null">#{auditTime},</if>
             <if test="auditRemark != null">#{auditRemark},</if>
+            <if test="lawName != null">#{lawName},</if>
+            <if test="articleNo != null">#{articleNo},</if>
+            <if test="issuingAuthority != null">#{issuingAuthority},</if>
+            <if test="effectiveDate != null">#{effectiveDate},</if>
+            <if test="validStatus != null">#{validStatus},</if>
+            <if test="sourceUrl != null">#{sourceUrl},</if>
+            <if test="publishVersion != null">#{publishVersion},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="remark != null">#{remark},</if>
             sysdate()
@@ -131,6 +158,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="auditBy != null">audit_by = #{auditBy},</if>
             <if test="auditTime != null">audit_time = #{auditTime},</if>
             <if test="auditRemark != null">audit_remark = #{auditRemark},</if>
+            <if test="lawName != null">law_name = #{lawName},</if>
+            <if test="articleNo != null">article_no = #{articleNo},</if>
+            <if test="issuingAuthority != null">issuing_authority = #{issuingAuthority},</if>
+            <if test="effectiveDate != null">effective_date = #{effectiveDate},</if>
+            <if test="validStatus != null">valid_status = #{validStatus},</if>
+            <if test="sourceUrl != null">source_url = #{sourceUrl},</if>
+            <if test="publishVersion != null">publish_version = #{publishVersion},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="remark != null">remark = #{remark},</if>
             update_time = sysdate()

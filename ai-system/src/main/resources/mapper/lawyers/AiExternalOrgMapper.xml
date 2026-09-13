@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiExternalOrgMapper">
+
+    <resultMap type="AiExternalOrg" id="AiExternalOrgResult">
+        <result property="orgId"           column="org_id"           />
+        <result property="orgName"         column="org_name"         />
+        <result property="externalType"    column="external_type"    />
+        <result property="province"        column="province"         />
+        <result property="city"            column="city"             />
+        <result property="district"        column="district"         />
+        <result property="address"         column="address"          />
+        <result property="contactPhone"    column="contact_phone"    />
+        <result property="contactPerson"   column="contact_person"   />
+        <result property="accessMode"      column="access_mode"      />
+        <result property="apiUrl"          column="api_url"          />
+        <result property="appId"           column="app_id"           />
+        <result property="appSecret"       column="app_secret"       />
+        <result property="serviceHours"    column="service_hours"    />
+        <result property="applyMaterials"  column="apply_materials"  />
+        <result property="status"          column="status"           />
+        <result property="createBy"        column="create_by"        />
+        <result property="createTime"      column="create_time"      />
+        <result property="updateBy"        column="update_by"        />
+        <result property="updateTime"      column="update_time"      />
+        <result property="remark"          column="remark"           />
+    </resultMap>
+
+    <sql id="selectAiExternalOrgVo">
+        select org_id, org_name, external_type, province, city, district, address, contact_phone,
+               contact_person, access_mode, api_url, app_id, app_secret, service_hours, apply_materials,
+               status, create_by, create_time, update_by, update_time, remark
+        from ai_external_org
+    </sql>
+
+    <select id="selectAiExternalOrgList" parameterType="AiExternalOrg" resultMap="AiExternalOrgResult">
+        <include refid="selectAiExternalOrgVo"/>
+        <where>
+            <if test="orgName != null and orgName != ''"> and org_name like concat('%', #{orgName}, '%')</if>
+            <if test="externalType != null and externalType != ''"> and external_type = #{externalType}</if>
+            <if test="province != null and province != ''"> and province = #{province}</if>
+            <if test="city != null and city != ''"> and city = #{city}</if>
+            <if test="district != null and district != ''"> and district = #{district}</if>
+            <if test="accessMode != null and accessMode != ''"> and access_mode = #{accessMode}</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+        </where>
+        order by external_type, province, city, org_id
+    </select>
+
+    <select id="selectAiExternalOrgByOrgId" parameterType="Long" resultMap="AiExternalOrgResult">
+        <include refid="selectAiExternalOrgVo"/>
+        where org_id = #{orgId}
+    </select>
+
+    <insert id="insertAiExternalOrg" parameterType="AiExternalOrg" useGeneratedKeys="true" keyProperty="orgId">
+        insert into ai_external_org
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="orgName != null and orgName != ''">org_name,</if>
+            <if test="externalType != null and externalType != ''">external_type,</if>
+            <if test="province != null">province,</if>
+            <if test="city != null">city,</if>
+            <if test="district != null">district,</if>
+            <if test="address != null">address,</if>
+            <if test="contactPhone != null">contact_phone,</if>
+            <if test="contactPerson != null">contact_person,</if>
+            <if test="accessMode != null and accessMode != ''">access_mode,</if>
+            <if test="apiUrl != null">api_url,</if>
+            <if test="appId != null">app_id,</if>
+            <if test="appSecret != null">app_secret,</if>
+            <if test="serviceHours != null">service_hours,</if>
+            <if test="applyMaterials != null">apply_materials,</if>
+            <if test="status != null and status != ''">status,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="orgName != null and orgName != ''">#{orgName},</if>
+            <if test="externalType != null and externalType != ''">#{externalType},</if>
+            <if test="province != null">#{province},</if>
+            <if test="city != null">#{city},</if>
+            <if test="district != null">#{district},</if>
+            <if test="address != null">#{address},</if>
+            <if test="contactPhone != null">#{contactPhone},</if>
+            <if test="contactPerson != null">#{contactPerson},</if>
+            <if test="accessMode != null and accessMode != ''">#{accessMode},</if>
+            <if test="apiUrl != null">#{apiUrl},</if>
+            <if test="appId != null">#{appId},</if>
+            <if test="appSecret != null">#{appSecret},</if>
+            <if test="serviceHours != null">#{serviceHours},</if>
+            <if test="applyMaterials != null">#{applyMaterials},</if>
+            <if test="status != null and status != ''">#{status},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateAiExternalOrg" parameterType="AiExternalOrg">
+        update ai_external_org
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="orgName != null and orgName != ''">org_name = #{orgName},</if>
+            <if test="externalType != null and externalType != ''">external_type = #{externalType},</if>
+            <if test="province != null">province = #{province},</if>
+            <if test="city != null">city = #{city},</if>
+            <if test="district != null">district = #{district},</if>
+            <if test="address != null">address = #{address},</if>
+            <if test="contactPhone != null">contact_phone = #{contactPhone},</if>
+            <if test="contactPerson != null">contact_person = #{contactPerson},</if>
+            <if test="accessMode != null and accessMode != ''">access_mode = #{accessMode},</if>
+            <if test="apiUrl != null">api_url = #{apiUrl},</if>
+            <if test="appId != null">app_id = #{appId},</if>
+            <if test="appSecret != null">app_secret = #{appSecret},</if>
+            <if test="serviceHours != null">service_hours = #{serviceHours},</if>
+            <if test="applyMaterials != null">apply_materials = #{applyMaterials},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where org_id = #{orgId}
+    </update>
+
+    <delete id="deleteAiExternalOrgByOrgId" parameterType="Long">
+        delete from ai_external_org where org_id = #{orgId}
+    </delete>
+
+    <delete id="deleteAiExternalOrgByOrgIds" parameterType="String">
+        delete from ai_external_org where org_id in
+        <foreach item="orgId" collection="array" open="(" separator="," close=")">
+            #{orgId}
+        </foreach>
+    </delete>
+</mapper>

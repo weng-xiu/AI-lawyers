@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiUnifiedSessionMapper">
+
+    <resultMap type="AiUnifiedSession" id="AiUnifiedSessionResult">
+        <result property="sessionId"     column="session_id"    />
+        <result property="profileId"     column="profile_id"    />
+        <result property="callerNumber"  column="caller_number" />
+        <result property="channelType"   column="channel_type"  />
+        <result property="bizType"       column="biz_type"      />
+        <result property="bizId"         column="biz_id"        />
+        <result property="bizTitle"      column="biz_title"     />
+        <result property="startTime"     column="start_time"    />
+        <result property="endTime"       column="end_time"      />
+        <result property="createTime"    column="create_time"   />
+    </resultMap>
+
+    <!-- uk_biz 去重：同业务主键重复写入忽略 -->
+    <insert id="insertIgnoreAiUnifiedSession" parameterType="AiUnifiedSession">
+        insert ignore into ai_unified_session
+        (profile_id, caller_number, channel_type, biz_type, biz_id, biz_title, start_time, end_time, create_time)
+        values
+        (#{profileId}, #{callerNumber}, #{channelType}, #{bizType}, #{bizId}, #{bizTitle},
+         #{startTime}, #{endTime}, sysdate())
+    </insert>
+
+    <update id="finishSession">
+        update ai_unified_session
+        set end_time = #{endTime}
+        where biz_type = #{bizType} and biz_id = #{bizId}
+    </update>
+
+    <select id="selectByProfileId" parameterType="Long" resultMap="AiUnifiedSessionResult">
+        select session_id, profile_id, caller_number, channel_type, biz_type, biz_id, biz_title,
+               start_time, end_time, create_time
+        from ai_unified_session
+        where profile_id = #{profileId}
+        order by start_time desc
+        limit 100
+    </select>
+
+    <select id="selectByCallerNumber" parameterType="String" resultMap="AiUnifiedSessionResult">
+        select session_id, profile_id, caller_number, channel_type, biz_type, biz_id, biz_title,
+               start_time, end_time, create_time
+        from ai_unified_session
+        where caller_number = #{callerNumber}
+        order by start_time desc
+        limit 100
+    </select>
+</mapper>

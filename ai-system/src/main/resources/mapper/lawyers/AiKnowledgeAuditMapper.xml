@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiKnowledgeAuditMapper">
+
+    <resultMap type="AiKnowledgeAudit" id="AiKnowledgeAuditResult">
+        <result property="auditId"          column="audit_id"          />
+        <result property="knowledgeId"      column="knowledge_id"      />
+        <result property="title"            column="title"             />
+        <result property="publishVersion"   column="publish_version"   />
+        <result property="action"           column="action"            />
+        <result property="fromStatus"       column="from_status"       />
+        <result property="toStatus"         column="to_status"         />
+        <result property="auditOpinion"     column="audit_opinion"     />
+        <result property="auditor"          column="auditor"           />
+        <result property="auditTime"        column="audit_time"        />
+        <result property="createBy"         column="create_by"         />
+        <result property="createTime"       column="create_time"       />
+    </resultMap>
+
+    <select id="selectAiKnowledgeAuditList" parameterType="AiKnowledgeAudit" resultMap="AiKnowledgeAuditResult">
+        select a.audit_id, a.knowledge_id, k.title, a.publish_version, a.action, a.from_status, a.to_status,
+               a.audit_opinion, a.auditor, a.audit_time, a.create_by, a.create_time
+        from ai_knowledge_audit a
+        left join ai_legal_knowledge k on a.knowledge_id = k.knowledge_id
+        <where>
+            <if test="knowledgeId != null"> and a.knowledge_id = #{knowledgeId}</if>
+            <if test="action != null and action != ''"> and a.action = #{action}</if>
+            <if test="auditor != null and auditor != ''"> and a.auditor like concat('%', #{auditor}, '%')</if>
+        </where>
+        order by a.audit_id desc
+    </select>
+
+    <select id="selectAiKnowledgeAuditByAuditId" parameterType="Long" resultMap="AiKnowledgeAuditResult">
+        select a.audit_id, a.knowledge_id, k.title, a.publish_version, a.action, a.from_status, a.to_status,
+               a.audit_opinion, a.auditor, a.audit_time, a.create_by, a.create_time
+        from ai_knowledge_audit a
+        left join ai_legal_knowledge k on a.knowledge_id = k.knowledge_id
+        where a.audit_id = #{auditId}
+    </select>
+
+    <insert id="insertAiKnowledgeAudit" parameterType="AiKnowledgeAudit" useGeneratedKeys="true" keyProperty="auditId">
+        insert into ai_knowledge_audit
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="knowledgeId != null">knowledge_id,</if>
+            <if test="publishVersion != null">publish_version,</if>
+            <if test="action != null and action != ''">action,</if>
+            <if test="fromStatus != null">from_status,</if>
+            <if test="toStatus != null">to_status,</if>
+            <if test="auditOpinion != null">audit_opinion,</if>
+            <if test="auditor != null">auditor,</if>
+            <if test="auditTime != null">audit_time,</if>
+            <if test="createBy != null">create_by,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="knowledgeId != null">#{knowledgeId},</if>
+            <if test="publishVersion != null">#{publishVersion},</if>
+            <if test="action != null and action != ''">#{action},</if>
+            <if test="fromStatus != null">#{fromStatus},</if>
+            <if test="toStatus != null">#{toStatus},</if>
+            <if test="auditOpinion != null">#{auditOpinion},</if>
+            <if test="auditor != null">#{auditor},</if>
+            <if test="auditTime != null">#{auditTime},</if>
+            <if test="createBy != null">#{createBy},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <!-- 审核状态 + 上下线状态一并更新（F7 审核流） -->
+    <update id="updateKnowledgeAuditState">
+        update ai_legal_knowledge
+        set audit_status = #{auditStatus},
+            status = #{status},
+            audit_by = #{auditBy},
+            audit_time = sysdate(),
+            audit_remark = #{auditRemark}
+        where knowledge_id = #{knowledgeId}
+    </update>
+
+    <update id="incrementPublishVersion">
+        update ai_legal_knowledge
+        set publish_version = ifnull(publish_version, 1) + 1
+        where knowledge_id = #{knowledgeId}
+    </update>
+</mapper>

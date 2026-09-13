@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiTicketTransferMapper">
+
+    <resultMap type="AiTicketTransfer" id="AiTicketTransferResult">
+        <result property="transferId"       column="transfer_id"        />
+        <result property="ticketId"         column="ticket_id"          />
+        <result property="ticketNo"         column="ticket_no"          />
+        <result property="direction"        column="direction"          />
+        <result property="externalType"     column="external_type"      />
+        <result property="orgId"            column="org_id"             />
+        <result property="orgName"          column="org_name"           />
+        <result property="externalTicketNo" column="external_ticket_no" />
+        <result property="externalStatus"   column="external_status"    />
+        <result property="transferStatus"   column="transfer_status"    />
+        <result property="requestPayload"   column="request_payload"    />
+        <result property="callbackPayload"  column="callback_payload"   />
+        <result property="idempotentKey"    column="idempotent_key"     />
+        <result property="failReason"       column="fail_reason"        />
+        <result property="retryCount"       column="retry_count"        />
+        <result property="nextRetryTime"    column="next_retry_time"    />
+        <result property="transferTime"     column="transfer_time"      />
+        <result property="callbackTime"     column="callback_time"      />
+        <result property="createBy"         column="create_by"          />
+        <result property="createTime"       column="create_time"        />
+        <result property="updateBy"         column="update_by"          />
+        <result property="updateTime"       column="update_time"        />
+        <result property="remark"           column="remark"             />
+    </resultMap>
+
+    <sql id="selectAiTicketTransferVo">
+        select transfer_id, ticket_id, ticket_no, direction, external_type, org_id, org_name,
+               external_ticket_no, external_status, transfer_status, request_payload, callback_payload,
+               idempotent_key, fail_reason, retry_count, next_retry_time, transfer_time, callback_time,
+               create_by, create_time, update_by, update_time, remark
+        from ai_ticket_transfer
+    </sql>
+
+    <select id="selectAiTicketTransferList" parameterType="AiTicketTransfer" resultMap="AiTicketTransferResult">
+        <include refid="selectAiTicketTransferVo"/>
+        <where>
+            <if test="ticketId != null"> and ticket_id = #{ticketId}</if>
+            <if test="ticketNo != null and ticketNo != ''"> and ticket_no like concat('%', #{ticketNo}, '%')</if>
+            <if test="direction != null and direction != ''"> and direction = #{direction}</if>
+            <if test="externalType != null and externalType != ''"> and external_type = #{externalType}</if>
+            <if test="orgId != null"> and org_id = #{orgId}</if>
+            <if test="externalTicketNo != null and externalTicketNo != ''"> and external_ticket_no like concat('%', #{externalTicketNo}, '%')</if>
+            <if test="externalStatus != null and externalStatus != ''"> and external_status = #{externalStatus}</if>
+            <if test="transferStatus != null and transferStatus != ''"> and transfer_status = #{transferStatus}</if>
+        </where>
+        order by transfer_id desc
+    </select>
+
+    <select id="selectAiTicketTransferByTransferId" parameterType="Long" resultMap="AiTicketTransferResult">
+        <include refid="selectAiTicketTransferVo"/>
+        where transfer_id = #{transferId}
+    </select>
+
+    <select id="selectByIdempotentKey" parameterType="String" resultMap="AiTicketTransferResult">
+        <include refid="selectAiTicketTransferVo"/>
+        where idempotent_key = #{idempotentKey}
+    </select>
+
+    <select id="selectByExternalTicketNo" resultMap="AiTicketTransferResult">
+        <include refid="selectAiTicketTransferVo"/>
+        where external_type = #{externalType}
+          and external_ticket_no = #{externalTicketNo}
+        order by transfer_id desc limit 1
+    </select>
+
+    <select id="selectRetryPending" resultMap="AiTicketTransferResult">
+        <include refid="selectAiTicketTransferVo"/>
+        where transfer_status in ('0', '2')
+          and retry_count &lt; #{maxRetry}
+          and next_retry_time is not null
+          and next_retry_time &lt;= #{now}
+        order by next_retry_time asc
+        limit 100
+    </select>
+
+    <insert id="insertAiTicketTransfer" parameterType="AiTicketTransfer" useGeneratedKeys="true" keyProperty="transferId">
+        insert into ai_ticket_transfer
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="ticketId != null">ticket_id,</if>
+            <if test="ticketNo != null">ticket_no,</if>
+            <if test="direction != null and direction != ''">direction,</if>
+            <if test="externalType != null and externalType != ''">external_type,</if>
+            <if test="orgId != null">org_id,</if>
+            <if test="orgName != null">org_name,</if>
+            <if test="externalTicketNo != null">external_ticket_no,</if>
+            <if test="externalStatus != null and externalStatus != ''">external_status,</if>
+            <if test="transferStatus != null and transferStatus != ''">transfer_status,</if>
+            <if test="requestPayload != null">request_payload,</if>
+            <if test="callbackPayload != null">callback_payload,</if>
+            <if test="idempotentKey != null and idempotentKey != ''">idempotent_key,</if>
+            <if test="failReason != null">fail_reason,</if>
+            <if test="retryCount != null">retry_count,</if>
+            <if test="nextRetryTime != null">next_retry_time,</if>
+            <if test="transferTime != null">transfer_time,</if>
+            <if test="callbackTime != null">callback_time,</if>
+            <if test="createBy != null">create_by,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="ticketId != null">#{ticketId},</if>
+            <if test="ticketNo != null">#{ticketNo},</if>
+            <if test="direction != null and direction != ''">#{direction},</if>
+            <if test="externalType != null and externalType != ''">#{externalType},</if>
+            <if test="orgId != null">#{orgId},</if>
+            <if test="orgName != null">#{orgName},</if>
+            <if test="externalTicketNo != null">#{externalTicketNo},</if>
+            <if test="externalStatus != null and externalStatus != ''">#{externalStatus},</if>
+            <if test="transferStatus != null and transferStatus != ''">#{transferStatus},</if>
+            <if test="requestPayload != null">#{requestPayload},</if>
+            <if test="callbackPayload != null">#{callbackPayload},</if>
+            <if test="idempotentKey != null and idempotentKey != ''">#{idempotentKey},</if>
+            <if test="failReason != null">#{failReason},</if>
+            <if test="retryCount != null">#{retryCount},</if>
+            <if test="nextRetryTime != null">#{nextRetryTime},</if>
+            <if test="transferTime != null">#{transferTime},</if>
+            <if test="callbackTime != null">#{callbackTime},</if>
+            <if test="createBy != null">#{createBy},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateCallbackResult">
+        update ai_ticket_transfer
+        set external_ticket_no = #{externalTicketNo},
+            external_status = #{externalStatus},
+            transfer_status = #{transferStatus},
+            callback_payload = #{callbackPayload},
+            callback_time = #{callbackTime},
+            fail_reason = null,
+            next_retry_time = null,
+            update_time = sysdate()
+        where transfer_id = #{transferId}
+    </update>
+
+    <update id="updatePushResult">
+        update ai_ticket_transfer
+        set transfer_status = #{transferStatus},
+            <if test="failReason != null">fail_reason = #{failReason},</if>
+            retry_count = #{retryCount},
+            next_retry_time = #{nextRetryTime},
+            update_time = sysdate()
+        where transfer_id = #{transferId}
+    </update>
+</mapper>

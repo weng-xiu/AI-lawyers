@@ -39,10 +39,13 @@ import ai.lawyers.system.utils.trunk.NumberTransformUtils;
  * 呼叫调度服务实现
  *
  * 并发控制分三层：
- *   1) 全局并发：AtomicInteger 上限 call.dispatch.maxGlobalConcurrent；
+ *   1) 全局并发：单实例 AtomicInteger / 多实例 Redis Lua 原子占位（call.dispatch.cluster.enabled=true）；
  *   2) 线路并发：数据库 UPDATE ... WHERE current_concurrent &lt; max_concurrent 原子占位，
  *      天然支持多实例部署；
- *   3) CPS 限速：线路级令牌桶，防止瞬时冲击导致运营商侧封堵。
+ *   3) CPS 限速：线路级令牌桶，单实例本地 / 多实例 Redis 秒级计数，防止瞬时冲击导致运营商侧封堵。
+ *
+ * 多实例开关：call.dispatch.cluster.enabled=true 时，全局并发/CPS/呼叫占用映射/排队队列
+ * 全部外置到 Redis（见 {@link ClusterDispatchState}）；false（默认）走原 JVM 内存态，零行为变化。
  *
  * 故障切换：下发失败或线路探测失败时，把该线路加入本次呼叫的排除列表，
  * 重新选路重试，最多 maxFailover 次；连续失败达阈值触发线路熔断。
@@ -76,6 +79,10 @@ public class CallDispatchServiceImpl implements ICallDispatchService
 
     @Autowired
     private ITrunkMonitorService trunkMonitorService;
+
+    /** N2：集群调度状态（Redis 版），clusterEnabled=false 时不启用，走下方内存态字段 */
+    @Autowired
+    private ClusterDispatchState clusterState;
 
     /** 全局最大并发呼叫数 */
     @Value("${call.dispatch.maxGlobalConcurrent:200}")
@@ -126,6 +133,11 @@ public class CallDispatchServiceImpl implements ICallDispatchService
         {
             log.warn("重置线路并发计数失败: {}", e.getMessage());
         }
+        // 集群模式下同步清理 Redis 全局并发计数（与线路级重置配套，应对异常退出残留）
+        if (clusterState.isClusterEnabled())
+        {
+            clusterState.resetGlobalConcurrent();
+        }
         if (queueEnabled)
         {
             dispatchThread = new Thread(this::dispatchLoop, "call-dispatch-worker");
@@ -161,7 +173,7 @@ public class CallDispatchServiceImpl implements ICallDispatchService
             return dial(request);
         }
         // 先尝试直接拨打，资源充足时不必排队
-        if (globalConcurrent.get() < maxGlobalConcurrent)
+        if (!isGlobalFull())
         {
             DialResult direct = doDial(request, 0L);
             if (direct.isSuccess() || !"NO_AVAILABLE_TRUNK".equals(direct.getErrorCode()))
@@ -170,24 +182,28 @@ public class CallDispatchServiceImpl implements ICallDispatchService
             }
             // 仅当"无可用线路"（通常是并发满）时才排队
         }
-        if (callQueue.size() >= queueCapacity)
+        if (queueSize() >= queueCapacity)
         {
             log.warn("呼叫队列已满({}), 拒绝新请求 callee={}", queueCapacity,
                     NumberTransformUtils.mask(request.getCalleeNumber()));
-            trunkMonitorService.raiseQueueOverflowAlarm(callQueue.size(), queueCapacity);
+            trunkMonitorService.raiseQueueOverflowAlarm(queueSize(), queueCapacity);
             return DialResult.fail("QUEUE_FULL", "呼叫队列已满，请稍后重试");
         }
-        callQueue.offer(new QueuedCall(request));
+        if (!enqueue(request))
+        {
+            // Redis 故障/容量满：尝试直呼一次，避免请求丢失
+            return doDial(request, 0L);
+        }
         DialResult queued = DialResult.ok(null);
         queued.setDialStatus(DialStatusEnum.QUEUING.getCode());
-        queued.setMessage("已进入呼叫队列，当前排队 " + callQueue.size() + " 个");
+        queued.setMessage("已进入呼叫队列，当前排队 " + queueSize() + " 个");
         return queued;
     }
 
     @Override
     public boolean hangup(String callUuid)
     {
-        Long trunkId = callTrunkHolder.get(callUuid);
+        Long trunkId = getHeldTrunk(callUuid);
         if (trunkId == null)
         {
             AiCallDialLog dialLog = dialLogMapper.selectByCallUuid(callUuid);
@@ -262,12 +278,20 @@ public class CallDispatchServiceImpl implements ICallDispatchService
     @Override
     public int getQueueSize()
     {
+        if (clusterState.isClusterEnabled())
+        {
+            return (int) clusterState.queueSize();
+        }
         return callQueue == null ? 0 : callQueue.size();
     }
 
     @Override
     public int getGlobalConcurrent()
     {
+        if (clusterState.isClusterEnabled())
+        {
+            return clusterState.getGlobalConcurrent();
+        }
         return globalConcurrent.get();
     }
 
@@ -286,8 +310,8 @@ public class CallDispatchServiceImpl implements ICallDispatchService
             return DialResult.fail("INVALID_NUMBER", "被叫号码不合法: " + request.getCalleeNumber());
         }
 
-        // 2. 全局并发控制
-        if (globalConcurrent.get() >= maxGlobalConcurrent)
+        // 2. 全局并发控制（多实例下经 Redis Lua 原子占位，杜绝 check-then-act 竞态）
+        if (isGlobalFull())
         {
             return DialResult.fail("NO_AVAILABLE_TRUNK",
                     "已达全局并发上限 " + maxGlobalConcurrent);
@@ -338,7 +362,14 @@ public class CallDispatchServiceImpl implements ICallDispatchService
                 lastFail = DialResult.fail("TRUNK_BUSY", "线路 " + trunk.getTrunkCode() + " 并发已满");
                 continue;
             }
-            globalConcurrent.incrementAndGet();
+            // 5.2.1 全局并发占位：多实例原子操作；失败则释放线路占位后切换下一条
+            if (!tryAcquireGlobal())
+            {
+                trunkMapper.releaseConcurrent(trunk.getTrunkId());
+                lastFail = DialResult.fail("NO_AVAILABLE_TRUNK",
+                        "已达全局并发上限 " + maxGlobalConcurrent);
+                continue;
+            }
 
             // 5.3 落库拨号日志（先记录，保证任何结果都有痕迹）
             AiCallDialLog dialLog = buildDialLog(request, trunk, segment, calleeCarrier,
@@ -374,6 +405,7 @@ public class CallDispatchServiceImpl implements ICallDispatchService
                 dialLogMapper.updateCallUuid(dialLog.getLogId(), result.getCallUuid());
 
                 callTrunkHolder.put(result.getCallUuid(), trunk.getTrunkId());
+                holdTrunkCluster(result.getCallUuid(), trunk.getTrunkId());
 
                 result.setLogId(dialLog.getLogId());
                 result.setTrunkId(trunk.getTrunkId());
@@ -623,6 +655,10 @@ public class CallDispatchServiceImpl implements ICallDispatchService
         if (callUuid != null)
         {
             callTrunkHolder.remove(callUuid);
+            if (clusterState.isClusterEnabled())
+            {
+                clusterState.releaseTrunk(callUuid);
+            }
         }
         if (trunkId != null)
         {
@@ -638,11 +674,113 @@ public class CallDispatchServiceImpl implements ICallDispatchService
         }
         finally
         {
-            if (globalConcurrent.get() > 0)
-            {
-                globalConcurrent.decrementAndGet();
-            }
+            releaseGlobal();
         }
+    }
+
+    // ------------------------------------------------------------------ 集群状态适配
+
+    /** 全局并发是否已达上限（多实例走 Redis GET，单实例走本地计数）。 */
+    private boolean isGlobalFull()
+    {
+        return getGlobalConcurrent() >= maxGlobalConcurrent;
+    }
+
+    /**
+     * 尝试占用一个全局并发槽位。
+     * 多实例下经 Redis Lua 原子 check-and-incr；单实例保持原 incrementAndGet 行为
+     *（单机模式下前置 isGlobalFull 已做软限流，此处直接占位）。
+     *
+     * @return true 占位成功；false 已达上限
+     */
+    private boolean tryAcquireGlobal()
+    {
+        if (clusterState.isClusterEnabled())
+        {
+            return clusterState.acquireGlobalConcurrent(maxGlobalConcurrent) > 0;
+        }
+        globalConcurrent.incrementAndGet();
+        return true;
+    }
+
+    /** 释放一个全局并发槽位（多实例走 Redis DECR，单实例走本地递减）。 */
+    private void releaseGlobal()
+    {
+        if (clusterState.isClusterEnabled())
+        {
+            clusterState.releaseGlobalConcurrent();
+            return;
+        }
+        if (globalConcurrent.get() > 0)
+        {
+            globalConcurrent.decrementAndGet();
+        }
+    }
+
+    /** 登记呼叫占用的线路（多实例同时写入 Redis，供跨实例挂断定位）。 */
+    private void holdTrunkCluster(String callUuid, Long trunkId)
+    {
+        if (clusterState.isClusterEnabled())
+        {
+            clusterState.holdTrunk(callUuid, trunkId);
+        }
+    }
+
+    /** 查找呼叫占用的线路：先本地、再 Redis、最终由调用方回退查 DB。 */
+    private Long getHeldTrunk(String callUuid)
+    {
+        Long trunkId = callTrunkHolder.get(callUuid);
+        if (trunkId == null && clusterState.isClusterEnabled())
+        {
+            trunkId = clusterState.getTrunk(callUuid);
+        }
+        return trunkId;
+    }
+
+    /** 队列长度（多实例走 Redis ZCARD）。 */
+    private int queueSize()
+    {
+        return getQueueSize();
+    }
+
+    /** 入队（多实例走 Redis ZADD 原子容量校验）。 */
+    private boolean enqueue(DialRequest request)
+    {
+        if (clusterState.isClusterEnabled())
+        {
+            return clusterState.enqueue(request, queueCapacity);
+        }
+        return callQueue.offer(new QueuedCall(request));
+    }
+
+    /**
+     * 出队一个排队项。
+     * 多实例走 Redis ZPOPMIN（空则立即返回 null，由调用方 sleep）；
+     * 单实例走本地阻塞 poll。
+     */
+    private QueuedCall pollQueue() throws InterruptedException
+    {
+        if (clusterState.isClusterEnabled())
+        {
+            ClusterDispatchState.QueueItem item = clusterState.pollQueue();
+            if (item == null || item.request == null)
+            {
+                return null;
+            }
+            return new QueuedCall(item.request, item.enqueueTime);
+        }
+        return callQueue.poll(scanIntervalMs, TimeUnit.MILLISECONDS);
+    }
+
+    /** 把未成功调度的呼叫重新放回队列（多实例重写回 Redis ZSet，保留原入队时间保证 FIFO 公平）。 */
+    private void requeue(QueuedCall queued)
+    {
+        if (clusterState.isClusterEnabled())
+        {
+            clusterState.enqueue(queued.request, queueCapacity, queued.enqueueTime);
+            return;
+        }
+        callQueue.offer(queued);
     }
 
     // ------------------------------------------------------------------ 排队调度
@@ -653,9 +791,13 @@ public class CallDispatchServiceImpl implements ICallDispatchService
         {
             try
             {
-                QueuedCall queued = callQueue.poll(scanIntervalMs, TimeUnit.MILLISECONDS);
+                QueuedCall queued = pollQueue();
                 if (queued == null)
                 {
+                    if (clusterState.isClusterEnabled())
+                    {
+                        Thread.sleep(scanIntervalMs);
+                    }
                     continue;
                 }
                 long waited = System.currentTimeMillis() - queued.enqueueTime;
@@ -665,17 +807,17 @@ public class CallDispatchServiceImpl implements ICallDispatchService
                             NumberTransformUtils.mask(queued.request.getCalleeNumber()), waited);
                     continue;
                 }
-                if (globalConcurrent.get() >= maxGlobalConcurrent)
+                if (isGlobalFull())
                 {
                     // 资源仍紧张，放回队列稍后再试
-                    callQueue.offer(queued);
+                    requeue(queued);
                     Thread.sleep(scanIntervalMs);
                     continue;
                 }
                 DialResult result = doDial(queued.request, waited);
                 if (!result.isSuccess() && "NO_AVAILABLE_TRUNK".equals(result.getErrorCode()))
                 {
-                    callQueue.offer(queued);
+                    requeue(queued);
                     Thread.sleep(scanIntervalMs);
                 }
             }
@@ -700,6 +842,10 @@ public class CallDispatchServiceImpl implements ICallDispatchService
         if (limit <= 0)
         {
             return true;
+        }
+        if (clusterState.isClusterEnabled())
+        {
+            return clusterState.acquireCps(trunk.getTrunkId(), limit);
         }
         CpsBucket bucket = cpsBuckets.computeIfAbsent(trunk.getTrunkId(), k -> new CpsBucket());
         return bucket.tryAcquire(limit);
@@ -735,6 +881,13 @@ public class CallDispatchServiceImpl implements ICallDispatchService
         {
             this.request = request;
             this.enqueueTime = System.currentTimeMillis();
+        }
+
+        /** 集群模式下从 Redis 还原：使用原始入队时间计算等待时长 */
+        QueuedCall(DialRequest request, long enqueueTime)
+        {
+            this.request = request;
+            this.enqueueTime = enqueueTime;
         }
 
         @Override

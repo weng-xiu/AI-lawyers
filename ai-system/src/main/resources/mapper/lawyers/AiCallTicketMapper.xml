@@ -22,6 +22,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="closeTime"       column="close_time"       />
         <result property="callerNumber"    column="caller_number"    />
         <result property="callerName"      column="caller_name"      />
+        <result property="externalType"     column="external_type"      />
+        <result property="externalOrgId"    column="external_org_id"    />
+        <result property="externalTicketNo" column="external_ticket_no" />
+        <result property="externalStatus"   column="external_status"    />
+        <result property="externalUpdateTime" column="external_update_time" />
+        <result property="transferTime"     column="transfer_time"      />
+        <result property="direction"        column="direction"          />
         <result property="createBy"        column="create_by"        />
         <result property="createTime"      column="create_time"      />
         <result property="updateBy"        column="update_by"        />
@@ -30,11 +37,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectAiCallTicketVo">
-        select t.ticket_id, t.ticket_no, t.record_id, t.title, t.content, 
+        select t.ticket_id, t.ticket_no, t.record_id, t.title, t.content,
                t.priority, t.due_time, t.overtime_flag, t.remind_time,
-               t.status, t.assign_user_id, t.assign_user_name, 
-               t.process_content, t.process_time, t.close_time, t.create_by, 
+               t.status, t.assign_user_id, t.assign_user_name,
+               t.process_content, t.process_time, t.close_time, t.create_by,
                t.create_time, t.update_by, t.update_time, t.remark,
+               t.external_type, t.external_org_id, t.external_ticket_no, t.external_status,
+               t.external_update_time, t.transfer_time, t.direction,
                cr.caller_number, cr.caller_name
         from ai_call_ticket t
         left join ai_call_record cr on t.record_id = cr.record_id
@@ -50,6 +59,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="assignUserId != null"> and t.assign_user_id = #{assignUserId}</if>
             <if test="recordId != null"> and t.record_id = #{recordId}</if>
             <if test="callerNumber != null and callerNumber != ''"> and cr.caller_number like concat('%', #{callerNumber}, '%')</if>
+            <if test="externalType != null and externalType != ''"> and t.external_type = #{externalType}</if>
+            <if test="externalStatus != null and externalStatus != ''"> and t.external_status = #{externalStatus}</if>
+            <if test="direction != null and direction != ''"> and t.direction = #{direction}</if>
         </where>
         order by t.create_time desc
     </select>
@@ -84,6 +96,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="status != null">status,</if>
             <if test="assignUserId != null">assign_user_id,</if>
             <if test="assignUserName != null">assign_user_name,</if>
+            <if test="externalType != null">external_type,</if>
+            <if test="externalOrgId != null">external_org_id,</if>
+            <if test="externalTicketNo != null">external_ticket_no,</if>
+            <if test="externalStatus != null">external_status,</if>
+            <if test="externalUpdateTime != null">external_update_time,</if>
+            <if test="transferTime != null">transfer_time,</if>
+            <if test="direction != null">direction,</if>
             <if test="createBy != null">create_by,</if>
             <if test="remark != null">remark,</if>
             create_time
@@ -100,6 +119,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="status != null">#{status},</if>
             <if test="assignUserId != null">#{assignUserId},</if>
             <if test="assignUserName != null">#{assignUserName},</if>
+            <if test="externalType != null">#{externalType},</if>
+            <if test="externalOrgId != null">#{externalOrgId},</if>
+            <if test="externalTicketNo != null">#{externalTicketNo},</if>
+            <if test="externalStatus != null">#{externalStatus},</if>
+            <if test="externalUpdateTime != null">#{externalUpdateTime},</if>
+            <if test="transferTime != null">#{transferTime},</if>
+            <if test="direction != null">#{direction},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="remark != null">#{remark},</if>
             sysdate()
@@ -123,10 +149,41 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="processContent != null">process_content = #{processContent},</if>
             <if test="processTime != null">process_time = #{processTime},</if>
             <if test="closeTime != null">close_time = #{closeTime},</if>
+            <if test="externalType != null">external_type = #{externalType},</if>
+            <if test="externalOrgId != null">external_org_id = #{externalOrgId},</if>
+            <if test="externalTicketNo != null">external_ticket_no = #{externalTicketNo},</if>
+            <if test="externalStatus != null">external_status = #{externalStatus},</if>
+            <if test="externalUpdateTime != null">external_update_time = #{externalUpdateTime},</if>
+            <if test="transferTime != null">transfer_time = #{transferTime},</if>
+            <if test="direction != null">direction = #{direction},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="remark != null">remark = #{remark},</if>
             update_time = sysdate()
         </trim>
+        where ticket_id = #{ticketId}
+    </update>
+
+    <!-- F3：发起转办时回写工单外部协同字段 -->
+    <update id="updateExternalInfo">
+        update ai_call_ticket
+        set external_type = #{externalType},
+            external_org_id = #{externalOrgId},
+            <if test="externalTicketNo != null">external_ticket_no = #{externalTicketNo},</if>
+            external_status = #{externalStatus},
+            external_update_time = #{externalUpdateTime},
+            transfer_time = #{transferTime},
+            direction = #{direction},
+            update_time = sysdate()
+        where ticket_id = #{ticketId}
+    </update>
+
+    <!-- F3：外部回调回写状态/外部工单号 -->
+    <update id="updateExternalCallback">
+        update ai_call_ticket
+        set external_status = #{externalStatus},
+            <if test="externalTicketNo != null and externalTicketNo != ''">external_ticket_no = #{externalTicketNo},</if>
+            external_update_time = #{externalUpdateTime},
+            update_time = sysdate()
         where ticket_id = #{ticketId}
     </update>
 
@@ -172,6 +229,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             update_time = sysdate()
         where ticket_id = #{ticketId}
     </update>
+
+    <!-- F9：逐级升级扫描——所有到点未办结工单（不区分 overtime_flag） -->
+    <select id="selectEscalatableTickets" resultMap="AiCallTicketResult">
+        <include refid="selectAiCallTicketVo"/>
+        where t.status in ('0', '1')
+          and t.due_time is not null
+          and t.due_time &lt; now()
+        order by t.due_time asc
+        limit 200
+    </select>
 
     <delete id="deleteAiCallTicketByTicketId" parameterType="Long">
         delete from ai_call_ticket where ticket_id = #{ticketId}

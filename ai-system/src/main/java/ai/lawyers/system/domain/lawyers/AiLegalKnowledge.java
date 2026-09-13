@@ -72,6 +72,32 @@ public class AiLegalKnowledge extends BaseEntity
     @Excel(name = "审核备注")
     private String auditRemark;
 
+    /** 法律名称（F7 溯源元数据） */
+    @Excel(name = "法律名称")
+    private String lawName;
+
+    /** 条号（F7） */
+    @Excel(name = "条号")
+    private String articleNo;
+
+    /** 发布机关（F7） */
+    @Excel(name = "发布机关")
+    private String issuingAuthority;
+
+    /** 施行日期（F7） */
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private java.util.Date effectiveDate;
+
+    /** 效力状态 1现行有效 2已修订 3已失效（F7） */
+    @Excel(name = "效力状态", readConverterExp = "1=现行有效,2=已修订,3=已失效")
+    private String validStatus;
+
+    /** 权威来源链接（F7） */
+    private String sourceUrl;
+
+    /** 发布版本号（F7） */
+    private Integer publishVersion;
+
     public Long getKnowledgeId()
     {
         return knowledgeId;
@@ -206,7 +232,28 @@ public class AiLegalKnowledge extends BaseEntity
     {
         this.auditRemark = auditRemark;
     }
-    
+
+    public String getLawName() { return lawName; }
+    public void setLawName(String lawName) { this.lawName = lawName; }
+
+    public String getArticleNo() { return articleNo; }
+    public void setArticleNo(String articleNo) { this.articleNo = articleNo; }
+
+    public String getIssuingAuthority() { return issuingAuthority; }
+    public void setIssuingAuthority(String issuingAuthority) { this.issuingAuthority = issuingAuthority; }
+
+    public java.util.Date getEffectiveDate() { return effectiveDate; }
+    public void setEffectiveDate(java.util.Date effectiveDate) { this.effectiveDate = effectiveDate; }
+
+    public String getValidStatus() { return validStatus; }
+    public void setValidStatus(String validStatus) { this.validStatus = validStatus; }
+
+    public String getSourceUrl() { return sourceUrl; }
+    public void setSourceUrl(String sourceUrl) { this.sourceUrl = sourceUrl; }
+
+    public Integer getPublishVersion() { return publishVersion; }
+    public void setPublishVersion(Integer publishVersion) { this.publishVersion = publishVersion; }
+
     @Override
     public String toString() {
         return new ToStringBuilder(this,ToStringStyle.MULTI_LINE_STYLE)

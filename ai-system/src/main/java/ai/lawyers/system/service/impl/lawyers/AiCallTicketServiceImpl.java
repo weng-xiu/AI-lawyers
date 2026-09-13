@@ -13,8 +13,10 @@ import ai.lawyers.common.utils.uuid.IdUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ai.lawyers.system.domain.lawyers.AiCallTicket;
+import ai.lawyers.system.domain.lawyers.AiSlaPolicy;
 import ai.lawyers.system.mapper.lawyers.AiCallTicketMapper;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
+import ai.lawyers.system.service.lawyers.IAiSlaPolicyService;
 import ai.lawyers.system.service.lawyers.queue.MessageNotifyDispatcher;
 
 @Service
@@ -27,6 +29,10 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
 
     @Autowired(required = false)
     private MessageNotifyDispatcher messageNotifyDispatcher;
+
+    /** F9：按策略自动计算 SLA 截止时间（无匹配策略时不阻断建单） */
+    @Autowired(required = false)
+    private IAiSlaPolicyService slaPolicyService;
 
     @Override
     public AiCallTicket selectAiCallTicketByTicketId(Long ticketId)
@@ -54,6 +60,29 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
         }
         if (aiCallTicket.getStatus() == null) {
             aiCallTicket.setStatus("0");
+        }
+        if (aiCallTicket.getOvertimeFlag() == null)
+        {
+            aiCallTicket.setOvertimeFlag(0);
+        }
+        // F9：未显式指定截止时间时，按业务类型+优先级匹配 SLA 策略自动计算
+        if (aiCallTicket.getDueTime() == null && slaPolicyService != null)
+        {
+            try
+            {
+                String bizType = StringUtils.isNotEmpty(aiCallTicket.getExternalType())
+                        ? aiCallTicket.getExternalType() : "TICKET";
+                AiSlaPolicy policy = slaPolicyService.matchPolicy(bizType, aiCallTicket.getPriority());
+                if (policy != null && policy.getResolveMinutes() != null)
+                {
+                    aiCallTicket.setDueTime(new Date(System.currentTimeMillis()
+                            + policy.getResolveMinutes() * 60_000L));
+                }
+            }
+            catch (Exception e)
+            {
+                log.warn("SLA 截止时间自动计算失败 ticketNo={}", aiCallTicket.getTicketNo(), e);
+            }
         }
         return aiCallTicketMapper.insertAiCallTicket(aiCallTicket);
     }

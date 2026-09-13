@@ -64,7 +64,30 @@ public class AiCallTicket extends BaseEntity
 
     private String callerName;
 
-    public void setTicketId(Long ticketId) 
+    /** 外部条线 LEGAL_AID/MEDIATION/NOTARY/FORENSIC/ARBITRATION/HOTLINE_12345（F3） */
+    private String externalType;
+
+    /** 协同机构ID（F3） */
+    private Long externalOrgId;
+
+    /** 外部工单号（F3） */
+    private String externalTicketNo;
+
+    /** 外部状态 PENDING/ACCEPTED/PROCESSING/DONE/REJECTED/FAILED（F3） */
+    private String externalStatus;
+
+    /** 外部状态最近回写时间（F3） */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date externalUpdateTime;
+
+    /** 最近转出/接收时间（F3） */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date transferTime;
+
+    /** 协同方向 OUT 转出 / IN 转入（F3） */
+    private String direction;
+
+    public void setTicketId(Long ticketId)
     {
         this.ticketId = ticketId;
     }
@@ -217,10 +240,31 @@ public class AiCallTicket extends BaseEntity
         return callerName;
     }
 
-    public void setCallerName(String callerName) 
+    public void setCallerName(String callerName)
     {
         this.callerName = callerName;
     }
+
+    public String getExternalType() { return externalType; }
+    public void setExternalType(String externalType) { this.externalType = externalType; }
+
+    public Long getExternalOrgId() { return externalOrgId; }
+    public void setExternalOrgId(Long externalOrgId) { this.externalOrgId = externalOrgId; }
+
+    public String getExternalTicketNo() { return externalTicketNo; }
+    public void setExternalTicketNo(String externalTicketNo) { this.externalTicketNo = externalTicketNo; }
+
+    public String getExternalStatus() { return externalStatus; }
+    public void setExternalStatus(String externalStatus) { this.externalStatus = externalStatus; }
+
+    public Date getExternalUpdateTime() { return externalUpdateTime; }
+    public void setExternalUpdateTime(Date externalUpdateTime) { this.externalUpdateTime = externalUpdateTime; }
+
+    public Date getTransferTime() { return transferTime; }
+    public void setTransferTime(Date transferTime) { this.transferTime = transferTime; }
+
+    public String getDirection() { return direction; }
+    public void setDirection(String direction) { this.direction = direction; }
 
     @Override
     public String toString() {

@@ -68,6 +68,14 @@ public class AiCallerProfile extends BaseEntity
     @Excel(name = "最后来电时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     private Date lastCallTime;
 
+    /** 语种偏好 zh-CN 普通话 / yue-CN 粤语（F1） */
+    @Excel(name = "语种偏好")
+    private String languagePreference;
+
+    /** 关怀模式偏好 0 标准 1 关怀（F2） */
+    @Excel(name = "关怀模式", readConverterExp = "0=标准,1=关怀")
+    private Integer careMode;
+
     public void setProfileId(Long profileId) { this.profileId = profileId; }
     public Long getProfileId() { return profileId; }
     public void setCallerNumber(String callerNumber) { this.callerNumber = callerNumber; }
@@ -104,6 +112,10 @@ public class AiCallerProfile extends BaseEntity
     public String getEmotionWarning() { return emotionWarning; }
     public void setLastCallTime(Date lastCallTime) { this.lastCallTime = lastCallTime; }
     public Date getLastCallTime() { return lastCallTime; }
+    public void setLanguagePreference(String languagePreference) { this.languagePreference = languagePreference; }
+    public String getLanguagePreference() { return languagePreference; }
+    public void setCareMode(Integer careMode) { this.careMode = careMode; }
+    public Integer getCareMode() { return careMode; }
 
     @Override
     public String toString() {

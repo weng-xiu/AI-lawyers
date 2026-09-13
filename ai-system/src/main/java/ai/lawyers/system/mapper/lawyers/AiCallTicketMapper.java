@@ -38,4 +38,29 @@ public interface AiCallTicketMapper
      * 标记工单为已超时并记录提醒时间。
      */
     public int markOvertime(@Param("ticketId") Long ticketId, @Param("remindTime") java.util.Date remindTime);
+
+    /**
+     * F3：发起转办时回写工单外部协同字段。
+     */
+    public int updateExternalInfo(@Param("ticketId") Long ticketId,
+                                  @Param("externalType") String externalType,
+                                  @Param("externalOrgId") Long externalOrgId,
+                                  @Param("externalTicketNo") String externalTicketNo,
+                                  @Param("externalStatus") String externalStatus,
+                                  @Param("externalUpdateTime") java.util.Date externalUpdateTime,
+                                  @Param("transferTime") java.util.Date transferTime,
+                                  @Param("direction") String direction);
+
+    /**
+     * F3：外部回调回写外部状态。
+     */
+    public int updateExternalCallback(@Param("ticketId") Long ticketId,
+                                      @Param("externalTicketNo") String externalTicketNo,
+                                      @Param("externalStatus") String externalStatus,
+                                      @Param("externalUpdateTime") java.util.Date externalUpdateTime);
+
+    /**
+     * F9：查询已超过 SLA 截止时间且仍未办结/归档的工单（含已标记超时，供逐级升级扫描）。
+     */
+    public List<AiCallTicket> selectEscalatableTickets();
 }

@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiChannelIdentityMapper">
+
+    <resultMap type="AiChannelIdentity" id="AiChannelIdentityResult">
+        <result property="id"               column="id"                 />
+        <result property="profileId"        column="profile_id"         />
+        <result property="channelType"      column="channel_type"       />
+        <result property="channelUid"       column="channel_uid"        />
+        <result property="channelNickname"  column="channel_nickname"   />
+        <result property="bindStatus"       column="bind_status"        />
+        <result property="bindConfirmTime"  column="bind_confirm_time"  />
+        <result property="unbindTime"       column="unbind_time"        />
+        <result property="createBy"         column="create_by"          />
+        <result property="createTime"       column="create_time"        />
+        <result property="updateBy"         column="update_by"          />
+        <result property="updateTime"       column="update_time"        />
+        <result property="remark"           column="remark"             />
+    </resultMap>
+
+    <sql id="selectAiChannelIdentityVo">
+        select id, profile_id, channel_type, channel_uid, channel_nickname, bind_status,
+               bind_confirm_time, unbind_time, create_by, create_time, update_by, update_time, remark
+        from ai_channel_identity
+    </sql>
+
+    <select id="selectAiChannelIdentityList" parameterType="AiChannelIdentity" resultMap="AiChannelIdentityResult">
+        <include refid="selectAiChannelIdentityVo"/>
+        <where>
+            <if test="profileId != null"> and profile_id = #{profileId}</if>
+            <if test="channelType != null and channelType != ''"> and channel_type = #{channelType}</if>
+            <if test="channelUid != null and channelUid != ''"> and channel_uid like concat('%', #{channelUid}, '%')</if>
+            <if test="bindStatus != null and bindStatus != ''"> and bind_status = #{bindStatus}</if>
+        </where>
+        order by bind_confirm_time desc
+    </select>
+
+    <select id="selectAiChannelIdentityById" parameterType="Long" resultMap="AiChannelIdentityResult">
+        <include refid="selectAiChannelIdentityVo"/>
+        where id = #{id}
+    </select>
+
+    <select id="selectByChannelUid" resultMap="AiChannelIdentityResult">
+        <include refid="selectAiChannelIdentityVo"/>
+        where channel_type = #{channelType} and channel_uid = #{channelUid}
+    </select>
+
+    <select id="selectBoundByProfileId" parameterType="Long" resultMap="AiChannelIdentityResult">
+        <include refid="selectAiChannelIdentityVo"/>
+        where profile_id = #{profileId} and bind_status = '0'
+        order by channel_type
+    </select>
+
+    <insert id="insertAiChannelIdentity" parameterType="AiChannelIdentity" useGeneratedKeys="true" keyProperty="id">
+        insert into ai_channel_identity
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="profileId != null">profile_id,</if>
+            <if test="channelType != null and channelType != ''">channel_type,</if>
+            <if test="channelUid != null and channelUid != ''">channel_uid,</if>
+            <if test="channelNickname != null">channel_nickname,</if>
+            <if test="bindStatus != null and bindStatus != ''">bind_status,</if>
+            <if test="bindConfirmTime != null">bind_confirm_time,</if>
+            <if test="unbindTime != null">unbind_time,</if>
+            <if test="createBy != null">create_by,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="profileId != null">#{profileId},</if>
+            <if test="channelType != null and channelType != ''">#{channelType},</if>
+            <if test="channelUid != null and channelUid != ''">#{channelUid},</if>
+            <if test="channelNickname != null">#{channelNickname},</if>
+            <if test="bindStatus != null and bindStatus != ''">#{bindStatus},</if>
+            <if test="bindConfirmTime != null">#{bindConfirmTime},</if>
+            <if test="unbindTime != null">#{unbindTime},</if>
+            <if test="createBy != null">#{createBy},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="confirmBind">
+        update ai_channel_identity
+        set bind_status = '0',
+            channel_nickname = #{nickname},
+            bind_confirm_time = #{confirmTime},
+            unbind_time = null,
+            update_time = sysdate()
+        where id = #{id}
+    </update>
+
+    <update id="unbind">
+        update ai_channel_identity
+        set bind_status = '1',
+            unbind_time = #{unbindTime},
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where id = #{id} and bind_status = '0'
+    </update>
+</mapper>

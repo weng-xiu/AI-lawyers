@@ -223,6 +223,8 @@
           <el-col :span="12"><el-form-item label="意图置信度"><el-input-number v-model="profileForm.intentConfidence" :min="0" :max="100" controls-position="right" style="width:100%" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="风险等级"><el-select v-model="profileForm.riskLevel" style="width:100%"><el-option label="低" value="0" /><el-option label="中" value="1" /><el-option label="高" value="2" /></el-select></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="情绪状态"><el-input v-model="profileForm.emotionStatus" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="语种偏好（F1）"><el-select v-model="profileForm.languagePreference" style="width:100%"><el-option label="普通话" value="zh-CN" /><el-option label="粤语" value="yue-CN" /></el-select></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="关怀模式（F2）"><el-switch v-model="profileForm.careMode" :active-value="1" :inactive-value="0" active-text="适老大字" inactive-text="标准" /></el-form-item></el-col>
         </el-row>
       </el-form>
       <div slot="footer">
@@ -599,7 +601,9 @@ export default {
         callerGender: p.callerGender, callerAge: p.callerAge, callerIdCard: p.callerIdCard,
         callerAddress: p.address, customerLevel: p.customerLevel, tags: p.tags,
         intentPrediction: p.intentPrediction, intentConfidence: p.intentConfidence,
-        riskLevel: p.riskLevel, emotionStatus: p.emotionStatus
+        riskLevel: p.riskLevel, emotionStatus: p.emotionStatus,
+        languagePreference: p.languagePreference || 'zh-CN',
+        careMode: p.careMode != null ? Number(p.careMode) : 0
       }
       this.editOpen = true
     },

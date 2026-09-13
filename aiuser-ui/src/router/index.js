@@ -11,6 +11,8 @@ const ConsultationHistory = () => import('@/views/ConsultationHistory')
 const EvaluationPage = () => import('@/views/EvaluationPage')
 const Login = () => import('@/views/Login')
 const Register = () => import('@/views/Register')
+const MyTickets = () => import('@/views/MyTickets')
+const ServiceNav = () => import('@/views/ServiceNav')
 
 const routes = [
   {
@@ -28,6 +30,19 @@ const routes = [
   {
     path: '/',
     redirect: '/consultation/submit'
+  },
+  {
+    path: '/ticket',
+    name: 'MyTickets',
+    component: MyTickets,
+    meta: { title: '我的工单', requiresAuth: true }
+  },
+  {
+    path: '/services',
+    name: 'ServiceNav',
+    component: ServiceNav,
+    // 服务机构目录为匿名只读接口，未登录也可浏览
+    meta: { title: '服务导航', requiresAuth: false }
   },
   {
     path: '/consultation',
