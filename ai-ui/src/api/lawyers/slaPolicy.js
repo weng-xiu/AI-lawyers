@@ -42,3 +42,12 @@ export function delSlaPolicy(policyIds) {
     method: 'delete'
   })
 }
+
+// F9 SLA 可视化看板聚合数据
+export function slaBoardData(query) {
+  return request({
+    url: '/lawyers/sla/board/data',
+    method: 'get',
+    params: query
+  })
+}

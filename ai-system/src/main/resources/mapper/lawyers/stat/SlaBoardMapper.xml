@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.stat.SlaBoardMapper">
+
+    <!-- F9 工单 SLA 看板：工单总体达成概况（区间内建单口径） -->
+    <select id="selectOverview" resultType="java.util.LinkedHashMap">
+        select
+            count(1)                                                            as totalCount,
+            sum(case when t.status in ('2','3') then 1 else 0 end)             as closedCount,
+            sum(case when t.status in ('2','3') and t.close_time is not null
+                      and t.due_time is not null and t.close_time &lt;= t.due_time
+                     then 1 else 0 end)                                        as closedOnTimeCount,
+            sum(case when t.status in ('2','3')
+                      and (
+                            (t.due_time is not null and t.close_time is not null and t.close_time &gt; t.due_time)
+                            or t.overtime_flag = 1
+                          )
+                     then 1 else 0 end)                                        as closedOvertimeCount,
+            sum(case when t.status in ('0','1') then 1 else 0 end)            as openCount,
+            sum(case when t.status in ('0','1') and t.due_time is not null and t.due_time &lt; now()
+                     then 1 else 0 end)                                        as openOvertimeCount,
+            sum(case when t.status in ('0','1') and t.due_time is not null
+                      and t.due_time &gt;= now()
+                     then 1 else 0 end)                                        as dueSoonCount
+        from ai_call_ticket t
+        where t.create_time &gt;= #{beginTime} and t.create_time &lt; #{endTime}
+    </select>
+
+    <!-- 按业务条线分组的达成率（内部工单归 INTERNAL） -->
+    <select id="selectAchieveByBizType" resultType="java.util.LinkedHashMap">
+        select
+            coalesce(t.external_type, 'INTERNAL')                              as bizType,
+            count(1)                                                            as totalCount,
+            sum(case when t.status in ('2','3') then 1 else 0 end)             as closedCount,
+            sum(case when t.status in ('2','3') and t.close_time is not null
+                      and t.due_time is not null and t.close_time &lt;= t.due_time
+                     then 1 else 0 end)                                        as onTimeCount,
+            sum(case when t.status in ('0','1') and t.due_time is not null and t.due_time &lt; now()
+                     then 1 else 0 end)                                        as openOvertimeCount
+        from ai_call_ticket t
+        where t.create_time &gt;= #{beginTime} and t.create_time &lt; #{endTime}
+        group by coalesce(t.external_type, 'INTERNAL')
+        order by totalCount desc
+    </select>
+
+    <!-- 按处理人分组的准时/超时达成（仅已分配且已办结工单） -->
+    <select id="selectAchieveByAssignee" resultType="java.util.LinkedHashMap">
+        select
+            t.assign_user_id                                                    as userId,
+            coalesce(nullif(t.assign_user_name, ''), concat('用户', t.assign_user_id)) as userName,
+            count(1)                                                            as closedCount,
+            sum(case when t.close_time is not null and t.due_time is not null
+                      and t.close_time &lt;= t.due_time then 1 else 0 end)       as onTimeCount,
+            round(avg(case when t.close_time is not null and t.create_time is not null
+                      then timestampdiff(SECOND, t.create_time, t.close_time) end) / 60, 1) as avgHandleMinutes
+        from ai_call_ticket t
+        where t.assign_user_id is not null
+          and t.status in ('2','3')
+          and t.close_time is not null
+          and t.create_time &gt;= #{beginTime} and t.create_time &lt; #{endTime}
+        group by t.assign_user_id, t.assign_user_name
+        order by closedCount desc, onTimeCount asc
+    </select>
+
+    <!-- 超时工单 TOP N：进行中已超期优先，其次历史办结超时，按超期/延迟时长降序 -->
+    <select id="selectOvertimeTop" resultType="java.util.LinkedHashMap">
+        select
+            t.ticket_id          as ticketId,
+            t.ticket_no          as ticketNo,
+            t.title              as title,
+            t.priority           as priority,
+            t.status             as status,
+            coalesce(t.external_type, 'INTERNAL') as bizType,
+            t.assign_user_name   as assignUserName,
+            t.due_time           as dueTime,
+            t.close_time         as closeTime,
+            case when t.status in ('0','1') then timestampdiff(MINUTE, t.due_time, now())
+                 else timestampdiff(MINUTE, t.due_time, t.close_time) end       as overdueMinutes
+        from ai_call_ticket t
+        where t.due_time is not null
+          and (
+                (t.status in ('0','1') and t.due_time &lt; now())
+             or (t.status in ('2','3') and t.close_time is not null and t.close_time &gt; t.due_time)
+          )
+          and t.create_time &gt;= #{beginTime} and t.create_time &lt; #{endTime}
+        order by case when t.status in ('0','1') then 0 else 1 end,
+                 overdueMinutes desc
+        limit #{limit}
+    </select>
+
+    <!-- 当前临近超时工单数（全量进行中，不受区间限制） -->
+    <select id="countDueSoon" resultType="long">
+        select count(1)
+        from ai_call_ticket t
+        where t.status in ('0','1')
+          and t.due_time is not null
+          and t.due_time &gt;= now()
+          and timestampdiff(SECOND, now(), t.due_time) &lt;= #{warnMinutes} * 60
+    </select>
+
+    <!-- 当前临近超时（全量进行中，不受区间限制），剩余秒数由 SQL 直接给出 -->
+    <select id="selectDueSoon" resultType="java.util.LinkedHashMap">
+        select
+            t.ticket_id          as ticketId,
+            t.ticket_no          as ticketNo,
+            t.title              as title,
+            t.priority           as priority,
+            coalesce(t.external_type, 'INTERNAL') as bizType,
+            t.assign_user_name   as assignUserName,
+            t.due_time           as dueTime,
+            timestampdiff(SECOND, now(), t.due_time) as remainSeconds
+        from ai_call_ticket t
+        where t.status in ('0','1')
+          and t.due_time is not null
+          and t.due_time &gt;= now()
+          and timestampdiff(SECOND, now(), t.due_time) &lt;= #{warnMinutes} * 60
+        order by t.due_time asc
+        limit #{limit}
+    </select>
+
+    <!-- 跨域流转统计（F3）：条线 + 方向，平均办结耗时=外部回写 DONE 与转出时间差 -->
+    <select id="selectTransferStat" resultType="java.util.LinkedHashMap">
+        select
+            tr.external_type                          as bizType,
+            tr.direction                              as direction,
+            count(1)                                  as transferCount,
+            sum(case when tr.external_status = 'DONE' then 1 else 0 end) as doneCount,
+            round(avg(case when tr.external_status = 'DONE' and tr.callback_time is not null
+                  then timestampdiff(SECOND, tr.transfer_time, tr.callback_time) end) / 60, 1) as avgHandleMinutes
+        from ai_ticket_transfer tr
+        where tr.create_time &gt;= #{beginTime} and tr.create_time &lt; #{endTime}
+        group by tr.external_type, tr.direction
+        order by transferCount desc
+    </select>
+
+</mapper>
