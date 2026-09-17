@@ -167,6 +167,8 @@ public class AiUserLoginController extends BaseController
 
         String capStr = null, code = null;
         BufferedImage image = null;
+        // F2 适老化：算式验证码的可读等式（不含答案），供前端语音验证码朗读；字符码为防刷不回传
+        String expr = null;
 
         // 生成验证码
         String captchaType = RuoYiConfig.getCaptchaType();
@@ -176,6 +178,10 @@ public class AiUserLoginController extends BaseController
             capStr = capText.substring(0, capText.lastIndexOf("@"));
             code = capText.substring(capText.lastIndexOf("@") + 1);
             image = captchaProducerMath.createImage(capStr);
+            // 运算符号转中文、去掉图形中的 "=?" 尾缀，供浏览器语音合成（SpeechSynthesis）朗读，如"7 加 5，等于几"
+            String spoken = capStr.replace("=?", "").trim();
+            expr = spoken.replace("*", "乘").replace("/", "除以").replace("+", "加").replace("-", "减")
+                    + "，等于几";
         }
         else if ("char".equals(captchaType))
         {
@@ -197,9 +203,11 @@ public class AiUserLoginController extends BaseController
 
         ajax.put("uuid", uuid);
         ajax.put("img", Base64.encode(os.toByteArray()));
+        // F2 适老化：返回算式可读文本（仅 math 类型，不含答案），供语音验证码朗读
+        ajax.put("expr", expr);
         return ajax;
     }
-    
+
     // 检查初始密码是否提醒修改
     public boolean initPasswordIsModify(Date pwdUpdateDate)
     {

@@ -35,4 +35,12 @@ public interface AiReturnVisitTaskMapper
      * @return 更新行数
      */
     public int markOverdueTasks(@Param("now") Date now);
+
+    /**
+     * F5 查询已逾期（status=2）且仍未回访的任务，供逐级升级定时任务扫描。
+     * 高优先级优先、计划时间最早优先，限制单轮批量。
+     *
+     * @param limit 单轮最多处理条数
+     */
+    public List<AiReturnVisitTask> selectOverdueTasksForEscalate(@Param("limit") int limit);
 }

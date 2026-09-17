@@ -1,7 +1,7 @@
 <template>
   <div class="portal-page my-tickets">
-    <!-- 跳到主内容由 App.vue 提供 -->
-    <main id="main-content" role="main" class="page-wrap" aria-live="polite">
+    <!-- 主内容容器与 skip 目标由 App.vue 统一提供，此处仅作语义分区；列表变化经 #a11y-announcer 播报 -->
+    <section class="page-wrap" aria-label="我的工单">
       <div class="page-head">
         <h2 class="page-title">我的工单</h2>
         <p class="page-sub">这里展示与您手机号关联的来电工单和跨部门转办进度</p>
@@ -85,12 +85,13 @@
           :total="total">
         </el-pagination>
       </div>
-    </main>
+    </section>
   </div>
 </template>
 
 <script>
 import { myTickets } from '@/api/portal'
+import { announce } from '@/utils/a11y'
 
 export default {
   name: 'MyTickets',
@@ -111,6 +112,13 @@ export default {
       myTickets(this.query).then(res => {
         this.ticketList = res.rows || []
         this.total = res.total || 0
+        const len = this.ticketList.length
+        const range = len > 0
+          ? `第 ${(this.query.pageNum - 1) * this.query.pageSize + 1} 到 ${(this.query.pageNum - 1) * this.query.pageSize + len} 条`
+          : ''
+        announce(`工单加载完成，共 ${this.total} 条，${range}`, 'polite')
+      }).catch(() => {
+        announce('工单加载失败，请稍后重试', 'assertive')
       }).finally(() => { this.loading = false })
     },
     handleFilter() {

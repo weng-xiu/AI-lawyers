@@ -68,6 +68,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           and plan_time &lt; #{now}
     </update>
 
+    <!-- F5 逾期任务逐级升级扫描：高优先级优先、计划时间最早优先 -->
+    <select id="selectOverdueTasksForEscalate" resultMap="AiReturnVisitTaskResult">
+        <include refid="selectAiReturnVisitTaskVo"/>
+        where status = '2'
+          and plan_time is not null
+        order by priority asc, plan_time asc
+        limit #{limit}
+    </select>
+
     <insert id="insertAiReturnVisitTask" parameterType="AiReturnVisitTask" useGeneratedKeys="true" keyProperty="taskId">
         insert into ai_return_visit_task
         <trim prefix="(" suffix=")" suffixOverrides=",">

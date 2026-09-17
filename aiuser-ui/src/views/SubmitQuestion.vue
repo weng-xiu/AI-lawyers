@@ -7,7 +7,7 @@
       
       <el-form :model="questionForm" :rules="rules" ref="questionForm" label-width="100px">
         <el-form-item label="问题分类" prop="category">
-          <el-select v-model="questionForm.category" placeholder="请选择问题分类" style="width: 100%">
+          <el-select v-model="questionForm.category" placeholder="请选择问题分类" style="width: 100%" aria-label="问题分类">
             <el-option label="婚姻家庭" value="marriage"></el-option>
             <el-option label="劳动纠纷" value="labor"></el-option>
             <el-option label="合同纠纷" value="contract"></el-option>
@@ -19,10 +19,11 @@
         </el-form-item>
         
         <el-form-item label="问题描述" prop="content">
-          <el-input 
-            type="textarea" 
-            v-model="questionForm.content" 
-            placeholder="请详细描述您的法律问题"
+          <el-input
+            type="textarea"
+            v-model="questionForm.content"
+            placeholder="请详细描述您的法律问题（至少10个字）"
+            aria-label="问题描述，请详细描述您的法律问题，至少10个字"
             :rows="8"
             maxlength="1000"
             show-word-limit>
@@ -66,6 +67,8 @@
 </template>
 
 <script>
+import { announce } from '@/utils/a11y'
+
 export default {
   name: 'SubmitQuestion',
   data() {
@@ -103,7 +106,8 @@ export default {
           this.processingPercentage = 0
           this.processingStatus = ''
           this.processingMessage = '正在分析您的问题...'
-          
+          announce('问题已提交，正在分析，请稍候', 'polite')
+
           // 模拟处理进度
           this.simulateProcessing()
           
@@ -128,7 +132,8 @@ export default {
             this.processingPercentage = 100
             this.processingStatus = 'success'
             this.processingMessage = '问题提交成功！'
-            
+            announce('问题提交成功，正在为您生成法律解答', 'polite')
+
             setTimeout(() => {
               this.processingDialogVisible = false
               this.submitting = false
@@ -142,6 +147,7 @@ export default {
           }).catch(error => {
             this.processingStatus = 'exception'
             this.processingMessage = '提交失败，请重试'
+            announce('提交失败：' + ((error.response && error.response.data && error.response.data.msg) || '请稍后重试'), 'assertive')
             this.submitting = false
             
             setTimeout(() => {

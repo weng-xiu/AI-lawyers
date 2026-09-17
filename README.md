@@ -316,7 +316,6 @@ fs_cli -x "events plain CHANNEL_CREATE CHANNEL_ANSWER CHANNEL_HANGUP"
 | 1002 软电话未注册导致 FreeSWITCH 崩溃 | B-leg 无法建立 | 使用浏览器自动注册，确保 5066 端口可达 |
 | 浏览器无法获取麦克风 | 非 HTTPS/localhost 访问 | 通过 `http://localhost/` 访问，或配置 HTTPS（WSS 7443） |
 | ESL 连接断开 | FreeSWITCH 重启 | 后端自动重连，查看日志 `[ESL-127.0.0.1] 鉴权成功` |
-| Clash 代理导致 WS 连接失败 | 198.18.0.1 是 Clash TUN 网段 | 临时关闭 Clash TUN 模式，或配置直连规则 |
 
 ---
 

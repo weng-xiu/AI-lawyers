@@ -135,6 +135,8 @@
 </template>
 
 <script>
+import { announce } from '@/utils/a11y'
+
 export default {
   name: 'ConsultationResult',
   data() {
@@ -161,14 +163,21 @@ export default {
   methods: {
     fetchConsultationResult(id) {
       this.loading = true
+      announce('正在获取咨询结果，请稍候', 'polite')
       this.$http.get(`/aiuser/consultation/result/${id}`)
         .then(response => {
           this.consultationResult = response.data
           this.loading = false
+          const r = response.data || {}
+          const lawCount = (r.relatedLaws && r.relatedLaws.length) || 0
+          announce(`咨询结果已生成，分类${this.getCategoryName(r.category)}，`
+            + `置信度${r.confidence == null ? '未知' : r.confidence + '%'}`
+            + (lawCount > 0 ? `，相关法律条文 ${lawCount} 条` : ''), 'polite')
         })
         .catch(error => {
           this.$message.error('获取咨询结果失败: ' + (error.response && error.response.data && error.response.data.msg || '未知错误'))
           this.loading = false
+          announce('获取咨询结果失败，请稍后重试', 'assertive')
         })
     },
     getCategoryType(category) {
@@ -214,6 +223,7 @@ export default {
     submitEvaluation() {
       if (this.rating === 0) {
         this.$message.warning('请先选择评分')
+        announce('请先选择评分', 'assertive')
         return
       }
       
@@ -227,10 +237,12 @@ export default {
       this.$http.post('/aiuser/consultation/evaluation', evaluationData)
         .then(() => {
           this.$message.success('评价提交成功')
+          announce('评价提交成功，感谢您的反馈', 'polite')
           this.submitting = false
         })
         .catch(error => {
           this.$message.error('评价提交失败: ' + (error.response && error.response.data && error.response.data.msg || '未知错误'))
+          announce('评价提交失败，请稍后重试', 'assertive')
           this.submitting = false
         })
     },

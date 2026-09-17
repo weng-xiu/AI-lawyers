@@ -1,5 +1,6 @@
 <template>
   <div class="register-container">
+   <main id="main-content" role="main" tabindex="-1" class="register-main">
     <el-card class="register-card">
       <div slot="header" class="register-header">
         <h2>用户注册</h2>
@@ -31,12 +32,18 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item v-if="captchaEnabled" label="验证码" prop="code">
-          <el-row :gutter="20">
-            <el-col :span="16">
-              <el-input v-model="registerForm.code" placeholder="请输入验证码"></el-input>
+          <el-row :gutter="20" class="captcha-row">
+            <el-col :span="12">
+              <el-input v-model="registerForm.code" placeholder="请输入验证码"
+                        aria-label="请输入图形验证码的计算结果"></el-input>
             </el-col>
-            <el-col :span="8">
-              <img :src="codeUrl" class="register-code-img" @click="getCode">
+            <el-col :span="7">
+              <img :src="codeUrl" class="register-code-img" alt="图形验证码，点击可刷新"
+                   role="button" tabindex="0" @click="getCode" @keyup.enter="getCode">
+            </el-col>
+            <el-col :span="5" v-if="speechSupported">
+              <el-button type="text" icon="el-icon-bell"
+                         aria-label="播放验证码语音" @click="playCaptchaVoice">听码</el-button>
             </el-col>
           </el-row>
         </el-form-item>
@@ -47,11 +54,13 @@
         </el-form-item>
       </el-form>
     </el-card>
+   </main>
   </div>
 </template>
 
 <script>
 import { getCodeImg, register } from '@/api/user'
+import { speak, announce, speechSupported } from '@/utils/a11y'
 
 export default {
   name: 'Register',
@@ -66,6 +75,8 @@ export default {
     }
     return {
       codeUrl: '',
+      captchaExpr: '',
+      speechSupported,
       registerForm: {
         username: '',
         nickName: '',
@@ -116,8 +127,23 @@ export default {
         if (this.captchaEnabled) {
           this.codeUrl = 'data:image/gif;base64,' + res.img
           this.registerForm.uuid = res.uuid
+          this.captchaExpr = res.expr || ''
         }
       })
+    },
+    // F2 语音验证码
+    playCaptchaVoice() {
+      if (!this.captchaExpr) {
+        this.$message.info('正在获取验证码，请稍后重试')
+        this.getCode()
+        return
+      }
+      const ok = speak('语音验证码：' + this.captchaExpr + '，请输入计算结果')
+      if (!ok) {
+        this.$message.warning('当前浏览器不支持语音播报，请根据图形验证码输入')
+      } else {
+        announce('正在播放语音验证码：' + this.captchaExpr, 'polite')
+      }
     },
     submitForm() {
       this.$refs.registerForm.validate(valid => {
@@ -126,11 +152,14 @@ export default {
           // 设置用户类型为普通用户
           this.registerForm.userType = '01'
           register(this.registerForm).then(res => {
+            announce('注册成功，请登录', 'polite')
             this.$message.success('注册成功，请登录')
             this.$router.push('/login')
             this.loading = false
-          }).catch(() => {
+          }).catch((err) => {
             this.loading = false
+            const msg = (err && err.response && err.response.data && err.response.data.msg) || '注册失败，请检查填写内容'
+            announce('注册失败：' + msg, 'assertive')
             if (this.captchaEnabled) {
               this.getCode()
             }
@@ -154,11 +183,14 @@ export default {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
+  min-height: 100vh;
+  padding: 20px;
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
 }
+.register-main { outline: none; width: 100%; display: flex; justify-content: center; }
 .register-card {
   width: 500px;
+  max-width: 100%;
   border-radius: 10px;
   box-shadow: 0 0 25px rgba(0, 0, 0, 0.1);
 }
@@ -169,12 +201,16 @@ export default {
   margin: 0;
   color: #303133;
 }
+.captcha-row { display: flex; align-items: center; }
 .register-code-img {
   height: 38px;
   cursor: pointer;
   vertical-align: middle;
   width: 100%;
+  border-radius: 4px;
 }
+html.care-high-contrast .register-card { border: 2px solid #000; box-shadow: none; }
+html.care-high-contrast .register-code-img { border: 2px solid #000; }
 .el-form-item {
   margin-bottom: 20px;
 }

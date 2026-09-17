@@ -1,6 +1,6 @@
 <template>
   <div class="portal-page service-nav">
-    <main id="main-content" role="main" class="page-wrap" aria-live="polite">
+    <section class="page-wrap" aria-label="法律服务导航">
       <div class="page-head">
         <h2 class="page-title">法律服务导航</h2>
         <p class="page-sub">查询法律援助、人民调解、公证、12345 转办等公共法律服务机构及办事指南</p>
@@ -75,12 +75,13 @@
           </div>
         </el-card>
       </div>
-    </main>
+    </section>
   </div>
 </template>
 
 <script>
 import { serviceOrgs } from '@/api/portal'
+import { announce } from '@/utils/a11y'
 
 export default {
   name: 'ServiceNav',
@@ -111,6 +112,10 @@ export default {
       if (this.query.orgName) params.orgName = this.query.orgName
       serviceOrgs(params).then(res => {
         this.orgList = res.data || []
+        const n = this.orgList.length
+        announce(n > 0 ? `查询到 ${n} 家服务机构` : '未找到符合条件的服务机构，可拨打 12348 获得帮助', 'polite')
+      }).catch(() => {
+        announce('机构查询失败，请稍后重试', 'assertive')
       }).finally(() => { this.loading = false })
     },
     handleSearch() {

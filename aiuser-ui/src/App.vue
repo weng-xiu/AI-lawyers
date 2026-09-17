@@ -3,6 +3,19 @@
     <!-- 跳到主内容（无障碍） -->
     <a href="#main-content" class="skip-link" @click.prevent="focusMain">跳到主要内容</a>
 
+    <!-- F2 无障碍：全局 aria-live 播报区（视觉隐藏，仅供读屏器）。
+         咨询结果/排队状态/错误提示经 utils/a11y.announce() 写入此处播报 -->
+    <div id="a11y-announcer" class="sr-only" aria-atomic="false">
+      <span data-role="polite" aria-live="polite"></span>
+      <span data-role="assertive" aria-live="assertive"></span>
+    </div>
+
+    <!-- F2 语音求助：固定悬浮入口，一键转人工热线（兜底，ASR 语音提问待 P3 公众端 ASR 接口） -->
+    <a class="voice-help" href="tel:12348" aria-label="语音求助，拨打 12348 公共法律服务人工热线">
+      <i class="el-icon-phone-outline"></i>
+      <span class="voice-help-text">语音求助</span>
+    </a>
+
     <!-- 登录/注册页面不显示导航栏 -->
     <div v-if="$route.path === '/login' || $route.path === '/register'">
       <router-view/>
@@ -72,7 +85,9 @@
         </div>
       </el-header>
       <el-main>
-        <router-view ref="mainView"/>
+        <main id="main-content" role="main" tabindex="-1" class="main-region">
+          <router-view ref="mainView"/>
+        </main>
       </el-main>
       <el-footer class="app-footer">
         <p>公共法律服务热线 12348 ｜ 政务服务便民热线 12345　© 2026 AI律师话务平台</p>
@@ -173,6 +188,50 @@ html, body {
 .skip-link:focus {
   left: 0;
   outline: 3px solid #ffd04b;
+}
+
+/* sr-only：视觉隐藏但读屏器可感知（aria-live 播报区） */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 主内容区去除聚焦轮廓（由 skip-link 编程聚焦时不显示突兀黑框） */
+.main-region { outline: none; }
+
+/* F2 语音求助悬浮入口：热区 >= 44px，固定右下角 */
+.voice-help {
+  position: fixed;
+  right: 20px;
+  bottom: 76px;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 48px;
+  padding: 0 18px;
+  background: #c8372d;
+  color: #fff;
+  border-radius: 24px;
+  box-shadow: 0 4px 14px rgba(200, 55, 45, 0.4);
+  text-decoration: none;
+  font-size: 16px;
+  font-weight: 600;
+}
+.voice-help:hover { color: #fff; text-decoration: none; background: #d9443a; }
+.voice-help .el-icon-phone-outline { font-size: 20px; }
+html.care-large .voice-help { min-height: 56px; font-size: 19px; padding: 0 24px; }
+html.care-xlarge .voice-help { min-height: 64px; font-size: 22px; padding: 0 30px; border-radius: 32px; }
+@media (max-width: 600px) {
+  .voice-help-text { display: none; }
+  .voice-help { width: 52px; height: 52px; justify-content: center; padding: 0; }
 }
 
 /* 统一可见焦点环（无障碍） */

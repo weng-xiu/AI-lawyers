@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.stat.VisitSatisfactionMapper">
+
+    <!-- 电话回访满意度总览（区间内已回访口径） -->
+    <select id="selectCallbackOverview" resultType="java.util.LinkedHashMap">
+        select
+            count(1)                                                          as visitCount,
+            sum(case when c.satisfaction is not null and c.satisfaction &lt;&gt; '' then 1 else 0 end) as ratedCount,
+            sum(case when c.satisfaction = '1' then 1 else 0 end)            as verySatisfiedCount,
+            sum(case when c.satisfaction = '2' then 1 else 0 end)            as satisfiedCount,
+            sum(case when c.satisfaction = '3' then 1 else 0 end)            as normalCount,
+            sum(case when c.satisfaction = '4' then 1 else 0 end)            as unsatisfiedCount,
+            sum(case when c.status = '0' then 1 else 0 end)                  as pendingCount,
+            sum(case when c.status = '1' then 1 else 0 end)                  as completedCount,
+            sum(case when c.status = '2' then 1 else 0 end)                  as unreachableCount,
+            round(avg(case when c.satisfaction is not null and c.satisfaction &lt;&gt; ''
+                  then (5 - cast(c.satisfaction as unsigned)) end), 2)       as avgScore
+        from ai_callback c
+        where c.visit_time is not null
+          and c.visit_time &gt;= #{beginTime} and c.visit_time &lt; #{endTime}
+    </select>
+
+    <!-- 电话回访满意度每日趋势 -->
+    <select id="selectCallbackTrend" resultType="java.util.LinkedHashMap">
+        select
+            date(c.visit_time)                                                  as statDate,
+            sum(case when c.satisfaction = '1' then 1 else 0 end)            as verySatisfied,
+            sum(case when c.satisfaction = '2' then 1 else 0 end)            as satisfied,
+            sum(case when c.satisfaction = '3' then 1 else 0 end)            as normal,
+            sum(case when c.satisfaction = '4' then 1 else 0 end)            as unsatisfied,
+            count(1)                                                          as total
+        from ai_callback c
+        where c.visit_time is not null
+          and c.visit_time &gt;= #{beginTime} and c.visit_time &lt; #{endTime}
+        group by date(c.visit_time)
+        order by statDate
+    </select>
+
+    <!-- 回访员维度 -->
+    <select id="selectByVisitor" resultType="java.util.LinkedHashMap">
+        select
+            c.visit_by_id                                   as userId,
+            coalesce(nullif(c.visit_by, ''), concat('用户', c.visit_by_id)) as userName,
+            count(1)                                                          as visitCount,
+            sum(case when c.satisfaction in ('1','2') then 1 else 0 end)    as satisfiedCount,
+            sum(case when c.satisfaction = '4' then 1 else 0 end)            as unsatisfiedCount,
+            round(avg(case when c.satisfaction is not null and c.satisfaction &lt;&gt; ''
+                  then (5 - cast(c.satisfaction as unsigned)) end), 2)       as avgScore
+        from ai_callback c
+        where c.visit_time is not null
+          and c.visit_time &gt;= #{beginTime} and c.visit_time &lt; #{endTime}
+          and c.visit_by is not null and c.visit_by &lt;&gt; ''
+        group by c.visit_by_id, c.visit_by
+        order by visitCount desc, unsatisfiedCount desc
+    </select>
+
+    <!-- 不满意/一般回访意见明细（供 Service 关键词归因） -->
+    <select id="selectNegativeCallbackOpinions" resultType="java.util.LinkedHashMap">
+        select c.callback_id as callbackId,
+               c.satisfaction as satisfaction,
+               c.visit_opinion as opinion,
+               c.visit_result as visitResult,
+               c.caller_name as callerName
+        from ai_callback c
+        where c.visit_time &gt;= #{beginTime} and c.visit_time &lt; #{endTime}
+          and c.satisfaction in ('3','4')
+          and c.visit_opinion is not null and c.visit_opinion &lt;&gt; ''
+        order by c.visit_time desc
+        limit #{limit}
+    </select>
+
+    <!-- 图文咨询评价总览 -->
+    <select id="selectEvaluationOverview" resultType="java.util.LinkedHashMap">
+        select
+            count(1)                                                  as evalCount,
+            round(avg(e.overall_rating), 2)                          as avgOverall,
+            round(avg(e.professionalism_rating), 2)                  as avgProfessionalism,
+            round(avg(e.responsiveness_rating), 2)                   as avgResponsiveness,
+            round(avg(e.quality_rating), 2)                           as avgQuality,
+            sum(case when e.overall_rating &gt;= 4 then 1 else 0 end)  as positiveCount,
+            sum(case when e.overall_rating &lt;= 2 then 1 else 0 end)  as negativeCount,
+            sum(case when e.feedback is not null and e.feedback &lt;&gt; '' then 1 else 0 end) as feedbackCount
+        from ai_user_evaluation e
+        where e.create_time is not null
+          and e.create_time &gt;= #{beginTime} and e.create_time &lt; #{endTime}
+    </select>
+
+    <!-- 图文低分评价明细（供关键词归因） -->
+    <select id="selectNegativeEvaluationFeedback" resultType="java.util.LinkedHashMap">
+        select e.evaluation_id as evaluationId,
+               e.overall_rating as overallRating,
+               e.feedback as feedback
+        from ai_user_evaluation e
+        where e.create_time &gt;= #{beginTime} and e.create_time &lt; #{endTime}
+          and e.overall_rating &lt;= 2
+          and e.feedback is not null and e.feedback &lt;&gt; ''
+        order by e.create_time desc
+        limit #{limit}
+    </select>
+
+    <!-- 回访任务运营总览（全量当前态） -->
+    <select id="selectTaskOverview" resultType="java.util.LinkedHashMap">
+        select
+            count(1)                                                  as totalCount,
+            sum(case when t.status = '0' then 1 else 0 end)          as pendingCount,
+            sum(case when t.status = '1' then 1 else 0 end)          as completedCount,
+            sum(case when t.status = '2' then 1 else 0 end)          as overdueCount,
+            sum(case when t.status = '0' and t.priority = '1' then 1 else 0 end) as pendingHighCount
+        from ai_return_visit_task t
+    </select>
+
+    <!-- 逾期未回访任务（超期分钟由 SQL 计算，分级在 Service/前端做） -->
+    <select id="selectOverdueTasks" resultType="java.util.LinkedHashMap">
+        select t.task_id       as taskId,
+               t.task_no       as taskNo,
+               t.caller_name   as callerName,
+               t.caller_number as callerNumber,
+               t.priority      as priority,
+               t.assignee      as assignee,
+               t.assignee_id   as assigneeId,
+               t.plan_time     as planTime,
+               timestampdiff(MINUTE, t.plan_time, #{now}) as overdueMinutes
+        from ai_return_visit_task t
+        where t.status = '2'
+          and t.plan_time is not null
+        order by t.priority asc, t.plan_time asc
+        limit #{limit}
+    </select>
+
+</mapper>
