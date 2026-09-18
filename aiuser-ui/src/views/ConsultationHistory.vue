@@ -9,7 +9,7 @@
       <!-- 搜索和筛选区域 -->
       <div class="filter-container">
         <el-row :gutter="20">
-          <el-col :span="8">
+          <el-col :span="10">
             <el-input
               v-model="searchQuery"
               placeholder="搜索问题内容"
@@ -18,30 +18,20 @@
               @keyup.enter.native="searchConsultations">
             </el-input>
           </el-col>
-          <el-col :span="6">
+          <el-col :span="8">
             <el-select v-model="selectedCategory" placeholder="问题分类" clearable>
               <el-option label="全部分类" value=""></el-option>
-              <el-option label="婚姻家庭" value="marriage"></el-option>
-              <el-option label="劳动纠纷" value="labor"></el-option>
-              <el-option label="合同纠纷" value="contract"></el-option>
-              <el-option label="房产纠纷" value="property"></el-option>
-              <el-option label="侵权责任" value="tort"></el-option>
-              <el-option label="刑事辩护" value="criminal"></el-option>
+              <el-option label="婚姻家庭" value="marriage_family"></el-option>
+              <el-option label="劳动纠纷" value="labor_dispute"></el-option>
+              <el-option label="合同纠纷" value="contract_dispute"></el-option>
+              <el-option label="财产权益" value="property_dispute"></el-option>
+              <el-option label="刑事案件" value="criminal_case"></el-option>
+              <el-option label="知识产权" value="intellectual_property"></el-option>
+              <el-option label="消费维权" value="consumer_rights"></el-option>
               <el-option label="其他" value="other"></el-option>
             </el-select>
           </el-col>
           <el-col :span="6">
-            <el-date-picker
-              v-model="dateRange"
-              type="daterange"
-              range-separator="至"
-              start-placeholder="开始日期"
-              end-placeholder="结束日期"
-              format="yyyy-MM-dd"
-              value-format="yyyy-MM-dd">
-            </el-date-picker>
-          </el-col>
-          <el-col :span="4">
             <el-button type="primary" @click="searchConsultations">搜索</el-button>
           </el-col>
         </el-row>
@@ -54,7 +44,7 @@
           style="width: 100%"
           @row-click="viewDetail">
           <el-table-column
-            prop="question"
+            prop="content"
             label="问题内容"
             min-width="300"
             show-overflow-tooltip>
@@ -96,7 +86,7 @@
                 type="primary"
                 @click.stop="viewDetail(scope.row)">查看详情</el-button>
               <el-button
-                v-if="scope.row.status === 'completed' && !scope.row.evaluated"
+                v-if="scope.row.status === 'COMPLETED'"
                 size="mini"
                 type="success"
                 @click.stop="evaluateConsultation(scope.row)">评价</el-button>
@@ -134,7 +124,7 @@
         <div class="rating-container">
           <span>请对本次咨询结果进行评价:</span>
           <el-rate 
-            v-model="evaluationForm.rating" 
+            v-model="evaluationForm.overallRating" 
             :colors="colors"
             show-text>
           </el-rate>
@@ -166,7 +156,6 @@ export default {
       consultationList: [],
       searchQuery: '',
       selectedCategory: '',
-      dateRange: [],
       pagination: {
         currentPage: 1,
         pageSize: 10,
@@ -175,7 +164,7 @@ export default {
       evaluationDialogVisible: false,
       evaluationForm: {
         consultationId: null,
-        rating: 0,
+        overallRating: 0,
         feedback: ''
       },
       submitting: false,
@@ -192,19 +181,14 @@ export default {
       const params = {
         pageNum: this.pagination.currentPage,
         pageSize: this.pagination.pageSize,
-        query: this.searchQuery,
+        content: this.searchQuery,
         category: this.selectedCategory
-      }
-      
-      if (this.dateRange && this.dateRange.length === 2) {
-        params.startDate = this.dateRange[0]
-        params.endDate = this.dateRange[1]
       }
       
       this.$http.get('/aiuser/consultation/history', { params })
         .then(response => {
-          this.consultationList = response.data.records || []
-          this.pagination.total = response.data.total || 0
+          this.consultationList = response.rows || []
+          this.pagination.total = response.total || 0
           this.loading = false
         })
         .catch(error => {
@@ -227,17 +211,17 @@ export default {
     viewDetail(row) {
       this.$router.push({
         path: '/consultation/result',
-        query: { id: row.id }
+        query: { id: row.consultationId }
       })
     },
     evaluateConsultation(row) {
-      this.evaluationForm.consultationId = row.id
-      this.evaluationForm.rating = 0
+      this.evaluationForm.consultationId = row.consultationId
+      this.evaluationForm.overallRating = 0
       this.evaluationForm.feedback = ''
       this.evaluationDialogVisible = true
     },
     submitEvaluation() {
-      if (this.evaluationForm.rating === 0) {
+      if (this.evaluationForm.overallRating === 0) {
         this.$message.warning('请先选择评分')
         return
       }
@@ -259,41 +243,43 @@ export default {
     },
     getCategoryType(category) {
       const typeMap = {
-        'marriage': 'danger',
-        'labor': 'warning',
-        'contract': 'primary',
-        'property': 'success',
-        'tort': 'info',
-        'criminal': 'danger',
-        'other': ''
+        marriage_family: 'danger',
+        labor_dispute: 'warning',
+        contract_dispute: 'primary',
+        property_dispute: 'success',
+        criminal_case: 'danger',
+        intellectual_property: 'info',
+        consumer_rights: 'warning',
+        other: ''
       }
       return typeMap[category] || ''
     },
     getCategoryName(category) {
       const nameMap = {
-        'marriage': '婚姻家庭',
-        'labor': '劳动纠纷',
-        'contract': '合同纠纷',
-        'property': '房产纠纷',
-        'tort': '侵权责任',
-        'criminal': '刑事辩护',
-        'other': '其他'
+        marriage_family: '婚姻家庭',
+        labor_dispute: '劳动纠纷',
+        contract_dispute: '合同纠纷',
+        property_dispute: '财产权益',
+        criminal_case: '刑事案件',
+        intellectual_property: '知识产权',
+        consumer_rights: '消费维权',
+        other: '其他'
       }
       return nameMap[category] || '其他'
     },
     getStatusType(status) {
       const typeMap = {
-        'processing': 'warning',
-        'completed': 'success',
-        'failed': 'danger'
+        PROCESSING: 'warning',
+        COMPLETED: 'success',
+        FAILED: 'danger'
       }
       return typeMap[status] || ''
     },
     getStatusName(status) {
       const nameMap = {
-        'processing': '处理中',
-        'completed': '已完成',
-        'failed': '处理失败'
+        PROCESSING: '处理中',
+        COMPLETED: '已完成',
+        FAILED: '处理失败'
       }
       return nameMap[status] || '未知'
     },

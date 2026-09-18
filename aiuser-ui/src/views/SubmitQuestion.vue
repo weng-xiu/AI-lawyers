@@ -8,12 +8,13 @@
       <el-form :model="questionForm" :rules="rules" ref="questionForm" label-width="100px">
         <el-form-item label="问题分类" prop="category">
           <el-select v-model="questionForm.category" placeholder="请选择问题分类" style="width: 100%" aria-label="问题分类">
-            <el-option label="婚姻家庭" value="marriage"></el-option>
-            <el-option label="劳动纠纷" value="labor"></el-option>
-            <el-option label="合同纠纷" value="contract"></el-option>
-            <el-option label="房产纠纷" value="property"></el-option>
-            <el-option label="侵权责任" value="tort"></el-option>
-            <el-option label="刑事辩护" value="criminal"></el-option>
+            <el-option label="婚姻家庭" value="marriage_family"></el-option>
+            <el-option label="劳动纠纷" value="labor_dispute"></el-option>
+            <el-option label="合同纠纷" value="contract_dispute"></el-option>
+            <el-option label="财产纠纷" value="property_dispute"></el-option>
+            <el-option label="刑事案件" value="criminal_case"></el-option>
+            <el-option label="知识产权" value="intellectual_property"></el-option>
+            <el-option label="消费者权益" value="consumer_rights"></el-option>
             <el-option label="其他" value="other"></el-option>
           </el-select>
         </el-form-item>
@@ -138,10 +139,10 @@ export default {
               this.processingDialogVisible = false
               this.submitting = false
               
-              // 跳转到结果页面
+              // 跳转到结果页面（http 拦截器已返回 body，主键为 consultationId）
               this.$router.push({
                 path: '/consultation/result',
-                query: { id: response.data.consultationId }
+                query: { id: response.data && response.data.consultationId }
               })
             }, 1500)
           }).catch(error => {

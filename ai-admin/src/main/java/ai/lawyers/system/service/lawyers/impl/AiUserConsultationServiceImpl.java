@@ -16,6 +16,7 @@ import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.common.core.text.Convert;
 import ai.lawyers.common.utils.DateUtils;
 import ai.lawyers.common.utils.SecurityUtils;
+import ai.lawyers.common.exception.ServiceException;
 import ai.lawyers.system.domain.lawyers.AiUserConsultation;
 import ai.lawyers.system.domain.lawyers.AiUserEvaluation;
 import ai.lawyers.system.mapper.lawyers.AiUserConsultationMapper;
@@ -36,7 +37,11 @@ public class AiUserConsultationServiceImpl implements IAiUserConsultationService
     
     @Autowired
     private AiUserEvaluationMapper aiUserEvaluationMapper;
-    
+
+    /** F8 公众端文本内容安全过滤 */
+    @Autowired
+    private ContentSafetyService contentSafetyService;
+
     @Value("${file.path}")
     private String filePath;
 
@@ -125,6 +130,9 @@ public class AiUserConsultationServiceImpl implements IAiUserConsultationService
     @Override
     public AiUserConsultation submitConsultation(String category, String content, List<MultipartFile> files)
     {
+        // F8 安全基线：内容长度 + 本地敏感词校验（坐席端/公众端共用，命中即拒绝入库）
+        contentSafetyService.validateConsultation(category, content);
+
         // 创建咨询记录
         AiUserConsultation consultation = new AiUserConsultation();
         consultation.setUserId(SecurityUtils.getUserId());
@@ -144,15 +152,16 @@ public class AiUserConsultationServiceImpl implements IAiUserConsultationService
                         String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
                         String newFilename = UUID.randomUUID().toString() + extension;
                         
-                        // 创建文件目录
-                        File dir = new File(filePath + "/consultation/");
-                        if (!dir.exists()) {
-                            dir.mkdirs();
+                        // 创建文件目录（取绝对路径：MultipartFile.transferTo 对相对路径会按
+                        // Tomcat 临时目录解析，导致 FileNotFoundException，F8 联调修复）
+                        File dir = new File(filePath + "/consultation/").getAbsoluteFile();
+                        if (!dir.exists() && !dir.mkdirs()) {
+                            throw new RuntimeException("上传目录创建失败: " + dir.getAbsolutePath());
                         }
                         
                         // 保存文件
                         File destFile = new File(dir, newFilename);
-                        file.transferTo(destFile);
+                        file.transferTo(destFile.getAbsoluteFile());
                         
                         // 记录文件路径
                         if (attachmentPaths.length() > 0) {
@@ -188,8 +197,82 @@ public class AiUserConsultationServiceImpl implements IAiUserConsultationService
     @Override
     public int submitEvaluation(AiUserEvaluation evaluation)
     {
+        contentSafetyService.validateFeedback(evaluation.getFeedback());
         evaluation.setCreateTime(new Date());
         evaluation.setUserId(SecurityUtils.getUserId());
+        return aiUserEvaluationMapper.insertAiUserEvaluation(evaluation);
+    }
+
+    /**
+     * 公众端：对象级归属校验——仅允许访问本人咨询，防 IDOR 遍历
+     */
+    @Override
+    public AiUserConsultation selectOwnConsultationById(Long consultationId)
+    {
+        AiUserConsultation consultation = aiUserConsultationMapper.selectAiUserConsultationById(consultationId);
+        if (consultation == null)
+        {
+            throw new ServiceException("咨询记录不存在");
+        }
+        Long currentUserId = SecurityUtils.getUserId();
+        if (!currentUserId.equals(consultation.getUserId()))
+        {
+            // 不暴露记录是否存在，统一按"不存在"返回
+            throw new ServiceException("咨询记录不存在");
+        }
+        return consultation;
+    }
+
+    /**
+     * 公众端：评价提交（咨询归属校验 + 一咨询一评价 + 四维评分兜底 + 文本安全）
+     */
+    @Override
+    public int submitOwnEvaluation(AiUserEvaluation evaluation)
+    {
+        if (evaluation.getConsultationId() == null)
+        {
+            throw new ServiceException("缺少咨询ID");
+        }
+        if (evaluation.getOverallRating() == null
+                || evaluation.getOverallRating() < 1 || evaluation.getOverallRating() > 5)
+        {
+            throw new ServiceException("请先选择总体评分（1-5分）");
+        }
+        contentSafetyService.validateFeedback(evaluation.getFeedback());
+
+        AiUserConsultation consultation = selectOwnConsultationById(evaluation.getConsultationId());
+        if (!"COMPLETED".equals(consultation.getStatus()))
+        {
+            throw new ServiceException("咨询尚未完成，暂不能评价");
+        }
+
+        AiUserEvaluation query = new AiUserEvaluation();
+        query.setConsultationId(evaluation.getConsultationId());
+        query.setUserId(SecurityUtils.getUserId());
+        List<AiUserEvaluation> existed = aiUserEvaluationMapper.selectAiUserEvaluationList(query);
+        if (existed != null && !existed.isEmpty())
+        {
+            throw new ServiceException("该咨询已评价，请勿重复提交");
+        }
+
+        // 四维评分缺省时以总体评分兜底（公众端仅采集总体评分 + 文字反馈）
+        Integer overall = evaluation.getOverallRating();
+        if (evaluation.getProfessionalismRating() == null)
+        {
+            evaluation.setProfessionalismRating(overall);
+        }
+        if (evaluation.getResponsivenessRating() == null)
+        {
+            evaluation.setResponsivenessRating(overall);
+        }
+        if (evaluation.getQualityRating() == null)
+        {
+            evaluation.setQualityRating(overall);
+        }
+
+        evaluation.setEvaluationId(null);
+        evaluation.setUserId(SecurityUtils.getUserId());
+        evaluation.setCreateTime(new Date());
         return aiUserEvaluationMapper.insertAiUserEvaluation(evaluation);
     }
 

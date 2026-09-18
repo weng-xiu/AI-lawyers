@@ -89,9 +89,25 @@ public interface IAiUserConsultationService
 
     /**
      * 处理AI咨询请求
-     * 
+     *
      * @param consultation 咨询信息
      * @return 处理后的咨询信息
      */
     public AiUserConsultation processAIConsultation(AiUserConsultation consultation);
+
+    /**
+     * 公众端：查询本人的咨询（对象级归属校验，不属于当前登录用户抛 ServiceException）
+     *
+     * @param consultationId 咨询ID
+     * @return 咨询记录
+     */
+    public AiUserConsultation selectOwnConsultationById(Long consultationId);
+
+    /**
+     * 公众端：提交咨询评价（校验咨询归属 + 一咨询一评价）
+     *
+     * @param evaluation 评价信息（userId 由服务端按登录态写入，不信任前端）
+     * @return 结果
+     */
+    public int submitOwnEvaluation(AiUserEvaluation evaluation);
 }

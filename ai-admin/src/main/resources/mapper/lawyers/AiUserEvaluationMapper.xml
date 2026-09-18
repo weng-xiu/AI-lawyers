@@ -5,21 +5,23 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 <mapper namespace="ai.lawyers.system.mapper.lawyers.AiUserEvaluationMapper">
     
     <resultMap type="AiUserEvaluation" id="AiUserEvaluationResult">
-        <result property="evaluationId"     column="evaluation_id"     />
-        <result property="consultationId"   column="consultation_id"   />
-        <result property="userId"           column="user_id"           />
-        <result property="rating"           column="rating"            />
-        <result property="feedback"         column="feedback"          />
-        <result property="suggestions"      column="suggestions"       />
-        <result property="createBy"         column="create_by"         />
-        <result property="createTime"       column="create_time"       />
-        <result property="updateBy"         column="update_by"         />
-        <result property="updateTime"       column="update_time"       />
-        <result property="remark"           column="remark"            />
+        <result property="evaluationId"          column="evaluation_id"          />
+        <result property="consultationId"        column="consultation_id"        />
+        <result property="userId"                column="user_id"                />
+        <result property="overallRating"         column="overall_rating"         />
+        <result property="professionalismRating" column="professionalism_rating" />
+        <result property="responsivenessRating"  column="responsiveness_rating"  />
+        <result property="qualityRating"         column="quality_rating"         />
+        <result property="feedback"              column="feedback"               />
+        <result property="createBy"              column="create_by"              />
+        <result property="createTime"            column="create_time"            />
+        <result property="updateBy"              column="update_by"              />
+        <result property="updateTime"            column="update_time"            />
+        <result property="remark"                column="remark"                 />
     </resultMap>
 
     <sql id="selectAiUserEvaluationVo">
-        select evaluation_id, consultation_id, user_id, rating, feedback, suggestions, create_by, create_time, update_by, update_time, remark from ai_user_evaluation
+        select evaluation_id, consultation_id, user_id, overall_rating, professionalism_rating, responsiveness_rating, quality_rating, feedback, create_by, create_time, update_by, update_time, remark from ai_user_evaluation
     </sql>
 
     <select id="selectAiUserEvaluationList" parameterType="AiUserEvaluation" resultMap="AiUserEvaluationResult">
@@ -27,7 +29,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <where>  
             <if test="consultationId != null "> and consultation_id = #{consultationId}</if>
             <if test="userId != null "> and user_id = #{userId}</if>
-            <if test="rating != null "> and rating = #{rating}</if>
+            <if test="overallRating != null "> and overall_rating = #{overallRating}</if>
             <if test="feedback != null  and feedback != ''"> and feedback like concat('%', #{feedback}, '%')</if>
         </where>
         order by create_time desc
@@ -43,9 +45,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="consultationId != null">consultation_id,</if>
             <if test="userId != null">user_id,</if>
-            <if test="rating != null">rating,</if>
+            <if test="overallRating != null">overall_rating,</if>
+            <if test="professionalismRating != null">professionalism_rating,</if>
+            <if test="responsivenessRating != null">responsiveness_rating,</if>
+            <if test="qualityRating != null">quality_rating,</if>
             <if test="feedback != null and feedback != ''">feedback,</if>
-            <if test="suggestions != null and suggestions != ''">suggestions,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
             <if test="updateBy != null">update_by,</if>
@@ -55,9 +59,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="consultationId != null">#{consultationId},</if>
             <if test="userId != null">#{userId},</if>
-            <if test="rating != null">#{rating},</if>
+            <if test="overallRating != null">#{overallRating},</if>
+            <if test="professionalismRating != null">#{professionalismRating},</if>
+            <if test="responsivenessRating != null">#{responsivenessRating},</if>
+            <if test="qualityRating != null">#{qualityRating},</if>
             <if test="feedback != null and feedback != ''">#{feedback},</if>
-            <if test="suggestions != null and suggestions != ''">#{suggestions},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
             <if test="updateBy != null">#{updateBy},</if>
@@ -71,9 +77,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <trim prefix="SET" suffixOverrides=",">
             <if test="consultationId != null">consultation_id = #{consultationId},</if>
             <if test="userId != null">user_id = #{userId},</if>
-            <if test="rating != null">rating = #{rating},</if>
+            <if test="overallRating != null">overall_rating = #{overallRating},</if>
+            <if test="professionalismRating != null">professionalism_rating = #{professionalismRating},</if>
+            <if test="responsivenessRating != null">responsiveness_rating = #{responsivenessRating},</if>
+            <if test="qualityRating != null">quality_rating = #{qualityRating},</if>
             <if test="feedback != null and feedback != ''">feedback = #{feedback},</if>
-            <if test="suggestions != null and suggestions != ''">suggestions = #{suggestions},</if>
             <if test="createBy != null">create_by = #{createBy},</if>
             <if test="createTime != null">create_time = #{createTime},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>

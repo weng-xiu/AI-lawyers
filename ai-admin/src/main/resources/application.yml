@@ -253,8 +253,18 @@ xss:
   enabled: true
   # 排除链接（多个用逗号分隔）
   excludes: /system/notice
-  # 匹配链接：覆盖业务接口 /lawyers/**（IVR脚本/知识库等富文本内容由后端按需转义）
-  urlPatterns: /system/*,/monitor/*,/tool/*,/lawyers/*
+  # 匹配链接：覆盖坐席业务接口 /lawyers/** 与公众端 /aiuser/**（F8 安全基线）
+  urlPatterns: /system/*,/monitor/*,/tool/*,/lawyers/*,/aiuser/*
+
+# ============================================================
+# 公众端文本内容安全（F8 安全基线，2026-09-17）
+# 本地敏感词过滤，离线环境可用；命中即拒绝入库。词库逗号分隔，
+# 生产可经 CONTENT_SAFETY_WORDS 环境变量扩充或替换为第三方内容安全 API（仅改 ContentSafetyService）。
+# ============================================================
+content:
+  safety:
+    enabled: ${CONTENT_SAFETY_ENABLED:true}
+    words: ${CONTENT_SAFETY_WORDS:法轮功,台独,藏独,港独,暴恐,枪支弹药,买卖毒品,代开发票,办假证,诈骗电话,色情服务,一夜情,外挂软件,翻墙软件}
 
 # ============================================================
 # 运营商线路对接与外呼调度配置

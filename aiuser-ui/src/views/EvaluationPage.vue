@@ -28,11 +28,11 @@
           </el-row>
           <div class="question-content">
             <span class="label">问题描述:</span>
-            <p>{{ consultationInfo.question }}</p>
+            <p>{{ consultationInfo.content }}</p>
           </div>
-          <div class="answer-content" v-if="consultationInfo.answer">
+          <div class="answer-content" v-if="consultationInfo.aiAnswer">
             <span class="label">AI解答:</span>
-            <p>{{ consultationInfo.answer.substring(0, 200) }}{{ consultationInfo.answer.length > 200 ? '...' : '' }}</p>
+            <p>{{ consultationInfo.aiAnswer.length > 200 ? consultationInfo.aiAnswer.substring(0, 200) + '...' : consultationInfo.aiAnswer }}</p>
           </div>
         </div>
         
@@ -43,10 +43,10 @@
           <h3>满意度评价</h3>
           
           <el-form :model="evaluationForm" :rules="rules" ref="evaluationForm" label-width="100px">
-            <el-form-item label="总体评价" prop="rating">
+            <el-form-item label="总体评价" prop="overallRating">
               <div class="rating-container">
                 <el-rate 
-                  v-model="evaluationForm.rating" 
+                  v-model="evaluationForm.overallRating" 
                   :colors="colors"
                   show-text
                   :texts="ratingTexts">
@@ -54,48 +54,13 @@
               </div>
             </el-form-item>
             
-            <el-form-item label="专业度" prop="professionalism">
-              <el-rate 
-                v-model="evaluationForm.professionalism" 
-                :colors="colors"
-                show-text>
-              </el-rate>
-            </el-form-item>
-            
-            <el-form-item label="响应速度" prop="responseSpeed">
-              <el-rate 
-                v-model="evaluationForm.responseSpeed" 
-                :colors="colors"
-                show-text>
-              </el-rate>
-            </el-form-item>
-            
-            <el-form-item label="解答质量" prop="answerQuality">
-              <el-rate 
-                v-model="evaluationForm.answerQuality" 
-                :colors="colors"
-                show-text>
-              </el-rate>
-            </el-form-item>
-            
             <el-form-item label="文字反馈" prop="feedback">
               <el-input
                 type="textarea"
                 :rows="4"
-                placeholder="请输入您的反馈意见，您的意见对我们非常重要"
+                placeholder="请输入您的反馈意见（选填），您的意见对我们非常重要"
                 v-model="evaluationForm.feedback"
                 maxlength="500"
-                show-word-limit>
-              </el-input>
-            </el-form-item>
-            
-            <el-form-item label="改进建议" prop="suggestions">
-              <el-input
-                type="textarea"
-                :rows="3"
-                placeholder="您认为我们有哪些地方可以改进？（可选）"
-                v-model="evaluationForm.suggestions"
-                maxlength="300"
                 show-word-limit>
               </el-input>
             </el-form-item>
@@ -125,32 +90,15 @@ export default {
       consultationInfo: null,
       evaluationForm: {
         consultationId: null,
-        rating: 0,
-        professionalism: 0,
-        responseSpeed: 0,
-        answerQuality: 0,
-        feedback: '',
-        suggestions: ''
+        overallRating: 0,
+        feedback: ''
       },
       submitting: false,
       colors: ['#99A9BF', '#F7BA2A', '#FF9900'],
       ratingTexts: ['非常不满意', '不满意', '一般', '满意', '非常满意'],
       rules: {
-        rating: [
+        overallRating: [
           { required: true, message: '请选择总体评价', trigger: 'change', validator: this.validateRating }
-        ],
-        professionalism: [
-          { required: true, message: '请评价专业度', trigger: 'change', validator: this.validateRating }
-        ],
-        responseSpeed: [
-          { required: true, message: '请评价响应速度', trigger: 'change', validator: this.validateRating }
-        ],
-        answerQuality: [
-          { required: true, message: '请评价解答质量', trigger: 'change', validator: this.validateRating }
-        ],
-        feedback: [
-          { required: true, message: '请输入反馈意见', trigger: 'blur' },
-          { min: 10, message: '反馈意见至少需要10个字符', trigger: 'blur' }
         ]
       }
     }
@@ -208,25 +156,27 @@ export default {
     },
     getCategoryType(category) {
       const typeMap = {
-        'marriage': 'danger',
-        'labor': 'warning',
-        'contract': 'primary',
-        'property': 'success',
-        'tort': 'info',
-        'criminal': 'danger',
-        'other': ''
+        marriage_family: 'danger',
+        labor_dispute: 'warning',
+        contract_dispute: 'primary',
+        property_dispute: 'success',
+        criminal_case: 'danger',
+        intellectual_property: 'info',
+        consumer_rights: 'warning',
+        other: ''
       }
       return typeMap[category] || ''
     },
     getCategoryName(category) {
       const nameMap = {
-        'marriage': '婚姻家庭',
-        'labor': '劳动纠纷',
-        'contract': '合同纠纷',
-        'property': '房产纠纷',
-        'tort': '侵权责任',
-        'criminal': '刑事辩护',
-        'other': '其他'
+        marriage_family: '婚姻家庭',
+        labor_dispute: '劳动纠纷',
+        contract_dispute: '合同纠纷',
+        property_dispute: '财产权益',
+        criminal_case: '刑事案件',
+        intellectual_property: '知识产权',
+        consumer_rights: '消费维权',
+        other: '其他'
       }
       return nameMap[category] || '其他'
     },
