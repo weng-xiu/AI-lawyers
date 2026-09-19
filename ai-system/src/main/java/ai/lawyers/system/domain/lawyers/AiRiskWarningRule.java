@@ -26,6 +26,13 @@ public class AiRiskWarningRule extends BaseEntity
     @Excel(name = "关键词")
     private String keywords;
 
+    /** 建议转办条线 LEGAL_AID/MEDIATION/NOTARY/FORENSIC/ARBITRATION/HOTLINE_12345（F3，空=不建议） */
+    @Excel(name = "建议转办条线")
+    private String suggestTransferType;
+
+    /** 默认建议协同机构ID（F3，空=坐席按条线自选） */
+    private Long suggestOrgId;
+
     @Excel(name = "是否启用", readConverterExp = "0=禁用,1=启用")
     private String isEnabled;
 
@@ -79,6 +86,26 @@ public class AiRiskWarningRule extends BaseEntity
         return keywords;
     }
 
+    public void setSuggestTransferType(String suggestTransferType)
+    {
+        this.suggestTransferType = suggestTransferType;
+    }
+
+    public String getSuggestTransferType()
+    {
+        return suggestTransferType;
+    }
+
+    public void setSuggestOrgId(Long suggestOrgId)
+    {
+        this.suggestOrgId = suggestOrgId;
+    }
+
+    public Long getSuggestOrgId()
+    {
+        return suggestOrgId;
+    }
+
     public void setIsEnabled(String isEnabled)
     {
         this.isEnabled = isEnabled;
@@ -97,6 +124,8 @@ public class AiRiskWarningRule extends BaseEntity
             .append("ruleType", getRuleType())
             .append("ruleLevel", getRuleLevel())
             .append("keywords", getKeywords())
+            .append("suggestTransferType", getSuggestTransferType())
+            .append("suggestOrgId", getSuggestOrgId())
             .append("isEnabled", getIsEnabled())
             .append("createBy", getCreateBy())
             .append("createTime", getCreateTime())

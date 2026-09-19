@@ -23,6 +23,43 @@
           <size-select id="size-select" class="right-menu-item hover-effect" />
         </el-tooltip>
 
+        <!-- F2 坐席端关怀模式：三档字号 + 高对比（工位浏览器本地持久化） -->
+        <el-popover placement="bottom" width="280" trigger="click" popper-class="care-settings-popover">
+          <div class="care-panel">
+            <div class="care-panel-title">显示设置</div>
+            <div class="care-panel-row">
+              <span class="care-panel-label" id="careFontLabel">字号</span>
+              <el-radio-group
+                :value="care.fontScale"
+                size="small"
+                aria-labelledby="careFontLabel"
+                @input="onFontScale">
+                <el-radio-button label="normal">标准</el-radio-button>
+                <el-radio-button label="large">大字</el-radio-button>
+                <el-radio-button label="xlarge">超大</el-radio-button>
+              </el-radio-group>
+            </div>
+            <div class="care-panel-row">
+              <span class="care-panel-label" id="careContrastLabel">高对比</span>
+              <el-switch
+                :value="care.highContrast"
+                active-color="#1A3C6E"
+                aria-labelledby="careContrastLabel"
+                @change="onHighContrast" />
+            </div>
+            <div class="care-panel-tip">标准14px / 大字18px / 超大22px；高对比主题正文对比度≥4.5:1。设置仅保存在当前工位浏览器，适用于视障坐席与投屏场景。</div>
+          </div>
+          <button
+            slot="reference"
+            type="button"
+            id="care-settings"
+            class="right-menu-item hover-effect care-entry"
+            :class="{ 'is-active': care.fontScale !== 'normal' || care.highContrast }"
+            aria-label="显示设置：字号与高对比度">
+            <span class="care-glyph" aria-hidden="true">A<sup class="care-glyph-plus">+</sup></span>
+          </button>
+        </el-popover>
+
         <el-popover placement="bottom-end" width="360" trigger="click" popper-class="message-bell-popover" @show="fetchRecent">
           <div class="msg-popover">
             <div class="msg-popover-header">
@@ -120,6 +157,10 @@ export default {
       'device',
       'nickName'
     ]),
+    // F2 坐席端关怀模式（utils/careMode.js 全局单例）
+    care() {
+      return this.$care.state
+    },
     setting: {
       get() {
         return this.$store.state.settings.showSettings
@@ -132,6 +173,13 @@ export default {
     }
   },
   methods: {
+    // F2 坐席端关怀模式
+    onFontScale(val) {
+      this.$care.setFontScale(val)
+    },
+    onHighContrast(val) {
+      this.$care.setHighContrast(val)
+    },
     fetchUnread() {
       unreadCount().then(res => {
         this.unread = res.data || 0
@@ -270,6 +318,37 @@ export default {
       }
     }
 
+    /* F2 关怀模式入口：A+ 字形按钮（复用 right-menu-item 深底悬停态） */
+    .care-entry {
+      padding: 0 10px;
+      border: none;
+      background: transparent;
+      vertical-align: top;
+
+      .care-glyph {
+        font-size: 16px;
+        font-weight: 700;
+        font-style: normal;
+        color: #DCE2EB;
+        line-height: 1;
+
+        .care-glyph-plus {
+          font-size: 11px;
+          margin-left: 1px;
+        }
+      }
+
+      &.is-active .care-glyph,
+      &.is-active {
+        color: #FFD04B;
+      }
+
+      &:focus-visible {
+        outline: 3px solid #FFD04B;
+        outline-offset: -3px;
+      }
+    }
+
     .avatar-container {
       margin-right: 0px;
       padding-right: 0px;
@@ -309,6 +388,41 @@ export default {
 </style>
 
 <style lang="scss">
+/* F2 关怀模式设置面板（el-popover 挂 body，需全局样式） */
+.care-settings-popover {
+  .care-panel {
+    .care-panel-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #1F2A3A;
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid #EBEEF5;
+    }
+
+    .care-panel-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+
+      .care-panel-label {
+        font-size: 14px;
+        color: #303133;
+      }
+    }
+
+    .care-panel-tip {
+      margin-top: 4px;
+      padding-top: 10px;
+      border-top: 1px dashed #DCE2EB;
+      font-size: 12px;
+      line-height: 1.6;
+      color: #909399;
+    }
+  }
+}
+
 .message-bell-popover {
   padding: 0 !important;
 

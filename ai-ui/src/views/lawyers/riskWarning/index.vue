@@ -105,6 +105,17 @@
             </template>
           </el-table-column>
           <el-table-column label="来源类型" align="center" prop="sourceType" width="90" />
+          <el-table-column label="命中规则" align="center" prop="ruleName" width="120" :show-overflow-tooltip="true">
+            <template slot-scope="scope">
+              <span>{{ scope.row.ruleName || '-' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="建议转办" align="center" prop="suggestTransferType" width="110">
+            <template slot-scope="scope">
+              <el-tag v-if="scope.row.suggestTransferType" :type="typeTag(scope.row.suggestTransferType)" size="small">{{ typeText(scope.row.suggestTransferType) }}</el-tag>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
           <el-table-column label="客户姓名" align="center" prop="customerName" width="100" />
           <el-table-column label="触发内容" align="center" prop="content" min-width="200" :show-overflow-tooltip="true" />
           <el-table-column label="处理状态" align="center" prop="status" width="90">
@@ -121,7 +132,7 @@
               <span>{{ parseTime(scope.row.triggerTime) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="200">
+          <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="290">
             <template slot-scope="scope">
               <el-button
                 size="mini"
@@ -130,6 +141,17 @@
                 @click="handleDetail(scope.row)"
                 v-hasPermi="['lawyers:riskWarning:query']"
               >详情</el-button>
+              <el-tooltip v-if="scope.row.transferId" content="已转办，点击查看工单号" placement="top">
+                <el-button size="mini" type="text" icon="el-icon-finished" disabled>已转办 {{ scope.row.ticketNo }}</el-button>
+              </el-tooltip>
+              <el-button
+                v-else-if="scope.row.suggestTransferType"
+                size="mini"
+                type="text"
+                icon="el-icon-promotion"
+                @click="handleTransfer(scope.row)"
+                v-hasPermi="['lawyers:ticketTransfer:add']"
+              >一键转办</el-button>
               <el-button
                 size="mini"
                 type="text"
@@ -242,6 +264,11 @@
             </el-descriptions-item>
             <el-descriptions-item label="来源类型">{{ detailForm.sourceType }}</el-descriptions-item>
             <el-descriptions-item label="来源ID">{{ detailForm.sourceId }}</el-descriptions-item>
+            <el-descriptions-item label="命中规则">{{ detailForm.ruleName || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="建议转办">
+              <el-tag v-if="detailForm.suggestTransferType" :type="typeTag(detailForm.suggestTransferType)" size="small">{{ typeText(detailForm.suggestTransferType) }}</el-tag>
+              <span v-else>-</span>
+            </el-descriptions-item>
             <el-descriptions-item label="客户姓名">{{ detailForm.customerName }}</el-descriptions-item>
             <el-descriptions-item label="处理状态">
               <el-tag v-if="detailForm.status == 0" type="danger" size="small">待处理</el-tag>
@@ -256,11 +283,55 @@
               <div style="max-height: 200px; overflow-y: auto;">{{ detailForm.content }}</div>
             </el-descriptions-item>
             <el-descriptions-item label="处理结果" :span="2">{{ detailForm.handleResult }}</el-descriptions-item>
+            <el-descriptions-item label="转办工单号">
+              <span v-if="detailForm.ticketNo" style="color: #1A3C6E; font-weight: 600">{{ detailForm.ticketNo }}</span>
+              <span v-else>-</span>
+            </el-descriptions-item>
             <el-descriptions-item label="创建时间">{{ parseTime(detailForm.createTime) }}</el-descriptions-item>
             <el-descriptions-item label="备注">{{ detailForm.remark }}</el-descriptions-item>
           </el-descriptions>
           <div slot="footer" class="dialog-footer">
+            <el-button
+              v-if="detailForm.suggestTransferType && !detailForm.transferId"
+              type="primary"
+              icon="el-icon-promotion"
+              @click="handleTransfer(detailForm)"
+              v-hasPermi="['lawyers:ticketTransfer:add']"
+            >一键转办</el-button>
             <el-button @click="detailOpen = false">关 闭</el-button>
+          </div>
+        </el-dialog>
+
+        <!-- F3 一键转办对话框 -->
+        <el-dialog title="高风险预警一键转办" :visible.sync="transferOpen" width="560px" append-to-body :close-on-click-modal="false">
+          <el-alert type="warning" :closable="false" show-icon style="margin-bottom: 16px;">
+            <div>命中高风险规则，系统建议转至【{{ typeText(transferForm.suggestTransferType) }}】条线处理。</div>
+            <div>确认后将自动创建工单并发起转办；该预警尚未关联工单，工单由系统自动生成。</div>
+          </el-alert>
+          <el-form ref="transferFormRef" :model="transferForm" :rules="transferRules" label-width="92px">
+            <el-form-item label="预警编号">
+              <span style="color: #606266">#{{ transferForm.warningId }}</span>
+            </el-form-item>
+            <el-form-item label="建议条线">
+              <el-tag :type="typeTag(transferForm.suggestTransferType)" size="medium">{{ typeText(transferForm.suggestTransferType) }}</el-tag>
+            </el-form-item>
+            <el-form-item label="目标机构" prop="orgId">
+              <el-select v-model="transferForm.orgId" placeholder="请选择同条线协同机构" filterable style="width: 100%" :loading="transferOrgLoading">
+                <el-option
+                  v-for="org in transferOrgOptions"
+                  :key="org.orgId"
+                  :label="org.orgName + '（' + [org.province, org.city, org.district].filter(Boolean).join('') + (org.contactPhone ? ' ' + org.contactPhone : '') + '）'"
+                  :value="org.orgId"
+                />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="转办备注" prop="remark">
+              <el-input v-model="transferForm.remark" type="textarea" :rows="3" maxlength="200" show-word-limit placeholder="选填，最小必要信息（推送外部系统，请勿填写身份证号等敏感信息）" />
+            </el-form-item>
+          </el-form>
+          <div slot="footer" class="dialog-footer">
+            <el-button type="primary" :loading="transferSubmitting" @click="submitTransfer">确认转办</el-button>
+            <el-button @click="transferOpen = false">取 消</el-button>
           </div>
         </el-dialog>
       </el-tab-pane>
@@ -348,7 +419,18 @@
               <el-tag :type="scope.row.ruleLevel == 1 ? 'danger' : scope.row.ruleLevel == 2 ? 'warning' : 'info'" size="small">{{ scope.row.ruleLevel == 1 ? '高' : scope.row.ruleLevel == 2 ? '中' : '低' }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="关键词" align="center" prop="keywords" min-width="200" :show-overflow-tooltip="true" />
+          <el-table-column label="关键词" align="center" prop="keywords" min-width="160" :show-overflow-tooltip="true" />
+          <el-table-column label="建议转办条线" align="center" prop="suggestTransferType" width="120">
+            <template slot-scope="scope">
+              <el-tag v-if="scope.row.suggestTransferType" :type="typeTag(scope.row.suggestTransferType)" size="small">{{ typeText(scope.row.suggestTransferType) }}</el-tag>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="默认建议机构" align="center" prop="suggestOrgId" min-width="160" :show-overflow-tooltip="true">
+            <template slot-scope="scope">
+              <span>{{ scope.row.suggestOrgId ? orgNameText(scope.row.suggestOrgId) : '-' }}</span>
+            </template>
+          </el-table-column>
           <el-table-column label="是否启用" align="center" prop="isEnabled" width="90">
             <template slot-scope="scope">
               <el-tag :type="scope.row.isEnabled == 1 ? 'success' : 'info'" size="small">{{ scope.row.isEnabled == 1 ? '启用' : '禁用' }}</el-tag>
@@ -411,6 +493,27 @@
             <el-form-item label="关键词" prop="keywords">
               <el-input v-model="ruleForm.keywords" type="textarea" placeholder="请输入关键词，多个关键词用逗号分隔" :rows="3" />
             </el-form-item>
+            <el-form-item label="建议转办" prop="suggestTransferType">
+              <el-select v-model="ruleForm.suggestTransferType" placeholder="不建议转办" clearable style="width: 100%" @change="onRuleSuggestTypeChange">
+                <el-option
+                  v-for="item in typeOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                />
+              </el-select>
+              <div style="color:#909399;font-size:12px;line-height:1.4;">命中该规则生成高风险预警时，向坐席推荐此条线，坐席可一键确认转办；留空表示不建议转办。</div>
+            </el-form-item>
+            <el-form-item label="默认机构" prop="suggestOrgId">
+              <el-select v-model="ruleForm.suggestOrgId" :disabled="!ruleForm.suggestTransferType" :placeholder="ruleForm.suggestTransferType ? '可留空，由坐席自选' : '请先选择建议条线'" clearable filterable style="width: 100%" :loading="ruleOrgLoading">
+                <el-option
+                  v-for="org in ruleOrgOptions"
+                  :key="org.orgId"
+                  :label="org.orgName + '（' + [org.province, org.city, org.district].filter(Boolean).join('') + '）'"
+                  :value="org.orgId"
+                />
+              </el-select>
+            </el-form-item>
             <el-form-item label="是否启用" prop="isEnabled">
               <el-radio-group v-model="ruleForm.isEnabled">
                 <el-radio label="1">启用</el-radio>
@@ -432,7 +535,7 @@
 </template>
 
 <script>
-import { listRiskWarning, getRiskWarning, addRiskWarning, updateRiskWarning, delRiskWarning, exportRiskWarning } from "@/api/lawyers/riskWarning"
+import { listRiskWarning, getRiskWarning, addRiskWarning, updateRiskWarning, delRiskWarning, exportRiskWarning, listTransferOrgs, transferRiskWarning } from "@/api/lawyers/riskWarning"
 import { listRiskWarningRule, getRiskWarningRule, addRiskWarningRule, updateRiskWarningRule, delRiskWarningRule } from "@/api/lawyers/riskWarning"
 
 export default {
@@ -441,6 +544,29 @@ export default {
     return {
       // 当前激活Tab
       activeTab: "warning",
+      // F3 司法行政业务条线（与 ai_external_type 字典、协同机构台账一致）
+      typeOptions: [
+        { value: 'LEGAL_AID', label: '法律援助' },
+        { value: 'MEDIATION', label: '人民调解' },
+        { value: 'NOTARY', label: '公证' },
+        { value: 'FORENSIC', label: '司法鉴定' },
+        { value: 'ARBITRATION', label: '仲裁' },
+        { value: 'HOTLINE_12345', label: '12345政务热线' }
+      ],
+      // 全部启用机构（用于规则列表默认机构名映射）
+      orgNameMap: {},
+      // 规则表单：当前建议条线下的候选机构
+      ruleOrgOptions: [],
+      ruleOrgLoading: false,
+      // F3 一键转办弹窗
+      transferOpen: false,
+      transferSubmitting: false,
+      transferOrgLoading: false,
+      transferOrgOptions: [],
+      transferForm: { warningId: undefined, suggestTransferType: undefined, orgId: undefined, remark: undefined },
+      transferRules: {
+        orgId: [{ required: true, message: "请选择转办目标机构", trigger: "change" }]
+      },
       // 遮罩层
       loading: true,
       // 选中数组
@@ -522,8 +648,29 @@ export default {
   },
   created() {
     this.getWarningList()
+    this.loadAllOrgs()
   },
   methods: {
+    /** F3 条线编码转名称/标签色（与协同机构页一致） */
+    typeText(v) {
+      const hit = this.typeOptions.find(i => i.value === v)
+      return hit ? hit.label : (v || '-')
+    },
+    typeTag(v) {
+      const map = { LEGAL_AID: '', MEDIATION: 'success', NOTARY: 'warning', FORENSIC: 'danger', ARBITRATION: 'info', HOTLINE_12345: 'danger' }
+      return map[v] || 'info'
+    },
+    /** 拉取全部启用机构，构建 orgId→名称 映射（规则列表展示默认建议机构） */
+    loadAllOrgs() {
+      listTransferOrgs().then(response => {
+        const map = {}
+        ;(response.data || []).forEach(o => { map[o.orgId] = o.orgName })
+        this.orgNameMap = map
+      })
+    },
+    orgNameText(orgId) {
+      return this.orgNameMap[orgId] || ('机构#' + orgId)
+    },
     /** Tab切换 */
     handleTabClick(tab) {
       if (tab.name === 'rule') {
@@ -687,9 +834,12 @@ export default {
         ruleType: undefined,
         ruleLevel: undefined,
         keywords: undefined,
+        suggestTransferType: undefined,
+        suggestOrgId: undefined,
         isEnabled: '1',
         remark: undefined
       }
+      this.ruleOrgOptions = []
       this.resetForm("ruleForm")
     },
     /** 搜索按钮操作 */
@@ -720,9 +870,28 @@ export default {
       const ruleId = row.ruleId || this.ruleIds
       getRiskWarningRule(ruleId).then(response => {
         this.ruleForm = response.data
+        if (this.ruleForm.suggestTransferType) {
+          this.loadRuleOrgs(this.ruleForm.suggestTransferType)
+        }
         this.ruleOpen = true
         this.ruleTitle = "修改预警规则"
       })
+    },
+    /** 加载规则表单中某条线下的启用机构 */
+    loadRuleOrgs(externalType) {
+      this.ruleOrgLoading = true
+      listTransferOrgs(externalType).then(response => {
+        this.ruleOrgOptions = response.data || []
+      }).finally(() => { this.ruleOrgLoading = false })
+    },
+    /** 规则表单切换建议条线：清空已选默认机构并重新加载候选 */
+    onRuleSuggestTypeChange(val) {
+      this.ruleForm.suggestOrgId = undefined
+      if (val) {
+        this.loadRuleOrgs(val)
+      } else {
+        this.ruleOrgOptions = []
+      }
     },
     /** 提交按钮 */
     submitRuleForm: function() {
@@ -753,6 +922,46 @@ export default {
         this.getRuleList()
         this.$modal.msgSuccess("删除成功")
       }).catch(() => {})
+    },
+
+    // ==================== F3 风险联动转办 ====================
+
+    /** 打开一键转办弹窗：加载建议条线下的启用机构，默认选中规则建议机构 */
+    handleTransfer(row) {
+      const warningId = row.warningId
+      this.detailOpen = false
+      this.transferForm = {
+        warningId: warningId,
+        suggestTransferType: row.suggestTransferType,
+        orgId: row.ruleSuggestOrgId || undefined,
+        remark: undefined
+      }
+      this.transferOrgOptions = []
+      this.transferOpen = true
+      this.$nextTick(() => this.$refs.transferFormRef && this.$refs.transferFormRef.clearValidate())
+      this.transferOrgLoading = true
+      listTransferOrgs(row.suggestTransferType).then(response => {
+        this.transferOrgOptions = response.data || []
+      }).finally(() => { this.transferOrgLoading = false })
+    },
+    /** 确认一键转办（后端无工单自动建单，已转办幂等） */
+    submitTransfer() {
+      this.$refs.transferFormRef.validate(valid => {
+        if (!valid) return
+        this.$modal.confirm('确认将该高风险预警转至所选机构？系统将自动创建工单并发起转办。').then(() => {
+          this.transferSubmitting = true
+          return transferRiskWarning({
+            warningId: this.transferForm.warningId,
+            orgId: this.transferForm.orgId,
+            remark: this.transferForm.remark
+          })
+        }).then(response => {
+          this.transferSubmitting = false
+          this.transferOpen = false
+          this.$modal.msgSuccess("转办已发起，工单号：" + (response.data && response.data.ticketNo))
+          this.getWarningList()
+        }).catch(() => { this.transferSubmitting = false })
+      })
     }
   }
 }

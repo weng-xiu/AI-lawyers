@@ -7,6 +7,7 @@ import './assets/styles/element-variables.scss'
 
 import '@/assets/styles/index.scss' // global css
 import '@/assets/styles/ruoyi.scss' // ruoyi css
+import '@/assets/styles/care-mode.scss' // F2 坐席端关怀模式（字号/高对比，最后引入覆盖）
 import App from './App'
 import store from './store'
 import router from './router'
@@ -19,6 +20,8 @@ import './permission' // permission control
 import { getDicts } from "@/api/system/dict/data"
 import { getConfigKey } from "@/api/system/config"
 import { parseTime, resetForm, addDateRange, selectDictLabel, selectDictLabels, handleTree } from "@/utils/ruoyi"
+// F2 坐席端关怀模式（三档字号/高对比，localStorage 工位级持久化）
+import careMode from '@/utils/careMode'
 // 分页组件
 import Pagination from "@/components/Pagination"
 // 自定义表格工具组件
@@ -61,6 +64,7 @@ Vue.component('UserSelect', UserSelect)
 
 Vue.use(directive)
 Vue.use(plugins)
+Vue.use(careMode)
 DictData.install()
 
 /**

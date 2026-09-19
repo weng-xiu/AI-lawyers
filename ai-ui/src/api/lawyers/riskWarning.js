@@ -98,3 +98,23 @@ export function delRiskWarningRule(ruleIds) {
     method: 'delete'
   })
 }
+
+// ========== F3 风险联动转办 ==========
+
+// 查询建议条线下可转办的启用机构（仅公开字段）
+export function listTransferOrgs(externalType) {
+  return request({
+    url: '/lawyers/riskWarning/transfer/orgs',
+    method: 'get',
+    params: { externalType: externalType || undefined }
+  })
+}
+
+// 高风险预警一键转办（无工单时后端自动建单）
+export function transferRiskWarning(data) {
+  return request({
+    url: '/lawyers/riskWarning/transfer',
+    method: 'post',
+    data: data
+  })
+}

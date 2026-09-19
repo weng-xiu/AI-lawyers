@@ -1,0 +1,571 @@
+/**
+ * F2 坐席端关怀模式全局规则（第十五部分 4.2 第 4 项，V2.11）
+ *
+ * 由 utils/careMode.js 在 <html> 上切换根类驱动：
+ * - care-large        大字档（正文 18px，主控件热区 >=44px）
+ * - care-xlarge       超大档（正文 22px，主控件热区 >=52px）
+ * - care-high-contrast 高对比主题（文字/背景对比度 >= 4.5:1）
+ *
+ * 设计边界：
+ * - 密集表格内 mini/small 控件仅适度放大，避免表格行高失控（话务高密度场景）；
+ *   表单页/弹窗/工单操作等主控件严格 >=44px。
+ * - 司法蓝深底导航/侧栏（#1A3C6E，白字对比度约 12:1）在高对比下保留品牌色，
+ *   仅强化选中态；内容区改纯白底黑字。
+ * - 本文件最后引入（main.js 中置于 ruoyi.scss 之后），同等特异性下后加载胜出。
+ */
+
+/* ======================================================================
+ * 0. 任一档位均启用：键盘焦点环（视障坐席/纯键盘操作）
+ * ==================================================================== */
+html.care-large a:focus-visible,
+html.care-large button:focus-visible,
+html.care-large .el-button:focus-visible,
+html.care-large .el-input__inner:focus-visible,
+html.care-large .el-textarea__inner:focus-visible,
+html.care-large .el-radio-button__inner:focus-visible,
+html.care-large [role='button']:focus-visible,
+html.care-xlarge a:focus-visible,
+html.care-xlarge button:focus-visible,
+html.care-xlarge .el-button:focus-visible,
+html.care-xlarge .el-input__inner:focus-visible,
+html.care-xlarge .el-textarea__inner:focus-visible,
+html.care-xlarge .el-radio-button__inner:focus-visible,
+html.care-xlarge [role='button']:focus-visible,
+html.care-high-contrast a:focus-visible,
+html.care-high-contrast button:focus-visible,
+html.care-high-contrast .el-button:focus-visible,
+html.care-high-contrast .el-input__inner:focus-visible,
+html.care-high-contrast .el-textarea__inner:focus-visible,
+html.care-high-contrast .el-radio-button__inner:focus-visible,
+html.care-high-contrast [role='button']:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #1a3c6e;
+}
+
+html.care-large .el-menu-item:focus-visible,
+html.care-large .el-submenu__title:focus-visible,
+html.care-xlarge .el-menu-item:focus-visible,
+html.care-xlarge .el-submenu__title:focus-visible,
+html.care-high-contrast .el-menu-item:focus-visible,
+html.care-high-contrast .el-submenu__title:focus-visible {
+  outline: 3px solid #ffd04b;
+  outline-offset: -3px;
+}
+
+/* ======================================================================
+ * 1. 大字档（正文 >=18px）
+ * ==================================================================== */
+html.care-large body { font-size: 18px; }
+
+/* 主操作按钮：热区 >=44px */
+html.care-large .el-button { font-size: 16px; }
+html.care-large .el-button:not(.el-button--mini):not(.el-button--small):not(.el-button--text) {
+  min-height: 44px;
+  padding: 10px 20px;
+}
+html.care-large .el-button--small { min-height: 38px; padding: 8px 15px; font-size: 15px; }
+html.care-large .el-button--mini { min-height: 32px; padding: 6px 12px; font-size: 14px; }
+
+/* 输入控件 */
+html.care-large .el-input__inner,
+html.care-large .el-textarea__inner { font-size: 16px; }
+html.care-large .el-input:not(.el-input--small):not(.el-input--mini) .el-input__inner {
+  height: 44px;
+  line-height: 44px;
+}
+html.care-large .el-input--small .el-input__inner { height: 38px; line-height: 38px; font-size: 15px; }
+html.care-large .el-input--mini .el-input__inner { height: 34px; line-height: 34px; }
+html.care-large .el-input-number:not(.el-input-number--small):not(.el-input-number--mini) .el-input-number__decrease,
+html.care-large .el-input-number:not(.el-input-number--small):not(.el-input-number--mini) .el-input-number__increase {
+  height: 21px;
+  line-height: 21px;
+}
+html.care-large .el-textarea__inner { min-height: 88px; padding: 10px 12px; }
+
+/* 表单/选项/弹层文本 */
+html.care-large .el-form-item__label,
+html.care-large .el-radio,
+html.care-large .el-checkbox,
+html.care-large .el-switch__label,
+html.care-large .el-select-dropdown__item,
+html.care-large .el-dropdown-menu__item,
+html.care-large .el-cascader-node__label,
+html.care-large .el-dialog__title,
+html.care-large .el-message-box__title,
+html.care-large .el-message-box__message { font-size: 17px; }
+html.care-large .el-select-dropdown__item,
+html.care-large .el-dropdown-menu__item { height: 36px; line-height: 36px; }
+html.care-large .el-radio-button__inner { min-height: 44px; padding: 10px 16px; font-size: 16px; }
+html.care-large .el-radio-group--small .el-radio-button__inner,
+html.care-large .el-radio-button--small .el-radio-button__inner { min-height: 34px; padding: 6px 12px; }
+html.care-large .el-radio-button--mini .el-radio-button__inner { min-height: 32px; padding: 6px 10px; }
+
+/* 表格（密集区适度放大） */
+html.care-large .el-table { font-size: 16px; }
+html.care-large .el-table .el-table__cell { padding: 8px 8px; }
+html.care-large .el-table--medium .el-table__cell,
+html.care-large .el-table--small .el-table__cell { padding: 7px 8px; }
+html.care-large .el-table--mini .el-table__cell { padding: 6px 8px; }
+html.care-large .el-tag { font-size: 14px; }
+
+/* 分页 */
+html.care-large .el-pagination { font-size: 15px; }
+html.care-large .el-pagination button,
+html.care-large .el-pagination .el-pager li { min-width: 36px; height: 36px; line-height: 36px; font-size: 15px; }
+
+/* 卡片/页签/弹窗/描述列表 */
+html.care-large .el-card__header { font-size: 17px; padding: 14px 18px; }
+html.care-large .el-card__body { padding: 18px; }
+html.care-large .el-tabs__item { font-size: 17px; height: 50px; line-height: 50px; }
+html.care-large .el-dialog__body { font-size: 16px; }
+html.care-large .el-descriptions { font-size: 15px; }
+html.care-large .el-descriptions__label.is-bordered-label,
+html.care-large .el-descriptions__cell { padding: 10px 12px; }
+
+/* 侧栏 / 导航 / 标签栏 */
+html.care-large .el-menu-item,
+html.care-large .el-submenu__title { height: 56px; line-height: 56px; font-size: 16px; }
+html.care-large .el-menu-item .el-submenu__icon-arrow,
+html.care-large .el-submenu__title .el-submenu__icon-arrow { margin-top: -7px; }
+html.care-large .navbar .right-menu-item { font-size: 20px; }
+html.care-large .navbar .user-nickname { font-size: 15px; }
+html.care-large .app-breadcrumb.el-breadcrumb { font-size: 15px; line-height: 56px; }
+html.care-large .tags-view-container { height: 42px; }
+html.care-large .tags-view-container .tags-view-item { height: 34px; line-height: 32px; font-size: 15px; }
+html.care-large .hamburger-container { font-size: 20px; }
+
+/* 日历（工作台） */
+html.care-large .el-calendar__title { font-size: 18px; }
+html.care-large .el-calendar-table .el-calendar-day { height: 92px; }
+html.care-large .el-calendar-date { font-size: 14px; }
+
+/* 工作台自定义区块 */
+html.care-large .wb-banner h2 { font-size: 22px; }
+html.care-large .wb-banner-label { font-size: 15px; }
+html.care-large .wb-banner-num { font-size: 28px; }
+html.care-large .wb-stat-value { font-size: 26px; }
+html.care-large .wb-stat-title { font-size: 15px; }
+html.care-large .wb-card-header { font-size: 17px; }
+html.care-large .wb-quick-item span { font-size: 15px; }
+html.care-large .wb-record-phone { font-size: 17px; }
+html.care-large .wb-record-name,
+html.care-large .wb-record-time { font-size: 14px; }
+html.care-large .wb-empty { font-size: 15px; }
+
+/* 来电弹屏自定义区块 */
+html.care-large .cp-banner-main { font-size: 19px; }
+html.care-large .cp-banner-sub { font-size: 15px; }
+html.care-large .cp-banner-number { font-size: 26px; }
+html.care-large .cp-time-label { font-size: 14px; }
+html.care-large .cp-time-value { font-size: 22px; }
+html.care-large .cp-caller-name { font-size: 18px; }
+html.care-large .cp-caller-phone,
+html.care-large .cp-detail-item { font-size: 15px; }
+html.care-large .cp-ai-label { font-size: 14px; }
+html.care-large .cp-ai-value { font-size: 17px; }
+html.care-large .cp-ai-sub,
+html.care-large .cp-ai-confidence { font-size: 14px; }
+html.care-large .cp-card-header { font-size: 17px; }
+
+/* ======================================================================
+ * 2. 超大档（正文 >=22px，主控件热区 >=52px）
+ * ==================================================================== */
+html.care-xlarge body { font-size: 22px; }
+
+html.care-xlarge .el-button { font-size: 20px; }
+html.care-xlarge .el-button:not(.el-button--mini):not(.el-button--small):not(.el-button--text) {
+  min-height: 52px;
+  padding: 12px 26px;
+}
+html.care-xlarge .el-button--small { min-height: 44px; padding: 9px 18px; font-size: 17px; }
+html.care-xlarge .el-button--mini { min-height: 36px; padding: 7px 13px; font-size: 16px; }
+
+html.care-xlarge .el-input__inner,
+html.care-xlarge .el-textarea__inner { font-size: 20px; }
+html.care-xlarge .el-input:not(.el-input--small):not(.el-input--mini) .el-input__inner {
+  height: 52px;
+  line-height: 52px;
+}
+html.care-xlarge .el-input--small .el-input__inner { height: 44px; line-height: 44px; font-size: 17px; }
+html.care-xlarge .el-input--mini .el-input__inner { height: 38px; line-height: 38px; font-size: 16px; }
+html.care-xlarge .el-input-number:not(.el-input-number--small):not(.el-input-number--mini) .el-input-number__decrease,
+html.care-xlarge .el-input-number:not(.el-input-number--small):not(.el-input-number--mini) .el-input-number__increase {
+  height: 25px;
+  line-height: 25px;
+}
+html.care-xlarge .el-textarea__inner { min-height: 104px; padding: 12px 14px; }
+
+html.care-xlarge .el-form-item__label,
+html.care-xlarge .el-radio,
+html.care-xlarge .el-checkbox,
+html.care-xlarge .el-switch__label,
+html.care-xlarge .el-select-dropdown__item,
+html.care-xlarge .el-dropdown-menu__item,
+html.care-xlarge .el-cascader-node__label,
+html.care-xlarge .el-dialog__title,
+html.care-xlarge .el-message-box__title,
+html.care-xlarge .el-message-box__message { font-size: 20px; }
+html.care-xlarge .el-select-dropdown__item,
+html.care-xlarge .el-dropdown-menu__item { height: 42px; line-height: 42px; }
+html.care-xlarge .el-radio-button__inner { min-height: 52px; padding: 12px 20px; font-size: 19px; }
+html.care-xlarge .el-radio-group--small .el-radio-button__inner,
+html.care-xlarge .el-radio-button--small .el-radio-button__inner { min-height: 40px; padding: 8px 14px; font-size: 17px; }
+html.care-xlarge .el-radio-button--mini .el-radio-button__inner { min-height: 36px; padding: 7px 12px; font-size: 16px; }
+
+html.care-xlarge .el-table { font-size: 18px; }
+html.care-xlarge .el-table .el-table__cell { padding: 10px 10px; }
+html.care-xlarge .el-table--medium .el-table__cell,
+html.care-xlarge .el-table--small .el-table__cell { padding: 8px 10px; }
+html.care-xlarge .el-table--mini .el-table__cell { padding: 7px 8px; }
+html.care-xlarge .el-tag { font-size: 16px; }
+
+html.care-xlarge .el-pagination { font-size: 17px; }
+html.care-xlarge .el-pagination button,
+html.care-xlarge .el-pagination .el-pager li { min-width: 40px; height: 40px; line-height: 40px; font-size: 17px; }
+
+html.care-xlarge .el-card__header { font-size: 20px; padding: 16px 20px; }
+html.care-xlarge .el-card__body { padding: 22px; }
+html.care-xlarge .el-tabs__item { font-size: 19px; height: 56px; line-height: 56px; }
+html.care-xlarge .el-dialog__body { font-size: 18px; }
+html.care-xlarge .el-descriptions { font-size: 17px; }
+html.care-xlarge .el-descriptions__label.is-bordered-label,
+html.care-xlarge .el-descriptions__cell { padding: 12px 14px; }
+
+html.care-xlarge .el-menu-item,
+html.care-xlarge .el-submenu__title { height: 60px; line-height: 60px; font-size: 18px; }
+html.care-xlarge .el-menu-item .el-submenu__icon-arrow,
+html.care-xlarge .el-submenu__title .el-submenu__icon-arrow { margin-top: -8px; }
+html.care-xlarge .navbar .right-menu-item { font-size: 22px; }
+html.care-xlarge .navbar .user-nickname { font-size: 17px; }
+html.care-xlarge .app-breadcrumb.el-breadcrumb { font-size: 17px; line-height: 56px; }
+html.care-xlarge .tags-view-container { height: 48px; }
+html.care-xlarge .tags-view-container .tags-view-item { height: 40px; line-height: 38px; font-size: 17px; }
+html.care-xlarge .hamburger-container { font-size: 22px; }
+
+html.care-xlarge .el-calendar__title { font-size: 21px; }
+html.care-xlarge .el-calendar-table .el-calendar-day { height: 108px; }
+html.care-xlarge .el-calendar-date { font-size: 16px; }
+
+html.care-xlarge .wb-banner h2 { font-size: 26px; }
+html.care-xlarge .wb-banner-label { font-size: 17px; }
+html.care-xlarge .wb-banner-num { font-size: 34px; }
+html.care-xlarge .wb-stat-value { font-size: 30px; }
+html.care-xlarge .wb-stat-title { font-size: 17px; }
+html.care-xlarge .wb-card-header { font-size: 20px; }
+html.care-xlarge .wb-quick-item span { font-size: 18px; }
+html.care-xlarge .wb-record-phone { font-size: 19px; }
+html.care-xlarge .wb-record-name,
+html.care-xlarge .wb-record-time { font-size: 16px; }
+html.care-xlarge .wb-empty { font-size: 17px; }
+
+html.care-xlarge .cp-banner-main { font-size: 23px; }
+html.care-xlarge .cp-banner-sub { font-size: 17px; }
+html.care-xlarge .cp-banner-number { font-size: 32px; }
+html.care-xlarge .cp-time-label { font-size: 16px; }
+html.care-xlarge .cp-time-value { font-size: 26px; }
+html.care-xlarge .cp-caller-name { font-size: 22px; }
+html.care-xlarge .cp-caller-phone,
+html.care-xlarge .cp-detail-item { font-size: 17px; }
+html.care-xlarge .cp-ai-label { font-size: 16px; }
+html.care-xlarge .cp-ai-value { font-size: 19px; }
+html.care-xlarge .cp-ai-sub,
+html.care-xlarge .cp-ai-confidence { font-size: 16px; }
+html.care-xlarge .cp-card-header { font-size: 19px; }
+
+/* ======================================================================
+ * 3. 高对比主题（内容区纯白底/黑字/2px 控件边界，对比度 >= 4.5:1）
+ * ==================================================================== */
+html.care-high-contrast body,
+html.care-high-contrast #app,
+html.care-high-contrast .app-main,
+html.care-high-contrast .app-container {
+  background: #ffffff !important;
+  color: #000000;
+}
+
+/* 弱灰文字（白底对比不足）整体压深 */
+html.care-high-contrast .wb-record-time,
+html.care-high-contrast .wb-empty,
+html.care-high-contrast .cp-ai-sub,
+html.care-high-contrast .text-muted,
+html.care-high-contrast .el-form-item__error {
+  color: #4a5568 !important;
+}
+
+/* 面包屑在深司法蓝导航条上：白字 + 当前页金色 */
+html.care-high-contrast .app-breadcrumb.el-breadcrumb,
+html.care-high-contrast .app-breadcrumb.el-breadcrumb a {
+  color: #ffffff !important;
+}
+html.care-high-contrast .app-breadcrumb.el-breadcrumb .no-redirect {
+  color: #ffd04b !important;
+}
+html.care-high-contrast .app-breadcrumb.el-breadcrumb .el-breadcrumb__separator {
+  color: #ffffff !important;
+}
+
+/* 卡片/面板：黑框去阴影 */
+html.care-high-contrast .el-card {
+  border: 2px solid #000000 !important;
+  box-shadow: none !important;
+}
+html.care-high-contrast .el-card__header {
+  border-bottom: 2px solid #000000 !important;
+}
+html.care-high-contrast .el-dialog {
+  border: 2px solid #000000;
+}
+html.care-high-contrast .el-dialog__header {
+  border-bottom: 2px solid #000000;
+}
+html.care-high-contrast .el-message-box {
+  border: 2px solid #000000;
+}
+
+/* 输入控件：2px 黑框白底黑字 */
+html.care-high-contrast .el-input__inner,
+html.care-high-contrast .el-textarea__inner {
+  border: 2px solid #000000 !important;
+  background: #ffffff !important;
+  color: #000000 !important;
+}
+html.care-high-contrast .el-input.is-disabled .el-input__inner,
+html.care-high-contrast .el-textarea.is-disabled .el-textarea__inner {
+  background: #f2f2f2 !important;
+  color: #000000 !important;
+}
+html.care-high-contrast .el-input__inner::placeholder,
+html.care-high-contrast .el-textarea__inner::placeholder {
+  color: #5a6a7e !important;
+}
+html.care-high-contrast .el-input__inner:focus,
+html.care-high-contrast .el-textarea__inner:focus {
+  border-color: #1a3c6e !important;
+}
+
+/* 表单文本与选中态 */
+html.care-high-contrast .el-form-item__label,
+html.care-high-contrast .el-radio,
+html.care-high-contrast .el-checkbox,
+html.care-high-contrast .el-switch__label {
+  color: #000000;
+}
+html.care-high-contrast .el-radio__input.is-checked .el-radio__inner,
+html.care-high-contrast .el-checkbox__input.is-checked .el-checkbox__inner {
+  background: #1a3c6e;
+  border-color: #1a3c6e;
+}
+html.care-high-contrast .el-radio__input.is-checked + .el-radio__label,
+html.care-high-contrast .el-checkbox__input.is-checked + .el-checkbox__label {
+  color: #1a3c6e;
+}
+html.care-high-contrast .el-switch.is-checked .el-switch__core {
+  background-color: #1a3c6e !important;
+  border-color: #1a3c6e !important;
+}
+html.care-high-contrast .el-radio-button__orig-radio:checked + .el-radio-button__inner {
+  background-color: #1a3c6e;
+  border-color: #1a3c6e;
+  box-shadow: -1px 0 0 0 #1a3c6e;
+}
+
+/* 按钮：默认白底黑框；语义色加深至白字 >=4.5:1 */
+html.care-high-contrast .el-button--default {
+  background: #ffffff;
+  border: 2px solid #000000;
+  color: #000000;
+}
+html.care-high-contrast .el-button--primary {
+  background: #1a3c6e;
+  border-color: #1a3c6e;
+  color: #ffffff;
+}
+html.care-high-contrast .el-button--success {
+  background: #1e6b54;
+  border-color: #1e6b54;
+  color: #ffffff;
+}
+html.care-high-contrast .el-button--warning {
+  background: #8a5300;
+  border-color: #8a5300;
+  color: #ffffff;
+}
+html.care-high-contrast .el-button--danger {
+  background: #a12835;
+  border-color: #a12835;
+  color: #ffffff;
+}
+html.care-high-contrast .el-button--info {
+  background: #000000;
+  border-color: #000000;
+  color: #ffffff;
+}
+html.care-high-contrast .el-button--text {
+  color: #0000cc;
+  text-decoration: underline;
+}
+
+/* 表格：表头灰底黑字、网格线加深、悬停浅黄 */
+html.care-high-contrast .el-table,
+html.care-high-contrast .el-table tr,
+html.care-high-contrast .el-table td.el-table__cell,
+html.care-high-contrast .el-table th.el-table__cell.is-leaf {
+  background: #ffffff !important;
+  color: #000000;
+}
+html.care-high-contrast .el-table th.el-table__cell {
+  background: #e8e8e8 !important;
+  color: #000000 !important;
+  border-bottom: 2px solid #000000;
+}
+html.care-high-contrast .el-table td.el-table__cell {
+  border-bottom: 1px solid #666666;
+}
+html.care-high-contrast .el-table--border .el-table__cell,
+html.care-high-contrast .el-table--group .el-table__cell {
+  border-right: 1px solid #666666 !important;
+}
+html.care-high-contrast .el-table::before {
+  background-color: #000000;
+}
+html.care-high-contrast .el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+  background: #f5f5f5 !important;
+}
+html.care-high-contrast .el-table__body tr.hover-row > td.el-table__cell,
+html.care-high-contrast .el-table__body tr:hover > td.el-table__cell {
+  background: #fff6d6 !important;
+}
+html.care-high-contrast .el-table .el-table__empty-block {
+  background: #ffffff;
+  color: #000000;
+}
+
+/* 描述列表：标签格灰底、黑网格 */
+html.care-high-contrast .el-descriptions__body {
+  background: #ffffff;
+  color: #000000;
+}
+html.care-high-contrast .el-descriptions--bordered .el-descriptions__cell {
+  border: 1px solid #000000 !important;
+}
+html.care-high-contrast .el-descriptions__cell.is-bordered-label,
+html.care-high-contrast .el-descriptions__label.is-bordered-label {
+  background: #e8e8e8 !important;
+  color: #000000 !important;
+}
+
+/* 页签（Tabs）：黑字、激活项深蓝加粗 + 3px 指示条 */
+html.care-high-contrast .el-tabs__item {
+  color: #000000;
+}
+html.care-high-contrast .el-tabs__item.is-active {
+  color: #1a3c6e;
+  font-weight: 700;
+}
+html.care-high-contrast .el-tabs__active-bar {
+  background-color: #1a3c6e;
+  height: 3px;
+}
+html.care-high-contrast .el-tabs__nav-wrap::after {
+  background-color: #000000;
+  height: 2px;
+}
+
+/* 语义标签保留可辨色（深色底白字），信息标签描边化 */
+html.care-high-contrast .el-tag--success {
+  background: #1e6b54 !important;
+  border-color: #1e6b54 !important;
+  color: #ffffff !important;
+}
+html.care-high-contrast .el-tag--warning {
+  background: #8a5300 !important;
+  border-color: #8a5300 !important;
+  color: #ffffff !important;
+}
+html.care-high-contrast .el-tag--danger {
+  background: #a12835 !important;
+  border-color: #a12835 !important;
+  color: #ffffff !important;
+}
+html.care-high-contrast .el-tag--info {
+  background: #ffffff !important;
+  border: 2px solid #000000 !important;
+  color: #000000 !important;
+}
+
+/* 分页：描边按钮、当前页司法蓝反白 */
+html.care-high-contrast .el-pagination {
+  color: #000000;
+}
+html.care-high-contrast .el-pagination button,
+html.care-high-contrast .el-pagination .el-pager li {
+  background: #ffffff !important;
+  color: #000000 !important;
+  border: 1px solid #000000;
+}
+html.care-high-contrast .el-pagination .el-pager li.active {
+  background: #1a3c6e !important;
+  color: #ffffff !important;
+  border-color: #1a3c6e;
+}
+
+/* 挂 body 的弹层：下拉/选择/气泡菜单 */
+html.care-high-contrast .el-select-dropdown,
+html.care-high-contrast .el-dropdown-menu,
+html.care-high-contrast .el-cascader__dropdown {
+  border: 2px solid #000000;
+}
+html.care-high-contrast .el-select-dropdown__item,
+html.care-high-contrast .el-dropdown-menu__item,
+html.care-high-contrast .el-cascader-node__label {
+  color: #000000;
+}
+html.care-high-contrast .el-select-dropdown__item.selected,
+html.care-high-contrast .el-dropdown-menu__item:focus,
+html.care-high-contrast .el-dropdown-menu__item:not(.is-disabled):hover,
+html.care-high-contrast .el-select-dropdown__item.hover,
+html.care-high-contrast .el-select-dropdown__item:hover {
+  background: #e8eef7 !important;
+  color: #000000 !important;
+}
+
+/* 标签栏（TagsView）：白底黑框、激活页司法蓝反白 */
+html.care-high-contrast .tags-view-container {
+  background: #ffffff;
+  border-bottom: 2px solid #000000;
+}
+html.care-high-contrast .tags-view-container .tags-view-item {
+  background: #ffffff;
+  color: #000000;
+  border: 1px solid #666666;
+}
+html.care-high-contrast .tags-view-container .tags-view-item.active {
+  background: #1a3c6e;
+  color: #ffffff;
+  border-color: #1a3c6e;
+}
+html.care-high-contrast .tags-view-container .tags-view-item.active .el-icon-close {
+  color: #ffffff;
+}
+
+/* 侧栏：保留司法蓝品牌底（白字约 12:1），强化选中态 */
+html.care-high-contrast .el-menu-item.is-active {
+  background-color: #255a99 !important;
+  box-shadow: inset 4px 0 0 #ffd04b;
+}
+html.care-high-contrast .el-submenu.is-active > .el-submenu__title {
+  color: #ffffff !important;
+}
+
+/* 工作台/弹屏中的浅色自定义块：补黑框保证边界可辨 */
+html.care-high-contrast .wb-stat-card,
+html.care-high-contrast .wb-quick-item,
+html.care-high-contrast .wb-record-item,
+html.care-high-contrast .cp-card,
+html.care-high-contrast .cp-ai-item,
+html.care-high-contrast .cp-detail-item {
+  border-color: #000000 !important;
+}
+html.care-high-contrast .cp-ai-value.cp-risk-2 {
+  color: #a12835 !important;
+}

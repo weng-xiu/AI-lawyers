@@ -27,6 +27,27 @@ public class AiRiskWarning extends BaseEntity
 
     private Long sourceId;
 
+    /** 命中的风险预警规则ID（F3，空=手工/其他来源） */
+    private Long ruleId;
+
+    /** 建议转办条线快照（F3，预警生成时由命中规则写入） */
+    @Excel(name = "建议转办条线")
+    private String suggestTransferType;
+
+    /** 一键转办生成的转办流水ID（F3，非空=已转办） */
+    private Long transferId;
+
+    /** 命中规则名称（联表展示，不持久化） */
+    @Excel(name = "命中规则")
+    private String ruleName;
+
+    /** 命中规则配置的默认建议机构ID（联表展示，不持久化；一键转办弹窗默认选中） */
+    private Long ruleSuggestOrgId;
+
+    /** 已发起转办的工单号（联表 ai_ticket_transfer 展示，不持久化） */
+    @Excel(name = "转办工单号")
+    private String ticketNo;
+
     @Excel(name = "触发内容")
     private String content;
 
@@ -101,6 +122,66 @@ public class AiRiskWarning extends BaseEntity
     public Long getSourceId()
     {
         return sourceId;
+    }
+
+    public void setRuleId(Long ruleId)
+    {
+        this.ruleId = ruleId;
+    }
+
+    public Long getRuleId()
+    {
+        return ruleId;
+    }
+
+    public void setSuggestTransferType(String suggestTransferType)
+    {
+        this.suggestTransferType = suggestTransferType;
+    }
+
+    public String getSuggestTransferType()
+    {
+        return suggestTransferType;
+    }
+
+    public void setTransferId(Long transferId)
+    {
+        this.transferId = transferId;
+    }
+
+    public Long getTransferId()
+    {
+        return transferId;
+    }
+
+    public void setRuleName(String ruleName)
+    {
+        this.ruleName = ruleName;
+    }
+
+    public String getRuleName()
+    {
+        return ruleName;
+    }
+
+    public void setRuleSuggestOrgId(Long ruleSuggestOrgId)
+    {
+        this.ruleSuggestOrgId = ruleSuggestOrgId;
+    }
+
+    public Long getRuleSuggestOrgId()
+    {
+        return ruleSuggestOrgId;
+    }
+
+    public void setTicketNo(String ticketNo)
+    {
+        this.ticketNo = ticketNo;
+    }
+
+    public String getTicketNo()
+    {
+        return ticketNo;
     }
 
     public void setContent(String content)
@@ -191,6 +272,9 @@ public class AiRiskWarning extends BaseEntity
             .append("warningLevel", getWarningLevel())
             .append("sourceType", getSourceType())
             .append("sourceId", getSourceId())
+            .append("ruleId", getRuleId())
+            .append("suggestTransferType", getSuggestTransferType())
+            .append("transferId", getTransferId())
             .append("content", getContent())
             .append("customerName", getCustomerName())
             .append("status", getStatus())

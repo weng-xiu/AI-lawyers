@@ -1,6 +1,7 @@
 package ai.lawyers.web.controller.lawyers;
 
 import java.util.List;
+import java.util.Map;
 import javax.servlet.http.HttpServletResponse;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import ai.lawyers.common.annotation.Log;
 import ai.lawyers.common.core.controller.BaseController;
@@ -19,6 +21,7 @@ import ai.lawyers.common.core.page.TableDataInfo;
 import ai.lawyers.common.enums.BusinessType;
 import ai.lawyers.common.utils.poi.ExcelUtil;
 import ai.lawyers.system.domain.lawyers.AiRiskWarning;
+import ai.lawyers.system.domain.lawyers.AiTicketTransfer;
 import ai.lawyers.system.service.lawyers.IAiRiskWarningService;
 
 @RestController
@@ -76,5 +79,41 @@ public class AiRiskWarningController extends BaseController
     public AjaxResult remove(@PathVariable Long[] warningIds)
     {
         return toAjax(aiRiskWarningService.deleteAiRiskWarningByWarningIds(warningIds));
+    }
+
+    /**
+     * F3 风险联动：按建议条线查询可转办的启用机构（仅公开字段）。
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:riskWarning:query')")
+    @GetMapping("/transfer/orgs")
+    public AjaxResult transferOrgs(@RequestParam(value = "externalType", required = false) String externalType)
+    {
+        return success(aiRiskWarningService.selectTransferOrgs(externalType));
+    }
+
+    /**
+     * F3 风险联动：高风险预警一键确认转办（自动建单+复用转办流水）。
+     * 请求体：{ "warningId":1, "orgId":2, "remark":"最小必要备注" }
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:ticketTransfer:add')")
+    @Log(title = "风险预警一键转办", businessType = BusinessType.INSERT)
+    @PostMapping("/transfer")
+    public AjaxResult transfer(@RequestBody Map<String, Object> body)
+    {
+        Long warningId = parseLong(body.get("warningId"));
+        Long orgId = parseLong(body.get("orgId"));
+        String remark = body.get("remark") == null ? null : String.valueOf(body.get("remark"));
+        AiTicketTransfer transfer = aiRiskWarningService.transferByWarning(warningId, orgId, remark, getUsername());
+        return AjaxResult.success("转办已发起", transfer);
+    }
+
+    private Long parseLong(Object value)
+    {
+        if (value == null)
+        {
+            return null;
+        }
+        String text = String.valueOf(value).trim();
+        return text.isEmpty() ? null : Long.valueOf(text);
     }
 }

@@ -10,6 +10,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="warningLevel"   column="warning_level"   />
         <result property="sourceType"     column="source_type"     />
         <result property="sourceId"       column="source_id"       />
+        <result property="ruleId"         column="rule_id"         />
+        <result property="suggestTransferType" column="suggest_transfer_type" />
+        <result property="transferId"     column="transfer_id"     />
+        <result property="ruleName"       column="rule_name"       />
+        <result property="ruleSuggestOrgId" column="rule_suggest_org_id" />
+        <result property="ticketNo"       column="ticket_no"       />
         <result property="content"        column="content"         />
         <result property="customerName"   column="customer_name"   />
         <result property="status"         column="status"          />
@@ -22,34 +28,46 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="remark"         column="remark"          />
     </resultMap>
 
+    <!-- F3：LEFT JOIN 规则表带出命中规则名与建议条线（预警快照优先，回退规则当前值）；LEFT JOIN 转办流水带出转办工单号 -->
     <sql id="selectAiRiskWarningVo">
-        select warning_id, warning_type, warning_level, source_type, source_id, content,
-               customer_name, status, handler_name, handler_id, handle_result, handle_time, trigger_time,
-               create_time, remark
-        from ai_risk_warning
+        select w.warning_id, w.warning_type, w.warning_level, w.source_type, w.source_id,
+               w.rule_id, coalesce(w.suggest_transfer_type, r.suggest_transfer_type) as suggest_transfer_type,
+               w.transfer_id, r.rule_name, r.suggest_org_id as rule_suggest_org_id, tt.ticket_no,
+               w.content, w.customer_name, w.status, w.handler_name, w.handler_id,
+               w.handle_result, w.handle_time, w.trigger_time, w.create_time, w.remark
+        from ai_risk_warning w
+        left join ai_risk_warning_rule r on r.rule_id = w.rule_id
+        left join ai_ticket_transfer tt on tt.transfer_id = w.transfer_id
     </sql>
 
     <select id="selectAiRiskWarningList" parameterType="AiRiskWarning" resultMap="AiRiskWarningResult">
         <include refid="selectAiRiskWarningVo"/>
         <where>
-            <if test="warningType != null and warningType != ''"> and warning_type = #{warningType}</if>
-            <if test="warningLevel != null and warningLevel != ''"> and warning_level = #{warningLevel}</if>
-            <if test="status != null and status != ''"> and status = #{status}</if>
-            <if test="customerName != null and customerName != ''"> and customer_name like concat('%', #{customerName}, '%')</if>
-            <if test="handlerId != null"> and handler_id = #{handlerId}</if>
+            <if test="warningType != null and warningType != ''"> and w.warning_type = #{warningType}</if>
+            <if test="warningLevel != null and warningLevel != ''"> and w.warning_level = #{warningLevel}</if>
+            <if test="status != null and status != ''"> and w.status = #{status}</if>
+            <if test="customerName != null and customerName != ''"> and w.customer_name like concat('%', #{customerName}, '%')</if>
+            <if test="handlerId != null"> and w.handler_id = #{handlerId}</if>
+            <if test="suggestTransferType != null and suggestTransferType != ''"> and coalesce(w.suggest_transfer_type, r.suggest_transfer_type) = #{suggestTransferType}</if>
             <if test="params.beginTime != null and params.beginTime != ''">
-                and trigger_time &gt;= #{params.beginTime}
+                and w.trigger_time &gt;= #{params.beginTime}
             </if>
             <if test="params.endTime != null and params.endTime != ''">
-                and trigger_time &lt;= #{params.endTime}
+                and w.trigger_time &lt;= #{params.endTime}
             </if>
         </where>
-        order by trigger_time desc, create_time desc
+        order by w.trigger_time desc, w.create_time desc
     </select>
 
     <select id="selectAiRiskWarningByWarningId" parameterType="Long" resultMap="AiRiskWarningResult">
         <include refid="selectAiRiskWarningVo"/>
-        where warning_id = #{warningId}
+        where w.warning_id = #{warningId}
+    </select>
+
+    <select id="selectByIdForUpdate" parameterType="Long" resultMap="AiRiskWarningResult">
+        <include refid="selectAiRiskWarningVo"/>
+        where w.warning_id = #{warningId}
+        for update
     </select>
 
     <insert id="insertAiRiskWarning" parameterType="AiRiskWarning" useGeneratedKeys="true" keyProperty="warningId">
@@ -59,6 +77,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="warningLevel != null">warning_level,</if>
             <if test="sourceType != null">source_type,</if>
             <if test="sourceId != null">source_id,</if>
+            <if test="ruleId != null">rule_id,</if>
+            <if test="suggestTransferType != null">suggest_transfer_type,</if>
+            <if test="transferId != null">transfer_id,</if>
             <if test="content != null">content,</if>
             <if test="customerName != null">customer_name,</if>
             <if test="status != null">status,</if>
@@ -75,6 +96,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="warningLevel != null">#{warningLevel},</if>
             <if test="sourceType != null">#{sourceType},</if>
             <if test="sourceId != null">#{sourceId},</if>
+            <if test="ruleId != null">#{ruleId},</if>
+            <if test="suggestTransferType != null">#{suggestTransferType},</if>
+            <if test="transferId != null">#{transferId},</if>
             <if test="content != null">#{content},</if>
             <if test="customerName != null">#{customerName},</if>
             <if test="status != null">#{status},</if>
@@ -106,6 +130,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="remark != null">remark = #{remark},</if>
         </trim>
         where warning_id = #{warningId}
+    </update>
+
+    <!-- F3：一键转办后回写转办流水ID（仅当未回写过，防并发重复转办） -->
+    <update id="updateTransferRef">
+        update ai_risk_warning
+        set transfer_id = #{transferId}
+        where warning_id = #{warningId} and transfer_id is null
     </update>
 
     <delete id="deleteAiRiskWarningByWarningId" parameterType="Long">

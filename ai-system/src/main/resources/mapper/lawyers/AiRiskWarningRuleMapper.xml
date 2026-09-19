@@ -10,6 +10,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="ruleType"    column="rule_type"    />
         <result property="ruleLevel"   column="rule_level"   />
         <result property="keywords"    column="keywords"     />
+        <result property="suggestTransferType" column="suggest_transfer_type" />
+        <result property="suggestOrgId" column="suggest_org_id" />
         <result property="isEnabled"   column="is_enabled"   />
         <result property="createBy"    column="create_by"    />
         <result property="createTime"  column="create_time"  />
@@ -19,7 +21,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectAiRiskWarningRuleVo">
-        select rule_id, rule_name, rule_type, rule_level, keywords, is_enabled,
+        select rule_id, rule_name, rule_type, rule_level, keywords,
+               suggest_transfer_type, suggest_org_id, is_enabled,
                create_by, create_time, update_by, update_time, remark
         from ai_risk_warning_rule
     </sql>
@@ -31,6 +34,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="ruleType != null and ruleType != ''"> and rule_type = #{ruleType}</if>
             <if test="ruleLevel != null and ruleLevel != ''"> and rule_level = #{ruleLevel}</if>
             <if test="isEnabled != null and isEnabled != ''"> and is_enabled = #{isEnabled}</if>
+            <if test="suggestTransferType != null and suggestTransferType != ''"> and suggest_transfer_type = #{suggestTransferType}</if>
         </where>
         order by create_time desc
     </select>
@@ -47,6 +51,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="ruleType != null">rule_type,</if>
             <if test="ruleLevel != null">rule_level,</if>
             <if test="keywords != null">keywords,</if>
+            <if test="suggestTransferType != null">suggest_transfer_type,</if>
+            <if test="suggestOrgId != null">suggest_org_id,</if>
             <if test="isEnabled != null">is_enabled,</if>
             <if test="createBy != null">create_by,</if>
             <if test="remark != null">remark,</if>
@@ -57,6 +63,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="ruleType != null">#{ruleType},</if>
             <if test="ruleLevel != null">#{ruleLevel},</if>
             <if test="keywords != null">#{keywords},</if>
+            <if test="suggestTransferType != null">#{suggestTransferType},</if>
+            <if test="suggestOrgId != null">#{suggestOrgId},</if>
             <if test="isEnabled != null">#{isEnabled},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="remark != null">#{remark},</if>
@@ -71,6 +79,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="ruleType != null">rule_type = #{ruleType},</if>
             <if test="ruleLevel != null">rule_level = #{ruleLevel},</if>
             <if test="keywords != null">keywords = #{keywords},</if>
+            suggest_transfer_type = #{suggestTransferType},
+            suggest_org_id = #{suggestOrgId},
             <if test="isEnabled != null">is_enabled = #{isEnabled},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="remark != null">remark = #{remark},</if>

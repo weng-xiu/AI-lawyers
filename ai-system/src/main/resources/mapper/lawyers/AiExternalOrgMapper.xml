@@ -49,6 +49,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by external_type, province, city, org_id
     </select>
 
+    <!-- F3 风险联动转办候选机构：仅启用态、仅公开字段（严禁带出 app_id/app_secret/api_url） -->
+    <select id="selectTransferOptions" resultMap="AiExternalOrgResult">
+        select org_id, org_name, external_type, province, city, district, contact_phone, access_mode, status
+        from ai_external_org
+        where status = '0'
+        <if test="externalType != null and externalType != ''"> and external_type = #{externalType}</if>
+        order by external_type, province, city, org_id
+    </select>
+
     <select id="selectAiExternalOrgByOrgId" parameterType="Long" resultMap="AiExternalOrgResult">
         <include refid="selectAiExternalOrgVo"/>
         where org_id = #{orgId}
