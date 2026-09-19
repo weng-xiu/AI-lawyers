@@ -41,6 +41,18 @@ public class AiUnifiedSession extends BaseEntity
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date endTime;
 
+    /** 是否活跃 1活跃 0已结束（方案B 同渠道互斥占用态） */
+    private String activeFlag;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date lastHeartbeat;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date expireTime;
+
+    /** 活跃占用键（DB 生成列 active_owner，只读）：身份+渠道 */
+    private String activeOwner;
+
     public Long getSessionId() { return sessionId; }
     public void setSessionId(Long sessionId) { this.sessionId = sessionId; }
 
@@ -67,4 +79,16 @@ public class AiUnifiedSession extends BaseEntity
 
     public Date getEndTime() { return endTime; }
     public void setEndTime(Date endTime) { this.endTime = endTime; }
+
+    public String getActiveFlag() { return activeFlag; }
+    public void setActiveFlag(String activeFlag) { this.activeFlag = activeFlag; }
+
+    public Date getLastHeartbeat() { return lastHeartbeat; }
+    public void setLastHeartbeat(Date lastHeartbeat) { this.lastHeartbeat = lastHeartbeat; }
+
+    public Date getExpireTime() { return expireTime; }
+    public void setExpireTime(Date expireTime) { this.expireTime = expireTime; }
+
+    public String getActiveOwner() { return activeOwner; }
+    public void setActiveOwner(String activeOwner) { this.activeOwner = activeOwner; }
 }

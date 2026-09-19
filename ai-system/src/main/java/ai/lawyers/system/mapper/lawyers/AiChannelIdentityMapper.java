@@ -35,4 +35,8 @@ public interface AiChannelIdentityMapper
 
     /** 重复发起绑定时刷新渠道昵称 */
     public int refreshNickname(@Param("id") Long id, @Param("nickname") String nickname);
+
+    /** 解绑状态转移归属（复用记录，避免唯一约束冲突） */
+    public int transferOwnership(@Param("id") Long id, @Param("profileId") Long profileId,
+                                @Param("nickname") String nickname, @Param("operator") String operator);
 }

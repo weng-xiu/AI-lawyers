@@ -1,0 +1,78 @@
+{
+  "config": {
+    "configFile": "D:\\project_job\\AI-lawyers\\aiuser-ui\\playwright.config.js",
+    "rootDir": "D:/project_job/AI-lawyers/aiuser-ui/tests/a11y",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {},
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "tests/a11y-results/raw-results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 15000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "D:/project_job/AI-lawyers/aiuser-ui/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "D:/project_job/AI-lawyers/aiuser-ui/tests/a11y",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "version": "1.47.2",
+    "workers": 1,
+    "webServer": {
+      "command": "npm run dev -- --port 8081",
+      "url": "http://localhost:8081",
+      "timeout": 240000,
+      "reuseExistingServer": false,
+      "env": {
+        "NODE_OPTIONS": "--openssl-legacy-provider",
+        "npm_config_port": "8081"
+      }
+    }
+  },
+  "suites": [],
+  "errors": [
+    {
+      "message": "Error: http://localhost:8081 is already used, make sure that nothing is running on the port/url or set reuseExistingServer:true in config.webServer.",
+      "stack": "Error: http://localhost:8081 is already used, make sure that nothing is running on the port/url or set reuseExistingServer:true in config.webServer."
+    }
+  ],
+  "stats": {
+    "startTime": "2026-09-19T09:38:29.543Z",
+    "duration": 695.3940000000002,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

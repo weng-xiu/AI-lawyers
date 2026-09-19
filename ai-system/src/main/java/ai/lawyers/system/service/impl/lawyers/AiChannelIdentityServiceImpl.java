@@ -71,6 +71,13 @@ public class AiChannelIdentityServiceImpl implements IAiChannelIdentityService
                 }
                 return existing.getId();
             }
+            // 已解绑状态 + 不同档案：转移归属（复用记录，避免唯一约束冲突）
+            if ("1".equals(existing.getBindStatus()))
+            {
+                channelIdentityMapper.transferOwnership(existing.getId(), profileId,
+                        channelNickname, operator);
+                return existing.getId();
+            }
         }
         AiChannelIdentity identity = new AiChannelIdentity();
         identity.setProfileId(profileId);

@@ -17,11 +17,15 @@ import ai.lawyers.common.core.text.Convert;
 import ai.lawyers.common.utils.DateUtils;
 import ai.lawyers.common.utils.SecurityUtils;
 import ai.lawyers.common.exception.ServiceException;
+import ai.lawyers.common.core.domain.entity.SysUser;
+import ai.lawyers.system.domain.lawyers.AiUnifiedSession;
 import ai.lawyers.system.domain.lawyers.AiUserConsultation;
 import ai.lawyers.system.domain.lawyers.AiUserEvaluation;
 import ai.lawyers.system.mapper.lawyers.AiUserConsultationMapper;
 import ai.lawyers.system.mapper.lawyers.AiUserEvaluationMapper;
 import ai.lawyers.system.service.lawyers.IAiUserConsultationService;
+import ai.lawyers.system.service.lawyers.IAiUnifiedSessionService;
+import ai.lawyers.system.service.lawyers.session.OccupyResult;
 
 /**
  * 用户咨询Service业务层处理
@@ -42,8 +46,28 @@ public class AiUserConsultationServiceImpl implements IAiUserConsultationService
     @Autowired
     private ContentSafetyService contentSafetyService;
 
+    /** 方案B：跨渠道统一会话占用 */
+    @Autowired
+    private IAiUnifiedSessionService unifiedSessionService;
+
     @Value("${file.path}")
     private String filePath;
+
+    /** 方案B：图文咨询同渠道互斥总开关（默认开启；关闭后仅写时间线不拦截） */
+    @Value("${session.occupy.enabled:true}")
+    private boolean occupyEnabled;
+
+    /** 方案B：MESSAGE 重复发起策略 REENTER 幂等恢复（默认）/ REJECT 直接拒绝 */
+    @Value("${session.occupy.message-mode:REENTER}")
+    private String messageOccupyMode;
+
+    /** 方案B：MESSAGE 占用兜底 TTL（秒），默认 24h（业务状态完成即提前释放） */
+    @Value("${session.occupy.ttl-message:86400}")
+    private int messageOccupyTtlSeconds;
+
+    /** 方案B：图文咨询统一会话渠道标识 */
+    private static final String CHANNEL_H5 = "H5";
+    private static final String BIZ_MESSAGE = "MESSAGE";
 
     /**
      * 查询用户咨询
@@ -133,9 +157,34 @@ public class AiUserConsultationServiceImpl implements IAiUserConsultationService
         // F8 安全基线：内容长度 + 本地敏感词校验（坐席端/公众端共用，命中即拒绝入库）
         contentSafetyService.validateConsultation(category, content);
 
+        // 方案B（同渠道互斥）：该公众在 H5 图文渠道已有 PROCESSING 咨询时，按策略幂等恢复或拒绝
+        Long currentUserId = SecurityUtils.getUserId();
+        AiUnifiedSession activeSession = null;
+        if (occupyEnabled)
+        {
+            List<AiUnifiedSession> actives = unifiedSessionService.listActive(null, currentPhone());
+            AiUnifiedSession blocked = actives.stream()
+                    .filter(s -> CHANNEL_H5.equals(s.getChannelType()) && BIZ_MESSAGE.equals(s.getBizType()))
+                    .findFirst().orElse(null);
+            if (blocked != null)
+            {
+                AiUserConsultation existing = findProcessingConsultation(currentUserId, blocked.getBizId());
+                if (existing != null)
+                {
+                    // REENTER：返回既有处理中咨询（不新增、不重复触发 AI）；REJECT：直接拒绝
+                    if ("REJECT".equalsIgnoreCase(messageOccupyMode))
+                    {
+                        throw new ServiceException("您有正在处理的咨询，请稍后查看结果后再提交");
+                    }
+                    return existing;
+                }
+                // DB 业务单已不存在（残留索引）：交由下方抢占，看门狗语义下不阻塞新提交
+            }
+        }
+
         // 创建咨询记录
         AiUserConsultation consultation = new AiUserConsultation();
-        consultation.setUserId(SecurityUtils.getUserId());
+        consultation.setUserId(currentUserId);
         consultation.setCategory(category);
         consultation.setContent(content);
         consultation.setStatus("PROCESSING"); // 处理中
@@ -181,11 +230,93 @@ public class AiUserConsultationServiceImpl implements IAiUserConsultationService
         
         // 保存咨询记录
         aiUserConsultationMapper.insertAiUserConsultation(consultation);
-        
-        // 异步处理AI咨询
-        processAIConsultation(consultation);
+
+        // 方案B：登记 H5 图文渠道活跃占用（并发双击/多标签下抢占失败者回滚本次插入并恢复既有单）
+        if (occupyEnabled)
+        {
+            AiUnifiedSession session = new AiUnifiedSession();
+            session.setCallerNumber(currentPhone());
+            session.setChannelType(CHANNEL_H5);
+            session.setBizType(BIZ_MESSAGE);
+            session.setBizId(String.valueOf(consultation.getConsultationId()));
+            session.setBizTitle(categoryName(getCategoryLabel(category)));
+            session.setStartTime(consultation.getCreateTime());
+            OccupyResult result = unifiedSessionService.startActive(session, messageOccupyTtlSeconds);
+            if (!result.isAcquired())
+            {
+                aiUserConsultationMapper.deleteAiUserConsultationById(consultation.getConsultationId());
+                if ("REJECT".equalsIgnoreCase(messageOccupyMode))
+                {
+                    throw new ServiceException("您有正在处理的咨询，请稍后查看结果后再提交");
+                }
+                AiUserConsultation existing = findProcessingConsultation(currentUserId, result.getExistingBizId());
+                if (existing != null)
+                {
+                    return existing;
+                }
+                // 极端情况：抢占失败但既有单查不到（对方刚结束），本次已回滚，提示重试一次
+                throw new ServiceException("提交冲突，请重新发起咨询");
+            }
+            activeSession = result.getSession();
+        }
+
+        // AI 处理（当前为同步模拟）；无论完成/失败都释放本渠道占用
+        try
+        {
+            processAIConsultation(consultation);
+        }
+        finally
+        {
+            if (activeSession != null)
+            {
+                unifiedSessionService.finishSession(BIZ_MESSAGE,
+                        String.valueOf(consultation.getConsultationId()), new Date());
+            }
+        }
         
         return consultation;
+    }
+
+    /** 取当前登录公众用户手机号（公众账号必须绑定手机号） */
+    private String currentPhone()
+    {
+        SysUser user = SecurityUtils.getLoginUser().getUser();
+        if (user == null || StringUtils.isEmpty(user.getPhonenumber()))
+        {
+            throw new ServiceException("当前账号未绑定手机号，无法关联服务记录");
+        }
+        return user.getPhonenumber();
+    }
+
+    /** 按占用索引 bizId（咨询ID）取本人处理中咨询；非本人或非处理中返回 null */
+    private AiUserConsultation findProcessingConsultation(Long userId, String bizId)
+    {
+        if (StringUtils.isEmpty(bizId) || !StringUtils.isNumeric(bizId))
+        {
+            return null;
+        }
+        AiUserConsultation c = aiUserConsultationMapper.selectAiUserConsultationById(Long.valueOf(bizId));
+        if (c != null && userId.equals(c.getUserId()) && "PROCESSING".equals(c.getStatus()))
+        {
+            return c;
+        }
+        return null;
+    }
+
+    /** 入参 category 可能是 value 或中文名，统一转中文用于时间线摘要 */
+    private String getCategoryLabel(String category)
+    {
+        if (StringUtils.isEmpty(category))
+        {
+            return "法律咨询";
+        }
+        return getCategoryName(category);
+    }
+
+    /** 兼容旧调用：分类名取值（与 getQuestionCategories 的 value 对齐） */
+    private String categoryName(String name)
+    {
+        return StringUtils.isEmpty(name) ? "法律咨询" : name;
     }
 
     /**

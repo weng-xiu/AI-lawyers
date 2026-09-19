@@ -8,7 +8,9 @@
     "dev": "vue-cli-service serve",
     "build:prod": "vue-cli-service build",
     "build:stage": "vue-cli-service build --mode staging",
-    "preview": "node build/index.js --preview"
+    "preview": "node build/index.js --preview",
+    "test:a11y": "playwright test --config=playwright.config.js",
+    "install:chromium": "playwright install chromium"
   },
   "dependencies": {
     "axios": "0.28.1",
@@ -19,9 +21,13 @@
     "vuex": "3.6.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.9.1",
+    "@playwright/test": "^1.47.2",
     "@vue/cli-plugin-babel": "4.4.6",
     "@vue/cli-service": "4.4.6",
     "babel-plugin-dynamic-import-node": "2.3.3",
+    "playwright": "^1.47.2",
+    "playwright-core": "^1.47.2",
     "sass": "1.32.13",
     "sass-loader": "10.1.1",
     "vue-template-compiler": "2.6.12"
