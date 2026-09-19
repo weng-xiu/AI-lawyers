@@ -82,7 +82,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <update id="confirmBind">
         update ai_channel_identity
         set bind_status = '0',
-            channel_nickname = #{nickname},
+            <if test="nickname != null">channel_nickname = #{nickname},</if>
             bind_confirm_time = #{confirmTime},
             unbind_time = null,
             update_time = sysdate()
@@ -96,5 +96,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             update_by = #{updateBy},
             update_time = sysdate()
         where id = #{id} and bind_status = '0'
+    </update>
+
+    <update id="refreshNickname">
+        update ai_channel_identity
+        set channel_nickname = #{nickname},
+            update_time = sysdate()
+        where id = #{id}
     </update>
 </mapper>

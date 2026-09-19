@@ -13,6 +13,7 @@ const Login = () => import('@/views/Login')
 const Register = () => import('@/views/Register')
 const MyTickets = () => import('@/views/MyTickets')
 const ServiceNav = () => import('@/views/ServiceNav')
+const MyChannels = () => import('@/views/MyChannels')
 
 const routes = [
   {
@@ -36,6 +37,12 @@ const routes = [
     name: 'MyTickets',
     component: MyTickets,
     meta: { title: '我的工单', requiresAuth: true }
+  },
+  {
+    path: '/channels',
+    name: 'MyChannels',
+    component: MyChannels,
+    meta: { title: '渠道绑定', requiresAuth: true }
   },
   {
     path: '/services',

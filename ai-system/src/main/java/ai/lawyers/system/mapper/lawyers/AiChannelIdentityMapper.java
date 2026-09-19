@@ -32,4 +32,7 @@ public interface AiChannelIdentityMapper
     /** 解绑（保留留痕，状态置为已解绑） */
     public int unbind(@Param("id") Long id, @Param("unbindTime") Date unbindTime,
                       @Param("updateBy") String updateBy);
+
+    /** 重复发起绑定时刷新渠道昵称 */
+    public int refreshNickname(@Param("id") Long id, @Param("nickname") String nickname);
 }

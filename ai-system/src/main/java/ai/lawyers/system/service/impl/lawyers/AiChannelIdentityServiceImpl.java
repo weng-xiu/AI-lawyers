@@ -63,10 +63,11 @@ public class AiChannelIdentityServiceImpl implements IAiChannelIdentityService
             }
             if (profileId.equals(existing.getProfileId()))
             {
-                // 同档案重复登记：已绑定直接返回，未绑定则重新发起确认
-                if ("0".equals(existing.getBindStatus()))
+                // 同档案重复登记：已绑定直接返回，未绑定则重新发起确认；携带新昵称时同步刷新
+                if (StringUtils.isNotEmpty(channelNickname)
+                        && !channelNickname.equals(existing.getChannelNickname()))
                 {
-                    return existing.getId();
+                    channelIdentityMapper.refreshNickname(existing.getId(), channelNickname);
                 }
                 return existing.getId();
             }

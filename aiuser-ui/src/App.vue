@@ -35,6 +35,7 @@
             active-text-color="#ffd04b">
             <el-menu-item index="/consultation/submit">我要咨询</el-menu-item>
             <el-menu-item index="/ticket">我的工单</el-menu-item>
+            <el-menu-item index="/channels">渠道绑定</el-menu-item>
             <el-menu-item index="/services">服务导航</el-menu-item>
             <el-menu-item index="/consultation/history">咨询历史</el-menu-item>
           </el-menu>
