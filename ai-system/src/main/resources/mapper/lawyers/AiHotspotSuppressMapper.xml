@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiHotspotSuppressMapper">
+
+    <resultMap type="AiHotspotSuppress" id="AiHotspotSuppressResult">
+        <result property="suppressId"     column="suppress_id"     />
+        <result property="ruleName"       column="rule_name"       />
+        <result property="matchType"      column="match_type"      />
+        <result property="matchValue"     column="match_value"     />
+        <result property="action"         column="action"          />
+        <result property="priorityLevel"  column="priority_level"  />
+        <result property="triggerCount"   column="trigger_count"   />
+        <result property="windowSeconds"  column="window_seconds"  />
+        <result property="hitCount"       column="hit_count"       />
+        <result property="status"         column="status"          />
+        <result property="effectiveStart" column="effective_start" />
+        <result property="effectiveEnd"   column="effective_end"   />
+        <result property="createBy"       column="create_by"       />
+        <result property="createTime"     column="create_time"     />
+        <result property="updateBy"       column="update_by"       />
+        <result property="updateTime"     column="update_time"     />
+        <result property="remark"         column="remark"          />
+    </resultMap>
+
+    <resultMap type="AiHotspotSuppressLog" id="AiHotspotSuppressLogResult">
+        <result property="logId"        column="log_id"        />
+        <result property="suppressId"   column="suppress_id"   />
+        <result property="ruleName"     column="rule_name"     />
+        <result property="direction"    column="direction"     />
+        <result property="matchType"    column="match_type"    />
+        <result property="matchValue"   column="match_value"   />
+        <result property="callerNumber" column="caller_number" />
+        <result property="calleeNumber" column="callee_number" />
+        <result property="action"       column="action"        />
+        <result property="priority"     column="priority"      />
+        <result property="channelUuid"  column="channel_uuid"  />
+        <result property="hitTime"      column="create_time"   />
+    </resultMap>
+
+    <sql id="suppressColumns">
+        select suppress_id, rule_name, match_type, match_value, action, priority_level,
+               trigger_count, window_seconds, hit_count, status, effective_start, effective_end,
+               create_by, create_time, update_by, update_time, remark
+        from ai_hotspot_suppress
+    </sql>
+
+    <select id="selectSuppressList" parameterType="AiHotspotSuppress" resultMap="AiHotspotSuppressResult">
+        <include refid="suppressColumns"/>
+        <where>
+            <if test="ruleName != null and ruleName != ''"> and rule_name like concat('%', #{ruleName}, '%')</if>
+            <if test="matchType != null and matchType != ''"> and match_type = #{matchType}</if>
+            <if test="matchValue != null and matchValue != ''"> and match_value like concat('%', #{matchValue}, '%')</if>
+            <if test="action != null and action != ''"> and action = #{action}</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+        </where>
+        order by suppress_id desc
+    </select>
+
+    <select id="selectSuppressById" parameterType="Long" resultMap="AiHotspotSuppressResult">
+        <include refid="suppressColumns"/>
+        where suppress_id = #{suppressId}
+    </select>
+
+    <insert id="insertSuppress" parameterType="AiHotspotSuppress" useGeneratedKeys="true" keyProperty="suppressId">
+        insert into ai_hotspot_suppress
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            rule_name,
+            match_type,
+            match_value,
+            <if test="action != null and action != ''">action,</if>
+            <if test="priorityLevel != null">priority_level,</if>
+            <if test="triggerCount != null">trigger_count,</if>
+            <if test="windowSeconds != null">window_seconds,</if>
+            <if test="status != null and status != ''">status,</if>
+            <if test="effectiveStart != null">effective_start,</if>
+            <if test="effectiveEnd != null">effective_end,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            #{ruleName},
+            #{matchType},
+            #{matchValue},
+            <if test="action != null and action != ''">#{action},</if>
+            <if test="priorityLevel != null">#{priorityLevel},</if>
+            <if test="triggerCount != null">#{triggerCount},</if>
+            <if test="windowSeconds != null">#{windowSeconds},</if>
+            <if test="status != null and status != ''">#{status},</if>
+            <if test="effectiveStart != null">#{effectiveStart},</if>
+            <if test="effectiveEnd != null">#{effectiveEnd},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateSuppress" parameterType="AiHotspotSuppress">
+        update ai_hotspot_suppress
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="ruleName != null and ruleName != ''">rule_name = #{ruleName},</if>
+            <if test="matchType != null and matchType != ''">match_type = #{matchType},</if>
+            <if test="matchValue != null and matchValue != ''">match_value = #{matchValue},</if>
+            <if test="action != null and action != ''">action = #{action},</if>
+            <if test="priorityLevel != null">priority_level = #{priorityLevel},</if>
+            <if test="triggerCount != null">trigger_count = #{triggerCount},</if>
+            <if test="windowSeconds != null">window_seconds = #{windowSeconds},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            effective_start = #{effectiveStart},
+            effective_end = #{effectiveEnd},
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </trim>
+        where suppress_id = #{suppressId}
+    </update>
+
+    <update id="incrementHitCount" parameterType="Long">
+        update ai_hotspot_suppress set hit_count = hit_count + 1 where suppress_id = #{suppressId}
+    </update>
+
+    <delete id="deleteSuppressByIds" parameterType="String">
+        delete from ai_hotspot_suppress where suppress_id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="selectLogList" parameterType="AiHotspotSuppressLog" resultMap="AiHotspotSuppressLogResult">
+        select log_id, suppress_id, rule_name, direction, match_type, match_value,
+               caller_number, callee_number, action, priority, channel_uuid, create_time
+        from ai_hotspot_suppress_log
+        <where>
+            <if test="suppressId != null"> and suppress_id = #{suppressId}</if>
+            <if test="direction != null and direction != ''"> and direction = #{direction}</if>
+            <if test="callerNumber != null and callerNumber != ''"> and caller_number like concat('%', #{callerNumber}, '%')</if>
+            <if test="action != null and action != ''"> and action = #{action}</if>
+        </where>
+        order by log_id desc
+    </select>
+
+    <insert id="insertLog" parameterType="AiHotspotSuppressLog" useGeneratedKeys="true" keyProperty="logId">
+        insert into ai_hotspot_suppress_log
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="suppressId != null">suppress_id,</if>
+            <if test="ruleName != null">rule_name,</if>
+            <if test="direction != null">direction,</if>
+            <if test="matchType != null">match_type,</if>
+            <if test="matchValue != null">match_value,</if>
+            <if test="callerNumber != null">caller_number,</if>
+            <if test="calleeNumber != null">callee_number,</if>
+            <if test="action != null">action,</if>
+            <if test="priority != null">priority,</if>
+            <if test="channelUuid != null">channel_uuid,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="suppressId != null">#{suppressId},</if>
+            <if test="ruleName != null">#{ruleName},</if>
+            <if test="direction != null">#{direction},</if>
+            <if test="matchType != null">#{matchType},</if>
+            <if test="matchValue != null">#{matchValue},</if>
+            <if test="callerNumber != null">#{callerNumber},</if>
+            <if test="calleeNumber != null">#{calleeNumber},</if>
+            <if test="action != null">#{action},</if>
+            <if test="priority != null">#{priority},</if>
+            <if test="channelUuid != null">#{channelUuid},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <select id="countRecentHits" resultType="int">
+        select count(*) from ai_hotspot_suppress_log
+        where suppress_id = #{suppressId} and create_time &gt;= #{windowStart}
+    </select>
+</mapper>

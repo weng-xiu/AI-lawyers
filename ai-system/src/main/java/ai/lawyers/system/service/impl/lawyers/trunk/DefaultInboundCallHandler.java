@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.system.domain.lawyers.AiCallAgentStatus;
 import ai.lawyers.system.domain.lawyers.AiCallRecord;
+import ai.lawyers.system.domain.lawyers.AiHotspotSuppress;
 import ai.lawyers.system.domain.lawyers.skill.AiSkillGroup;
 import ai.lawyers.system.domain.lawyers.skill.AiSkillGroupMember;
 import ai.lawyers.system.domain.lawyers.skill.DispatchContext;
@@ -22,6 +23,7 @@ import ai.lawyers.system.mapper.lawyers.trunk.AiCallTrunkMapper;
 import ai.lawyers.system.service.lawyers.CallEventPublisher;
 import ai.lawyers.system.service.lawyers.IAiCallAgentStatusService;
 import ai.lawyers.system.service.lawyers.IAiCallBlacklistService;
+import ai.lawyers.system.service.lawyers.IAiHotspotSuppressService;
 import ai.lawyers.system.service.lawyers.skill.IAgentDispatchService;
 import ai.lawyers.system.service.lawyers.skill.IAiSkillGroupService;
 import ai.lawyers.system.service.lawyers.trunk.gateway.CallGatewayFactory;
@@ -79,6 +81,12 @@ public class DefaultInboundCallHandler implements InboundCallHandler
     @Autowired
     private IAiCallBlacklistService blacklistService;
 
+    @Autowired
+    private IAiHotspotSuppressService hotspotSuppressService;
+
+    @Value("${hotspot.suppress.enabled:true}")
+    private boolean hotspotEnabled;
+
     @Autowired(required = false)
     private EslEventBridgeService eslEventBridgeService;
 
@@ -132,6 +140,30 @@ public class DefaultInboundCallHandler implements InboundCallHandler
             return;
         }
 
+        // 高频置底判定：命中 REJECT 直接挂断；命中 PRIORITY 则在排队时降权沉底（仍可接听）。
+        // 入站 CHANNEL_CREATE 阶段尚无 ASR 文本，关键词规则按号码上下文之外的内容在后续 IVR 节点处置。
+        AiHotspotSuppress suppress = null;
+        if (hotspotEnabled && StringUtils.isNotEmpty(caller))
+        {
+            suppress = hotspotSuppressService.matchInbound(caller, null, uuid, dnis);
+        }
+        if (suppress != null && "REJECT".equals(suppress.getAction()))
+        {
+            log.warn("[Inbound] 高频置底规则[{}]拦截来电: {}", suppress.getRuleName(), caller);
+            if (eslEventBridgeService != null)
+            {
+                try
+                {
+                    eslEventBridgeService.hangupCall(host, uuid);
+                }
+                catch (Exception ex)
+                {
+                    log.warn("[Inbound] 置底拦截挂断失败 uuid={} caller={}: {}", uuid, caller, ex.getMessage());
+                }
+            }
+            return;
+        }
+
         try
         {
             // 1. 建立话单
@@ -152,6 +184,13 @@ public class DefaultInboundCallHandler implements InboundCallHandler
 
             // 3. 分配坐席
             DispatchContext dctx = DispatchContext.of(uuid, recordId, caller);
+            // 命中置底降权规则：排队优先级置为负数，沉到普通来电之后（有空闲坐席仍可直接接听）
+            if (suppress != null && "PRIORITY".equals(suppress.getAction()))
+            {
+                dctx.setPriority(suppress.getPriorityLevel() != null ? suppress.getPriorityLevel() : -100);
+                log.info("[Inbound] 高频置底规则[{}]降权 caller={} priority={}",
+                        suppress.getRuleName(), caller, dctx.getPriority());
+            }
             DispatchResult result = agentDispatchService.dispatch(groupId, dctx);
 
             if (result.isSuccess())
