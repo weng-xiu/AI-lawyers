@@ -102,10 +102,20 @@ public class TicketSlaScheduleTask
         data.put("priority", ticket.getPriority());
         data.put("dueTime", ticket.getDueTime());
         data.put("callerNumber", ticket.getCallerNumber());
+        data.put("assignUserId", ticket.getAssignUserId());
+        data.put("assignUserName", ticket.getAssignUserName());
         data.put("ts", System.currentTimeMillis());
         if (callEventPublisher != null)
         {
-            callEventPublisher.broadcast("TICKET_OVERTIME", data);
+            // F9 超时到人：优先推给工单处理人；未分配时回退广播
+            if (ticket.getAssignUserId() != null)
+            {
+                callEventPublisher.publishToUser(ticket.getAssignUserId(), "TICKET_OVERTIME", data);
+            }
+            else
+            {
+                callEventPublisher.broadcast("TICKET_OVERTIME", data);
+            }
         }
     }
 }

@@ -104,7 +104,7 @@
           <el-input-number v-model="form.warnThreshold" :min="1" :max="100" controls-position="right" />
         </el-form-item>
         <el-form-item label="逐级升级角色链">
-          <el-input v-model="form.escalateRoles" placeholder="逗号分隔角色key，如 teamleader,director,legal-director" maxlength="300" />
+          <el-input v-model="form.escalateRoles" placeholder="逗号分隔角色key，如 ai_team_leader,ai_manager,ai_director" maxlength="300" />
           <div class="form-tip">超期后按办结时限周期逐级升级，每个角色一级，经 WebSocket 广播 TICKET_ESCALATE</div>
         </el-form-item>
         <el-form-item label="状态">

@@ -55,6 +55,9 @@ public class AiMissedCall extends BaseEntity
     /** 语音留言时长(秒) */
     private Integer voiceDuration;
 
+    /** 语音留言录音文件 URL/路径 */
+    private String voiceFileUrl;
+
     /** 漏话通知状态（0未通知 1已通知） */
     private String noticeStatus;
 
@@ -159,6 +162,16 @@ public class AiMissedCall extends BaseEntity
     public Integer getVoiceDuration()
     {
         return voiceDuration;
+    }
+
+    public void setVoiceFileUrl(String voiceFileUrl)
+    {
+        this.voiceFileUrl = voiceFileUrl;
+    }
+
+    public String getVoiceFileUrl()
+    {
+        return voiceFileUrl;
     }
 
     public void setNoticeStatus(String noticeStatus)

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.stat.AiStatMinuteMapper">
+
+    <resultMap id="AiStatMinuteResult" type="ai.lawyers.system.domain.lawyers.stat.AiStatMinute">
+        <id     property="statId"      column="stat_id"      />
+        <result property="statTime"    column="stat_time"    />
+        <result property="dimension"   column="dimension"    />
+        <result property="metricKey"   column="metric_key"   />
+        <result property="metricValue" column="metric_value" />
+        <result property="createTime"  column="create_time"  />
+    </resultMap>
+
+    <!-- 幂等覆盖写：uk_stat(stat_time, dimension, metric_key) 冲突时更新值 -->
+    <insert id="upsert" parameterType="ai.lawyers.system.domain.lawyers.stat.AiStatMinute"
+            useGeneratedKeys="true" keyProperty="statId">
+        insert into ai_stat_minute (stat_time, dimension, metric_key, metric_value, create_time)
+        values (#{statTime}, #{dimension}, #{metricKey}, #{metricValue}, now())
+        on duplicate key update metric_value = values(metric_value), create_time = now()
+    </insert>
+
+    <insert id="batchUpsert">
+        insert into ai_stat_minute (stat_time, dimension, metric_key, metric_value, create_time)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.statTime}, #{item.dimension}, #{item.metricKey}, #{item.metricValue}, now())
+        </foreach>
+        on duplicate key update metric_value = values(metric_value), create_time = now()
+    </insert>
+
+    <select id="selectByPeriod" resultMap="AiStatMinuteResult">
+        select stat_id, stat_time, dimension, metric_key, metric_value, create_time
+        from ai_stat_minute
+        where stat_time &gt;= #{beginTime} and stat_time &lt;= #{endTime}
+          and dimension = 'ALL'
+          and metric_key = #{metricKey}
+        order by stat_time
+    </select>
+
+    <select id="selectByPeriodAndKeys" resultMap="AiStatMinuteResult">
+        select stat_id, stat_time, dimension, metric_key, metric_value, create_time
+        from ai_stat_minute
+        where stat_time &gt;= #{beginTime} and stat_time &lt;= #{endTime}
+          and dimension = 'ALL'
+          and metric_key in
+          <foreach collection="metricKeys" item="k" open="(" separator="," close=")">#{k}</foreach>
+        order by stat_time
+    </select>
+
+</mapper>

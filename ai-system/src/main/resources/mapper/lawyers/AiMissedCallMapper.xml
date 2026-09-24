@@ -15,6 +15,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="recordId"       column="record_id"        />
         <result property="voiceContent"   column="voice_content"    />
         <result property="voiceDuration"  column="voice_duration"   />
+        <result property="voiceFileUrl"   column="voice_file_url"   />
         <result property="noticeStatus"   column="notice_status"    />
         <result property="noticeChannel"  column="notice_channel"   />
         <result property="createBy"       column="create_by"        />
@@ -26,7 +27,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <sql id="selectAiMissedCallVo">
         select missed_call_id, caller_number, caller_name, call_time, status, callback_time, callback_by,
-               record_id, voice_content, voice_duration, notice_status, notice_channel,
+               record_id, voice_content, voice_duration, voice_file_url, notice_status, notice_channel,
                create_by, create_time, update_by, update_time, remark
         from ai_missed_call
     </sql>
@@ -69,6 +70,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="recordId != null">record_id,</if>
             <if test="voiceContent != null">voice_content,</if>
             <if test="voiceDuration != null">voice_duration,</if>
+            <if test="voiceFileUrl != null and voiceFileUrl != ''">voice_file_url,</if>
             <if test="noticeStatus != null and noticeStatus != ''">notice_status,</if>
             <if test="noticeChannel != null and noticeChannel != ''">notice_channel,</if>
             <if test="createBy != null and createBy != ''">create_by,</if>
@@ -85,6 +87,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="recordId != null">#{recordId},</if>
             <if test="voiceContent != null">#{voiceContent},</if>
             <if test="voiceDuration != null">#{voiceDuration},</if>
+            <if test="voiceFileUrl != null and voiceFileUrl != ''">#{voiceFileUrl},</if>
             <if test="noticeStatus != null and noticeStatus != ''">#{noticeStatus},</if>
             <if test="noticeChannel != null and noticeChannel != ''">#{noticeChannel},</if>
             <if test="createBy != null and createBy != ''">#{createBy},</if>
@@ -105,6 +108,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="recordId != null">record_id = #{recordId},</if>
             <if test="voiceContent != null">voice_content = #{voiceContent},</if>
             <if test="voiceDuration != null">voice_duration = #{voiceDuration},</if>
+            <if test="voiceFileUrl != null and voiceFileUrl != ''">voice_file_url = #{voiceFileUrl},</if>
             <if test="noticeStatus != null and noticeStatus != ''">notice_status = #{noticeStatus},</if>
             <if test="noticeChannel != null and noticeChannel != ''">notice_channel = #{noticeChannel},</if>
             <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>

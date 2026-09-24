@@ -107,6 +107,14 @@ public interface SysUserMapper
     public int deleteUserByIds(Long[] userIds);
 
     /**
+     * 按角色权限字符（role_key）查询正常状态的用户ID集合（F9 SLA 升级到人用）
+     *
+     * @param roleKey 角色权限字符
+     * @return 用户ID集合
+     */
+    public List<Long> selectUserIdsByRoleKey(@Param("roleKey") String roleKey);
+
+    /**
      * 校验用户名称是否唯一
      * 
      * @param userName 用户名称

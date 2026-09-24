@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.stat.ReportMapper">
+
+    <!-- 周期标签表达式：day 日 / week ISO 周 / month 月，通过 include 的 col 属性代入列名 -->
+    <sql id="periodLabel">
+        <choose>
+            <when test="granularity == 'week'">concat(date_format(${col}, '%x-W'), lpad(date_format(${col}, '%v'), 2, '0'))</when>
+            <when test="granularity == 'month'">date_format(${col}, '%Y-%m')</when>
+            <otherwise>date_format(${col}, '%Y-%m-%d')</otherwise>
+        </choose>
+    </sql>
+
+    <select id="selectCallReport" resultType="map">
+        select <include refid="periodLabel"><property name="col" value="call_time"/></include> as period,
+               count(*) as totalCalls,
+               sum(case when status = '1' then 1 else 0 end) as answeredCalls,
+               sum(case when status = '3' then 1 else 0 end) as missedCalls,
+               sum(case when status = '2' then 1 else 0 end) as transferredCalls,
+               round(sum(case when status = '1' then 1 else 0 end) / count(*) * 100, 2) as answerRate,
+               ifnull(round(avg(case when status = '1' then duration end), 0), 0) as avgDurationSec
+        from ai_call_record
+        where call_time &gt;= #{beginTime} and call_time &lt; date_add(#{endTime}, interval 1 day)
+        group by period
+        order by period
+    </select>
+
+    <select id="selectServiceReport" resultType="map">
+        select cr.agent_id as agentId,
+               ifnull(a.agent_name, concat('坐席', cr.agent_id)) as agentName,
+               count(*) as totalCalls,
+               sum(case when cr.status = '1' then 1 else 0 end) as answeredCalls,
+               round(sum(case when cr.status = '1' then 1 else 0 end) / count(*) * 100, 2) as answerRate,
+               ifnull(round(avg(case when cr.status = '1' then cr.duration end), 0), 0) as avgDurationSec,
+               ifnull(sum(case when cr.status = '1' then cr.duration else 0 end), 0) as totalTalkSec
+        from ai_call_record cr
+        left join ai_call_agent_status a on cr.agent_id = a.agent_id
+        where cr.call_time &gt;= #{beginTime} and cr.call_time &lt; date_add(#{endTime}, interval 1 day)
+          and cr.agent_id is not null
+        group by cr.agent_id, a.agent_name
+        order by totalCalls desc
+    </select>
+
+    <select id="selectQualityReport" resultType="map">
+        select <include refid="periodLabel"><property name="col" value="create_time"/></include> as period,
+               count(*) as inspections,
+               ifnull(round(avg(total_score), 2), 0) as avgScore,
+               sum(case when review_status = '1' then 1 else 0 end) as reviewedCount,
+               sum(case when review_status = '0' or review_status is null then 1 else 0 end) as pendingCount,
+               sum(case when risk_warning_id is not null then 1 else 0 end) as riskCount
+        from ai_quality_inspection
+        where create_time &gt;= #{beginTime} and create_time &lt; date_add(#{endTime}, interval 1 day)
+        group by period
+        order by period
+    </select>
+
+    <select id="selectBusinessReport" resultType="map">
+        select <include refid="periodLabel"><property name="col" value="create_time"/></include> as period,
+               count(*) as totalTickets,
+               sum(case when status in ('2', '3') then 1 else 0 end) as closedTickets,
+               round(sum(case when status in ('2', '3') then 1 else 0 end) / count(*) * 100, 2) as closeRate,
+               sum(case when overtime_flag = 1 then 1 else 0 end) as overdueTickets,
+               ifnull(round(avg(case when status in ('2', '3') and close_time is not null
+                                     then timestampdiff(SECOND, create_time, close_time) end) / 60, 1), 0) as avgCloseMinutes
+        from ai_call_ticket
+        where create_time &gt;= #{beginTime} and create_time &lt; date_add(#{endTime}, interval 1 day)
+        group by period
+        order by period
+    </select>
+
+</mapper>

@@ -140,4 +140,70 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where enqueue_time &gt;= #{beginTime} and enqueue_time &lt; #{endTime}
     </select>
 
+    <!-- ============================== F10 公共法律服务业务类指标 ============================== -->
+
+    <!-- 语种分布：区间通话按来电人档案语种分组（无档案视为普通话 zh-CN） -->
+    <select id="selectLanguageDist" resultType="map">
+        select ifnull(p.language_preference, 'zh-CN') as lang, count(*) as value
+        from ai_call_record cr
+        left join ai_caller_profile p on p.caller_number = cr.caller_number
+        where cr.call_time &gt;= #{beginTime} and cr.call_time &lt; #{endTime}
+        group by ifnull(p.language_preference, 'zh-CN')
+        order by value desc
+    </select>
+
+    <!-- 关怀模式使用率：区间通话中关怀模式号码的通话量与独立号码占比 -->
+    <select id="selectCareUsage" resultType="map">
+        select count(*) as totalCalls,
+               ifnull(sum(case when p.care_mode = 1 then 1 else 0 end), 0) as careCalls,
+               count(distinct cr.caller_number) as totalCallers,
+               count(distinct case when p.care_mode = 1 then cr.caller_number end) as careCallers
+        from ai_call_record cr
+        left join ai_caller_profile p on p.caller_number = cr.caller_number
+        where cr.call_time &gt;= #{beginTime} and cr.call_time &lt; #{endTime}
+    </select>
+
+    <!-- 业务条线转办统计：按条线分组的转办量/办结量/平均办结分钟（办结口径 status in('2','3')，与 SLA 看板一致） -->
+    <select id="selectTransferLineStats" resultType="map">
+        select t.external_type as line,
+               count(*) as transferCount,
+               ifnull(sum(case when tk.status in ('2','3') then 1 else 0 end), 0) as closedCount,
+               ifnull(round(avg(case when tk.status in ('2','3') and tk.close_time is not null
+                                     then timestampdiff(SECOND, t.create_time, tk.close_time) end) / 60, 1), 0) as avgCloseMinutes
+        from ai_ticket_transfer t
+        left join ai_call_ticket tk on tk.ticket_id = t.ticket_id
+        where t.direction = 'OUT' and t.create_time &gt;= #{beginTime} and t.create_time &lt; #{endTime}
+        group by t.external_type
+        order by transferCount desc
+    </select>
+
+    <!-- 公众端渠道活跃：区间统一会话按渠道类型分组 -->
+    <select id="selectChannelSessions" resultType="map">
+        select channel_type as channel, count(*) as value
+        from ai_unified_session
+        where start_time &gt;= #{beginTime} and start_time &lt; #{endTime}
+        group by channel_type
+        order by value desc
+    </select>
+
+    <!-- 公众端渠道绑定累计：已确认绑定按渠道类型分组（累计口径，不分区间） -->
+    <select id="selectChannelBinds" resultType="map">
+        select channel_type as channel, count(*) as value
+        from ai_channel_identity
+        where bind_status = '1'
+        group by channel_type
+        order by value desc
+    </select>
+
+    <!-- 公众端满意度：区间图文评价总量与总体/四维均分 -->
+    <select id="selectPortalSatisfaction" resultType="map">
+        select count(*) as evalCount,
+               ifnull(round(avg(overall_rating), 1), 0) as avgOverall,
+               ifnull(round(avg(professionalism_rating), 1), 0) as avgProfessionalism,
+               ifnull(round(avg(responsiveness_rating), 1), 0) as avgResponsiveness,
+               ifnull(round(avg(quality_rating), 1), 0) as avgQuality
+        from ai_user_evaluation
+        where create_time &gt;= #{beginTime} and create_time &lt; #{endTime}
+    </select>
+
 </mapper>

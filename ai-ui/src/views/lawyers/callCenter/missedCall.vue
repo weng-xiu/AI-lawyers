@@ -119,14 +119,24 @@
                 <span class="mc-voice-name">{{ item.callerName || '未知来电人' }}</span>
                 <span class="mc-voice-number">{{ item.callerNumber }}</span>
                 <el-tag size="mini" :type="item.status === '1' ? 'success' : 'danger'">{{ item.status === '1' ? '已回拨' : '未回拨' }}</el-tag>
+                <el-tag v-if="item.remark && item.remark.indexOf('已转工单') >= 0" size="mini" type="warning">{{ item.remark }}</el-tag>
               </div>
               <div class="mc-voice-content">"{{ item.voiceContent || '（无语音留言内容）' }}"</div>
               <div class="mc-voice-meta">
                 <span><i class="el-icon-time"></i> {{ item.callTime }}</span>
                 <span><i class="el-icon-service"></i> 留言时长 {{ item.voiceDuration || 0 }}秒</span>
-                <el-button size="mini" type="primary" plain icon="el-icon-video-play" @click="handlePlayVoice(item)">播放</el-button>
+                <el-button v-if="item.voiceFileUrl" size="mini" type="primary" plain
+                           :icon="playingId === item.missedCallId ? 'el-icon-video-pause' : 'el-icon-video-play'"
+                           :loading="voiceLoading && playingId === item.missedCallId"
+                           @click="handlePlayVoice(item)">
+                  {{ playingId === item.missedCallId ? '停止' : '播放' }}
+                </el-button>
+                <span v-else class="mc-voice-nofile">无录音文件</span>
+                <el-button size="mini" type="warning" plain icon="el-icon-document" @click="handleTransfer(item)" v-hasPermi="['lawyers:call:missed:callback']">转工单</el-button>
                 <el-button size="mini" type="success" plain icon="el-icon-phone" v-if="item.status === '0'" @click="handleCallback(item)">回拨</el-button>
               </div>
+              <audio v-if="playingId === item.missedCallId && voiceAudioUrl" :src="voiceAudioUrl" controls autoplay
+                     class="mc-voice-audio" @ended="handleVoiceEnded"></audio>
             </div>
           </div>
         </div>
@@ -203,7 +213,7 @@
 </template>
 
 <script>
-import { listMissedCall, getMissedCall, addMissedCall, updateMissedCall, delMissedCall, getMissedCallStats, callbackMissedCall } from '@/api/lawyers/missedCall'
+import { listMissedCall, getMissedCall, addMissedCall, updateMissedCall, delMissedCall, getMissedCallStats, callbackMissedCall, fetchVoiceBlob, transferVoiceToTicket } from '@/api/lawyers/missedCall'
 
 export default {
   name: 'MissedCall',
@@ -237,7 +247,12 @@ export default {
       form: {},
       rules: {
         callerNumber: [{ required: true, message: '来电号码不能为空', trigger: 'blur' }]
-      }
+      },
+      // 语音留言播放状态
+      playingId: null,
+      voiceAudioUrl: '',
+      voiceBlobUrl: '',
+      voiceLoading: false
     }
   },
   computed: {
@@ -251,6 +266,9 @@ export default {
   created() {
     this.loadStats()
     this.getList()
+  },
+  beforeDestroy() {
+    this.stopVoice()
   },
   methods: {
     loadStats() {
@@ -278,8 +296,9 @@ export default {
     },
     loadVoiceList() {
       this.loading = true
+      this.stopVoice()
       listMissedCall({ pageNum: 1, pageSize: 100 }).then(res => {
-        this.voiceList = (res.rows || []).filter(item => item.voiceContent)
+        this.voiceList = (res.rows || []).filter(item => item.voiceContent || item.voiceFileUrl)
       }).finally(() => {
         this.loading = false
       })
@@ -318,8 +337,55 @@ export default {
         if (this.activeTab === 'notice') this.getNoticeList()
       }).catch(() => {})
     },
+    // 语音留言播放：blob 带 token 拉取后本地播放，失败给出明确提示
     handlePlayVoice(row) {
-      this.$message.info('播放语音留言：' + (row.voiceContent || '').substring(0, 20) + '...')
+      if (this.playingId === row.missedCallId) {
+        this.stopVoice()
+        return
+      }
+      this.stopVoice()
+      this.playingId = row.missedCallId
+      this.voiceLoading = true
+      fetchVoiceBlob(row.missedCallId).then(blob => {
+        if (this.playingId !== row.missedCallId) return
+        this.voiceBlobUrl = URL.createObjectURL(blob)
+        this.voiceAudioUrl = this.voiceBlobUrl
+      }).catch(() => {
+        if (this.playingId === row.missedCallId) {
+          this.$message.warning('语音文件不存在或读取失败')
+          this.stopVoice()
+        }
+      }).finally(() => {
+        this.voiceLoading = false
+      })
+    },
+    stopVoice() {
+      if (this.voiceBlobUrl) {
+        URL.revokeObjectURL(this.voiceBlobUrl)
+      }
+      this.voiceBlobUrl = ''
+      this.voiceAudioUrl = ''
+      this.playingId = null
+      this.voiceLoading = false
+    },
+    handleVoiceEnded() {
+      this.stopVoice()
+    },
+    // 语音留言一键转工单
+    handleTransfer(row) {
+      if (row.remark && row.remark.indexOf('已转工单') >= 0) {
+        this.$message.info('该留言已转过工单（' + row.remark + '），请勿重复提交')
+        return
+      }
+      this.$confirm('是否将来电 ' + row.callerNumber + ' 的语音留言转为工单？', '转工单确认', {
+        type: 'warning'
+      }).then(() => {
+        return transferVoiceToTicket(row.missedCallId)
+      }).then(res => {
+        this.$message.success('转工单成功，工单号：' + (res.data || res.msg || ''))
+        this.loadVoiceList()
+        this.getList()
+      }).catch(() => {})
     },
     handleNotice(row) {
       const data = { missedCallId: row.missedCallId, noticeStatus: '1', noticeChannel: '1' }
@@ -494,6 +560,15 @@ export default {
     display: flex; align-items: center; gap: 16px;
     color: #8C8C8C; font-size: 12px;
     margin-top: 8px;
+  }
+  .mc-voice-nofile {
+    color: #C0C4CC; font-size: 12px;
+  }
+  .mc-voice-audio {
+    width: 100%;
+    margin-top: 10px;
+    height: 32px;
+    display: block;
   }
 }
 </style>

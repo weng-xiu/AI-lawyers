@@ -49,6 +49,9 @@ public class SlaEscalationScheduleTask
     private AiCallTicketMapper ticketMapper;
 
     @Autowired
+    private ai.lawyers.system.mapper.SysUserMapper sysUserMapper;
+
+    @Autowired
     private IAiSlaPolicyService slaPolicyService;
 
     @Autowired
@@ -137,10 +140,33 @@ public class SlaEscalationScheduleTask
         data.put("ts", now.getTime());
         if (callEventPublisher != null)
         {
-            callEventPublisher.broadcast("TICKET_ESCALATE", data);
+            // F9 升级到人：解析目标角色持有的正常用户逐一推送；无持有者时回退广播避免事件丢失
+            List<Long> targetUserIds = null;
+            try
+            {
+                targetUserIds = sysUserMapper.selectUserIdsByRoleKey(targetRole);
+            }
+            catch (Exception ex)
+            {
+                log.warn("[SLA] 角色用户解析失败 role={}: {}", targetRole, ex.getMessage());
+            }
+            if (targetUserIds != null && !targetUserIds.isEmpty())
+            {
+                data.put("targetUserIds", targetUserIds);
+                for (Long uid : targetUserIds)
+                {
+                    callEventPublisher.publishToUser(uid, "TICKET_ESCALATE", data);
+                }
+                log.warn("[SLA] 工单逐级升级到人 ticketNo={} level={} role={} users={} dueTime={}",
+                        ticket.getTicketNo(), level, targetRole, targetUserIds, ticket.getDueTime());
+            }
+            else
+            {
+                callEventPublisher.broadcast("TICKET_ESCALATE", data);
+                log.warn("[SLA] 工单逐级升级（角色无持有者，回退广播） ticketNo={} level={} role={} dueTime={}",
+                        ticket.getTicketNo(), level, targetRole, ticket.getDueTime());
+            }
         }
-        log.warn("[SLA] 工单逐级升级 ticketNo={} level={} role={} dueTime={}",
-                ticket.getTicketNo(), level, targetRole, ticket.getDueTime());
         if (redisCache != null)
         {
             redisCache.setCacheObject(markerKey, targetRole, (int) MARKER_TTL_DAYS, TimeUnit.DAYS);

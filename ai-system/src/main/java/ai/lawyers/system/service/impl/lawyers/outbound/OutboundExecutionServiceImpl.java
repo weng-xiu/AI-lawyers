@@ -30,6 +30,7 @@ import ai.lawyers.common.core.domain.entity.SysUser;
 import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.system.domain.lawyers.AiCallRecord;
 import ai.lawyers.system.domain.lawyers.AiCallTicket;
+import ai.lawyers.system.domain.lawyers.AiHotspotSuppress;
 import ai.lawyers.system.domain.lawyers.outbound.AiOutboundCallee;
 import ai.lawyers.system.domain.lawyers.outbound.AiOutboundResult;
 import ai.lawyers.system.domain.lawyers.outbound.AiOutboundTask;
@@ -45,6 +46,7 @@ import ai.lawyers.system.service.ISysUserService;
 import ai.lawyers.system.service.lawyers.cluster.RedisLeaderLock;
 import ai.lawyers.system.service.lawyers.IAiCallRecordService;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
+import ai.lawyers.system.service.lawyers.IAiHotspotSuppressService;
 import ai.lawyers.system.service.lawyers.outbound.IAiOutboundResultService;
 import ai.lawyers.system.service.lawyers.outbound.IAiOutboundTaskService;
 import ai.lawyers.system.service.lawyers.outbound.IOutboundExecutionService;
@@ -118,6 +120,20 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
 
     @Autowired(required = false)
     private ai.lawyers.system.service.lawyers.compliance.ComplianceGuard complianceGuard;
+
+    /** P3-D1 高频置底：外呼拨号前号码规则判定（REJECT 跳过 / PRIORITY 沉底） */
+    @Autowired
+    private IAiHotspotSuppressService hotspotSuppressService;
+
+    /** 高频置底总开关（与入站共用） */
+    @Value("${hotspot.suppress.enabled:true}")
+    private boolean hotspotEnabled;
+
+    /**
+     * 外呼置底沉底偏移量：外呼内存队列按 priority 升序（越小越优先），与入站 ACD desc 相反，
+     * 沉底=抬高数值；加固定偏移而非取极大值，保持同批被压制号码间仍按任务原优先级有序。
+     */
+    private static final int HOTSPOT_SINK_OFFSET = 10000;
 
     /** createBy（登录名）反查 userId，用于确定站内信接收人 */
     @Autowired
@@ -571,6 +587,20 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
             markCalleeSkipped(callee, "UNSUBSCRIBED");
             return;
         }
+        // P3-D1：高频置底外呼侧判定——命中 REJECT 跳过拨号（状态4跳过、不计失败、计入完成防任务卡死）；
+        // 命中 PRIORITY 抬高排队优先级数值沉底（外呼队列升序，方向与入站相反）
+        AiHotspotSuppress suppress = null;
+        if (hotspotEnabled)
+        {
+            suppress = hotspotSuppressService.matchOutbound(callee.getCalleeNumber(), task.getTaskId());
+        }
+        if (suppress != null && "REJECT".equals(suppress.getAction()))
+        {
+            log.info("外呼号码命中高频置底规则[{}]，跳过拨号 taskId={} calleeId={}",
+                    suppress.getRuleName(), task.getTaskId(), callee.getCalleeId());
+            markCalleeSkipped(callee, "高频置底拦截:" + suppress.getRuleName());
+            return;
+        }
         Date dialTime = new Date();
         // 号码已由 executeTask 通过 claimCallee 原子置为呼叫中(1)，此处不再重复置状态
 
@@ -580,7 +610,15 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
         request.setTaskId(task.getTaskId());
         // C5：把被叫ID透传到 dial_log，回调事件按 callUuid→dialLog→calleeId 精确定位
         request.setCalleeId(callee.getCalleeId());
-        request.setPriority(task.getPriority() == null ? 100 : task.getPriority());
+        int dialPriority = task.getPriority() == null ? 100 : task.getPriority();
+        if (suppress != null && "PRIORITY".equals(suppress.getAction()))
+        {
+            log.info("外呼号码命中置底降权规则[{}]，排队优先级 {} -> {} taskId={} calleeId={}",
+                    suppress.getRuleName(), dialPriority, dialPriority + HOTSPOT_SINK_OFFSET,
+                    task.getTaskId(), callee.getCalleeId());
+            dialPriority += HOTSPOT_SINK_OFFSET;
+        }
+        request.setPriority(dialPriority);
         request.setAnswerAction(task.getIvrFlowId() == null ? "BRIDGE_AGENT" : "IVR");
         request.setIvrFlowId(task.getIvrFlowId());
         request.setEnableRecord(true);

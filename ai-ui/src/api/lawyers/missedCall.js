@@ -58,3 +58,20 @@ export function callbackMissedCall(missedCallId) {
     method: 'put'
   })
 }
+
+// 语音留言 blob 播放（带 token）
+export function fetchVoiceBlob(missedCallId) {
+  return request({
+    url: '/lawyers/call/missed/' + missedCallId + '/voice/play',
+    method: 'get',
+    responseType: 'blob'
+  })
+}
+
+// 语音留言转工单
+export function transferVoiceToTicket(missedCallId) {
+  return request({
+    url: '/lawyers/call/missed/' + missedCallId + '/transfer',
+    method: 'post'
+  })
+}

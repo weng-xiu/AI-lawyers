@@ -159,6 +159,7 @@ import {
   listChatMessage, sendChatMessage,
   closeChatSession, transferChatSession, markRead
 } from "@/api/lawyers/chat"
+import { getToken } from "@/utils/auth"
 
 export default {
   name: "Chat",
@@ -176,7 +177,10 @@ export default {
       transferOpen: false,
       transferUserId: null,
       transferUserName: '',
-      pollTimer: null
+      pollTimer: null,
+      // P3-D4：会话房间 WS 连接（实时收推，轮询降级为兜底）
+      chatWs: null,
+      chatWsDead: false
     }
   },
   computed: {
@@ -194,8 +198,10 @@ export default {
     this.loadSessions()
   },
   mounted() {
+    // P3-D4：WS 存活时跳过消息轮询（实时推送覆盖）；会话列表仍低频轮询刷新最后消息
     this.pollTimer = setInterval(() => {
-      if (this.currentSession) {
+      const wsAlive = this.chatWs && this.chatWs.readyState === WebSocket.OPEN
+      if (this.currentSession && !wsAlive) {
         this.loadMessages()
       }
       this.loadSessions(true)
@@ -203,6 +209,7 @@ export default {
   },
   beforeDestroy() {
     if (this.pollTimer) clearInterval(this.pollTimer)
+    this.closeChatWs()
   },
   methods: {
     loadSessions(silent) {
@@ -224,6 +231,40 @@ export default {
     selectSession(sess) {
       this.currentSession = sess
       this.loadMessages()
+      this.connectChatWs(sess.sessionId)
+    },
+    // P3-D4：连会话房间 WS，收到推送直接插入消息；断开时标记降级（轮询兜底自动接管）
+    connectChatWs(sessionId) {
+      this.closeChatWs()
+      if (!sessionId) return
+      const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
+      const token = getToken()
+      const url = `${proto}://${window.location.host}/ws/chat/${sessionId}` +
+        (token ? `?token=${encodeURIComponent(token)}` : '')
+      try {
+        this.chatWs = new WebSocket(url)
+      } catch (e) {
+        this.chatWs = null
+        return
+      }
+      this.chatWs.onmessage = (evt) => {
+        let msg = null
+        try { msg = JSON.parse(evt.data) } catch (e) { return }
+        if (!msg || !msg.messageId) return
+        // 去重：本端发送后 loadMessages 也会拉到同一条
+        if (this.messageList.some(m => m.messageId === msg.messageId)) return
+        this.messageList.push(msg)
+        this.$nextTick(() => { this.scrollToBottom() })
+        markRead(sessionId).catch(() => {})
+      }
+      this.chatWs.onclose = () => { this.chatWs = null }
+      this.chatWs.onerror = () => {}
+    },
+    closeChatWs() {
+      if (this.chatWs) {
+        try { this.chatWs.close() } catch (e) { /* 忽略 */ }
+        this.chatWs = null
+      }
     },
     loadMessages() {
       if (!this.currentSession) return

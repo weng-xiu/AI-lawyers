@@ -48,4 +48,24 @@ public interface DashboardMapper
     Map<String, Object> selectSlaSummary(@Param("beginTime") Date beginTime,
                                          @Param("endTime") Date endTime,
                                          @Param("thresholdSeconds") int thresholdSeconds);
+
+    // ------------------------------------------------------------------ F10 业务类指标（公共法律服务）
+
+    /** F10 语种分布：区间内通话按来电人档案 language_preference 分组（无档案记 zh-CN） */
+    List<Map<String, Object>> selectLanguageDist(@Param("beginTime") Date beginTime, @Param("endTime") Date endTime);
+
+    /** F10 关怀模式使用率：区间通话总量/关怀号码通话量/独立来电数/关怀独立号码数 */
+    Map<String, Object> selectCareUsage(@Param("beginTime") Date beginTime, @Param("endTime") Date endTime);
+
+    /** F10 业务条线转办统计：按转办条线分组——转办量/办结量/平均办结分钟（办结口径 status in('2','3')，与 SLA 看板一致） */
+    List<Map<String, Object>> selectTransferLineStats(@Param("beginTime") Date beginTime, @Param("endTime") Date endTime);
+
+    /** F10 公众端渠道活跃：区间内统一会话按渠道类型分组计数 */
+    List<Map<String, Object>> selectChannelSessions(@Param("beginTime") Date beginTime, @Param("endTime") Date endTime);
+
+    /** F10 公众端渠道绑定累计：已确认绑定按渠道类型分组计数（累计口径，不分区间） */
+    List<Map<String, Object>> selectChannelBinds();
+
+    /** F10 公众端满意度：区间内图文评价总量/总体均分/四维均分 */
+    Map<String, Object> selectPortalSatisfaction(@Param("beginTime") Date beginTime, @Param("endTime") Date endTime);
 }

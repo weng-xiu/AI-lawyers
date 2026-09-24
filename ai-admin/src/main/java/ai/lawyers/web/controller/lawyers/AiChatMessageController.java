@@ -20,6 +20,8 @@ import ai.lawyers.common.core.domain.AjaxResult;
 import ai.lawyers.common.core.page.TableDataInfo;
 import ai.lawyers.common.enums.BusinessType;
 import ai.lawyers.common.utils.poi.ExcelUtil;
+import ai.lawyers.framework.websocket.ChatWebSocketServer;
+import com.alibaba.fastjson2.JSON;
 import ai.lawyers.system.domain.lawyers.AiChatMessage;
 import ai.lawyers.system.domain.lawyers.AiChatSession;
 import ai.lawyers.system.service.lawyers.IAiChatMessageService;
@@ -86,6 +88,16 @@ public class AiChatMessageController extends BaseController
         session.setLastMessageTime(new Date());
         session.setUpdateBy(getUsername());
         aiChatSessionService.updateAiChatSession(session);
+
+        // P3-D4：落库后向会话房间 WS 推送，前端从 5s 轮询升级为实时收推
+        try
+        {
+            ChatWebSocketServer.broadcast(String.valueOf(message.getSessionId()), JSON.toJSONString(message));
+        }
+        catch (Exception e)
+        {
+            logger.warn("ChatWS 推送失败，走轮询兜底 sessionId={}: {}", message.getSessionId(), e.getMessage());
+        }
 
         return toAjax(rows);
     }

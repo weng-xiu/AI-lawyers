@@ -163,6 +163,14 @@ public class IvrEngineServiceImpl implements IIvrEngineService
     @Autowired
     private ISmsService smsService;
 
+    /** P3-D1 高频置底：IVR 识别文本关键词规则判定（REJECT 终止流程 / PRIORITY 转人工降权） */
+    @Autowired
+    private ai.lawyers.system.service.lawyers.IAiHotspotSuppressService hotspotSuppressService;
+
+    /** 高频置底总开关（与入站/外呼共用） */
+    @org.springframework.beans.factory.annotation.Value("${hotspot.suppress.enabled:true}")
+    private boolean hotspotEnabled;
+
     @Override
     public IvrExecuteResult executeFlow(IvrExecuteRequest request)
     {
@@ -378,6 +386,32 @@ public class IvrEngineServiceImpl implements IIvrEngineService
                     {
                         Object lastInputValue = variables.get("lastInput");
                         intentText = lastInputValue == null ? "" : lastInputValue.toString();
+                    }
+                    // P3-D1：高频置底关键词拦截——识别文本命中 REJECT 规则即终止流程（挂断语义，复用 hangup 终止标记）；
+                    // 命中 PRIORITY 规则写入 dispatchPriority 变量，后续转人工节点 dispatchAgent 自动读取降权沉底
+                    if (hotspotEnabled && StringUtils.isNotEmpty(intentText))
+                    {
+                        String hotspotDirection = StringUtils.isNotEmpty(request.getCalleeNumber()) ? "OUTBOUND" : "INBOUND";
+                        ai.lawyers.system.domain.lawyers.AiHotspotSuppress kwSuppress =
+                                hotspotSuppressService.matchKeyword(intentText, request.getCallerNumber(), sessionId, hotspotDirection);
+                        if (kwSuppress != null && "REJECT".equals(kwSuppress.getAction()))
+                        {
+                            log.warn("[IVR] 命中高频置底关键词规则[{}]，流程终止（拦截挂断） sessionId={}",
+                                    kwSuppress.getRuleName(), sessionId);
+                            step.setAction("HANGUP");
+                            step.setDetail("命中高频置底关键词规则[" + kwSuppress.getRuleName() + "]，拦截挂断");
+                            result.getSteps().add(step);
+                            variables.put("__terminated", "hangup");
+                            current = null;
+                            break;
+                        }
+                        if (kwSuppress != null && "PRIORITY".equals(kwSuppress.getAction()))
+                        {
+                            int kwPriority = kwSuppress.getPriorityLevel() != null ? kwSuppress.getPriorityLevel() : -100;
+                            variables.put("dispatchPriority", kwPriority);
+                            log.info("[IVR] 命中置底降权关键词规则[{}]，转人工降权 priority={} sessionId={}",
+                                    kwSuppress.getRuleName(), kwPriority, sessionId);
+                        }
                     }
                     IntentionMatchResult match = intentionRecognitionService.recognize(intentText,
                             request.getRecordId(), sessionId, flow.getFlowId(), current.getNodeId());

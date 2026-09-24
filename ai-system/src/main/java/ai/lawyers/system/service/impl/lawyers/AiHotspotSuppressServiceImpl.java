@@ -74,7 +74,41 @@ public class AiHotspotSuppressServiceImpl implements IAiHotspotSuppressService
     @Override
     public AiHotspotSuppress matchInbound(String callerNumber, String content, String channelUuid, String calleeNumber)
     {
-        // 号码规则：查全部规则后按生效条件在内存过滤（规则量级有限）
+        return doMatch(callerNumber, content, channelUuid, callerNumber, calleeNumber, "INBOUND", null);
+    }
+
+    @Override
+    public AiHotspotSuppress matchOutbound(String calleeNumber, Long taskId)
+    {
+        // 外呼拨号前只判号码规则，匹配目标为被叫客户号码；channelUuid 未生成，用任务号做日志关联键；
+        // 日志中客户号码记 callee_number 列（direction=OUTBOUND），与入站主叫语义区分
+        return doMatch(calleeNumber, null, taskId == null ? null : "task-" + taskId, null, calleeNumber, "OUTBOUND", MATCH_PHONE);
+    }
+
+    @Override
+    public AiHotspotSuppress matchKeyword(String content, String callerNumber, String sessionId, String direction)
+    {
+        if (StringUtils.isEmpty(content))
+        {
+            return null;
+        }
+        return doMatch(null, content, sessionId, callerNumber, null,
+                StringUtils.isEmpty(direction) ? "INBOUND" : direction, MATCH_KEYWORD);
+    }
+
+    /**
+     * 通用匹配：查全部启用规则后内存过滤（规则量级有限）。
+     * onlyMatchType 非空时只判该类规则（PHONE=拨号前号码判定，KEYWORD=IVR 识别文本判定）。
+     * 命中后先留痕累计，再判定窗口内是否已达频次阈值；未达阈值仅记录、不处置。
+     *
+     * @param matchNumber     PHONE 规则的匹配目标号码（入站=主叫，外呼=被叫客户）
+     * @param logCallerNumber 日志留痕主叫号码
+     * @param logCalleeNumber 日志留痕被叫号码
+     */
+    private AiHotspotSuppress doMatch(String matchNumber, String content, String channelUuid,
+                                      String logCallerNumber, String logCalleeNumber,
+                                      String direction, String onlyMatchType)
+    {
         List<AiHotspotSuppress> rules = suppressMapper.selectSuppressList(new AiHotspotSuppress());
         if (rules == null || rules.isEmpty())
         {
@@ -82,11 +116,15 @@ public class AiHotspotSuppressServiceImpl implements IAiHotspotSuppressService
         }
         for (AiHotspotSuppress rule : rules)
         {
+            if (onlyMatchType != null && !onlyMatchType.equals(rule.getMatchType()))
+            {
+                continue;
+            }
             boolean matched = false;
             if (MATCH_PHONE.equals(rule.getMatchType()))
             {
-                matched = StringUtils.isNotEmpty(callerNumber)
-                        && callerNumber.equals(rule.getMatchValue());
+                matched = StringUtils.isNotEmpty(matchNumber)
+                        && matchNumber.equals(rule.getMatchValue());
             }
             else if (MATCH_KEYWORD.equals(rule.getMatchType()))
             {
@@ -95,8 +133,7 @@ public class AiHotspotSuppressServiceImpl implements IAiHotspotSuppressService
             }
             if (matched && isActive(rule))
             {
-                // 先留痕累计，再判定窗口内是否已达频次阈值；未达阈值仅记录、不处置
-                int recent = recordHit(rule, callerNumber, channelUuid, calleeNumber);
+                int recent = recordHit(rule, logCallerNumber, channelUuid, logCalleeNumber, direction);
                 if (withinFrequency(rule, recent))
                 {
                     return rule;
@@ -141,14 +178,14 @@ public class AiHotspotSuppressServiceImpl implements IAiHotspotSuppressService
 
     /** 记录命中：日志 + 累计计数；返回当前时间窗内（含本次）命中数，留痕失败返回 0 */
     private int recordHit(AiHotspotSuppress rule, String callerNumber,
-                          String channelUuid, String calleeNumber)
+                          String channelUuid, String calleeNumber, String direction)
     {
         try
         {
             AiHotspotSuppressLog hit = new AiHotspotSuppressLog();
             hit.setSuppressId(rule.getSuppressId());
             hit.setRuleName(rule.getRuleName());
-            hit.setDirection("INBOUND");
+            hit.setDirection(StringUtils.isEmpty(direction) ? "INBOUND" : direction);
             hit.setMatchType(rule.getMatchType());
             hit.setMatchValue(rule.getMatchValue());
             hit.setCallerNumber(callerNumber);

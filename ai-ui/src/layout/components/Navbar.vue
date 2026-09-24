@@ -149,6 +149,32 @@ export default {
       this.fetchUnread()
       this.fetchRecent()
     })
+    // F9 SLA 升级到人：TICKET_ESCALATE 强提醒（targetUserIds 匹配或广播时均弹出）
+    callSocket.on('TICKET_ESCALATE', (data) => {
+      const me = this.$store.state.user.id
+      const targetIds = data.targetUserIds || []
+      if (targetIds.length > 0 && targetIds.indexOf(me) < 0) return
+      const roleName = { ai_team_leader: '班长', ai_manager: '主管', ai_director: '主任' }[data.escalateRole] || data.escalateRole
+      this.$notify({
+        title: `工单 SLA 升级（${data.level}级）`,
+        message: `工单【${data.ticketNo}】${data.title || ''} 已超时，升级至 ${roleName}，请尽快处理`,
+        type: 'warning',
+        duration: 0,
+        position: 'top-right'
+      })
+    })
+    // F9 SLA 首次超时到人：推给工单处理人（未分配则广播到所有坐席）
+    callSocket.on('TICKET_OVERTIME', (data) => {
+      const me = this.$store.state.user.id
+      if (data.assignUserId != null && data.assignUserId !== me) return
+      this.$notify({
+        title: '工单 SLA 超时提醒',
+        message: `工单【${data.ticketNo}】${data.title || ''} 已超时，请尽快处理`,
+        type: 'error',
+        duration: 0,
+        position: 'top-right'
+      })
+    })
   },
   computed: {
     ...mapGetters([

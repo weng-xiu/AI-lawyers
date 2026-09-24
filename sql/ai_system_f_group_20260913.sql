@@ -467,10 +467,10 @@ SELECT 1, menu_id FROM sys_menu WHERE menu_id BETWEEN 3900 AND 3954
 
 INSERT INTO ai_sla_policy (policy_name, biz_type, priority, respond_minutes, resolve_minutes, warn_threshold, escalate_roles, status, create_by, create_time, remark)
 SELECT * FROM (
-  SELECT '热线工单-紧急' AS a, 'TICKET' AS b, '1' AS c, 15 AS d, 240 AS e, 80 AS f, 'team_leader,manager' AS g, '0' AS h, 'admin' AS i, NOW() AS j, '紧急工单4小时办结' AS k UNION ALL
-  SELECT '热线工单-普通', 'TICKET', '2', 60, 1440, 80, 'team_leader,manager,director', '0', 'admin', NOW(), '普通工单24小时办结' UNION ALL
-  SELECT '热线工单-低', 'TICKET', '3', 240, 4320, 80, 'team_leader', '0', 'admin', NOW(), '低优先级3个工作日' UNION ALL
-  SELECT '法援转办默认策略', 'LEGAL_AID', '2', 120, 4320, 80, 'manager,director', '0', 'admin', NOW(), 'F3法援条线'
+  SELECT '热线工单-紧急' AS a, 'TICKET' AS b, '1' AS c, 15 AS d, 240 AS e, 80 AS f, 'ai_team_leader,ai_manager' AS g, '0' AS h, 'admin' AS i, NOW() AS j, '紧急工单4小时办结' AS k UNION ALL
+  SELECT '热线工单-普通', 'TICKET', '2', 60, 1440, 80, 'ai_team_leader,ai_manager,ai_director', '0', 'admin', NOW(), '普通工单24小时办结' UNION ALL
+  SELECT '热线工单-低', 'TICKET', '3', 240, 4320, 80, 'ai_team_leader', '0', 'admin', NOW(), '低优先级3个工作日' UNION ALL
+  SELECT '法援转办默认策略', 'LEGAL_AID', '2', 120, 4320, 80, 'ai_manager,ai_director', '0', 'admin', NOW(), 'F3法援条线'
 ) s
 WHERE NOT EXISTS (SELECT 1 FROM ai_sla_policy p WHERE p.biz_type=s.b AND p.priority=s.c);
 

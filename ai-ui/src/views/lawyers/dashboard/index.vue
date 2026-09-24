@@ -91,6 +91,68 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- F10 公共法律服务业务指标 -->
+    <el-row :gutter="12" style="margin-top: 12px">
+      <el-col :span="8">
+        <el-card shadow="never" class="panel-card">
+          <div slot="header" class="clearfix"><span>语种分布</span></div>
+          <div ref="langChart" style="height: 260px"></div>
+        </el-card>
+      </el-col>
+      <el-col :span="8">
+        <el-card shadow="never" class="panel-card">
+          <div slot="header" class="clearfix"><span>业务条线转办</span></div>
+          <el-table :data="bizMetrics.transferLines || []" size="small" border max-height="260">
+            <el-table-column label="条线" prop="lineName" min-width="90" :show-overflow-tooltip="true" />
+            <el-table-column label="转办量" prop="transferCount" width="80" align="center" />
+            <el-table-column label="办结率" width="90" align="center">
+              <template slot-scope="s">{{ num(s.row.closeRate) }}%</template>
+            </el-table-column>
+            <el-table-column label="平均办结(分)" prop="avgCloseMinutes" width="100" align="center" />
+          </el-table>
+        </el-card>
+      </el-col>
+      <el-col :span="8">
+        <el-card shadow="never" class="panel-card">
+          <div slot="header" class="clearfix"><span>公众端渠道活跃/绑定</span></div>
+          <div ref="channelChart" style="height: 260px"></div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <el-row :gutter="12" style="margin-top: 12px">
+      <el-col :span="12">
+        <el-card shadow="never" class="panel-card">
+          <div slot="header" class="clearfix"><span>关怀模式使用率</span></div>
+          <div class="care-box">
+            <div class="care-item">
+              <div class="care-num">{{ num(bizCare.careCallRate) }}%</div>
+              <div class="care-label">关怀号码通话占比（{{ num(bizCare.careCalls) }}/{{ num(bizCare.totalCalls) }}）</div>
+            </div>
+            <div class="care-item">
+              <div class="care-num">{{ num(bizCare.careCallerRate) }}%</div>
+              <div class="care-label">关怀号码占独立来电比（{{ num(bizCare.careCallers) }}/{{ num(bizCare.totalCallers) }}）</div>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :span="12">
+        <el-card shadow="never" class="panel-card">
+          <div slot="header" class="clearfix"><span>公众端满意度（图文评价）</span></div>
+          <div class="care-box">
+            <div class="care-item">
+              <div class="care-num">{{ num(bizSatis.avgOverall) }}</div>
+              <div class="care-label">总体均分（共 {{ num(bizSatis.evalCount) }} 条评价）</div>
+            </div>
+            <div class="care-item">
+              <div class="care-sub">专业 {{ num(bizSatis.avgProfessionalism) }} / 响应 {{ num(bizSatis.avgResponsiveness) }} / 质量 {{ num(bizSatis.avgQuality) }}</div>
+              <div class="care-label">四维均分</div>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
   </div>
 </template>
 
@@ -112,10 +174,13 @@ export default {
       agentLoad: [],
       queueNow: [],
       outboundProgress: [],
+      bizMetrics: {},
       timer: null,
       trendChart: null,
       categoryChart: null,
-      aiChart: null
+      aiChart: null,
+      langChart: null,
+      channelChart: null
     };
   },
   computed: {
@@ -131,6 +196,12 @@ export default {
         { label: "平均满意度", value: this.num(this.satisfactionSummary.avgSatisfaction), color: "#9B6EAA" },
         { label: "AI独立解决", value: aiSolved, color: "#54A68B" }
       ];
+    },
+    bizCare() {
+      return this.bizMetrics.careUsage || {};
+    },
+    bizSatis() {
+      return this.bizMetrics.portalSatisfaction || {};
     }
   },
   created() {
@@ -139,7 +210,7 @@ export default {
   },
   beforeDestroy() {
     if (this.timer) clearInterval(this.timer);
-    [this.trendChart, this.categoryChart, this.aiChart].forEach(c => {
+    [this.trendChart, this.categoryChart, this.aiChart, this.langChart, this.channelChart].forEach(c => {
       if (c && c.dispose) c.dispose();
     });
   },
@@ -161,10 +232,13 @@ export default {
         this.agentLoad = d.agentLoad || [];
         this.queueNow = d.queueNow || [];
         this.outboundProgress = d.outboundProgress || [];
+        this.bizMetrics = d.bizMetrics || {};
         this.$nextTick(() => {
           this.renderTrend();
           this.renderCategory();
           this.renderAi();
+          this.renderLang();
+          this.renderChannel();
         });
       });
     },
@@ -224,6 +298,49 @@ export default {
         }]
       });
     },
+    renderLang() {
+      if (!this.langChart) this.langChart = echarts.init(this.$refs.langChart);
+      const colors = { 'zh-CN': '#1A3C6E', 'yue-CN': '#C9A96E' };
+      this.langChart.setOption({
+        tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+        legend: { bottom: 0 },
+        series: [{
+          type: 'pie',
+          radius: ['42%', '66%'],
+          center: ['50%', '45%'],
+          label: { formatter: '{b}\n{c}' },
+          data: (this.bizMetrics.languageDist || []).map(i => ({
+            name: i.langName,
+            value: this.num(i.value),
+            itemStyle: { color: colors[i.lang] || '#3B73B3' }
+          }))
+        }]
+      });
+    },
+    renderChannel() {
+      if (!this.channelChart) this.channelChart = echarts.init(this.$refs.channelChart);
+      const sessions = this.bizMetrics.channelSessions || [];
+      const binds = this.bizMetrics.channelBinds || [];
+      const nameSet = [];
+      sessions.concat(binds).forEach(i => {
+        if (nameSet.indexOf(i.channelName) < 0) nameSet.push(i.channelName);
+      });
+      const pick = (list, name) => {
+        const hit = list.find(i => i.channelName === name);
+        return hit ? this.num(hit.value) : 0;
+      };
+      this.channelChart.setOption({
+        tooltip: { trigger: 'axis' },
+        legend: { bottom: 0 },
+        grid: { left: 50, right: 20, top: 30, bottom: 50 },
+        xAxis: { type: 'category', data: nameSet, axisLabel: { fontSize: 10, interval: 0, rotate: 20 } },
+        yAxis: { type: 'value', minInterval: 1 },
+        series: [
+          { name: '活跃会话', type: 'bar', barMaxWidth: 18, data: nameSet.map(n => pick(sessions, n)), itemStyle: { color: '#3B73B3' } },
+          { name: '累计绑定', type: 'bar', barMaxWidth: 18, data: nameSet.map(n => pick(binds, n)), itemStyle: { color: '#2B8C6E' } }
+        ]
+      });
+    },
     num(v) {
       const n = Number(v);
       return Number.isFinite(n) ? n : 0;
@@ -256,4 +373,9 @@ export default {
 .stat-num { font-size: 24px; font-weight: bold; }
 .stat-label { font-size: 12px; margin-top: 6px; opacity: 0.92; }
 .panel-card { margin-bottom: 0; }
+.care-box { display: flex; align-items: center; justify-content: space-around; height: 260px; }
+.care-item { text-align: center; }
+.care-num { font-size: 34px; font-weight: bold; color: #1A3C6E; }
+.care-sub { font-size: 16px; font-weight: 600; color: #1F2A3A; margin-bottom: 6px; }
+.care-label { font-size: 12px; color: #8C8C8C; margin-top: 8px; }
 </style>
