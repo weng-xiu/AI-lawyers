@@ -58,6 +58,10 @@ public class TrunkMonitorServiceImpl implements ITrunkMonitorService
 
     private static final String ALARM_NO_TRUNK = "NO_AVAILABLE_TRUNK";
 
+    private static final String ALARM_STREAM_LAG = "STREAM_LAG";
+
+    private static final String ALARM_STREAM_DLQ = "STREAM_DLQ";
+
     @Autowired
     private AiCallTrunkMapper trunkMapper;
 
@@ -487,6 +491,40 @@ public class TrunkMonitorServiceImpl implements ITrunkMonitorService
         {
             log.error("写入告警失败", e);
         }
+    }
+
+    @Override
+    public void raiseStreamLagAlarm(String queue, long pendingCount, long threshold)
+    {
+        AiTrunkAlarm alarm = new AiTrunkAlarm();
+        alarm.setAlarmType(ALARM_STREAM_LAG);
+        alarm.setAlarmLevel("3");
+        alarm.setAlarmTitle("Stream 队列积压: " + queue);
+        alarm.setAlarmContent("队列 " + queue + " 未 ACK 消息数 " + pendingCount
+                + " 持续超阈值 " + threshold + "，消费可能停滞或处理能力不足");
+        alarm.setMetricValue(String.valueOf(pendingCount));
+        alarm.setThresholdValue(String.valueOf(threshold));
+        alarm.setAlarmStatus("0");
+        alarm.setAlarmTime(new Date());
+        // trunkId 为空，借用告警收敛键：insertIfNotSuppressed 按 (trunkId, type) 查重，
+        // Stream 告警无线路维度，以 trunkId=null + alarmTitle 区分队列由内容承载
+        insertIfNotSuppressed(null, ALARM_STREAM_LAG, alarm);
+    }
+
+    @Override
+    public void raiseStreamDlqAlarm(String queue, long deadCount, long threshold)
+    {
+        AiTrunkAlarm alarm = new AiTrunkAlarm();
+        alarm.setAlarmType(ALARM_STREAM_DLQ);
+        alarm.setAlarmLevel("2");
+        alarm.setAlarmTitle("Stream 死信堆积: " + queue);
+        alarm.setAlarmContent("队列 " + queue + " 死信消息数 " + deadCount
+                + " 超过阈值 " + threshold + "，请到队列监控页排查并重投");
+        alarm.setMetricValue(String.valueOf(deadCount));
+        alarm.setThresholdValue(String.valueOf(threshold));
+        alarm.setAlarmStatus("0");
+        alarm.setAlarmTime(new Date());
+        insertIfNotSuppressed(null, ALARM_STREAM_DLQ, alarm);
     }
 
     @Override

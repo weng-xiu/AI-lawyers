@@ -54,6 +54,12 @@ public interface ITrunkMonitorService
     /** 排队溢出告警 */
     void raiseQueueOverflowAlarm(int queueSize, int capacity);
 
+    /** Stream 队列积压告警（P3-H1）：某队列 pending 超过阈值 */
+    void raiseStreamLagAlarm(String queue, long pendingCount, long threshold);
+
+    /** Stream 死信堆积告警（P3-H1）：某队列死信数超过阈值 */
+    void raiseStreamDlqAlarm(String queue, long deadCount, long threshold);
+
     /** 实时线路状态列表（含并发使用率、质量指标） */
     List<Map<String, Object>> realtimeTrunkStatus();
 

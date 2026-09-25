@@ -39,6 +39,10 @@ public class AiLegalKnowledgeController extends BaseController
     @Autowired
     private IRagIndexService ragIndexService;
 
+    /** P3-C5：向量索引后端信息（运维确认 memory/redis 生效状态） */
+    @Autowired
+    private ai.lawyers.system.service.lawyers.rag.VectorIndexRouter vectorIndexRouter;
+
     /**
      * 查询法律知识库列表
      */
@@ -184,6 +188,7 @@ public class AiLegalKnowledgeController extends BaseController
 
     /**
      * T3 RAG：查询当前内存向量索引条目数（供运维确认向量化是否就绪）。
+     * P3-C5：附带当前向量索引后端（memory/redis）与就绪状态。
      */
     @PreAuthorize("@ss.hasPermi('lawyers:knowledge:list')")
     @GetMapping("/rag/indexInfo")
@@ -191,6 +196,7 @@ public class AiLegalKnowledgeController extends BaseController
     {
         java.util.Map<String, Object> info = new java.util.HashMap<>();
         info.put("vectorCount", ragIndexService.indexedVectorCount());
+        info.put("backend", vectorIndexRouter.backend());
         return success(info);
     }
 }

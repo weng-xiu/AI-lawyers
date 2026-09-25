@@ -198,6 +198,148 @@ public class StreamQueueService
         }
     }
 
+    // ------------------------------------------------------------------ P3-H1 队列监控与死信治理
+
+    /** @return 已注册处理器（即已启用消费）的队列名集合，供监控任务与接口遍历 */
+    public java.util.Set<String> registeredQueues()
+    {
+        return java.util.Collections.unmodifiableSet(handlers.keySet());
+    }
+
+    /** 主 Stream 长度（XLEN，含已 ACK 历史；Stream 不主动修剪时持续增长的堆积水位参考值）。 */
+    public long streamLength(String queue)
+    {
+        return xlen(QueueNames.streamKey(queue));
+    }
+
+    /** 死信 Stream 长度（XLEN）。 */
+    public long deadLetterCount(String queue)
+    {
+        return xlen(QueueNames.deadLetterKey(queue));
+    }
+
+    private long xlen(String key)
+    {
+        try
+        {
+            Long size = stringRedisTemplate.opsForStream().size(key);
+            return size == null ? 0L : size;
+        }
+        catch (Exception e)
+        {
+            return -1L;
+        }
+    }
+
+    /**
+     * 死信列表（按消息 ID 倒序=最新在前，offset/count 分页）。
+     * 每条返回 {id, originStream, originId, error, payload}（死信信封见 {@link #moveToDeadLetter}）。
+     */
+    @SuppressWarnings("rawtypes")
+    public java.util.List<java.util.Map<String, Object>> deadLetterList(String queue, int offset, int count)
+    {
+        java.util.List<java.util.Map<String, Object>> rows = new ArrayList<>();
+        try
+        {
+            String key = QueueNames.deadLetterKey(queue);
+            List<MapRecord<String, Object, Object>> records = stringRedisTemplate.opsForStream()
+                    .reverseRange(key, Range.unbounded(),
+                            org.springframework.data.redis.connection.RedisZSetCommands.Limit
+                                    .limit().offset(offset).count(count));
+            if (records == null)
+            {
+                return rows;
+            }
+            com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+            for (MapRecord<String, Object, Object> record : records)
+            {
+                java.util.Map<String, Object> row = new ConcurrentHashMap<>();
+                row.put("id", record.getId().getValue());
+                Object payload = record.getValue().get(PAYLOAD_FIELD);
+                String json = payload == null ? null : payload.toString();
+                // 解析死信信封；解析失败时原样透出 raw 字段，保证人工可排查
+                try
+                {
+                    @SuppressWarnings("unchecked")
+                    java.util.Map<String, Object> env = om.readValue(json, java.util.Map.class);
+                    row.put("originStream", env.get("originStream"));
+                    row.put("originId", env.get("originId"));
+                    row.put("error", env.get("error"));
+                    Object p = env.get("payload");
+                    row.put("payload", p == null ? null : om.writeValueAsString(p));
+                }
+                catch (Exception parseEx)
+                {
+                    row.put("raw", json);
+                }
+                rows.add(row);
+            }
+        }
+        catch (Exception e)
+        {
+            log.warn("Stream[{}] 死信列表查询失败: {}", queue, e.getMessage());
+        }
+        return rows;
+    }
+
+    /**
+     * 重投一条死信：从死信信封解析 originStream/payload，回投原队列 Stream 后删除死信记录。
+     * 回投走原 Stream（同一消费组会再次消费），消费端幂等保证不重复生效。
+     *
+     * @return true 重投并清理成功；false 记录不存在/解析失败/Redis 异常
+     */
+    @SuppressWarnings("rawtypes")
+    public boolean replayDeadLetter(String queue, String id)
+    {
+        String deadKey = QueueNames.deadLetterKey(queue);
+        try
+        {
+            List<MapRecord<String, Object, Object>> records = stringRedisTemplate.opsForStream()
+                    .range(deadKey, Range.closed(id, id));
+            if (records == null || records.isEmpty())
+            {
+                return false;
+            }
+            Object payload = records.get(0).getValue().get(PAYLOAD_FIELD);
+            String json = payload == null ? null : payload.toString();
+            com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, Object> env = om.readValue(json, java.util.Map.class);
+            String originStream = String.valueOf(env.get("originStream"));
+            Object originPayload = env.get("payload");
+            if (originStream == null || "null".equals(originStream) || originPayload == null)
+            {
+                log.warn("Stream[{}] 死信信封缺 originStream/payload，无法重投 id={}", queue, id);
+                return false;
+            }
+            stringRedisTemplate.opsForStream().add(MapRecord.create(originStream,
+                    singletonPayload(om.writeValueAsString(originPayload))));
+            stringRedisTemplate.opsForStream().delete(deadKey, id);
+            log.info("Stream[{}] 死信重投成功 id={} -> {}", queue, id, originStream);
+            return true;
+        }
+        catch (Exception e)
+        {
+            log.warn("Stream[{}] 死信重投失败 id={}: {}", queue, id, e.getMessage());
+            return false;
+        }
+    }
+
+    /** 删除一条死信记录（人工确认无需重投时使用）。 */
+    public boolean deleteDeadLetter(String queue, String id)
+    {
+        try
+        {
+            Long removed = stringRedisTemplate.opsForStream().delete(QueueNames.deadLetterKey(queue), id);
+            return removed != null && removed > 0;
+        }
+        catch (Exception e)
+        {
+            log.warn("Stream[{}] 死信删除失败 id={}: {}", queue, id, e.getMessage());
+            return false;
+        }
+    }
+
     // ------------------------------------------------------------------ 消费侧
 
     private void startConsumer(String queue)

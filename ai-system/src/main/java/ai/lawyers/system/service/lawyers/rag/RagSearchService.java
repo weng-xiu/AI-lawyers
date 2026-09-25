@@ -59,7 +59,7 @@ public class RagSearchService
     private IAiModelConfigService modelConfigService;
 
     @Autowired
-    private InMemoryVectorIndex vectorIndex;
+    private VectorIndex vectorIndex;
 
     /** T5-1：RAG 召回指标（未引入 micrometer 时内部静默） */
     @Autowired(required = false)

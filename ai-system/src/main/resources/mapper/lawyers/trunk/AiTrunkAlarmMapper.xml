@@ -64,7 +64,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectActiveSameAlarm" resultMap="AiTrunkAlarmResult">
         <include refid="selectAiTrunkAlarmVo"/>
-        where trunk_id = #{trunkId}
+        where (trunk_id = #{trunkId} or (trunk_id is null and #{trunkId} is null))
           and alarm_type = #{alarmType}
           and alarm_status in ('0','1')
           and alarm_time &gt;= #{since}

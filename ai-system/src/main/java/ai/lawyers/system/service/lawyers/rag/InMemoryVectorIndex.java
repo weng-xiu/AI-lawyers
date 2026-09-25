@@ -17,10 +17,13 @@ import ai.lawyers.system.domain.lawyers.AiLegalKnowledgeChunk;
  *
  * <p>线程模型：用 volatile 快照 + 原子引用整体替换，重建期间读请求仍走旧快照，无锁读。</p>
  *
+ * <p>P3-C5：实现 {@link VectorIndex} 接口，作为 {@link VectorIndexRouter} 的默认实现与
+ * Redis Stack 不可用时的降级快照（{@code ai.rag.vector-store=memory} 时直接使用本实现）。</p>
+ *
  * @author ai-lawyers
  */
 @Component
-public class InMemoryVectorIndex
+public class InMemoryVectorIndex implements VectorIndex
 {
     /** 索引条目：分块元信息 + 向量 */
     public static class Entry
@@ -46,6 +49,7 @@ public class InMemoryVectorIndex
      * @param chunks 全部分块（含 embedding 字节）
      * @return 成功载入的向量条目数
      */
+    @Override
     public int rebuild(List<AiLegalKnowledgeChunk> chunks)
     {
         List<Entry> entries = new ArrayList<>();
@@ -76,6 +80,7 @@ public class InMemoryVectorIndex
      * @param topN         返回条数
      * @return 按相似度降序的命中条目（相似度得分为余弦值）
      */
+    @Override
     public List<RagChunk> searchNearest(float[] queryVector, List<Long> knowledgeIds, int topN)
     {
         List<Entry> entries = snapshot.get();
@@ -107,12 +112,14 @@ public class InMemoryVectorIndex
     }
 
     /** 当前索引向量条目数 */
+    @Override
     public int size()
     {
         return snapshot.get().size();
     }
 
     /** 是否已就绪（有可用向量） */
+    @Override
     public boolean isReady()
     {
         return !snapshot.get().isEmpty();

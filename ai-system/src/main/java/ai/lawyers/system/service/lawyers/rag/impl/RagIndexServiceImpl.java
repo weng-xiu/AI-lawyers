@@ -21,7 +21,7 @@ import ai.lawyers.system.mapper.lawyers.AiLegalKnowledgeChunkMapper;
 import ai.lawyers.system.mapper.lawyers.AiLegalKnowledgeMapper;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 import ai.lawyers.system.service.lawyers.rag.IRagIndexService;
-import ai.lawyers.system.service.lawyers.rag.InMemoryVectorIndex;
+import ai.lawyers.system.service.lawyers.rag.VectorIndex;
 import ai.lawyers.system.service.lawyers.rag.VectorUtils;
 
 /**
@@ -55,8 +55,9 @@ public class RagIndexServiceImpl implements IRagIndexService
     @Autowired
     private IAiModelConfigService modelConfigService;
 
+    /** P3-C5：注入 VectorIndex 接口（VectorIndexRouter 门面），支持 memory/redis 双后端 */
     @Autowired
-    private InMemoryVectorIndex vectorIndex;
+    private VectorIndex vectorIndex;
 
     /** T3 RAG 总开关（关闭则不建向量索引、检索退回旧 LIKE 知识路） */
     @Value("${ai.rag.enabled:true}")
