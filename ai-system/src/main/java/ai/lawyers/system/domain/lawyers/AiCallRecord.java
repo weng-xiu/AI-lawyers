@@ -73,6 +73,19 @@ public class AiCallRecord extends BaseEntity
     @Excel(name = "ASR转写文本")
     private String transcript;
 
+    /** AI 通话小结（案情摘要/争议焦点/法律意见/待办/回访建议，结构化文本） */
+    private String aiSummary;
+
+    /** AI 小结状态：0=待生成 1=生成中 2=已生成 3=失败 */
+    private String aiSummaryStatus;
+
+    /** AI 小结生成时间 */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date aiSummaryTime;
+
+    /** AI 小结失败原因 */
+    private String aiSummaryFailReason;
+
     private String agentName;
 
     private String categoryName;
@@ -264,6 +277,46 @@ public class AiCallRecord extends BaseEntity
         this.transcript = transcript;
     }
 
+    public String getAiSummary()
+    {
+        return aiSummary;
+    }
+
+    public void setAiSummary(String aiSummary)
+    {
+        this.aiSummary = aiSummary;
+    }
+
+    public String getAiSummaryStatus()
+    {
+        return aiSummaryStatus;
+    }
+
+    public void setAiSummaryStatus(String aiSummaryStatus)
+    {
+        this.aiSummaryStatus = aiSummaryStatus;
+    }
+
+    public Date getAiSummaryTime()
+    {
+        return aiSummaryTime;
+    }
+
+    public void setAiSummaryTime(Date aiSummaryTime)
+    {
+        this.aiSummaryTime = aiSummaryTime;
+    }
+
+    public String getAiSummaryFailReason()
+    {
+        return aiSummaryFailReason;
+    }
+
+    public void setAiSummaryFailReason(String aiSummaryFailReason)
+    {
+        this.aiSummaryFailReason = aiSummaryFailReason;
+    }
+
     public String getAgentName() 
     {
         return agentName;
@@ -307,6 +360,8 @@ public class AiCallRecord extends BaseEntity
             .append("recordDuration", getRecordDuration())
             .append("asrStatus", getAsrStatus())
             .append("transcript", getTranscript())
+            .append("aiSummaryStatus", getAiSummaryStatus())
+            .append("aiSummaryTime", getAiSummaryTime())
             .append("agentName", getAgentName())
             .append("categoryName", getCategoryName())
             .append("createBy", getCreateBy())

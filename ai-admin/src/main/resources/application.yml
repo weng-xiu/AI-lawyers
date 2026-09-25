@@ -181,6 +181,9 @@ ai:
       maxIdleConnections: ${AI_HTTP_MAX_IDLE:32}
       keepAliveSeconds: ${AI_HTTP_KEEPALIVE_SECONDS:300}
       connectTimeoutMs: ${AI_HTTP_CONNECT_TIMEOUT_MS:10000}
+    # P3-E5 大模型调用成本/质量埋点：异步写 ai_model_call_log；SQL 未执行或排障时可关
+    call-log:
+      enabled: ${AI_MODEL_CALL_LOG_ENABLED:true}
   rag:
     # RAG 总开关：关闭后智能体不检索知识、退回纯模型对话；分块/向量索引不重建
     enabled: ${AI_RAG_ENABLED:true}
@@ -210,6 +213,12 @@ ai:
     auto-on-hangup: ${AI_QUALITY_AUTO_ON_HANGUP:true}
     # 采样率：1.0 全量质检；可按坐席规模调为 0.1~0.5 抽检
     sample-rate: ${AI_QUALITY_SAMPLE_RATE:1.0}
+  # P3-E3 话后 AI 通话小结
+  call-summary:
+    # 小结总开关：关闭后手动接口与质检联动均不生成
+    enabled: ${AI_CALL_SUMMARY_ENABLED:true}
+    # 质检完成（转写已就绪）后自动联动生成小结
+    auto-on-inspect: ${AI_CALL_SUMMARY_AUTO_ON_INSPECT:true}
 
 # ============================================================
 # 语音引擎配置（TTS / ASR）。ASR 为 OpenAI/Whisper 兼容端点

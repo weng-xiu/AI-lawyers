@@ -31,6 +31,7 @@ import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 import ai.lawyers.system.service.lawyers.quality.IAiQualityInspectionService;
 import ai.lawyers.system.service.lawyers.queue.MessageNotifyDispatcher;
+import ai.lawyers.system.service.lawyers.summary.IAiCallSummaryService;
 import ai.lawyers.system.service.lawyers.voice.VoiceEngineManager;
 import ai.lawyers.system.service.lawyers.voice.VoiceModelEnum;
 
@@ -93,6 +94,14 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
     /** 采样率：1.0 全量质检；0.05~1 抽检 */
     @Value("${ai.quality.sample-rate:1.0}")
     private double sampleRate;
+
+    /** P3-E3：质检完成（转写已就绪）后是否自动联动生成 AI 通话小结 */
+    @Value("${ai.call-summary.auto-on-inspect:true}")
+    private boolean summaryAutoOnInspect;
+
+    /** P3-E3：话后小结服务（required=false：小结模块/开关缺失不影响质检主链路） */
+    @Autowired(required = false)
+    private IAiCallSummaryService callSummaryService;
 
     /** 录音文件基础路径（对应 FreeSWITCH recordings_dir） */
     @Value("${call.recording.base-path:C:/Program Files/FreeSWITCH/recordings}")
@@ -206,6 +215,9 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
             // 4. T4-2 命中违禁/激烈情绪 → 联动风险预警
             linkRiskWarning(ins, record, transcript, score);
 
+            // 5. P3-E3：质检完成后复用本次转写联动生成话后小结（失败已在服务内落库为状态3，不外抛）
+            linkCallSummary(recordId);
+
             // T5-1：质检成功计数
             if (metrics != null)
             {
@@ -284,7 +296,8 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
         String user = "通话记录ID：" + record.getRecordId()
                 + (StringUtils.isNotEmpty(record.getContent()) ? "；咨询内容：" + record.getContent() : "")
                 + "\n通话转写：\n" + transcript;
-        String raw = modelConfigService.chatJson(system, user);
+        String raw = modelConfigService.chatJson(system, user,
+                ai.lawyers.system.service.lawyers.stat.AiModelCallLogRecorder.SCENE_QUALITY);
         try
         {
             JsonNode node = MAPPER.readTree(cleanJson(raw));
@@ -374,6 +387,26 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
         catch (Exception e)
         {
             log.warn("质检联动风险预警失败 inspectionId={}: {}", ins.getInspectionId(), e.getMessage());
+        }
+    }
+
+    /**
+     * P3-E3：质检成功后联动生成话后 AI 小结。此时转写已确认落盘，小结零额外 ASR 成本；
+     * 服务内部已吞掉全部异常（落库为状态3），这里再加一层防御与开关判断，绝不影响质检主流程。
+     */
+    private void linkCallSummary(Long recordId)
+    {
+        if (!summaryAutoOnInspect || callSummaryService == null)
+        {
+            return;
+        }
+        try
+        {
+            callSummaryService.generateSummary(recordId, false);
+        }
+        catch (Exception e)
+        {
+            log.warn("质检联动话后小结失败 recordId={}: {}", recordId, e.getMessage());
         }
     }
 

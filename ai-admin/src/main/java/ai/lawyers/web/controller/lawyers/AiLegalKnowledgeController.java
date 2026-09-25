@@ -43,6 +43,10 @@ public class AiLegalKnowledgeController extends BaseController
     @Autowired
     private ai.lawyers.system.service.lawyers.rag.VectorIndexRouter vectorIndexRouter;
 
+    /** P3-E1：rerank 连通性联调 */
+    @Autowired
+    private ai.lawyers.system.service.lawyers.rag.RagSearchService ragSearchService;
+
     /**
      * 查询法律知识库列表
      */
@@ -189,6 +193,7 @@ public class AiLegalKnowledgeController extends BaseController
     /**
      * T3 RAG：查询当前内存向量索引条目数（供运维确认向量化是否就绪）。
      * P3-C5：附带当前向量索引后端（memory/redis）与就绪状态。
+     * P3-E1：附带 rerank 启用状态。
      */
     @PreAuthorize("@ss.hasPermi('lawyers:knowledge:list')")
     @GetMapping("/rag/indexInfo")
@@ -197,6 +202,17 @@ public class AiLegalKnowledgeController extends BaseController
         java.util.Map<String, Object> info = new java.util.HashMap<>();
         info.put("vectorCount", ragIndexService.indexedVectorCount());
         info.put("backend", vectorIndexRouter.backend());
+        info.put("rerankEnabled", ragSearchService.rerankStatus().get("enabled"));
         return success(info);
+    }
+
+    /**
+     * P3-E1：rerank 服务连通性联调测试（固定样例请求一次 rerank 端点，返回排序结果/耗时/错误）。
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:knowledge:edit')")
+    @PostMapping("/rag/rerankTest")
+    public AjaxResult ragRerankTest()
+    {
+        return success(ragSearchService.testRerank());
     }
 }

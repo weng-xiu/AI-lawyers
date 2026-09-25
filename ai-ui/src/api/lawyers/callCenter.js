@@ -220,6 +220,15 @@ export function delRecord(recordIds) {
   })
 }
 
+// P3-E3：生成/重新生成 AI 通话小结（force=true 时已生成也重新生成）
+export function generateAiSummary(recordId, force) {
+  return request({
+    url: '/lawyers/call/record/' + recordId + '/ai-summary',
+    method: 'post',
+    params: { force: force ? true : false }
+  })
+}
+
 export function getRecordsByAgentId(agentId) {
   return request({
     url: '/lawyers/call/record/agent/' + agentId,

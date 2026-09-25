@@ -1,13 +1,18 @@
 package ai.lawyers.system.service.lawyers.rag;
 
+import java.io.File;
 import java.io.InputStream;
 import java.lang.reflect.Field;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +20,7 @@ import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 
 import ai.lawyers.system.domain.lawyers.AiLegalKnowledgeChunk;
 import ai.lawyers.system.mapper.lawyers.AiLegalKnowledgeChunkMapper;
@@ -29,11 +35,20 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * W3 RAG 评测集回归测试：验证「混合检索（FULLTEXT + 向量 + RRF 融合）Top-K 命中率
- * 较 LIKE 基线提升 ≥ 20 个百分点」的 T3 建设目标。
+ * RAG 评测集常态化回归（W3 建设目标 + P3-E2 门禁）：
+ * 验证「混合检索（FULLTEXT + 向量 + RRF 融合）Top-K 命中率较 LIKE 基线提升 ≥ 20 个百分点」，
+ * 并以评测集 {@code src/test/resources/rag-evaluation.json} 驱动质量门禁。
  *
- * <p>评测集 {@code src/test/resources/rag-evaluation.json}：36 条法律知识语料 +
- * 32 个真实口径的咨询问题（8 条逐字标题问题 + 24 条口语化改述问题）。</p>
+ * <p>P3-E2 常态化机制：</p>
+ * <ul>
+ *   <li>评测集为外置 JSON（v2：category 业务分类 + difficulty=verbatim/colloquial），
+ *       可在不改代码的情况下持续扩充至 ≥300 条真实来电问句；</li>
+ *   <li>{@link #evaluationDataset_isValid} 校验数据集结构（问句唯一非空、期望知识存在等）；</li>
+ *   <li>{@link #qualityGate_topKHitRate} 产出整体/分难度/分分类命中率与 MRR，
+ *       落盘 {@code target/rag-evaluation-report.json} 供 CI 采集；
+ *       命中率低于 {@code rag.eval.minHitRate}（默认 0.95）打印门禁告警，
+ *       仅当 {@code -Drag.eval.gate=strict} 时构建失败（CI 卡点）。</li>
+ * </ul>
  *
  * <p>DB/LLM 环境按生产语义在测试内仿真：</p>
  * <ul>
@@ -54,6 +69,10 @@ class RagEvaluationTest
     private static final int TOP_K = 3;
     private static final int CANDIDATE_SIZE = 20;
 
+    /** 门禁告警阈值（strict 模式下也是失败线，可用 -Drag.eval.minHitRate 覆盖） */
+    private static final double GATE_HIT_RATE =
+            Double.parseDouble(System.getProperty("rag.eval.minHitRate", "0.95"));
+
     private final ObjectMapper mapper = new ObjectMapper();
 
     private RagSearchService service;
@@ -66,6 +85,8 @@ class RagEvaluationTest
     private static final class Case
     {
         String question;
+        String category = "综合";
+        String difficulty = "colloquial";
         List<Long> expected = new ArrayList<>();
     }
 
@@ -196,7 +217,195 @@ class RagEvaluationTest
         assertThat(service.knowledgeIdsOf(hits)).isNotEmpty();
     }
 
-    /** LIKE 基线（生产 SQL 语义）取 Top-K 后判断命中 */
+    /**
+     * P3-E2：评测集结构校验——扩充数据集（向 300 条目标推进）时防止格式/引用错误：
+     * 问句非空且唯一、期望知识 ID 全部存在于语料、分类与难度枚举合法、口语问句占主体。
+     */
+    @Test
+    void evaluationDataset_isValid()
+    {
+        Set<Long> corpusIds = corpus.stream()
+                .map(AiLegalKnowledgeChunk::getKnowledgeId).collect(Collectors.toSet());
+        Set<String> questions = new HashSet<>();
+        int colloquial = 0;
+        for (Case c : cases)
+        {
+            assertThat(c.question).as("评测问句不能为空").isNotBlank();
+            assertThat(questions.add(c.question)).as("评测问句不能重复：%s", c.question).isTrue();
+            assertThat(c.expected).as("用例期望知识不能为空：%s", c.question).isNotEmpty();
+            for (Long id : c.expected)
+            {
+                assertThat(corpusIds).as("用例 [%s] 引用了不存在的 knowledgeId=%s", c.question, id).contains(id);
+            }
+            assertThat(c.category).as("用例分类缺失：%s", c.question).isNotBlank();
+            assertThat(Arrays.asList("verbatim", "colloquial"))
+                    .as("difficulty 仅支持 verbatim/colloquial：%s", c.question).contains(c.difficulty);
+            if ("colloquial".equals(c.difficulty))
+            {
+                colloquial++;
+            }
+        }
+        // 常态化下限：语料/问句规模只允许增长（W3 基线 36/32，P3-E2 v2 为 36/103，目标 ≥300）
+        assertThat(corpus.size()).as("语料规模不应回退").isGreaterThanOrEqualTo(36);
+        assertThat(cases.size()).as("评测问句规模不应回退（目标 ≥300）").isGreaterThanOrEqualTo(100);
+        assertThat((double) colloquial / cases.size())
+                .as("口语化改述问句应占主体（≥70%），否则无法检验混合检索相对 LIKE 的增益")
+                .isGreaterThanOrEqualTo(0.70d);
+    }
+
+    /**
+     * P3-E2：质量门禁。
+     *
+     * <p>默认（本地/普通 CI）：命中率低于 {@link #GATE_HIT_RATE}（默认 95%）只打印醒目的
+     * 门禁告警并落盘报告，不阻断构建；{@code -Drag.eval.gate=strict}（发布流水线）时
+     * 低于阈值直接失败。硬地板 60% 与"+20pp 提升"由 {@link #fusedRetrieval_beatsLikeBaseline_byAtLeast20Points()}
+     * 独立保证，门禁退化为告警不会掩盖检索链路的破坏性回归。</p>
+     */
+    @Test
+    void qualityGate_topKHitRate() throws Exception
+    {
+        Map<String, Object> report = runEvaluation();
+        writeReport(report);
+
+        double fusedRate = (double) report.get("fusedHitRate");
+        boolean strict = "strict".equalsIgnoreCase(System.getProperty("rag.eval.gate", ""));
+        if (fusedRate < GATE_HIT_RATE)
+        {
+            String msg = String.format(
+                    "[RAG门禁告警] Top-%d 命中率 %.1f%% 低于门禁 %.0f%%（strict=%s），详见 target/rag-evaluation-report.json",
+                    TOP_K, fusedRate * 100, GATE_HIT_RATE * 100, strict);
+            System.out.println("⚠ " + msg);
+            if (strict)
+            {
+                assertThat(fusedRate).as(msg).isGreaterThanOrEqualTo(GATE_HIT_RATE);
+            }
+        }
+        else
+        {
+            System.out.printf("[RAG门禁通过] Top-%d 命中率 %.1f%% ≥ %.0f%%%n",
+                    TOP_K, fusedRate * 100, GATE_HIT_RATE * 100);
+        }
+    }
+
+    // ------------------------------------------------------------------ 评测执行与报告
+
+    /** 跑全量评测，产出整体/分难度/分分类命中率、MRR、未命中清单 */
+    private Map<String, Object> runEvaluation()
+    {
+        int likeHits = 0;
+        int fusedHits = 0;
+        double reciprocalRankSum = 0d;
+        List<String> misses = new ArrayList<>();
+        Map<String, int[]> byDifficulty = new TreeMap<>();   // [hits, total]
+        Map<String, int[]> byCategory = new TreeMap<>();
+
+        for (Case c : cases)
+        {
+            boolean likeHit = likeBaselineTopK(c.question, TOP_K);
+            List<RagChunk> hits = service.search(c.question, null);
+            List<Long> topK = hits.stream().limit(TOP_K).map(RagChunk::getKnowledgeId)
+                    .collect(Collectors.toList());
+            boolean fusedHit = topK.stream().anyMatch(c.expected::contains);
+            int rank = firstExpectedRank(topK, c.expected);
+            if (likeHit)
+            {
+                likeHits++;
+            }
+            if (fusedHit)
+            {
+                fusedHits++;
+                reciprocalRankSum += 1d / rank;
+            }
+            else
+            {
+                misses.add(c.question);
+            }
+            byDifficulty.computeIfAbsent(c.difficulty, k -> new int[2])[1]++;
+            byCategory.computeIfAbsent(c.category, k -> new int[2])[1]++;
+            if (fusedHit)
+            {
+                byDifficulty.get(c.difficulty)[0]++;
+                byCategory.get(c.category)[0]++;
+            }
+        }
+
+        double likeRate = (double) likeHits / cases.size();
+        double fusedRate = (double) fusedHits / cases.size();
+        double mrr = reciprocalRankSum / cases.size();
+
+        Map<String, Object> report = new LinkedHashMap<>();
+        report.put("generatedAt", new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date()));
+        report.put("topK", TOP_K);
+        report.put("corpusCount", corpus.size());
+        report.put("caseCount", cases.size());
+        report.put("likeHitRate", round4(likeRate));
+        report.put("fusedHitRate", round4(fusedRate));
+        report.put("improvementPoints", round4((fusedRate - likeRate) * 100d));
+        report.put("mrr", round4(mrr));
+        report.put("gateThreshold", GATE_HIT_RATE);
+        report.put("byDifficulty", ratioMap(byDifficulty));
+        report.put("byCategory", ratioMap(byCategory));
+        report.put("misses", misses);
+
+        System.out.printf("[RAG评测] 语料=%d 问题=%d LIKE=%.1f%% 混合=%.1f%% 提升=%.1fpp MRR=%.3f 未命中=%d%n",
+                corpus.size(), cases.size(), likeRate * 100, fusedRate * 100,
+                (fusedRate - likeRate) * 100, mrr, misses.size());
+        System.out.println("[RAG评测] 分难度：" + ratioMap(byDifficulty));
+        return report;
+    }
+
+    /** 期望知识在 Top-K 中首次出现的名次（1 起），未命中由调用方过滤 */
+    private int firstExpectedRank(List<Long> topK, List<Long> expected)
+    {
+        for (int i = 0; i < topK.size(); i++)
+        {
+            if (expected.contains(topK.get(i)))
+            {
+                return i + 1;
+            }
+        }
+        return Integer.MAX_VALUE;
+    }
+
+    private Map<String, Object> ratioMap(Map<String, int[]> raw)
+    {
+        Map<String, Object> out = new TreeMap<>();
+        for (Map.Entry<String, int[]> e : raw.entrySet())
+        {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("hits", e.getValue()[0]);
+            item.put("total", e.getValue()[1]);
+            item.put("hitRate", round4((double) e.getValue()[0] / e.getValue()[1]));
+            out.put(e.getKey(), item);
+        }
+        return out;
+    }
+
+    private static double round4(double v)
+    {
+        return Math.round(v * 10000d) / 10000d;
+    }
+
+    /** 落盘机器可读报告（CI 可归档/采集；surefire 工作目录为 ai-system 模块根） */
+    private void writeReport(Map<String, Object> report)
+    {
+        try
+        {
+            File target = new File("target");
+            if (!target.exists() && !target.mkdirs())
+            {
+                return;
+            }
+            ObjectMapper writer = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+            Files.write(new File(target, "rag-evaluation-report.json").toPath(),
+                    writer.writeValueAsBytes(report));
+        }
+        catch (Exception e)
+        {
+            System.out.println("[RAG评测] 报告落盘失败（不影响门禁）：" + e.getMessage());
+        }
+    }
+
     private boolean likeBaselineTopK(String question, int k)
     {
         return corpus.stream()
@@ -248,6 +457,14 @@ class RagEvaluationTest
             {
                 Case c = new Case();
                 c.question = item.path("question").asText();
+                if (item.hasNonNull("category"))
+                {
+                    c.category = item.get("category").asText();
+                }
+                if (item.hasNonNull("difficulty"))
+                {
+                    c.difficulty = item.get("difficulty").asText();
+                }
                 for (JsonNode id : item.path("expectedKnowledgeIds"))
                 {
                     c.expected.add(id.asLong());
@@ -255,8 +472,9 @@ class RagEvaluationTest
                 cases.add(c);
             }
         }
-        assertThat(corpus).hasSize(36);
-        assertThat(cases).hasSize(32);
+        // 结构校验交给 evaluationDataset_isValid；此处仅保证非空，数据集扩充无需改测试代码
+        assertThat(corpus).as("评测集语料不能为空").isNotEmpty();
+        assertThat(cases).as("评测集问句不能为空").isNotEmpty();
     }
 
     /** 确定性字符 n-gram 哈希嵌入：unigram 权重 1.0、bigram 权重 1.5，L2 归一化 */

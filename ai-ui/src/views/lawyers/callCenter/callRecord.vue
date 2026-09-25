@@ -209,6 +209,40 @@
         <el-descriptions-item label="备注" :span="2">{{ detailForm.remark }}</el-descriptions-item>
       </el-descriptions>
 
+      <!-- AI 通话小结（P3-E3） -->
+      <div class="detail-section">
+        <div class="detail-section-title detail-section-title-bar">
+          <span><i class="el-icon-data-analysis"></i> AI 通话小结
+            <el-tag size="mini" :type="summaryStatusType(detailForm.aiSummaryStatus)" style="margin-left:8px;">
+              {{ summaryStatusLabel(detailForm.aiSummaryStatus) }}
+            </el-tag>
+            <span v-if="detailForm.aiSummaryStatus === '2' && detailForm.aiSummaryTime" class="summary-time">
+              生成时间 {{ parseTime(detailForm.aiSummaryTime) }}
+            </span>
+          </span>
+          <el-button
+            size="mini"
+            type="primary"
+            plain
+            :icon="detailForm.aiSummaryStatus === '2' ? 'el-icon-refresh' : 'el-icon-magic-line'"
+            :loading="summaryLoading"
+            @click="handleGenerateSummary(detailForm.aiSummaryStatus === '2')"
+            v-hasPermi="['lawyers:call:record:edit']"
+          >{{ detailForm.aiSummaryStatus === '2' ? '重新生成' : '生成小结' }}</el-button>
+        </div>
+        <div v-if="detailForm.aiSummaryStatus === '2'" class="ai-summary-text">{{ detailForm.aiSummary }}</div>
+        <div v-else-if="detailForm.aiSummaryStatus === '3'" class="ai-summary-fail">
+          <i class="el-icon-warning-outline"></i>
+          生成失败：{{ detailForm.aiSummaryFailReason || '未知原因' }}
+        </div>
+        <div v-else-if="detailForm.aiSummaryStatus === '1'" class="ai-summary-empty">
+          <i class="el-icon-loading"></i> 小结正在生成中（质检联动生成约需数十秒），可稍后关闭重开详情查看
+        </div>
+        <div v-else class="ai-summary-empty">
+          尚未生成小结。通话需已完成 ASR 转写，或已人工登记咨询/解答内容；点击右上角"生成小结"由 AI 提炼案情摘要、法律意见、待办与回访建议。
+        </div>
+      </div>
+
       <!-- 关联工单 -->
       <div class="detail-section">
         <div class="detail-section-title"><i class="el-icon-tickets"></i> 关联工单</div>
@@ -347,7 +381,7 @@
 </template>
 
 <script>
-import { listRecord, getRecord, addRecord, updateRecord, delRecord, getCallStatistics, getCallStatisticsByCategory, getCallStatisticsByDate, addTicket, generateTicketNo, listTicket, getTransfersByRecordId, listAgent } from "@/api/lawyers/callCenter"
+import { listRecord, getRecord, addRecord, updateRecord, delRecord, getCallStatistics, getCallStatisticsByCategory, getCallStatisticsByDate, addTicket, generateTicketNo, listTicket, getTransfersByRecordId, listAgent, generateAiSummary } from "@/api/lawyers/callCenter"
 import * as echarts from 'echarts'
 
 export default {
@@ -365,6 +399,7 @@ export default {
       open: false,
       detailOpen: false,
       detailLoading: false,
+      summaryLoading: false,
       detailTickets: [],
       detailTransfers: [],
       statisticsOpen: false,
@@ -489,6 +524,7 @@ export default {
     },
     handleDetail(row) {
       const recordId = row.recordId
+      this.summaryLoading = false
       getRecord(recordId).then(response => {
         this.detailForm = response.data
         this.detailOpen = true
@@ -496,6 +532,24 @@ export default {
         this.detailTransfers = []
         this.loadDetailRelations(recordId)
       })
+    },
+    // P3-E3：AI 通话小结状态展示（0待生成 1生成中 2已生成 3失败）
+    summaryStatusType(s) {
+      return { '0': 'info', '1': 'warning', '2': 'success', '3': 'danger' }[s] || 'info'
+    },
+    summaryStatusLabel(s) {
+      return { '0': '待生成', '1': '生成中', '2': '已生成', '3': '生成失败' }[s] || '待生成'
+    },
+    handleGenerateSummary(force) {
+      const recordId = this.detailForm.recordId
+      this.summaryLoading = true
+      generateAiSummary(recordId, force).then(res => {
+        this.$modal.msgSuccess('AI 通话小结已生成')
+        this.detailForm = res.data || this.detailForm
+      }).catch(() => {
+        // 后端失败时返回业务错误（request 已弹提示），拉取最新话单同步失败原因/状态
+        return getRecord(recordId).then(res => { this.detailForm = res.data || this.detailForm })
+      }).finally(() => { this.summaryLoading = false })
     },
     loadDetailRelations(recordId) {
       this.detailLoading = true
@@ -519,8 +573,9 @@ export default {
         const d = res.data || {}
         this.ticketForm = {
           recordId: d.recordId,
-          title: (d.consultationCategory || '法律咨询') + '工单 - ' + (d.callerNumber || ''),
-          content: d.consultationContent || d.content || '',
+          title: (d.consultationCategory || d.categoryName || '法律咨询') + '工单 - ' + (d.callerNumber || ''),
+          // P3-E3：有 AI 小结时优先用小结（含案情/法律意见/待办）预填工单内容，坐席可再编辑
+          content: d.aiSummary || d.consultationContent || d.content || '',
           priority: '2',
           callerNumber: d.callerNumber || '',
           callerName: d.callerName || ''
@@ -643,6 +698,46 @@ export default {
     padding-left: 8px;
     border-left: 3px solid #1A3C6E;
     i { margin-right: 4px; color: #1A3C6E; }
+  }
+  .detail-section-title-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-left: 3px solid #1A3C6E;
+    .el-button { margin-right: 4px; }
+  }
+  .summary-time {
+    margin-left: 10px;
+    font-size: 12px;
+    font-weight: 400;
+    color: #8C8C8C;
+  }
+  .ai-summary-text {
+    white-space: pre-wrap;
+    line-height: 1.9;
+    font-size: 13px;
+    color: #1F2A3A;
+    background: #f5f8fc;
+    border: 1px solid #dce6f5;
+    border-radius: 4px;
+    padding: 10px 12px;
+  }
+  .ai-summary-fail {
+    font-size: 13px;
+    color: #c45656;
+    background: #fef0f0;
+    border: 1px solid #fbc4c4;
+    border-radius: 4px;
+    padding: 10px 12px;
+  }
+  .ai-summary-empty {
+    font-size: 13px;
+    color: #8C8C8C;
+    background: #fafafa;
+    border: 1px dashed #d9d9d9;
+    border-radius: 4px;
+    padding: 10px 12px;
+    line-height: 1.8;
   }
 }
 </style>

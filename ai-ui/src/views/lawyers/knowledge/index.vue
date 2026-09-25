@@ -99,6 +99,20 @@
           v-hasPermi="['lawyers:knowledge:audit']"
         >审核</el-button>
       </el-col>
+      <el-col :span="1.5">
+        <el-dropdown trigger="click" @command="handleRagCommand">
+          <el-button type="warning" plain icon="el-icon-cpu" size="mini">
+            RAG 运维<i class="el-icon-arrow-down el-icon--right"></i>
+          </el-button>
+          <el-dropdown-menu slot="dropdown">
+            <el-dropdown-item icon="el-icon-data-line" command="status">
+              索引状态：{{ ragInfo.vectorCount === undefined ? '加载中' : ragInfo.vectorCount + ' 条/' + ragInfo.backend + (ragInfo.rerankEnabled ? '/rerank开' : '') }}
+            </el-dropdown-item>
+            <el-dropdown-item icon="el-icon-refresh" command="rebuild" v-hasPermi="['lawyers:knowledge:edit']">全量重建索引</el-dropdown-item>
+            <el-dropdown-item icon="el-icon-connection" command="rerankTest" v-hasPermi="['lawyers:knowledge:edit']">rerank 连通测试</el-dropdown-item>
+          </el-dropdown-menu>
+        </el-dropdown>
+      </el-col>
       <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
@@ -265,11 +279,46 @@
         <el-button @click="auditOpen = false">取 消</el-button>
       </div>
     </el-dialog>
+
+    <!-- P3-E1 RAG rerank 连通性测试对话框 -->
+    <el-dialog title="RAG rerank 连通性测试" :visible.sync="rerankOpen" width="640px" append-to-body>
+      <div v-loading="rerankLoading">
+        <el-alert
+          v-if="rerankResult"
+          :title="rerankResult.success ? 'rerank 服务连通正常' : 'rerank 联调失败'"
+          :type="rerankResult.success ? 'success' : 'error'"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 12px;"
+        />
+        <el-descriptions v-if="rerankResult" :column="1" border size="small">
+          <el-descriptions-item label="启用状态">{{ rerankResult.enabled ? '已启用' : '未启用' }}</el-descriptions-item>
+          <el-descriptions-item label="服务地址">{{ rerankResult.url || '（未配置）' }}</el-descriptions-item>
+          <el-descriptions-item label="模型">{{ rerankResult.model }}</el-descriptions-item>
+          <el-descriptions-item label="耗时">{{ rerankResult.latencyMs !== undefined ? rerankResult.latencyMs + ' ms' : '-' }}</el-descriptions-item>
+          <el-descriptions-item v-if="rerankResult.httpStatus !== undefined" label="HTTP 状态">{{ rerankResult.httpStatus }}</el-descriptions-item>
+          <el-descriptions-item v-if="rerankResult.ranking" label="重排结果">
+            <div v-for="(item, idx) in rerankResult.ranking" :key="idx" class="rerank-line">{{ idx + 1 }}. {{ item }}</div>
+          </el-descriptions-item>
+          <el-descriptions-item v-if="rerankResult.error" label="错误信息">
+            <span class="rerank-error">{{ rerankResult.error }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item v-if="rerankResult.raw" label="原始响应（截断）">
+            <pre class="rerank-raw">{{ rerankResult.raw }}</pre>
+          </el-descriptions-item>
+        </el-descriptions>
+        <div v-else-if="!rerankLoading" style="color:#909399;font-size:13px;">点击"开始测试"将以固定样例（劳动合同问句）请求一次 rerank 端点。</div>
+      </div>
+      <div slot="footer" class="dialog-footer">
+        <el-button type="primary" size="small" :loading="rerankLoading" @click="handleRerankTest">开始测试</el-button>
+        <el-button size="small" @click="rerankOpen = false">关 闭</el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import { listKnowledge, getKnowledge, delKnowledge, addKnowledge, updateKnowledge, exportKnowledge, importTemplate, importKnowledge, auditKnowledge } from "@/api/lawyers/knowledge"
+import { listKnowledge, getKnowledge, delKnowledge, addKnowledge, updateKnowledge, exportKnowledge, importTemplate, importKnowledge, auditKnowledge, getRagIndexInfo, rebuildRagIndex, testRagRerank } from "@/api/lawyers/knowledge"
 import { getValidCategories } from "@/api/lawyers/category"
 
 export default {
@@ -318,6 +367,11 @@ export default {
       },
       // 审核表单
       auditForm: {},
+      // P3-E1 RAG 运维
+      ragInfo: {},
+      rerankOpen: false,
+      rerankLoading: false,
+      rerankResult: null,
       // 查询参数
       queryParams: {
         pageNum: 1,
@@ -356,8 +410,46 @@ export default {
   created() {
     this.getList()
     this.getCategoryOptions()
+    this.fetchRagInfo()
   },
   methods: {
+    /** P3-E1 查询 RAG 索引/rerank 状态 */
+    fetchRagInfo() {
+      getRagIndexInfo().then(response => {
+        this.ragInfo = response.data || {}
+      }).catch(() => {})
+    },
+    /** RAG 运维下拉命令分发 */
+    handleRagCommand(command) {
+      if (command === 'status') {
+        this.fetchRagInfo()
+        this.$modal.msgSuccess('索引状态已刷新')
+      } else if (command === 'rebuild') {
+        this.handleRagRebuild()
+      } else if (command === 'rerankTest') {
+        this.rerankOpen = true
+        this.rerankResult = null
+      }
+    },
+    /** 全量重建 RAG 索引（异步，完成后刷新状态） */
+    handleRagRebuild() {
+      this.$modal.confirm('将在后台全量重建分块与向量索引（embedding 调用可能耗时数分钟），确认提交？').then(() => {
+        return rebuildRagIndex()
+      }).then(() => {
+        this.$modal.msgSuccess('重建任务已提交，可稍后通过"索引状态"确认条目数')
+        setTimeout(() => this.fetchRagInfo(), 8000)
+      }).catch(() => {})
+    },
+    /** rerank 连通性测试 */
+    handleRerankTest() {
+      this.rerankLoading = true
+      testRagRerank().then(response => {
+        this.rerankResult = response.data
+        this.fetchRagInfo()
+      }).finally(() => {
+        this.rerankLoading = false
+      })
+    },
     /** 查询法律知识库列表 */
     getList() {
       this.loading = true
@@ -526,3 +618,26 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+.rerank-line {
+  line-height: 1.8;
+  font-size: 13px;
+}
+.rerank-error {
+  color: #C63D4A;
+  font-size: 13px;
+  word-break: break-all;
+}
+.rerank-raw {
+  margin: 0;
+  max-height: 180px;
+  overflow: auto;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: #f5f7fa;
+  padding: 8px;
+  border-radius: 4px;
+}
+</style>

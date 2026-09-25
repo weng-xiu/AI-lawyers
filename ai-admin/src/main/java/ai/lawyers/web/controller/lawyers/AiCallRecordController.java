@@ -35,6 +35,7 @@ import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.common.utils.poi.ExcelUtil;
 import ai.lawyers.system.domain.lawyers.AiCallRecord;
 import ai.lawyers.system.service.lawyers.IAiCallRecordService;
+import ai.lawyers.system.service.lawyers.summary.IAiCallSummaryService;
 
 @RestController
 @RequestMapping("/lawyers/call/record")
@@ -44,6 +45,9 @@ public class AiCallRecordController extends BaseController
 
     @Autowired
     private IAiCallRecordService aiCallRecordService;
+
+    @Autowired
+    private IAiCallSummaryService aiCallSummaryService;
 
     /** 录音文件基础路径，对应 FreeSWITCH recordings_dir */
     @Value("${call.recording.base-path:C:/Program Files/FreeSWITCH/recordings}")
@@ -149,6 +153,37 @@ public class AiCallRecordController extends BaseController
     }
 
     // ---------------------------------------------------------------- 录音播放 / 下载
+
+    /**
+     * P3-E3：生成（或重新生成）AI 通话小结。
+     * 同步调用大模型（受模型舱壁与读超时保护，默认 60s）；失败不抛 500，
+     * 返回业务错误并把失败原因落库（状态 3），前端可据此提示并允许重试。
+     *
+     * @param force true=已生成也重新生成
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:call:record:edit')")
+    @Log(title = "AI通话小结", businessType = BusinessType.UPDATE)
+    @PostMapping("/{recordId}/ai-summary")
+    public AjaxResult generateAiSummary(@PathVariable("recordId") Long recordId,
+                                        @org.springframework.web.bind.annotation.RequestParam(
+                                                defaultValue = "false") boolean force)
+    {
+        AiCallRecord rec = aiCallSummaryService.generateSummary(recordId, force);
+        if (rec == null)
+        {
+            return AjaxResult.error("话单不存在：" + recordId);
+        }
+        if ("3".equals(rec.getAiSummaryStatus()))
+        {
+            return AjaxResult.error(StringUtils.isNotEmpty(rec.getAiSummaryFailReason())
+                    ? rec.getAiSummaryFailReason() : "AI 小结生成失败，请稍后重试");
+        }
+        if ("1".equals(rec.getAiSummaryStatus()))
+        {
+            return AjaxResult.error("小结正在生成中，请稍后刷新查看");
+        }
+        return AjaxResult.success(rec);
+    }
 
     /**
      * 在线播放录音（支持 HTTP Range，支持音频拖动进度条）。

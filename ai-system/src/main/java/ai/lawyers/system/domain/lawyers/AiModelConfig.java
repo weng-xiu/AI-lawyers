@@ -1,5 +1,6 @@
 package ai.lawyers.system.domain.lawyers;
 
+import java.math.BigDecimal;
 import java.util.Date;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -43,6 +44,12 @@ public class AiModelConfig extends BaseEntity
     /** 最大令牌数 */
     @Excel(name = "最大令牌数")
     private Integer maxTokens;
+
+    /** 输入单价（元/千Token，P3-E5 成本估算用，可空） */
+    private BigDecimal inputPrice;
+
+    /** 输出单价（元/千Token，P3-E5 成本估算用，可空） */
+    private BigDecimal outputPrice;
 
     /** 温度参数(0.0-1.0) */
     @Excel(name = "温度参数")
@@ -135,11 +142,29 @@ public class AiModelConfig extends BaseEntity
         this.maxTokens = maxTokens;
     }
 
-    public Integer getMaxTokens() 
+    public Integer getMaxTokens()
     {
         return maxTokens;
     }
-    public void setTemperature(Double temperature) 
+    public void setInputPrice(BigDecimal inputPrice)
+    {
+        this.inputPrice = inputPrice;
+    }
+
+    public BigDecimal getInputPrice()
+    {
+        return inputPrice;
+    }
+    public void setOutputPrice(BigDecimal outputPrice)
+    {
+        this.outputPrice = outputPrice;
+    }
+
+    public BigDecimal getOutputPrice()
+    {
+        return outputPrice;
+    }
+    public void setTemperature(Double temperature)
     {
         this.temperature = temperature;
     }
@@ -222,6 +247,8 @@ public class AiModelConfig extends BaseEntity
             .append("apiKey", getApiKey())
             .append("apiUrl", getApiUrl())
             .append("maxTokens", getMaxTokens())
+            .append("inputPrice", getInputPrice())
+            .append("outputPrice", getOutputPrice())
             .append("temperature", getTemperature())
             .append("topP", getTopP())
             .append("frequencyPenalty", getFrequencyPenalty())

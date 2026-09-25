@@ -48,4 +48,19 @@ public interface AiCallRecordMapper
      * {@link AiCallRecord#getCallUuid()} 更新。</p>
      */
     public int updateRecordingInfo(AiCallRecord aiCallRecord);
+
+    /**
+     * P3-E3：AI 小结状态 CAS 抢占（仅当当前状态=fromStatus 时改为 toStatus）。
+     * @return 影响行数；0 表示状态已被其他线程改变（抢占失败）
+     */
+    public int casAiSummaryStatus(@org.apache.ibatis.annotations.Param("recordId") Long recordId,
+                                  @org.apache.ibatis.annotations.Param("fromStatus") String fromStatus,
+                                  @org.apache.ibatis.annotations.Param("toStatus") String toStatus);
+
+    /** P3-E3：AI 小结生成成功回写（ai_summary + 状态2 + 生成时间，清空失败原因） */
+    public int updateAiSummarySuccess(AiCallRecord aiCallRecord);
+
+    /** P3-E3：AI 小结生成失败回写（状态3 + 失败原因） */
+    public int updateAiSummaryFail(@org.apache.ibatis.annotations.Param("recordId") Long recordId,
+                                   @org.apache.ibatis.annotations.Param("failReason") String failReason);
 }

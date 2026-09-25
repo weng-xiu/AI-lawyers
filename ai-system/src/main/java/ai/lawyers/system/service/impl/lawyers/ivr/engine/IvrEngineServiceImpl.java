@@ -909,7 +909,8 @@ public class IvrEngineServiceImpl implements IIvrEngineService
             String system = "你是情绪分析助手。请判断用户话语的情绪，仅返回JSON对象："
                     + "{\"sentiment\":\"positive|negative|neutral\",\"confidence\":0.0-1.0}";
             String user = "用户话语：" + text;
-            String raw = modelConfigService.chatJson(system, user);
+            String raw = modelConfigService.chatJson(system, user,
+                    ai.lawyers.system.service.lawyers.stat.AiModelCallLogRecorder.SCENE_EMOTION);
             JsonNode node = MAPPER.readTree(cleanJson(raw));
             String value = node.path("sentiment").asText(node.path("emotion").asText("neutral"));
             return normalizeSentiment(value);
@@ -1024,7 +1025,8 @@ public class IvrEngineServiceImpl implements IIvrEngineService
             String system = "你是信息抽取助手。请从用户提供的文本中提取字段，仅返回JSON对象，"
                     + "字段值缺失时使用空字符串，不要输出任何多余内容。";
             String user = "需要提取的字段：\n" + fieldDesc + "\n原始文本：" + text;
-            String raw = modelConfigService.chatJson(system, user);
+            String raw = modelConfigService.chatJson(system, user,
+                    ai.lawyers.system.service.lawyers.stat.AiModelCallLogRecorder.SCENE_EXTRACT);
             JsonNode extracted = MAPPER.readTree(cleanJson(raw));
             int count = 0;
             for (String name : fieldNames)

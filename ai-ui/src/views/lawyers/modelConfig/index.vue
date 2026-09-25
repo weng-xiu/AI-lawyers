@@ -75,6 +75,12 @@
       <el-table-column label="API地址" align="center" prop="apiUrl" show-overflow-tooltip />
       <el-table-column label="API密钥" align="center" prop="apiKey" show-overflow-tooltip />
       <el-table-column label="最大Token数" align="center" prop="maxTokens" />
+      <el-table-column label="输入单价(元/千Token)" align="center" prop="inputPrice" width="150">
+        <template slot-scope="scope">{{ scope.row.inputPrice != null ? scope.row.inputPrice : '—' }}</template>
+      </el-table-column>
+      <el-table-column label="输出单价(元/千Token)" align="center" prop="outputPrice" width="150">
+        <template slot-scope="scope">{{ scope.row.outputPrice != null ? scope.row.outputPrice : '—' }}</template>
+      </el-table-column>
       <el-table-column label="温度" align="center" prop="temperature" />
       <el-table-column label="默认配置" align="center" prop="isDefault">
         <template slot-scope="scope">
@@ -153,6 +159,32 @@
         </el-form-item>
         <el-form-item label="最大Token数" prop="maxTokens">
           <el-input-number v-model="form.maxTokens" :min="100" :max="8192" />
+        </el-form-item>
+        <el-form-item label="输入单价" prop="inputPrice">
+          <el-input-number
+            v-model="form.inputPrice"
+            :min="0"
+            :step="0.001"
+            :precision="6"
+            :controls="false"
+            value-on-clear="null"
+            placeholder="元/千Token，可空"
+            style="width: 200px"
+          />
+          <span style="color: #999; margin-left: 8px">元/千Token，留空不计费</span>
+        </el-form-item>
+        <el-form-item label="输出单价" prop="outputPrice">
+          <el-input-number
+            v-model="form.outputPrice"
+            :min="0"
+            :step="0.001"
+            :precision="6"
+            :controls="false"
+            value-on-clear="null"
+            placeholder="元/千Token，可空"
+            style="width: 200px"
+          />
+          <span style="color: #999; margin-left: 8px">元/千Token，留空不计费</span>
         </el-form-item>
         <el-form-item label="温度" prop="temperature">
           <el-input-number v-model="form.temperature" :min="0" :max="2" :step="0.1" :precision="1" />
@@ -275,6 +307,8 @@ export default {
         apiUrl: null,
         apiKey: null,
         maxTokens: 2048,
+        inputPrice: null,
+        outputPrice: null,
         temperature: 0.7,
         isDefault: "N",
         status: "0",

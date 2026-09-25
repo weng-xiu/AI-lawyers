@@ -127,7 +127,8 @@ public class AgentChatServiceImpl implements IAgentChatService
             String user = buildUserMessage(history, userMessage);
 
             // 4. 调用大模型，约束返回 JSON
-            String raw = modelConfigService.chatJson(system, user);
+            String raw = modelConfigService.chatJson(system, user,
+                    ai.lawyers.system.service.lawyers.stat.AiModelCallLogRecorder.SCENE_AGENT);
             JsonNode node = MAPPER.readTree(cleanJson(raw));
             String reply = node.path("reply").asText("");
             boolean handoff = node.path("handoff").asBoolean(false);

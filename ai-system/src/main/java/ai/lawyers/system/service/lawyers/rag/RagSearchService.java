@@ -20,8 +20,11 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.system.domain.lawyers.AiLegalKnowledgeChunk;
 import ai.lawyers.system.mapper.lawyers.AiLegalKnowledgeChunkMapper;
+import ai.lawyers.system.domain.lawyers.stat.AiModelCallLog;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
+import ai.lawyers.system.service.lawyers.stat.AiModelCallLogRecorder;
+import ai.lawyers.system.service.lawyers.stat.ModelUsage;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -64,6 +67,10 @@ public class RagSearchService
     /** T5-1：RAG 召回指标（未引入 micrometer 时内部静默） */
     @Autowired(required = false)
     private HotlineMetrics metrics;
+
+    /** P3-E5：模型调用成本/质量埋点（未装配时静默，不影响检索） */
+    @Autowired(required = false)
+    private AiModelCallLogRecorder callLogRecorder;
 
     @Value("${ai.rag.enabled:true}")
     private boolean ragEnabled;
@@ -112,6 +119,19 @@ public class RagSearchService
     public boolean isEnabled()
     {
         return ragEnabled;
+    }
+
+    /**
+     * P3-E1：rerank 配置状态（供 indexInfo/前端展示）。
+     */
+    public java.util.Map<String, Object> rerankStatus()
+    {
+        java.util.Map<String, Object> s = new LinkedHashMap<>();
+        s.put("enabled", rerankEnabled);
+        s.put("url", rerankUrl);
+        s.put("model", rerankModel);
+        s.put("configured", rerankEnabled && StringUtils.isNotEmpty(rerankUrl));
+        return s;
     }
 
     /**
@@ -200,7 +220,8 @@ public class RagSearchService
         }
         try
         {
-            List<float[]> qVec = modelConfigService.embedTexts(java.util.Collections.singletonList(query));
+            List<float[]> qVec = modelConfigService.embedTexts(
+                    java.util.Collections.singletonList(query), AiModelCallLogRecorder.SCENE_RAG);
             if (qVec == null || qVec.isEmpty() || qVec.get(0).length == 0)
             {
                 return new ArrayList<>();
@@ -249,20 +270,29 @@ public class RagSearchService
     }
 
     /**
-     * 可选 Cross-Encoder rerank：POST {rerank-url} {query, documents[]}，
-     * 按返回 index/relevance_score 重排。任何异常退回融合序。
+     * 可选 Cross-Encoder rerank：POST {rerank-url} {model, query, documents[], top_n}，
+     * 按返回 index/relevance_score（兼容 score 字段、data/顶层数组响应）重排。
+     * 任何异常退回融合序。
+     *
+     * <p>P3-E1 联调增强：① 传 top_n=topK 减少服务端计算；② 文档按 chunk-max-len 截断，
+     * 避免超 bge-reranker 等模型的 max length；③ 响应协议多供应商兼容，解析逻辑抽到
+     * {@link #applyRerankResponse} 便于单测；④ 联调验证见 {@link #testRerank()}。</p>
      */
     private List<RagChunk> rerank(String query, List<RagChunk> candidates)
     {
+        // P3-E5：rerank 协议通常不回 token，usage 记 0，仅统计调用量/耗时/成败（费用按调用量另算）
+        long start = System.currentTimeMillis();
         try
         {
             ObjectNode body = MAPPER.createObjectNode();
             body.put("model", rerankModel);
             body.put("query", query);
+            // top_n：只需最终入 Prompt 的条数（topK），减少服务端打分开销
+            body.put("top_n", topK > 0 ? topK : candidates.size());
             ArrayNode docs = body.putArray("documents");
             for (RagChunk rc : candidates)
             {
-                docs.add(rc.getContent());
+                docs.add(truncateForRerank(rc.getContent()));
             }
             Request.Builder builder = new Request.Builder().url(rerankUrl)
                     .post(RequestBody.create(JSON_MEDIA_TYPE,
@@ -277,41 +307,217 @@ public class RagSearchService
                 String text = rb == null ? "" : rb.string();
                 if (!response.isSuccessful() || StringUtils.isEmpty(text))
                 {
+                    log.debug("RAG rerank 返回非成功 HTTP {}，使用 RRF 融合序", response.code());
+                    recordRerankLog(start, AiModelCallLog.RESULT_FAIL,
+                            "rerank HTTP " + response.code());
+                    if (metrics != null)
+                    {
+                        metrics.incrementAi("rerank", "fail");
+                    }
                     return candidates;
                 }
                 JsonNode root = MAPPER.readTree(text);
-                JsonNode results = root.path("results");
-                if (!results.isArray() || results.size() == 0)
+                List<RagChunk> reranked = applyRerankResponse(candidates, root);
+                if (reranked.isEmpty())
                 {
+                    // 协议解析为空属有效降级，但不计成功，避免成功率虚高
+                    recordRerankLog(start, AiModelCallLog.RESULT_FAIL, "rerank 响应解析为空");
+                    if (metrics != null)
+                    {
+                        metrics.incrementAi("rerank", "fail");
+                    }
                     return candidates;
                 }
-                // results[].index 指向入参 documents 的下标，按下标取回候选并按分数降序
-                List<RagChunk> reranked = new ArrayList<>();
-                List<JsonNode> items = new ArrayList<>();
-                for (JsonNode item : results)
+                recordRerankLog(start, AiModelCallLog.RESULT_SUCCESS, null);
+                if (metrics != null)
                 {
-                    items.add(item);
+                    metrics.incrementAi("rerank", "success");
                 }
-                items.sort(Comparator.comparingDouble((JsonNode it) ->
-                        it.path("relevance_score").asDouble(0d)).reversed());
-                for (JsonNode item : items)
-                {
-                    int idx = item.path("index").asInt(-1);
-                    if (idx >= 0 && idx < candidates.size())
-                    {
-                        RagChunk rc = candidates.get(idx);
-                        rc.setScore(item.path("relevance_score").asDouble(0d));
-                        reranked.add(rc);
-                    }
-                }
-                return reranked.isEmpty() ? candidates : reranked;
+                return reranked;
             }
         }
         catch (Exception e)
         {
             log.debug("RAG rerank 失败，使用 RRF 融合序：{}", e.getMessage());
+            recordRerankLog(start, AiModelCallLog.RESULT_FAIL, e.getMessage());
+            if (metrics != null)
+            {
+                metrics.incrementAi("rerank", "fail");
+            }
             return candidates;
         }
+    }
+
+    /** P3-E5：rerank 无独立模型配置行，走 recordWithoutConfig 快照埋点（best-effort） */
+    private void recordRerankLog(long startMillis, String result, String failReason)
+    {
+        if (callLogRecorder == null)
+        {
+            return;
+        }
+        try
+        {
+            callLogRecorder.recordWithoutConfig(AiModelCallLogRecorder.KIND_RERANK,
+                    AiModelCallLogRecorder.SCENE_RAG, "rerank",
+                    StringUtils.isNotEmpty(rerankModel) ? rerankModel : "unknown",
+                    ModelUsage.ZERO, System.currentTimeMillis() - startMillis, 1, result, failReason);
+        }
+        catch (Exception ignore)
+        {
+            // 埋点永不影响检索主链路
+        }
+    }
+
+    /**
+     * 文档截断：与拼 Prompt 的单块上限一致（chunk-max-len），避免超 bge-reranker 等
+     * 模型的 max length 导致 400。包级可见供测试。
+     */
+    String truncateForRerank(String content)
+    {
+        if (content == null)
+        {
+            return "";
+        }
+        int max = chunkMaxLen > 0 ? chunkMaxLen : 500;
+        return content.length() > max ? content.substring(0, max) : content;
+    }
+
+    /**
+     * 解析 rerank 响应并按分数降序重排候选。多协议兼容（P3-E1 联调确认的实际供应商形态）：
+     * <ul>
+     *   <li>结果数组位置：{@code results}（Cohere/Jina/SiliconFlow）/ {@code data}（部分国产网关）/ 顶层数组；</li>
+     *   <li>分数字段：{@code relevance_score}（主流）/ {@code score}（Jina 新版/TEI 系）；</li>
+     *   <li>{@code index} 越界或缺失的条目跳过；全部不可解析时返回空列表（调用方退回融合序）。</li>
+     * </ul>
+     * 包级可见供测试。
+     */
+    static List<RagChunk> applyRerankResponse(List<RagChunk> candidates, JsonNode root)
+    {
+        JsonNode results = root.path("results");
+        if (!results.isArray() || results.size() == 0)
+        {
+            results = root.path("data");
+        }
+        if (!results.isArray() || results.size() == 0)
+        {
+            // 顶层数组形态：[{index, score}, ...]
+            results = root.isArray() ? root : null;
+        }
+        if (results == null || results.size() == 0)
+        {
+            return new ArrayList<>();
+        }
+        List<JsonNode> items = new ArrayList<>();
+        for (JsonNode item : results)
+        {
+            items.add(item);
+        }
+        items.sort(Comparator.comparingDouble((JsonNode it) -> {
+            JsonNode s = it.hasNonNull("relevance_score") ? it.get("relevance_score") : it.get("score");
+            return s == null ? 0d : s.asDouble(0d);
+        }).reversed());
+        List<RagChunk> reranked = new ArrayList<>();
+        for (JsonNode item : items)
+        {
+            int idx = item.path("index").asInt(-1);
+            if (idx >= 0 && idx < candidates.size())
+            {
+                RagChunk rc = candidates.get(idx);
+                JsonNode s = item.hasNonNull("relevance_score") ? item.get("relevance_score") : item.get("score");
+                rc.setScore(s == null ? 0d : s.asDouble(0d));
+                reranked.add(rc);
+            }
+        }
+        return reranked;
+    }
+
+    /**
+     * P3-E1：rerank 服务连通性联调（固定样例，不触知识库/embedding）。
+     *
+     * @return 结果描述：enabled/url/model、success、latencyMs、ranking（重排后下标序）、error
+     */
+    public java.util.Map<String, Object> testRerank()
+    {
+        java.util.Map<String, Object> out = new LinkedHashMap<>();
+        out.put("enabled", rerankEnabled);
+        out.put("url", rerankUrl);
+        out.put("model", rerankModel);
+        if (!rerankEnabled || StringUtils.isEmpty(rerankUrl))
+        {
+            out.put("success", false);
+            out.put("error", "rerank 未启用或未配置 rerank-url（ai.rag.rerank-enabled / ai.rag.rerank-url）");
+            return out;
+        }
+        List<RagChunk> samples = new ArrayList<>();
+        samples.add(new RagChunk(stubChunk("劳动合同应当以书面形式订立"), 0.01d));
+        samples.add(new RagChunk(stubChunk("今天天气晴朗适合户外运动"), 0.02d));
+        long start = System.currentTimeMillis();
+        try
+        {
+            ObjectNode body = MAPPER.createObjectNode();
+            body.put("model", rerankModel);
+            body.put("query", "劳动合同必须签书面合同吗");
+            body.put("top_n", 2);
+            ArrayNode docs = body.putArray("documents");
+            for (RagChunk rc : samples)
+            {
+                docs.add(rc.getContent());
+            }
+            Request.Builder builder = new Request.Builder().url(rerankUrl)
+                    .post(RequestBody.create(JSON_MEDIA_TYPE,
+                            MAPPER.writeValueAsString(body).getBytes(StandardCharsets.UTF_8)));
+            if (StringUtils.isNotEmpty(rerankApiKey))
+            {
+                builder.header("Authorization", "Bearer " + rerankApiKey);
+            }
+            try (Response response = rerankClient.newCall(builder.build()).execute())
+            {
+                ResponseBody rb = response.body();
+                String text = rb == null ? "" : rb.string();
+                out.put("latencyMs", System.currentTimeMillis() - start);
+                out.put("httpStatus", response.code());
+                if (!response.isSuccessful())
+                {
+                    out.put("success", false);
+                    out.put("error", "HTTP " + response.code() + "："
+                            + (text.length() > 300 ? text.substring(0, 300) : text));
+                    return out;
+                }
+                JsonNode root = MAPPER.readTree(text);
+                List<RagChunk> reranked = applyRerankResponse(samples, root);
+                if (reranked.isEmpty())
+                {
+                    out.put("success", false);
+                    out.put("raw", text.length() > 500 ? text.substring(0, 500) : text);
+                    out.put("error", "响应无法解析为 results/data 数组或 index 均越界，请核对服务协议");
+                    return out;
+                }
+                List<String> ranking = new ArrayList<>();
+                for (RagChunk rc : reranked)
+                {
+                    ranking.add(String.format("score=%.4f %s", rc.getScore(), rc.getContent()));
+                }
+                out.put("success", true);
+                out.put("ranking", ranking);
+                return out;
+            }
+        }
+        catch (Exception e)
+        {
+            out.put("latencyMs", System.currentTimeMillis() - start);
+            out.put("success", false);
+            out.put("error", e.getClass().getSimpleName() + "：" + e.getMessage());
+            return out;
+        }
+    }
+
+    /** 联调样例用的轻量 chunk（无 DB 依赖） */
+    private static AiLegalKnowledgeChunk stubChunk(String content)
+    {
+        AiLegalKnowledgeChunk c = new AiLegalKnowledgeChunk();
+        c.setChunkId(-1L);
+        c.setChunkContent(content);
+        return c;
     }
 
     /**

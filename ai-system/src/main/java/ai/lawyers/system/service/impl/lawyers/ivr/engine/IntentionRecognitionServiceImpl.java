@@ -179,7 +179,8 @@ public class IntentionRecognitionServiceImpl implements IntentionRecognitionServ
         String context = "意图候选：" + candidate;
         try
         {
-            String response = modelConfigService.callAiModel(question, context);
+            String response = modelConfigService.callAiModel(question, context,
+                    ai.lawyers.system.service.lawyers.stat.AiModelCallLogRecorder.SCENE_INTENTION);
             if (StringUtils.isEmpty(response))
             {
                 return null;

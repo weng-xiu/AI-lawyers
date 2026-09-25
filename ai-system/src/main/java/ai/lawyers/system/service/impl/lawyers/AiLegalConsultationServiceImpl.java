@@ -146,7 +146,8 @@ public class AiLegalConsultationServiceImpl implements IAiLegalConsultationServi
             }
             
             // 调用AI模型生成回答
-            String aiAnswer = aiModelConfigService.callAiModel(question, contextBuilder.toString());
+            String aiAnswer = aiModelConfigService.callAiModel(question, contextBuilder.toString(),
+                    ai.lawyers.system.service.lawyers.stat.AiModelCallLogRecorder.SCENE_CONSULTATION);
             
             // 如果AI模型调用失败，返回默认回答
             if (aiAnswer == null || aiAnswer.isEmpty()) {

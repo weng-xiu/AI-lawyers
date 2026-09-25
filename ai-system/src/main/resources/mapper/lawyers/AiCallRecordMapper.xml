@@ -25,6 +25,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="recordDuration"  column="record_duration"  />
         <result property="asrStatus"       column="asr_status"       />
         <result property="transcript"      column="transcript"       />
+        <result property="aiSummary"          column="ai_summary"             />
+        <result property="aiSummaryStatus"    column="ai_summary_status"      />
+        <result property="aiSummaryTime"      column="ai_summary_time"        />
+        <result property="aiSummaryFailReason" column="ai_summary_fail_reason" />
         <result property="agentName"       column="agent_name"       />
         <result property="categoryName"    column="category_name"    />
         <result property="createBy"        column="create_by"        />
@@ -39,6 +43,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                cr.end_time, cr.duration, cr.agent_id, cr.category_id, cr.content, cr.answer, 
                cr.status, cr.transfer_id, cr.ticket_id, cr.call_uuid,
                cr.record_file, cr.recording_url, cr.record_duration, cr.asr_status, cr.transcript,
+               cr.ai_summary, cr.ai_summary_status, cr.ai_summary_time, cr.ai_summary_fail_reason,
                cr.create_by, cr.create_time, 
                cr.update_by, cr.update_time, cr.remark,
                a.agent_name, c.category_name
@@ -235,7 +240,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </select>
 
     <update id="updateRecordingInfo" parameterType="ai.lawyers.system.domain.lawyers.AiCallRecord">
-        update ai_call_record
         <trim prefix="SET" suffixOverrides=",">
             <if test="recordFile != null">record_file = #{recordFile},</if>
             <if test="recordingUrl != null">recording_url = #{recordingUrl},</if>
@@ -254,5 +258,34 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 </otherwise>
             </choose>
         </where>
+    </update>
+
+    <!-- P3-E3：AI 小结状态 CAS 抢占（0待生成/3失败 → 1生成中），返回影响行数 0 表示已被其他线程抢占 -->
+    <update id="casAiSummaryStatus">
+        update ai_call_record
+        set ai_summary_status = #{toStatus}, update_time = sysdate()
+        where record_id = #{recordId}
+          and ai_summary_status = #{fromStatus}
+    </update>
+
+    <!-- P3-E3：AI 小结生成成功回写（状态 2） -->
+    <update id="updateAiSummarySuccess" parameterType="ai.lawyers.system.domain.lawyers.AiCallRecord">
+        update ai_call_record
+        set ai_summary = #{aiSummary},
+            ai_summary_status = '2',
+            ai_summary_time = sysdate(),
+            ai_summary_fail_reason = null,
+            update_by = 'call-summary-ai',
+            update_time = sysdate()
+        where record_id = #{recordId}
+    </update>
+
+    <!-- P3-E3：AI 小结生成失败回写（状态 3 + 截断后的失败原因，不覆盖已有小结） -->
+    <update id="updateAiSummaryFail">
+        update ai_call_record
+        set ai_summary_status = '3',
+            ai_summary_fail_reason = #{failReason},
+            update_time = sysdate()
+        where record_id = #{recordId}
     </update>
 </mapper>

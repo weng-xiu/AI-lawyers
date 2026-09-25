@@ -12,6 +12,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="apiKey"    column="api_key"    />
         <result property="apiUrl"    column="api_url"    />
         <result property="maxTokens"    column="max_tokens"    />
+        <result property="inputPrice"    column="input_price"    />
+        <result property="outputPrice"    column="output_price"    />
         <result property="temperature"    column="temperature"    />
         <result property="topP"    column="top_p"    />
         <result property="frequencyPenalty"    column="frequency_penalty"    />
@@ -28,7 +30,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectAiModelConfigVo">
-        select config_id, config_name, model_type, model_name, api_key, api_url, max_tokens, temperature, top_p, frequency_penalty, presence_penalty, timeout, retry_count, status, is_default, remark, create_by, create_time, update_by, update_time from ai_model_config
+        select config_id, config_name, model_type, model_name, api_key, api_url, max_tokens, input_price, output_price, temperature, top_p, frequency_penalty, presence_penalty, timeout, retry_count, status, is_default, remark, create_by, create_time, update_by, update_time from ai_model_config
     </sql>
 
     <select id="selectAiModelConfigList" parameterType="AiModelConfig" resultMap="AiModelConfigResult">
@@ -63,6 +65,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="apiKey != null">api_key,</if>
             <if test="apiUrl != null">api_url,</if>
             <if test="maxTokens != null">max_tokens,</if>
+            <if test="inputPrice != null">input_price,</if>
+            <if test="outputPrice != null">output_price,</if>
             <if test="temperature != null">temperature,</if>
             <if test="topP != null">top_p,</if>
             <if test="frequencyPenalty != null">frequency_penalty,</if>
@@ -84,6 +88,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="apiKey != null">#{apiKey},</if>
             <if test="apiUrl != null">#{apiUrl},</if>
             <if test="maxTokens != null">#{maxTokens},</if>
+            <if test="inputPrice != null">#{inputPrice},</if>
+            <if test="outputPrice != null">#{outputPrice},</if>
             <if test="temperature != null">#{temperature},</if>
             <if test="topP != null">#{topP},</if>
             <if test="frequencyPenalty != null">#{frequencyPenalty},</if>
@@ -109,6 +115,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="apiKey != null">api_key = #{apiKey},</if>
             <if test="apiUrl != null">api_url = #{apiUrl},</if>
             <if test="maxTokens != null">max_tokens = #{maxTokens},</if>
+            <if test="inputPrice != null">input_price = #{inputPrice},</if>
+            <if test="outputPrice != null">output_price = #{outputPrice},</if>
             <if test="temperature != null">temperature = #{temperature},</if>
             <if test="topP != null">top_p = #{topP},</if>
             <if test="frequencyPenalty != null">frequency_penalty = #{frequencyPenalty},</if>

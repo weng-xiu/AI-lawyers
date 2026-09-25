@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.stat.AiModelCallLogMapper">
+
+    <resultMap type="ai.lawyers.system.domain.lawyers.stat.AiModelCallLog" id="AiModelCallLogResult">
+        <result property="logId"          column="log_id"          />
+        <result property="callTime"       column="call_time"       />
+        <result property="kind"           column="kind"            />
+        <result property="scene"          column="scene"           />
+        <result property="configId"       column="config_id"       />
+        <result property="configName"     column="config_name"     />
+        <result property="modelType"      column="model_type"      />
+        <result property="modelName"      column="model_name"      />
+        <result property="promptTokens"   column="prompt_tokens"   />
+        <result property="completionTokens" column="completion_tokens" />
+        <result property="totalTokens"    column="total_tokens"    />
+        <result property="inputPrice"     column="input_price"     />
+        <result property="outputPrice"    column="output_price"    />
+        <result property="costAmount"     column="cost_amount"     />
+        <result property="elapsedMs"      column="elapsed_ms"      />
+        <result property="attempts"       column="attempts"        />
+        <result property="result"         column="result"          />
+        <result property="failReason"     column="fail_reason"     />
+        <result property="traceId"        column="trace_id"        />
+        <result property="createTime"     column="create_time"     />
+    </resultMap>
+
+    <sql id="selectLogVo">
+        select log_id, call_time, kind, scene, config_id, config_name, model_type, model_name,
+               prompt_tokens, completion_tokens, total_tokens, input_price, output_price,
+               cost_amount, elapsed_ms, attempts, result, fail_reason, trace_id, create_time
+        from ai_model_call_log
+    </sql>
+
+    <insert id="insertAiModelCallLog" parameterType="ai.lawyers.system.domain.lawyers.stat.AiModelCallLog"
+            useGeneratedKeys="true" keyProperty="logId">
+        insert into ai_model_call_log
+        (call_time, kind, scene, config_id, config_name, model_type, model_name,
+         prompt_tokens, completion_tokens, total_tokens, input_price, output_price,
+         cost_amount, elapsed_ms, attempts, result, fail_reason, trace_id)
+        values
+        (#{callTime}, #{kind}, #{scene}, #{configId}, #{configName}, #{modelType}, #{modelName},
+         #{promptTokens}, #{completionTokens}, #{totalTokens}, #{inputPrice}, #{outputPrice},
+         #{costAmount}, #{elapsedMs}, #{attempts}, #{result}, #{failReason}, #{traceId})
+    </insert>
+
+    <select id="selectLogList" parameterType="ai.lawyers.system.domain.lawyers.stat.AiModelCallLog"
+            resultMap="AiModelCallLogResult">
+        <include refid="selectLogVo"/>
+        <where>
+            <if test="kind != null and kind != ''"> and kind = #{kind}</if>
+            <if test="scene != null and scene != ''"> and scene = #{scene}</if>
+            <if test="modelName != null and modelName != ''"> and model_name like concat('%', #{modelName}, '%')</if>
+            <if test="result != null and result != ''"> and result = #{result}</if>
+            <if test="params.beginTime != null and params.beginTime != ''">
+                and call_time &gt;= #{params.beginTime}
+            </if>
+            <if test="params.endTime != null and params.endTime != ''">
+                and call_time &lt;= #{params.endTime}
+            </if>
+        </where>
+        order by call_time desc, log_id desc
+    </select>
+
+    <select id="selectOverview" resultType="map">
+        select count(*) as totalCalls,
+               ifnull(sum(case when result = '1' then 1 else 0 end), 0) as successCalls,
+               ifnull(sum(case when result = '0' then 1 else 0 end), 0) as failCalls,
+               ifnull(sum(case when result = '2' then 1 else 0 end), 0) as rejectCalls,
+               ifnull(sum(case when attempts &gt; 1 then 1 else 0 end), 0) as retryCalls,
+               ifnull(sum(prompt_tokens), 0) as promptTokens,
+               ifnull(sum(completion_tokens), 0) as completionTokens,
+               ifnull(sum(total_tokens), 0) as totalTokens,
+               ifnull(sum(cost_amount), 0) as costAmount,
+               ifnull(round(avg(elapsed_ms), 0), 0) as avgElapsedMs,
+               ifnull(max(elapsed_ms), 0) as maxElapsedMs
+        from ai_model_call_log
+        where call_time &gt;= #{beginTime} and call_time &lt; date_add(#{endTime}, interval 1 day)
+    </select>
+
+    <select id="selectCallCount" resultType="long">
+        select count(*) from ai_call_record
+        where call_time &gt;= #{beginTime} and call_time &lt; date_add(#{endTime}, interval 1 day)
+    </select>
+
+    <select id="selectTrend" resultType="map">
+        select date_format(call_time, '%Y-%m-%d') as period,
+               count(*) as totalCalls,
+               ifnull(sum(case when result = '1' then 1 else 0 end), 0) as successCalls,
+               ifnull(sum(case when result = '0' then 1 else 0 end), 0) as failCalls,
+               ifnull(sum(case when result = '2' then 1 else 0 end), 0) as rejectCalls,
+               ifnull(sum(total_tokens), 0) as totalTokens,
+               ifnull(sum(cost_amount), 0) as costAmount,
+               ifnull(round(avg(elapsed_ms), 0), 0) as avgElapsedMs
+        from ai_model_call_log
+        where call_time &gt;= #{beginTime} and call_time &lt; date_add(#{endTime}, interval 1 day)
+        group by date_format(call_time, '%Y-%m-%d')
+        order by period
+    </select>
+
+    <select id="selectByModel" resultType="map">
+        select ifnull(model_name, '未知模型') as modelName,
+               ifnull(max(model_type), '') as modelType,
+               count(*) as totalCalls,
+               ifnull(sum(case when result = '1' then 1 else 0 end), 0) as successCalls,
+               ifnull(sum(case when result = '0' then 1 else 0 end), 0) as failCalls,
+               ifnull(sum(case when result = '2' then 1 else 0 end), 0) as rejectCalls,
+               ifnull(sum(total_tokens), 0) as totalTokens,
+               ifnull(sum(cost_amount), 0) as costAmount,
+               ifnull(round(avg(elapsed_ms), 0), 0) as avgElapsedMs
+        from ai_model_call_log
+        where call_time &gt;= #{beginTime} and call_time &lt; date_add(#{endTime}, interval 1 day)
+        group by model_name
+        order by costAmount desc, totalCalls desc
+    </select>
+
+    <select id="selectByScene" resultType="map">
+        select kind,
+               scene,
+               count(*) as totalCalls,
+               ifnull(sum(case when result = '1' then 1 else 0 end), 0) as successCalls,
+               ifnull(sum(case when result = '0' then 1 else 0 end), 0) as failCalls,
+               ifnull(sum(case when result = '2' then 1 else 0 end), 0) as rejectCalls,
+               ifnull(sum(total_tokens), 0) as totalTokens,
+               ifnull(sum(cost_amount), 0) as costAmount,
+               ifnull(round(avg(elapsed_ms), 0), 0) as avgElapsedMs
+        from ai_model_call_log
+        where call_time &gt;= #{beginTime} and call_time &lt; date_add(#{endTime}, interval 1 day)
+        group by kind, scene
+        order by totalCalls desc
+    </select>
+
+</mapper>

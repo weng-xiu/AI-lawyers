@@ -93,3 +93,27 @@ export function auditKnowledge(data) {
     data: data
   })
 }
+
+// RAG 索引状态（向量条目数/索引后端/rerank 开关）
+export function getRagIndexInfo() {
+  return request({
+    url: '/lawyers/knowledge/rag/indexInfo',
+    method: 'get'
+  })
+}
+
+// RAG 全量重建索引（异步）
+export function rebuildRagIndex() {
+  return request({
+    url: '/lawyers/knowledge/rag/rebuild',
+    method: 'post'
+  })
+}
+
+// RAG rerank 服务连通性测试（固定样例）
+export function testRagRerank() {
+  return request({
+    url: '/lawyers/knowledge/rag/rerankTest',
+    method: 'post'
+  })
+}

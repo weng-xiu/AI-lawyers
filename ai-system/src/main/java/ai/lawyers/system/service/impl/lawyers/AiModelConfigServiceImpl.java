@@ -32,9 +32,12 @@ import okhttp3.ResponseBody;
 import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.common.utils.sign.SecretCryptoUtils;
 import ai.lawyers.system.domain.lawyers.AiModelConfig;
+import ai.lawyers.system.domain.lawyers.stat.AiModelCallLog;
 import ai.lawyers.system.mapper.lawyers.AiModelConfigMapper;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
+import ai.lawyers.system.service.lawyers.stat.AiModelCallLogRecorder;
+import ai.lawyers.system.service.lawyers.stat.ModelUsage;
 
 /**
  * AI模型参数配置Service业务层处理。
@@ -64,6 +67,10 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
     /** T5-1：AI 调用指标上报（未引入 micrometer 时内部静默） */
     @Autowired(required = false)
     private HotlineMetrics metrics;
+
+    /** P3-E5：大模型调用明细日志（Token/费用/耗时/场景），异步 best-effort，未装配时静默 */
+    @Autowired(required = false)
+    private AiModelCallLogRecorder callLogRecorder;
 
     /**
      * R1 舱壁：限制在途大模型调用并发数，防止慢响应耗尽 Tomcat 线程后雪崩传导到全系统。
@@ -150,6 +157,32 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
         }
     }
 
+    /** chat 调用结果：文本 + Token 用量（P3-E5 落日志用） */
+    private static class Reply
+    {
+        final String content;
+        final ModelUsage usage;
+
+        Reply(String content, ModelUsage usage)
+        {
+            this.content = content;
+            this.usage = usage == null ? ModelUsage.ZERO : usage;
+        }
+    }
+
+    /** embedding 调用结果：向量列表 + Token 用量 */
+    private static class EmbedResult
+    {
+        final List<float[]> vectors;
+        final ModelUsage usage;
+
+        EmbedResult(List<float[]> vectors, ModelUsage usage)
+        {
+            this.vectors = vectors;
+            this.usage = usage == null ? ModelUsage.ZERO : usage;
+        }
+    }
+
     @Override
     public AiModelConfig selectAiModelConfigByConfigId(Long configId)
     {
@@ -227,7 +260,8 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
         }
         try
         {
-            String response = chat(config, "你是一个连接测试助手。", "请仅回复：连接成功", false);
+            String response = chat(config, "你是一个连接测试助手。", "请仅回复：连接成功",
+                    false, AiModelCallLogRecorder.SCENE_TEST);
             return StringUtils.isNotEmpty(response);
         }
         catch (Exception e)
@@ -239,6 +273,12 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
 
     @Override
     public String callAiModel(String question, String context)
+    {
+        return callAiModel(question, context, AiModelCallLogRecorder.SCENE_OTHER);
+    }
+
+    @Override
+    public String callAiModel(String question, String context, String scene)
     {
         AiModelConfig config = getDefaultAiModelConfig();
         if (config == null)
@@ -253,7 +293,7 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
         user.append("用户问题：").append(question);
         try
         {
-            return chat(config, DEFAULT_SYSTEM_PROMPT, user.toString(), false);
+            return chat(config, DEFAULT_SYSTEM_PROMPT, user.toString(), false, scene);
         }
         catch (Exception e)
         {
@@ -264,23 +304,35 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
     @Override
     public String chat(String systemPrompt, String userMessage)
     {
-        AiModelConfig config = getDefaultAiModelConfig();
-        if (config == null)
-        {
-            throw new IllegalStateException("未找到可用的AI模型配置，请联系管理员配置模型参数。");
-        }
-        return chat(config, systemPrompt, userMessage, false);
+        return chat(systemPrompt, userMessage, AiModelCallLogRecorder.SCENE_OTHER);
     }
 
     @Override
-    public String chatJson(String systemPrompt, String userMessage)
+    public String chat(String systemPrompt, String userMessage, String scene)
     {
         AiModelConfig config = getDefaultAiModelConfig();
         if (config == null)
         {
             throw new IllegalStateException("未找到可用的AI模型配置，请联系管理员配置模型参数。");
         }
-        return chat(config, systemPrompt, userMessage, true);
+        return chat(config, systemPrompt, userMessage, false, scene);
+    }
+
+    @Override
+    public String chatJson(String systemPrompt, String userMessage)
+    {
+        return chatJson(systemPrompt, userMessage, AiModelCallLogRecorder.SCENE_OTHER);
+    }
+
+    @Override
+    public String chatJson(String systemPrompt, String userMessage, String scene)
+    {
+        AiModelConfig config = getDefaultAiModelConfig();
+        if (config == null)
+        {
+            throw new IllegalStateException("未找到可用的AI模型配置，请联系管理员配置模型参数。");
+        }
+        return chat(config, systemPrompt, userMessage, true, scene);
     }
 
     /**
@@ -291,6 +343,12 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
      */
     @Override
     public List<float[]> embedTexts(List<String> texts)
+    {
+        return embedTexts(texts, AiModelCallLogRecorder.SCENE_RAG);
+    }
+
+    @Override
+    public List<float[]> embedTexts(List<String> texts, String scene)
     {
         if (texts == null || texts.isEmpty())
         {
@@ -319,16 +377,23 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
                 {
                     metrics.incrementAi("embed", "reject");
                 }
+                // P3-E5：舱壁拒绝落日志（不计费，仅反映过载）
+                recordCallLog(AiModelCallLogRecorder.KIND_EMBED, scene, config, ModelUsage.ZERO,
+                        start, 1, AiModelCallLog.RESULT_REJECT,
+                        "embedding 服务繁忙（在途并发已达上限 " + maxInflight + "）");
                 throw new RuntimeException("embedding 服务繁忙（在途并发已达上限 " + maxInflight + "）");
             }
-            List<float[]> vectors = callEmbeddings(config, texts);
+            EmbedResult result = callEmbeddings(config, texts);
             // T5-1：embedding 成功 + 首响（调用耗时）
             if (metrics != null)
             {
                 metrics.incrementAi("embed", "success");
                 metrics.recordAiFirstResponse(System.currentTimeMillis() - start);
             }
-            return vectors;
+            // P3-E5：成功落日志（Token 用量 + 费用快照）
+            recordCallLog(AiModelCallLogRecorder.KIND_EMBED, scene, config, result.usage,
+                    start, 1, AiModelCallLog.RESULT_SUCCESS, null);
+            return result.vectors;
         }
         catch (Exception e)
         {
@@ -336,6 +401,12 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
             if (metrics != null && acquired)
             {
                 metrics.incrementAi("embed", "fail");
+            }
+            // P3-E5：失败落日志（舱壁拒绝上面已记，此处不重复）
+            if (acquired)
+            {
+                recordCallLog(AiModelCallLogRecorder.KIND_EMBED, scene, config, ModelUsage.ZERO,
+                        start, 1, AiModelCallLog.RESULT_FAIL, e.getMessage());
             }
             throw new RuntimeException("生成文本向量失败：" + e.getMessage(), e);
         }
@@ -345,6 +416,25 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
             {
                 inflightSemaphore.release();
             }
+        }
+    }
+
+    /** P3-E5：统一落日志入口，记录器缺失/异常均不影响业务调用 */
+    private void recordCallLog(String kind, String scene, AiModelConfig config, ModelUsage usage,
+                               long startMillis, int attempts, String result, String failReason)
+    {
+        if (callLogRecorder == null)
+        {
+            return;
+        }
+        try
+        {
+            callLogRecorder.record(kind, scene, config, usage,
+                    System.currentTimeMillis() - startMillis, attempts, result, failReason);
+        }
+        catch (Exception ex)
+        {
+            log.debug("P3-E5 调用日志记录异常（忽略）：{}", ex.getMessage());
         }
     }
 
@@ -359,6 +449,8 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
         c.setApiKey(src.getApiKey());
         c.setApiUrl(src.getApiUrl());
         c.setMaxTokens(src.getMaxTokens());
+        c.setInputPrice(src.getInputPrice());
+        c.setOutputPrice(src.getOutputPrice());
         c.setTemperature(src.getTemperature());
         c.setTopP(src.getTopP());
         c.setFrequencyPenalty(src.getFrequencyPenalty());
@@ -389,8 +481,8 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
         return null;
     }
 
-    /** 调用 OpenAI 兼容 POST {apiUrl}/embeddings，解析 data[].embedding */
-    private List<float[]> callEmbeddings(AiModelConfig config, List<String> texts) throws Exception
+    /** 调用 OpenAI 兼容 POST {apiUrl}/embeddings，解析 data[].embedding + usage 用量 */
+    private EmbedResult callEmbeddings(AiModelConfig config, List<String> texts) throws Exception
     {
         String endpoint = endpointOf(config, "/embeddings");
         ObjectNode body = MAPPER.createObjectNode();
@@ -410,6 +502,12 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
         }
 
         JsonNode root = httpPost(endpoint, headers, MAPPER.writeValueAsString(body), config);
+        // P3-E5：embedding 用量多数实现仅回 total_tokens/prompt_tokens，统一归入输入侧
+        ModelUsage parsed = ModelUsage.parseOpenAi(root);
+        int promptTokens = parsed.getPromptTokens() > 0
+                ? parsed.getPromptTokens() : parsed.getTotalTokens();
+        ModelUsage usage = new ModelUsage(promptTokens, 0,
+                parsed.getTotalTokens() > 0 ? parsed.getTotalTokens() : promptTokens);
         JsonNode data = root.path("data");
         if (!data.isArray() || data.size() != texts.size())
         {
@@ -430,13 +528,15 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
             }
             vectors.add(vec);
         }
-        return vectors;
+        return new EmbedResult(vectors, usage);
     }
 
     /**
      * 真实 HTTP 调用。失败按配置重试，最终抛出异常由上层兜底。
+     * P3-E5：终态（成功/失败/全程舱壁拒绝）异步落一条调用日志，attempt 透传实际尝试次数。
      */
-    private String chat(AiModelConfig rawConfig, String systemPrompt, String userMessage, boolean jsonMode)
+    private String chat(AiModelConfig rawConfig, String systemPrompt, String userMessage,
+                        boolean jsonMode, String scene)
     {
         // S6：库中 apiKey 为密文，调用前解密（复制对象避免污染缓存对象）
         AiModelConfig config = rawConfig;
@@ -448,6 +548,9 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
         String modelType = normalizeModelType(config.getModelType());
         int attempts = Math.max(1, config.getRetryCount() == null ? 1 : config.getRetryCount() + 1);
         Exception lastError = null;
+        int lastAttempt = 0;
+        // 只要有一次拿到过在途许可，终态失败即记 fail；全程被舱壁拒绝才记 reject
+        boolean everAcquired = false;
         // T5-1：chat 首响计时（含重试等待，反映调用方真实等待）
         long start = System.currentTimeMillis();
         for (int attempt = 1; attempt <= attempts; attempt++)
@@ -467,7 +570,8 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
                     throw new RuntimeException("AI模型调用繁忙（在途并发已达上限 " + maxInflight
                             + "），请稍后再试");
                 }
-                String answer = "Claude".equalsIgnoreCase(modelType)
+                everAcquired = true;
+                Reply reply = "Claude".equalsIgnoreCase(modelType)
                         ? callClaude(config, systemPrompt, userMessage)
                         : callOpenAiCompatible(config, modelType, systemPrompt, userMessage, jsonMode);
                 // T5-1：chat 成功 + 首响耗时
@@ -476,11 +580,15 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
                     metrics.incrementAi("chat", "success");
                     metrics.recordAiFirstResponse(System.currentTimeMillis() - start);
                 }
-                return answer;
+                // P3-E5：成功落日志（Token 用量 + 费用快照 + 实际尝试次数）
+                recordCallLog(AiModelCallLogRecorder.KIND_CHAT, scene, config, reply.usage,
+                        start, attempt, AiModelCallLog.RESULT_SUCCESS, null);
+                return reply.content;
             }
             catch (Exception e)
             {
                 lastError = e;
+                lastAttempt = attempt;
                 boolean retryable = isRetryable(e);
                 log.warn("AI模型调用失败 configId={} attempt={}/{} retryable={} error={}",
                         config.getConfigId(), attempt, attempts, retryable, e.getMessage());
@@ -509,6 +617,12 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
                 }
             }
         }
+        // P3-E5：终态失败/拒绝只落一条日志（重试过程不重复计费统计）
+        String terminalResult = everAcquired
+                ? AiModelCallLog.RESULT_FAIL : AiModelCallLog.RESULT_REJECT;
+        recordCallLog(AiModelCallLogRecorder.KIND_CHAT, scene, config, ModelUsage.ZERO,
+                start, Math.max(1, lastAttempt), terminalResult,
+                lastError == null ? null : lastError.getMessage());
         throw new RuntimeException("调用AI模型失败：" + lastError.getMessage(), lastError);
     }
 
@@ -534,8 +648,8 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
         return e.getMessage() != null && e.getMessage().contains("在途并发已达上限");
     }
 
-    private String callOpenAiCompatible(AiModelConfig config, String modelType, String systemPrompt,
-                                        String userMessage, boolean jsonMode) throws Exception
+    private Reply callOpenAiCompatible(AiModelConfig config, String modelType, String systemPrompt,
+                                       String userMessage, boolean jsonMode) throws Exception
     {
         String endpoint = endpointOf(config, "/chat/completions");
         ObjectNode body = MAPPER.createObjectNode();
@@ -577,28 +691,30 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
         }
 
         JsonNode root = httpPost(endpoint, headers, MAPPER.writeValueAsString(body), config);
+        // P3-E5：解析 Token 用量（缺失不报错，计 0）
+        ModelUsage usage = ModelUsage.parseOpenAi(root);
         JsonNode choices = root.path("choices");
         if (choices.isArray() && choices.size() > 0)
         {
             JsonNode content = choices.get(0).path("message").path("content");
             if (content.isTextual())
             {
-                return content.asText();
+                return new Reply(content.asText(), usage);
             }
             if (content.isArray() || content.isObject())
             {
-                return content.toString();
+                return new Reply(content.toString(), usage);
             }
         }
         JsonNode outputText = root.path("output").path("text");
         if (outputText.isTextual())
         {
-            return outputText.asText();
+            return new Reply(outputText.asText(), usage);
         }
         throw new IllegalStateException("模型响应缺少choices[0].message.content字段");
     }
 
-    private String callClaude(AiModelConfig config, String systemPrompt, String userMessage) throws Exception
+    private Reply callClaude(AiModelConfig config, String systemPrompt, String userMessage) throws Exception
     {
         String endpoint = endpointOf(config, "/messages");
         ObjectNode body = MAPPER.createObjectNode();
@@ -623,6 +739,8 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
         headers.put("anthropic-version", "2023-06-01");
 
         JsonNode root = httpPost(endpoint, headers, MAPPER.writeValueAsString(body), config);
+        // P3-E5：Claude usage 为 input_tokens/output_tokens
+        ModelUsage usage = ModelUsage.parseClaude(root);
         JsonNode content = root.path("content");
         if (content.isArray() && content.size() > 0)
         {
@@ -636,7 +754,7 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService
             }
             if (sb.length() > 0)
             {
-                return sb.toString();
+                return new Reply(sb.toString(), usage);
             }
         }
         throw new IllegalStateException("Claude响应缺少content字段");

@@ -335,7 +335,8 @@ public class RagIndexServiceImpl implements IRagIndexService
                 {
                     texts.add(c.getChunkContent());
                 }
-                List<float[]> vectors = modelConfigService.embedTexts(texts);
+                List<float[]> vectors = modelConfigService.embedTexts(texts,
+                        ai.lawyers.system.service.lawyers.stat.AiModelCallLogRecorder.SCENE_RAG_INDEX);
                 for (int j = 0; j < batch.size() && j < vectors.size(); j++)
                 {
                     float[] vec = vectors.get(j);
