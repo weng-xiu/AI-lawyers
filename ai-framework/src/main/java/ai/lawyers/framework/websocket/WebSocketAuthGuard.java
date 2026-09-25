@@ -104,6 +104,24 @@ public class WebSocketAuthGuard
     }
 
     /**
+     * 校验流式语音通道（P3-A1 {@code /ws/voice/{sessionId}/{role}}）：登录态有效即可。
+     *
+     * <p>语音流为会话内媒体/字幕通道，角色合法性（agent/caller）由端点校验；
+     * 会话级业务归属由话单/会话层保证，与图文通道口径一致。</p>
+     *
+     * @param queryString 会话 query 串
+     * @return true 放行；false 拒绝（端点以 1008 策略违例关闭）
+     */
+    public boolean authorizeVoice(String queryString)
+    {
+        if (!authEnabled)
+        {
+            return true;
+        }
+        return resolveLoginUser(queryString) != null;
+    }
+
+    /**
      * 解析握手 query 中的令牌并换取登录态；任何异常均视为未认证（不抛异常影响握手流程）。
      */
     private LoginUser resolveLoginUser(String queryString)

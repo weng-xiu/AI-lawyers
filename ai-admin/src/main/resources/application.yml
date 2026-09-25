@@ -131,6 +131,13 @@ websocket:
   # 持有目标连接的实例，并在 Redis 维护全局在线注册表；单机保持 false（零行为变化）
   cluster:
     enabled: ${WEBSOCKET_CLUSTER_ENABLED:false}
+  # P3-A1 流式语音端点 /ws/voice：默认开启（当前仅 Mock 流式 ASR/TTS 引擎，无外网/凭证可联调；
+  # 真实 DashScope 等 Provider 随 A2/A3 接入，请求未接入引擎会显式回 error 帧，不静默假成功）
+  # max-sessions 为本机连接上限（每连接 2 个守护线程，按容量规划）；send-queue-capacity 为单连接保序下发队列
+  voice:
+    enabled: ${WEBSOCKET_VOICE_ENABLED:true}
+    max-sessions: ${WEBSOCKET_VOICE_MAX_SESSIONS:200}
+    send-queue-capacity: ${WEBSOCKET_VOICE_QUEUE_CAP:1000}
 
 # N1 Redis Stream 消费重试（PEL 重读 + 真实投递计数 + 死消费者接管）
 # 应急可置 queue.stream.retry-enabled=false 恢复旧行为（失败即转死信）

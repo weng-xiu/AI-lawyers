@@ -117,6 +117,22 @@ class WebSocketAuthGuardTest
         assertThat(guard.authorizeChat(null)).isFalse();
     }
 
+    // ---------- 流式语音通道（P3-A1）：仅验登录态，角色合法性由端点校验 ----------
+
+    @Test
+    void authorizeVoice_goodToken_passes()
+    {
+        assertThat(guard.authorizeVoice("token=" + GOOD_TOKEN)).isTrue();
+    }
+
+    @Test
+    void authorizeVoice_badOrMissingToken_rejected()
+    {
+        assertThat(guard.authorizeVoice("token=" + BAD_TOKEN)).isFalse();
+        assertThat(guard.authorizeVoice(null)).isFalse();
+        assertThat(guard.authorizeVoice("role=agent")).isFalse();
+    }
+
     // ---------- maskQueryToken：日志出口兜底掩码 ----------
 
     @Test
@@ -148,6 +164,7 @@ class WebSocketAuthGuardTest
         // 无 token、userId 不一致，开关关闭时一律放行（仅限联调应急）
         assertThat(guard.authorizeCall(999L, null)).isTrue();
         assertThat(guard.authorizeChat("foo=1")).isTrue();
+        assertThat(guard.authorizeVoice("foo=1")).isTrue();
         assertThat(guard.isAuthEnabled()).isFalse();
     }
 }

@@ -85,7 +85,7 @@ class AiCallSummaryServiceImplTest
     @Test
     void generateSummary_withTranscript_buildsFiveSectionTextAndDone()
     {
-        when(modelConfigService.chatJson(anyString(), anyString())).thenReturn(JSON_OK);
+        when(modelConfigService.chatJson(anyString(), anyString(), eq("summary"))).thenReturn(JSON_OK);
 
         AiCallRecord out = service.generateSummary(RECORD_ID, false);
 
@@ -111,7 +111,7 @@ class AiCallSummaryServiceImplTest
 
         assertThat(out.getAiSummaryStatus()).isEqualTo("3");
         assertThat(out.getAiSummaryFailReason()).contains("无可用通话文本");
-        verify(modelConfigService, never()).chatJson(anyString(), anyString());
+        verify(modelConfigService, never()).chatJson(anyString(), anyString(), eq("summary"));
         verify(mapper, never()).casAiSummaryStatus(eq(RECORD_ID), anyString(), anyString());
         verify(mapper).updateAiSummaryFail(eq(RECORD_ID), anyString());
     }
@@ -125,7 +125,7 @@ class AiCallSummaryServiceImplTest
         AiCallRecord out = service.generateSummary(RECORD_ID, false);
 
         assertThat(out.getAiSummary()).isEqualTo("【案情摘要】历史小结");
-        verify(modelConfigService, never()).chatJson(anyString(), anyString());
+        verify(modelConfigService, never()).chatJson(anyString(), anyString(), eq("summary"));
         verify(mapper, never()).casAiSummaryStatus(eq(RECORD_ID), anyString(), anyString());
         verify(mapper, never()).updateAiSummarySuccess(any());
     }
@@ -135,14 +135,14 @@ class AiCallSummaryServiceImplTest
     {
         record.setAiSummaryStatus("2");
         record.setAiSummary("旧小结");
-        when(modelConfigService.chatJson(anyString(), anyString())).thenReturn(JSON_OK);
+        when(modelConfigService.chatJson(anyString(), anyString(), eq("summary"))).thenReturn(JSON_OK);
 
         AiCallRecord out = service.generateSummary(RECORD_ID, true);
 
         assertThat(out.getAiSummaryStatus()).isEqualTo("2");
         assertThat(out.getAiSummary()).contains("【案情摘要】");
         verify(mapper).casAiSummaryStatus(RECORD_ID, "2", "1");
-        verify(modelConfigService).chatJson(anyString(), anyString());
+        verify(modelConfigService).chatJson(anyString(), anyString(), eq("summary"));
     }
 
     @Test
@@ -152,7 +152,7 @@ class AiCallSummaryServiceImplTest
 
         service.generateSummary(RECORD_ID, false);
 
-        verify(modelConfigService, never()).chatJson(anyString(), anyString());
+        verify(modelConfigService, never()).chatJson(anyString(), anyString(), eq("summary"));
         verify(mapper, never()).casAiSummaryStatus(eq(RECORD_ID), anyString(), anyString());
     }
 
@@ -163,14 +163,14 @@ class AiCallSummaryServiceImplTest
 
         service.generateSummary(RECORD_ID, false);
 
-        verify(modelConfigService, never()).chatJson(anyString(), anyString());
+        verify(modelConfigService, never()).chatJson(anyString(), anyString(), eq("summary"));
         verify(mapper, never()).updateAiSummarySuccess(any());
     }
 
     @Test
     void generateSummary_modelThrows_marksFailAndDoesNotPropagate()
     {
-        when(modelConfigService.chatJson(anyString(), anyString()))
+        when(modelConfigService.chatJson(anyString(), anyString(), eq("summary")))
                 .thenThrow(new RuntimeException("模型服务繁忙"));
 
         AiCallRecord out = service.generateSummary(RECORD_ID, false);
@@ -189,7 +189,7 @@ class AiCallSummaryServiceImplTest
         AiCallRecord out = service.generateSummary(RECORD_ID, false);
 
         assertThat(out).isSameAs(record);
-        verify(modelConfigService, never()).chatJson(anyString(), anyString());
+        verify(modelConfigService, never()).chatJson(anyString(), anyString(), eq("summary"));
         verify(mapper, never()).casAiSummaryStatus(any(), anyString(), anyString());
         verify(mapper, never()).updateAiSummarySuccess(any());
     }
@@ -207,13 +207,13 @@ class AiCallSummaryServiceImplTest
         record.setTranscript(null);
         record.setContent("咨询老板拖欠工资怎么办");
         record.setAnswer("建议申请劳动仲裁");
-        when(modelConfigService.chatJson(anyString(), anyString())).thenReturn(JSON_OK);
+        when(modelConfigService.chatJson(anyString(), anyString(), eq("summary"))).thenReturn(JSON_OK);
 
         AiCallRecord out = service.generateSummary(RECORD_ID, false);
 
         assertThat(out.getAiSummaryStatus()).isEqualTo("2");
         ArgumentCaptor<String> userCaptor = ArgumentCaptor.forClass(String.class);
-        verify(modelConfigService).chatJson(anyString(), userCaptor.capture());
+        verify(modelConfigService).chatJson(anyString(), userCaptor.capture(), eq("summary"));
         assertThat(userCaptor.getValue()).contains("群众咨询：咨询老板拖欠工资怎么办")
                 .contains("坐席解答：建议申请劳动仲裁");
     }
