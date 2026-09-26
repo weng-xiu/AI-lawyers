@@ -1,6 +1,10 @@
 package ai.lawyers.framework.websocket;
 
 import java.net.InetAddress;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -12,12 +16,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.connection.MessageListener;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.RedisCallback;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import ai.lawyers.framework.websocket.voice.VoiceSessionManager;
 
 /**
  * WebSocket 跨实例消息中转（N4）。
@@ -28,9 +36,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *   <li><b>跨实例 fan-out</b>：任一点产生的推送发布到统一频道 {@value #CHANNEL}，
  *       所有实例订阅；收到后仅投递给本机持有的连接，来源实例跳过自己发出的消息
  *       （避免与本地直发重复）。</li>
- *   <li><b>在线注册表</b>：坐席签入后在 Redis 写 {@code ai-law:ws:presence:call:{userId}}
- *       （值为实例ID，带 TTL），心跳定时续期，最后一条本地连接关闭时 CAS 删除，
- *       供运维从 Redis 侧观察全局在线情况。</li>
+ *   <li><b>在线注册表（每实例 key，P3-C2 加固）</b>：坐席在本机建立连接后写
+ *       {@code ai-law:ws:presence:call:{userId}:{instanceId}}（带 TTL），
+ *       心跳仅续期本实例 key、本实例最后一条连接关闭时直接删除本实例 key；
+ *       同一坐席同时连接多个实例时各实例 key 并存，任一实例断连不影响其他实例的
+ *       在线标记（修复早期单值 key 被覆盖、CAS 删除导致假离线的缺陷）；
+ *       全局在线判定 = 该坐席前缀下是否存在任一实例 key。</li>
+ *   <li><b>语音会话注册表</b>：{@code /ws/voice} 连接登记
+ *       {@code ai-law:ws:presence:voice:{sessionId}:{role}:{instanceId}}（值=connId），
+ *       供跨实例查询"语音会话锚定在哪台实例"；本批不做二进制帧跨实例转发
+ *       （部署用 nginx sticky 或随 C6 扩展帧中继）。</li>
  * </ol>
  *
  * <p><b>回退开关</b>：{@code websocket.cluster.enabled=false}（默认）时本 Bean 不装配，
@@ -48,8 +63,11 @@ public class WsClusterRelay implements MessageListener
     /** 跨实例 fan-out 统一频道 */
     public static final String CHANNEL = "ai-law:ws:fanout";
 
-    /** 呼叫坐席在线注册表 key 前缀（key = 前缀 + userId） */
+    /** 呼叫坐席在线注册表 key 前缀（完整 key = 前缀 + userId + ':' + instanceId） */
     private static final String PRESENCE_PREFIX = "ai-law:ws:presence:call:";
+
+    /** 语音会话注册表 key 前缀（完整 key = 前缀 + sessionId + ':' + role + ':' + instanceId） */
+    private static final String VOICE_PRESENCE_PREFIX = "ai-law:ws:presence:voice:";
 
     /** 在线键 TTL（秒），必须大于心跳间隔 */
     private static final long PRESENCE_TTL_SECONDS = 60;
@@ -57,17 +75,15 @@ public class WsClusterRelay implements MessageListener
     /** 心跳续期间隔（秒） */
     private static final long HEARTBEAT_SECONDS = 20;
 
+    /** SCAN hint（presence key 总量≈在线坐席×实例数，规模小） */
+    private static final long SCAN_HINT_COUNT = 200L;
+
     /** 消息类别：呼叫定向推送给某 userId */
     private static final String CAT_CALL_USER = "CU";
     /** 消息类别：呼叫全员广播 */
     private static final String CAT_CALL_BROADCAST = "CB";
     /** 消息类别：图文会话房间广播 */
     private static final String CAT_CHAT = "CH";
-
-    /** 仅当键值等于本实例ID时删除（CAS），避免删掉其他实例的在线标记 */
-    private static final DefaultRedisScript<Long> RELEASE_PRESENCE_SCRIPT = new DefaultRedisScript<>(
-            "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
-            Long.class);
 
     /** 单机回退时为 null，静态入口据此静默跳过 Redis 路径 */
     private static volatile WsClusterRelay instance;
@@ -122,6 +138,10 @@ public class WsClusterRelay implements MessageListener
             for (Long userId : CallWebSocketServer.localUserIds())
             {
                 unregisterCallUser(userId);
+            }
+            for (VoiceSessionManager.VoiceRef ref : VoiceSessionManager.localVoiceRefs())
+            {
+                unregisterVoice(ref.sessionId, ref.role);
             }
         }
         catch (Exception ignored)
@@ -205,15 +225,15 @@ public class WsClusterRelay implements MessageListener
         }
     }
 
-    // ===================== 在线注册表 =====================
+    // ===================== 呼叫坐席在线注册表 =====================
 
-    /** 坐席在本机建立连接时登记（覆盖写+TTL，后续由心跳续期） */
+    /** 坐席在本机建立连接时登记本实例 key（多实例并存不互相覆盖，TTL 由心跳续期） */
     public void registerCallUser(Long userId)
     {
         if (userId == null) return;
         try
         {
-            stringRedisTemplate.opsForValue().set(presenceKey(userId), instanceId,
+            stringRedisTemplate.opsForValue().set(callPresenceKey(userId), instanceId,
                     PRESENCE_TTL_SECONDS, TimeUnit.SECONDS);
         }
         catch (Exception e)
@@ -222,14 +242,13 @@ public class WsClusterRelay implements MessageListener
         }
     }
 
-    /** 本实例该坐席最后一条连接关闭时，仅当标记仍属于本实例才删除 */
+    /** 本实例该坐席最后一条连接关闭时删除本实例 key（不触碰其他实例 key，无需 CAS） */
     public void unregisterCallUser(Long userId)
     {
         if (userId == null) return;
         try
         {
-            stringRedisTemplate.execute(RELEASE_PRESENCE_SCRIPT,
-                    java.util.Collections.singletonList(presenceKey(userId)), instanceId);
+            stringRedisTemplate.delete(callPresenceKey(userId));
         }
         catch (Exception e)
         {
@@ -237,14 +256,118 @@ public class WsClusterRelay implements MessageListener
         }
     }
 
-    /** 为当前本机所有在线坐席续期（在线标记只要求"任一实例在线"，覆盖写本实例ID即可） */
+    /**
+     * 全局在线判定：该坐席在任一实例上存在 presence key。
+     * Redis 异常时保守返回 false（调用方可按需先查本地）。
+     */
+    public boolean isCallUserOnline(Long userId)
+    {
+        if (userId == null) return false;
+        try
+        {
+            return !scanKeys(PRESENCE_PREFIX + userId + ":*").isEmpty();
+        }
+        catch (Exception e)
+        {
+            log.warn("[WsCluster] 全局在线判定失败 userId={}: {}", userId, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * 全集群去重在线坐席数（同一坐席多实例/多连接只计一次）。Redis 异常返回 0。
+     */
+    public int globalOnlineCount()
+    {
+        try
+        {
+            Set<String> userIds = new HashSet<>();
+            for (String key : scanKeys(PRESENCE_PREFIX + "*"))
+            {
+                String tail = key.substring(PRESENCE_PREFIX.length());
+                int sep = tail.lastIndexOf(':');
+                if (sep > 0)
+                {
+                    userIds.add(tail.substring(0, sep));
+                }
+            }
+            return userIds.size();
+        }
+        catch (Exception e)
+        {
+            log.warn("[WsCluster] 全局在线数统计失败: {}", e.getMessage());
+            return 0;
+        }
+    }
+
+    // ===================== 语音会话注册表 =====================
+
+    /** /ws/voice 建连时登记（key 含实例，值为 connId，TTL 由心跳续期） */
+    public void registerVoice(String sessionId, String role, String connId)
+    {
+        if (sessionId == null || role == null) return;
+        try
+        {
+            stringRedisTemplate.opsForValue().set(voicePresenceKey(sessionId, role),
+                    connId == null ? "" : connId, PRESENCE_TTL_SECONDS, TimeUnit.SECONDS);
+        }
+        catch (Exception e)
+        {
+            log.warn("[WsCluster] 语音在线登记失败 sessionId={}, role={}: {}", sessionId, role, e.getMessage());
+        }
+    }
+
+    /** /ws/voice 断连时删除本实例 key */
+    public void unregisterVoice(String sessionId, String role)
+    {
+        if (sessionId == null || role == null) return;
+        try
+        {
+            stringRedisTemplate.delete(voicePresenceKey(sessionId, role));
+        }
+        catch (Exception e)
+        {
+            log.warn("[WsCluster] 语音在线注销失败 sessionId={}, role={}: {}", sessionId, role, e.getMessage());
+        }
+    }
+
+    /**
+     * 查询持有指定语音会话（sessionId+role）的全部实例ID；空集合表示无实例锚定。
+     */
+    public Set<String> voiceInstances(String sessionId, String role)
+    {
+        Set<String> instances = new HashSet<>();
+        if (sessionId == null || role == null) return instances;
+        try
+        {
+            String pattern = VOICE_PRESENCE_PREFIX + sessionId + ":" + role + ":*";
+            for (String key : scanKeys(pattern))
+            {
+                instances.add(key.substring(key.lastIndexOf(':') + 1));
+            }
+        }
+        catch (Exception e)
+        {
+            log.warn("[WsCluster] 语音实例查询失败 sessionId={}, role={}: {}", sessionId, role, e.getMessage());
+        }
+        return instances;
+    }
+
+    // ===================== 心跳与内部工具 =====================
+
+    /** 为本机全部呼叫/语音 presence key 续期（只续本实例 key） */
     private void refreshLocalPresence()
     {
         try
         {
             for (Long userId : CallWebSocketServer.localUserIds())
             {
-                stringRedisTemplate.expire(presenceKey(userId), PRESENCE_TTL_SECONDS, TimeUnit.SECONDS);
+                stringRedisTemplate.expire(callPresenceKey(userId), PRESENCE_TTL_SECONDS, TimeUnit.SECONDS);
+            }
+            for (VoiceSessionManager.VoiceRef ref : VoiceSessionManager.localVoiceRefs())
+            {
+                stringRedisTemplate.expire(voicePresenceKey(ref.sessionId, ref.role),
+                        PRESENCE_TTL_SECONDS, TimeUnit.SECONDS);
             }
         }
         catch (Exception e)
@@ -253,9 +376,32 @@ public class WsClusterRelay implements MessageListener
         }
     }
 
-    private static String presenceKey(Long userId)
+    /** SCAN（cursor + hint，不用 KEYS）匹配 key 快照 */
+    private List<String> scanKeys(String pattern)
     {
-        return PRESENCE_PREFIX + userId;
+        return stringRedisTemplate.execute((RedisCallback<List<String>>) connection ->
+        {
+            List<String> keys = new ArrayList<>();
+            ScanOptions options = ScanOptions.scanOptions().match(pattern).count(SCAN_HINT_COUNT).build();
+            try (Cursor<byte[]> cursor = connection.scan(options))
+            {
+                while (cursor.hasNext())
+                {
+                    keys.add(new String(cursor.next(), java.nio.charset.StandardCharsets.UTF_8));
+                }
+            }
+            return keys;
+        });
+    }
+
+    private String callPresenceKey(Long userId)
+    {
+        return PRESENCE_PREFIX + userId + ":" + instanceId;
+    }
+
+    private String voicePresenceKey(String sessionId, String role)
+    {
+        return VOICE_PRESENCE_PREFIX + sessionId + ":" + role + ":" + instanceId;
     }
 
     /** @return 本实例ID（运维排障用） */

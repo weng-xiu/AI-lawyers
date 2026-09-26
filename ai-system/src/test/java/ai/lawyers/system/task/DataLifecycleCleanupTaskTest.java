@@ -162,4 +162,30 @@ class DataLifecycleCleanupTaskTest
         assertThat(DataLifecycleCleanupTask.resolveRecordingFile("/data/rec", "  ")).isNull();
         assertThat(DataLifecycleCleanupTask.resolveRecordingFile("", "2026/a.wav")).isNull();
     }
+
+    @Test
+    void doCleanup_p3F1_includesQualityInspectionAndAgentMessage()
+    {
+        // P3-F1 纳管：质检记录（12 个月）与智能体对话消息（6 个月）进入清理清单
+        ReflectionTestUtils.setField(task, "qualityInspectionMonths", 12);
+        ReflectionTestUtils.setField(task, "agentMessageMonths", 6);
+        when(jdbc.update(anyString(), any(Timestamp.class), eq(1000))).thenReturn(0);
+        when(jdbc.queryForList(anyString(), any(Timestamp.class), eq(1000)))
+                .thenReturn(new ArrayList<>());
+
+        task.doCleanup();
+
+        org.mockito.ArgumentCaptor<String> sqlCaptor =
+                org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(jdbc, Mockito.atLeastOnce()).update(sqlCaptor.capture(), any(Timestamp.class), eq(1000));
+        List<String> sqls = sqlCaptor.getAllValues();
+        assertThat(sqls).anyMatch(s -> s.startsWith("delete from ai_quality_inspection"));
+        assertThat(sqls).anyMatch(s -> s.startsWith("delete from ai_agent_message"));
+        // 引用 record_id 的流水表必须先于话单清理（buildSpecs 顺序保证）
+        int qualityIdx = sqls.indexOf(
+                sqls.stream().filter(s -> s.startsWith("delete from ai_quality_inspection")).findFirst().orElse(""));
+        int dialIdx = sqls.indexOf(
+                sqls.stream().filter(s -> s.startsWith("delete from ai_call_dial_log")).findFirst().orElse(""));
+        assertThat(qualityIdx).isGreaterThan(dialIdx);
+    }
 }

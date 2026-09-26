@@ -1,5 +1,7 @@
 package ai.lawyers.framework.websocket.voice;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
@@ -8,13 +10,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import ai.lawyers.framework.websocket.WsClusterRelay;
 
 /**
  * /ws/voice 本机连接注册表（P3-A1）。
  *
  * <p>key=WebSocket connId（{@code Session.getId()}）；注册即创建
  * {@link VoiceSession}（含保序发送线程），注销幂等释放全部引擎句柄。
- * 跨实例消息路由（语音会话锚定）随多实例部署批次扩展，A1 仅维护本机表。</p>
+ * P3-C2：注册/注销同步外置到 Redis 语音会话注册表（经 {@link WsClusterRelay}，
+ * 集群未开启时空操作），供跨实例锚定查询；二进制帧跨实例转发仍随 C6。</p>
  *
  * <p>配置：{@code websocket.voice.enabled}（默认 true，关闭时拒连）、
  * {@code websocket.voice.max-sessions}（默认 200，超限拒连保护线程/内存）、
@@ -76,6 +80,11 @@ public class VoiceSessionManager
             return old;
         }
         session.sendConnected();
+        WsClusterRelay relay = WsClusterRelay.getInstance();
+        if (relay != null)
+        {
+            relay.registerVoice(sessionId, role, wsSession.getId());
+        }
         log.info("VoiceWS connect sessionId={}, role={}, connId={}, online={}",
                 sessionId, role, wsSession.getId(), sessions.size());
         return session;
@@ -87,9 +96,59 @@ public class VoiceSessionManager
         VoiceSession session = sessions.remove(connId);
         if (session != null)
         {
+            WsClusterRelay relay = WsClusterRelay.getInstance();
+            if (relay != null)
+            {
+                relay.unregisterVoice(session.getSessionId(), session.getRole());
+            }
             session.shutdown();
             log.info("VoiceWS disconnect connId={}, remaining={}", connId, sessions.size());
         }
+    }
+
+    /**
+     * P3-C2：本机当前持有的语音会话引用快照（sessionId+role），供 presence 心跳续期。
+     */
+    public static List<VoiceRef> localVoiceRefs()
+    {
+        return getCurrentManager().collectVoiceRefs();
+    }
+
+    /** 实例侧收集本机语音会话引用 */
+    List<VoiceRef> collectVoiceRefs()
+    {
+        List<VoiceRef> refs = new ArrayList<>();
+        for (VoiceSession s : sessions.values())
+        {
+            refs.add(new VoiceRef(s.getSessionId(), s.getRole()));
+        }
+        return refs;
+    }
+
+    /**
+     * 语音会话引用（心跳快照用）。
+     */
+    public static final class VoiceRef
+    {
+        /** 图文/语音会话ID */
+        public final String sessionId;
+        /** agent/caller */
+        public final String role;
+
+        VoiceRef(String sessionId, String role)
+        {
+            this.sessionId = sessionId;
+            this.role = role;
+        }
+    }
+
+    /**
+     * localVoiceRefs 是静态方法（供 WsClusterRelay 静态调用），通过当前装配实例取本机表；
+     * 未开启集群时该方法不会被调用。
+     */
+    private static VoiceSessionManager getCurrentManager()
+    {
+        return ai.lawyers.common.utils.spring.SpringUtils.getBean(VoiceSessionManager.class);
     }
 
     public VoiceSession get(String connId)

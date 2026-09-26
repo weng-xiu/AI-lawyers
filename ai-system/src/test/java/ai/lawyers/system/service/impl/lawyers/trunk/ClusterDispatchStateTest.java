@@ -2,10 +2,8 @@ package ai.lawyers.system.service.impl.lawyers.trunk;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -14,10 +12,11 @@ import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.concurrent.TimeUnit;
+import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.data.redis.core.ZSetOperations;
@@ -28,8 +27,9 @@ import ai.lawyers.system.domain.lawyers.trunk.DialRequest;
 /**
  * N2：集群调度状态底座（Redis 版）单测。
  *
- * <p>覆盖：全局并发原子占位（成功/已满/Redis 故障 fail-closed）、CPS 限速计数与过期、
- * 呼叫-线路映射、排队入队容量校验与出队反序列化。</p>
+ * <p>覆盖：全局并发原子占位（成功/已满/Redis 故障 fail-closed）、释放 Lua 下界保护、
+ * 看门狗漂移矫正（漂移/无漂移/负值兜底/Redis 异常）、CPS 原子 INCR+PEXPIRE、
+ * 呼叫-线路映射与 SCAN、排队入队容量校验与出队反序列化。</p>
  *
  * @author ai-lawyers
  */
@@ -83,10 +83,23 @@ class ClusterDispatchStateTest
     }
 
     @Test
-    void releaseGlobalConcurrent_callsDecr()
+    void releaseGlobalConcurrent_callsSafeDecrScript()
     {
         state.releaseGlobalConcurrent();
-        verify(valueOps, times(1)).decrement("call:dispatch:global-concurrent");
+        // Lua 下界保护脚本：仅计数>0才 DECR，不带 ARGV
+        verify(redis, times(1)).execute(any(),
+                eq(Collections.singletonList("call:dispatch:global-concurrent")));
+        verify(valueOps, never()).decrement(anyString());
+    }
+
+    @Test
+    void releaseGlobalConcurrent_redisFailure_swallowed()
+    {
+        org.mockito.Mockito.doThrow(new RuntimeException("down"))
+                .when(redis).execute(any(), any(java.util.List.class));
+
+        // 异常不外抛，靠线路 DB 并发与看门狗漂移矫正兜底
+        state.releaseGlobalConcurrent();
     }
 
     @Test
@@ -106,31 +119,85 @@ class ClusterDispatchStateTest
         verify(redis, times(1)).delete("call:dispatch:global-concurrent");
     }
 
-    // ---------- CPS 限速 ----------
+    // ---------- 全局并发漂移矫正 ----------
 
     @Test
-    void acquireCps_firstCount_setsExpireAndReturnsTrue()
+    void reconcile_drift_returnsReclaimedAndTargetsDbValue()
     {
-        when(valueOps.increment("call:dispatch:cps:7")).thenReturn(1L);
+        // DB 线路并发合计=30，余量=8 → ceiling=38；脚本返回回收 10 个槽位
+        when(redis.execute(any(org.springframework.data.redis.core.script.RedisScript.class),
+                any(java.util.List.class), any(), any())).thenReturn(10L);
 
-        assertThat(state.acquireCps(7L, 5)).isTrue();
-        verify(redis, times(1)).expire(eq("call:dispatch:cps:7"), eq(1L), eq(TimeUnit.SECONDS));
+        assertThat(state.reconcileGlobalConcurrent(30, 8)).isEqualTo(10L);
+        // Lua 参数：ceiling=38、target=30（矫正到权威值而非上限）
+        verify(redis, times(1)).execute(any(),
+                eq(Collections.singletonList("call:dispatch:global-concurrent")),
+                eq("38"), eq("30"));
     }
 
     @Test
-    void acquireCps_underLimit_returnsTrueWithoutExpire()
+    void reconcile_noDrift_returnsZero()
     {
-        when(valueOps.increment("call:dispatch:cps:7")).thenReturn(3L);
+        when(redis.execute(any(org.springframework.data.redis.core.script.RedisScript.class),
+                any(java.util.List.class), any(), any())).thenReturn(0L);
+
+        assertThat(state.reconcileGlobalConcurrent(50, 8)).isZero();
+    }
+
+    @Test
+    void reconcile_negativeAuthoritative_floorsToZero()
+    {
+        // 权威值异常为负（不应发生）：ceiling=max(0,-5+8)=3（先加余量再兜底）、target=0，
+        // 矫正只能向下到 0，方向安全
+        when(redis.execute(any(org.springframework.data.redis.core.script.RedisScript.class),
+                any(java.util.List.class), any(), any())).thenReturn(0L);
+
+        assertThat(state.reconcileGlobalConcurrent(-5, 8)).isZero();
+        verify(redis).execute(any(),
+                eq(Collections.singletonList("call:dispatch:global-concurrent")),
+                eq("3"), eq("0"));
+    }
+
+    @Test
+    void reconcile_redisFailure_returnsMinusOne()
+    {
+        when(redis.execute(any(org.springframework.data.redis.core.script.RedisScript.class),
+                any(java.util.List.class), any(), any()))
+                .thenThrow(new RuntimeException("connection lost"));
+
+        // -1 表示本轮未矫正，下个周期再试
+        assertThat(state.reconcileGlobalConcurrent(30, 8)).isEqualTo(-1L);
+    }
+
+    // ---------- CPS 限速 ----------
+
+    @Test
+    void acquireCps_firstCount_returnsTrueViaAtomicScript()
+    {
+        // Lua 原子 INCR + 首次 PEXPIRE，返回 1
+        when(redis.execute(any(), any(), any())).thenReturn(1L);
 
         assertThat(state.acquireCps(7L, 5)).isTrue();
-        // 非首次计数不应重复设置过期
-        verify(redis, never()).expire(anyString(), anyLong(), any());
+        verify(redis, times(1)).execute(any(),
+                eq(Collections.singletonList("call:dispatch:cps:7")), eq("1000"));
+        // 不再有独立的 expire 往返（消除 INCR 成功/EXPIRE 丢失导致的永久卡限）
+        verify(redis, never()).expire(anyString(),
+                org.mockito.ArgumentMatchers.anyLong(),
+                any(java.util.concurrent.TimeUnit.class));
+    }
+
+    @Test
+    void acquireCps_underLimit_returnsTrue()
+    {
+        when(redis.execute(any(), any(), any())).thenReturn(3L);
+
+        assertThat(state.acquireCps(7L, 5)).isTrue();
     }
 
     @Test
     void acquireCps_overLimit_returnsFalse()
     {
-        when(valueOps.increment("call:dispatch:cps:7")).thenReturn(6L);
+        when(redis.execute(any(), any(), any())).thenReturn(6L);
 
         assertThat(state.acquireCps(7L, 5)).isFalse();
     }
@@ -139,13 +206,14 @@ class ClusterDispatchStateTest
     void acquireCps_zeroLimit_bypass()
     {
         assertThat(state.acquireCps(7L, 0)).isTrue();
-        verify(valueOps, never()).increment(anyString());
+        verify(redis, never()).execute(any(org.springframework.data.redis.core.script.RedisScript.class),
+                any(java.util.List.class), any());
     }
 
     @Test
     void acquireCps_redisFailure_failOpen()
     {
-        when(valueOps.increment("call:dispatch:cps:7")).thenThrow(new RuntimeException("down"));
+        when(redis.execute(any(), any(), any())).thenThrow(new RuntimeException("down"));
 
         // fail-open：CPS 为软限速，Redis 故障不阻断呼叫
         assertThat(state.acquireCps(7L, 5)).isTrue();
@@ -157,7 +225,8 @@ class ClusterDispatchStateTest
     void trunkHolder_holdGetRelease()
     {
         state.holdTrunk("uuid-1", 7L);
-        verify(valueOps).set(eq("call:dispatch:trunk:uuid-1"), eq("7"), eq(3600L), eq(TimeUnit.SECONDS));
+        verify(valueOps).set(eq("call:dispatch:trunk:uuid-1"), eq("7"),
+                eq(3600L), eq(java.util.concurrent.TimeUnit.SECONDS));
 
         when(valueOps.get("call:dispatch:trunk:uuid-1")).thenReturn("7");
         assertThat(state.getTrunk("uuid-1")).isEqualTo(7L);
@@ -171,6 +240,26 @@ class ClusterDispatchStateTest
     {
         when(valueOps.get("call:dispatch:trunk:missing")).thenReturn(null);
         assertThat(state.getTrunk("missing")).isNull();
+    }
+
+    @Test
+    void scanTrunkHolders_returnsUuids()
+    {
+        // RedisCallback 在 mock 中不会真实执行，直接桩回调返回值即可
+        when(redis.execute(any(RedisCallback.class)))
+                .thenReturn(Arrays.asList("uuid-a", "uuid-b"));
+
+        List<String> uuids = state.scanTrunkHolders();
+
+        assertThat(uuids).containsExactly("uuid-a", "uuid-b");
+    }
+
+    @Test
+    void scanTrunkHolders_redisFailure_returnsEmptyList()
+    {
+        when(redis.execute(any(RedisCallback.class))).thenThrow(new RuntimeException("down"));
+
+        assertThat(state.scanTrunkHolders()).isEmpty();
     }
 
     // ---------- 排队队列 ----------

@@ -458,6 +458,11 @@ public class VoiceSession
         return sessionId;
     }
 
+    String getRole()
+    {
+        return role;
+    }
+
     boolean isAsrActive()
     {
         return asrActive;

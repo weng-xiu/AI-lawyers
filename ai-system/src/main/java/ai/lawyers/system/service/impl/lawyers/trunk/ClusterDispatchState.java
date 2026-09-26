@@ -1,5 +1,7 @@
 package ai.lawyers.system.service.impl.lawyers.trunk;
 
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -8,6 +10,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.RedisCallback;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
@@ -24,13 +29,20 @@ import ai.lawyers.system.domain.lawyers.trunk.DialRequest;
  * <ul>
  *   <li><b>全局并发</b>：Lua 原子 "get &lt; max 则 incr"，杜绝本地 check-then-act 竞态；
  *       Redis 故障时 <b>fail-closed</b>（返回满），避免突破运营商并发限额；</li>
- *   <li><b>线路 CPS</b>：每秒级 INCR 计数（首次 INCR 设 1s TTL），Redis 故障时
- *       <b>fail-open</b>（放行，CPS 为软限速，不阻断呼叫）；</li>
+ *   <li><b>线路 CPS</b>：Lua 原子完成 INCR + 首次 PEXPIRE（避免两次往返间故障导致
+ *       key 永不过期、中继被永久限死），Redis 故障时 <b>fail-open</b>
+ *       （放行，CPS 为软限速，不阻断呼叫）；</li>
  *   <li><b>呼叫-线路占用</b>：callUuid→trunkId 单 key（1h TTL 自动清理），挂断时优先查 Redis，
- *       未命中再回退 DB（{@code ai_call_dial_log.trunk_id}）；</li>
+ *       未命中再回退 DB（{@code ai_call_dial_log.trunk_id}）；残留 holder 由看门狗
+ *       {@code DispatchStateWatchdogTask} 分钟级主动回收；</li>
  *   <li><b>排队队列</b>：Redis Sorted Set，score = priority * 1e13 + 入队毫秒，
  *       ZPOPMIN 原子出队，天然实现多实例负载分发，无需额外选主锁。</li>
  * </ul>
+ *
+ * <p><b>看门狗自愈（P3-C1）</b>：全局并发释放使用 Lua 下界保护（计数不会被迟到/重复释放
+ * 打成负数而变相突破上限）；{@code reconcileGlobalConcurrent} 以 DB 线路并发合计为权威，
+ * 仅当 Redis 计数高于「权威值 + 在途余量」时原子向下矫正（只收缩不扩张，安全方向），
+ * 兜底 DECR 丢失造成的槽位泄漏。</p>
  *
  * <p><b>回退开关</b>：{@code call.dispatch.cluster.enabled=false}（默认）时本组件不被调用，
  * 调度服务走原 JVM 内存态实现，零行为变化。</p>
@@ -74,6 +86,46 @@ public class ClusterDispatchState
           + "return r",
             List.class);
 
+    /**
+     * CPS 计数原子脚本：INCR 后仅在首次（v==1）设置毫秒级过期，单脚本保证
+     * "计数 + 过期"原子完成。若沿用 INCR/EXPIRE 两次往返，中间进程/节点故障会留下
+     * 无 TTL 的计数 key，该中继将被永久卡在 CPS 上限。
+     */
+    private static final DefaultRedisScript<Long> ACQUIRE_CPS_SCRIPT = new DefaultRedisScript<>(
+            "local v = redis.call('incr', KEYS[1]) "
+          + "if v == 1 then redis.call('pexpire', KEYS[1], ARGV[1]) end "
+          + "return v",
+            Long.class);
+
+    /**
+     * 全局并发释放下界保护：仅当当前计数 &gt; 0 才 DECR，返回释放后的计数；
+     * 计数为 0（迟到释放/重复释放/启动 reset 后的残留回调）时返回 0 不下探，
+     * 防止计数变负后实际放行超过 maxGlobalConcurrent。
+     */
+    private static final DefaultRedisScript<Long> RELEASE_GLOBAL_SCRIPT = new DefaultRedisScript<>(
+            "local v = tonumber(redis.call('get', KEYS[1]) or '0') "
+          + "if v > 0 then return redis.call('decr', KEYS[1]) else return 0 end",
+            Long.class);
+
+    /**
+     * 全局并发漂移矫正（看门狗用）：服务端原子比较——当前值 &gt; ceiling 才 SET 为 target，
+     * 返回回收的槽位数；无漂移返回 0。只允许向下矫正，杜绝 Java 侧 check-then-set 窗口。
+     */
+    private static final DefaultRedisScript<Long> RECONCILE_GLOBAL_SCRIPT = new DefaultRedisScript<>(
+            "local cur = tonumber(redis.call('get', KEYS[1]) or '0') "
+          + "local ceiling = tonumber(ARGV[1]) "
+          + "if cur > ceiling then "
+          + "  redis.call('set', KEYS[1], ARGV[2]) "
+          + "  return cur - tonumber(ARGV[2]) "
+          + "else return 0 end",
+            Long.class);
+
+    /** CPS 计数窗口长度（毫秒） */
+    private static final long CPS_WINDOW_MILLIS = 1000L;
+
+    /** SCAN 批次提示量（非硬上限），避免 holder 扫描阻塞 Redis */
+    private static final long SCAN_HINT_COUNT = 200L;
+
     /** score 放大因子：priority * SCORE_SCALE + enqueueTimeMs，保证优先级主导、同优先级按入队时间 FIFO */
     private static final double SCORE_SCALE = 1e13;
 
@@ -113,12 +165,16 @@ public class ClusterDispatchState
         }
     }
 
-    /** 释放一个全局并发槽位（Redis 异常仅记录，靠线路级 DB 并发兜底）。 */
+    /**
+     * 释放一个全局并发槽位（Lua 下界保护，计数不会下探为负）。
+     * Redis 异常仅记录，靠线路级 DB 并发与看门狗漂移矫正兜底。
+     */
     public void releaseGlobalConcurrent()
     {
         try
         {
-            stringRedisTemplate.opsForValue().decrement(KEY_GLOBAL);
+            stringRedisTemplate.execute(RELEASE_GLOBAL_SCRIPT,
+                    Collections.singletonList(KEY_GLOBAL));
         }
         catch (Exception e)
         {
@@ -158,10 +214,44 @@ public class ClusterDispatchState
         }
     }
 
+    /**
+     * 全局并发计数漂移矫正（看门狗单主调用）。
+     *
+     * <p>以 DB 侧线路并发合计 {@code authoritative}（全部启用线路 current_concurrent 之和）
+     * 为权威值：占位顺序为"先线路 DB 后 Redis 全局"、释放顺序相反，故存在短暂在途偏差，
+     * 用 {@code inflightMargin} 作为容忍带。仅当 Redis 当前计数高于
+     *「权威值 + 余量」（即 DECR 丢失导致的槽位泄漏方向）才原子向下矫正为权威值；
+     * <b>绝不向上调高</b>，保证不突破运营商并发限额（fail-closed 安全方向）。</p>
+     *
+     * @param authoritative DB 侧全部启用线路当前并发合计
+     * @param inflightMargin 在途容忍余量（覆盖占位/释放两阶段的提交窗口）
+     * @return 实际回收（向下矫正）的槽位数；0 表示无漂移；-1 表示 Redis 异常本轮未矫正
+     */
+    public long reconcileGlobalConcurrent(int authoritative, int inflightMargin)
+    {
+        int target = Math.max(0, authoritative);
+        int ceiling = Math.max(0, authoritative + inflightMargin);
+        try
+        {
+            Long r = stringRedisTemplate.execute(RECONCILE_GLOBAL_SCRIPT,
+                    Collections.singletonList(KEY_GLOBAL),
+                    String.valueOf(ceiling), String.valueOf(target));
+            return r == null ? -1L : r;
+        }
+        catch (Exception e)
+        {
+            log.warn("全局并发漂移矫正 Redis 异常，跳过本轮: {}", e.getMessage());
+            return -1L;
+        }
+    }
+
     // ------------------------------------------------------------------ CPS 限速
 
     /**
      * 尝试获取一个 CPS 令牌。
+     *
+     * <p>Lua 原子 INCR + 首次 PEXPIRE 1s，形成秒级计数窗口；单次往返避免
+     * "INCR 成功但 EXPIRE 丢失"造成中继永久卡限。</p>
      *
      * @return true 放行；false 达到该线路 CPS 上限；Redis 故障返回 true（fail-open）
      */
@@ -173,13 +263,9 @@ public class ClusterDispatchState
         }
         try
         {
-            String key = KEY_CPS_PREFIX + trunkId;
-            Long v = stringRedisTemplate.opsForValue().increment(key);
-            if (v != null && v == 1L)
-            {
-                // 首次计数设置 1 秒过期，形成滑动秒窗口
-                stringRedisTemplate.expire(key, 1, java.util.concurrent.TimeUnit.SECONDS);
-            }
+            Long v = stringRedisTemplate.execute(ACQUIRE_CPS_SCRIPT,
+                    Collections.singletonList(KEY_CPS_PREFIX + trunkId),
+                    String.valueOf(CPS_WINDOW_MILLIS));
             return v == null || v <= limit;
         }
         catch (Exception e)
@@ -241,6 +327,44 @@ public class ClusterDispatchState
         catch (Exception e)
         {
             log.debug("呼叫线路占用释放失败 uuid={}: {}", callUuid, e.getMessage());
+        }
+    }
+
+    /**
+     * 扫描全部呼叫-线路占用 holder，返回 callUuid 列表（看门狗残留回收用）。
+     *
+     * <p>使用 CURSOR + SCAN（hint={@value #SCAN_HINT_COUNT}），不使用 KEYS 阻塞 Redis；
+     * holder 总量上限约等于全局并发上限（默认 200），全量扫描代价可控。
+     * 调用方对每个 uuid 查 DB：话单已终态或查无记录即为残留，调 {@link #releaseTrunk} 删除。
+     * holder 仅是挂断定位的加速映射，误删后 hangup 自动回退查 DB，不影响正确性。</p>
+     *
+     * @return holder 对应的 callUuid 列表；Redis 故障返回空列表（本轮跳过）
+     */
+    public List<String> scanTrunkHolders()
+    {
+        try
+        {
+            return stringRedisTemplate.execute((RedisCallback<List<String>>) connection -> {
+                List<String> uuids = new ArrayList<>();
+                ScanOptions options = ScanOptions.scanOptions()
+                        .match(KEY_TRUNK_PREFIX + "*")
+                        .count(SCAN_HINT_COUNT)
+                        .build();
+                try (Cursor<byte[]> cursor = connection.scan(options))
+                {
+                    while (cursor.hasNext())
+                    {
+                        String key = new String(cursor.next(), StandardCharsets.UTF_8);
+                        uuids.add(key.substring(KEY_TRUNK_PREFIX.length()));
+                    }
+                }
+                return uuids;
+            });
+        }
+        catch (Exception e)
+        {
+            log.warn("呼叫线路占用扫描 Redis 异常，跳过本轮: {}", e.getMessage());
+            return Collections.emptyList();
         }
     }
 

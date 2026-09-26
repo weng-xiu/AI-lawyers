@@ -179,6 +179,27 @@ public class CallWebSocketServer
     }
 
     /**
+     * P3-C2：全集群在线判定——本机持有连接直接 true，否则查 Redis presence。
+     * 未开启集群时等价于本机判定。
+     */
+    public static boolean isUserOnlineGlobally(Long userId)
+    {
+        if (userId == null) return false;
+        if (AGENTS.containsKey(userId)) return true;
+        WsClusterRelay relay = WsClusterRelay.getInstance();
+        return relay != null && relay.isCallUserOnline(userId);
+    }
+
+    /**
+     * P3-C2：全集群去重在线坐席数。未开启集群时返回本机在线数。
+     */
+    public static int globalOnlineCount()
+    {
+        WsClusterRelay relay = WsClusterRelay.getInstance();
+        return relay == null ? AGENTS.size() : relay.globalOnlineCount();
+    }
+
+    /**
      * N4：本实例当前持有连接的坐席ID快照，供集群在线注册表心跳续期使用。
      */
     static java.util.Set<Long> localUserIds()

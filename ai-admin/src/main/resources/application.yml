@@ -170,9 +170,28 @@ data:
     video-consult-log-months: ${DATA_RETENTION_VIDEO_LOG_MONTHS:6}
     ivr-execution-log-months: ${DATA_RETENTION_IVR_EXEC_LOG_MONTHS:1}
     ivr-intention-log-months: ${DATA_RETENTION_IVR_INTENTION_LOG_MONTHS:1}
+    # 智能质检记录默认保留 12 个月（P3-F1 纳管），调整前确认复核追溯要求
+    quality-inspection-months: ${DATA_RETENTION_QUALITY_INSPECTION_MONTHS:12}
+    # AI 智能体对话消息默认保留 6 个月（P3-F1 纳管）
+    agent-message-months: ${DATA_RETENTION_AGENT_MESSAGE_MONTHS:6}
     # 话单+录音默认保留 36 个月，调整前必须确认当地政务热线归档合规要求
     call-record-months: ${DATA_RETENTION_CALL_RECORD_MONTHS:36}
     delete-recording-file: ${DATA_RETENTION_DELETE_RECORDING_FILE:true}
+
+  # P3-F1 话单冷热分离归档（DataArchiveTask）：热表超 keep-months 的话单分批迁入
+  # ai_call_record_archive（按月分区，DDL 见 sql/ai_system_f1_archive_partition_20260926.sql）。
+  # 开启前必须先执行归档表 DDL；开启后 N12 对话单自然命中 0 行，录音文件随 F2 管理或用
+  # delete-recording-file-months 过渡接管。默认关闭+dry-run 双保险。
+  archive:
+    enabled: ${DATA_ARCHIVE_ENABLED:false}
+    dry-run: ${DATA_ARCHIVE_DRY_RUN:true}
+    cron: ${DATA_ARCHIVE_CRON:0 40 3 * * ?}
+    batch-size: ${DATA_ARCHIVE_BATCH_SIZE:500}
+    max-batches: ${DATA_ARCHIVE_MAX_BATCHES:200}
+    # 话单在线保留月数（更早迁移归档，历史可查），默认 12 个月
+    keep-months: ${DATA_ARCHIVE_KEEP_MONTHS:12}
+    # 已归档话单的磁盘录音文件到期清理月数（0=关闭；如设 36 删文件并置空 record_file，行保留）
+    delete-recording-file-months: ${DATA_ARCHIVE_DELETE_RECORDING_FILE_MONTHS:0}
 
 # ============================================================
 # AI 大模型调用与 RAG 检索配置（T2-1 连接池 / T3 RAG 混合检索）
@@ -310,6 +329,17 @@ call:
     #       实现跨实例一致的并发限速与负载分发；false（默认）走原 JVM 内存态，单实例零变化。
     cluster:
       enabled: ${CALL_DISPATCH_CLUSTER_ENABLED:false}
+    # [P3-C1] 调度状态看门狗（仅集群模式生效，多实例经 Redis 单主执行）：
+    #   全局并发计数按 DB 线路并发合计做漂移矫正（只向下回收泄漏槽位）+
+    #   残留呼叫线路占用 holder 分钟级清理；watchdog 默认开启，单机模式自动跳过。
+    watchdog:
+      enabled: ${CALL_DISPATCH_WATCHDOG_ENABLED:true}
+      # 扫描间隔(ms)
+      interval-ms: ${CALL_DISPATCH_WATCHDOG_INTERVAL_MS:300000}
+      # 启动后首次扫描延迟(ms)
+      initial-delay-ms: ${CALL_DISPATCH_WATCHDOG_INITIAL_DELAY_MS:120000}
+      # 在途余量：Redis 计数高于「DB线路并发合计+余量」才向下矫正，覆盖占位/释放提交窗口
+      inflight-margin: ${CALL_DISPATCH_WATCHDOG_INFLIGHT_MARGIN:8}
 
   # ---------- 线路监控与告警 ----------
   monitor:

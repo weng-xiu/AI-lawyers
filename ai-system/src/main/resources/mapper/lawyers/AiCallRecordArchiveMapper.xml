@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiCallRecordArchiveMapper">
+
+    <resultMap type="AiCallRecord" id="AiCallRecordArchiveResult">
+        <result property="recordId"        column="record_id"        />
+        <result property="callerNumber"    column="caller_number"    />
+        <result property="callerName"      column="caller_name"      />
+        <result property="callerAddress"   column="caller_address"   />
+        <result property="callTime"        column="call_time"        />
+        <result property="endTime"         column="end_time"         />
+        <result property="duration"        column="duration"         />
+        <result property="agentId"         column="agent_id"         />
+        <result property="categoryId"      column="category_id"      />
+        <result property="content"         column="content"          />
+        <result property="answer"          column="answer"           />
+        <result property="status"          column="status"           />
+        <result property="transferId"      column="transfer_id"      />
+        <result property="ticketId"        column="ticket_id"        />
+        <result property="callUuid"        column="call_uuid"        />
+        <result property="recordFile"      column="record_file"      />
+        <result property="recordingUrl"    column="recording_url"    />
+        <result property="recordDuration"  column="record_duration"  />
+        <result property="asrStatus"       column="asr_status"       />
+        <result property="transcript"      column="transcript"       />
+        <result property="aiSummary"          column="ai_summary"             />
+        <result property="aiSummaryStatus"    column="ai_summary_status"      />
+        <result property="aiSummaryTime"      column="ai_summary_time"        />
+        <result property="aiSummaryFailReason" column="ai_summary_fail_reason" />
+        <result property="agentName"       column="agent_name"       />
+        <result property="categoryName"    column="category_name"    />
+        <result property="createBy"        column="create_by"        />
+        <result property="createTime"      column="create_time"      />
+        <result property="updateBy"        column="update_by"        />
+        <result property="updateTime"      column="update_time"      />
+        <result property="remark"          column="remark"           />
+    </resultMap>
+
+    <!-- 归档表为冷数据：查询固定携带 call_time 条件可触发分区裁剪；
+         名称字段与热表列表一致走维度表联查，保证前端展示契约不变 -->
+    <sql id="selectArchiveVo">
+        select ar.record_id, ar.caller_number, ar.caller_name, ar.caller_address, ar.call_time,
+               ar.end_time, ar.duration, ar.agent_id, ar.category_id, ar.content, ar.answer,
+               ar.status, ar.transfer_id, ar.ticket_id, ar.call_uuid,
+               ar.record_file, ar.recording_url, ar.record_duration, ar.asr_status, ar.transcript,
+               ar.ai_summary, ar.ai_summary_status, ar.ai_summary_time, ar.ai_summary_fail_reason,
+               ar.create_by, ar.create_time, ar.update_by, ar.update_time, ar.remark,
+               a.agent_name, c.category_name
+        from ai_call_record_archive ar
+        left join ai_call_agent_status a on ar.agent_id = a.agent_id
+        left join ai_consultation_category c on ar.category_id = c.category_id
+    </sql>
+
+    <select id="selectArchiveList" parameterType="AiCallRecord" resultMap="AiCallRecordArchiveResult">
+        <include refid="selectArchiveVo"/>
+        <where>
+            <if test="callerNumber != null and callerNumber != ''">and ar.caller_number like concat('%', #{callerNumber}, '%')</if>
+            <if test="callerName != null and callerName != ''">and ar.caller_name like concat('%', #{callerName}, '%')</if>
+            <if test="agentId != null">and ar.agent_id = #{agentId}</if>
+            <if test="categoryId != null">and ar.category_id = #{categoryId}</if>
+            <if test="status != null and status != ''">and ar.status = #{status}</if>
+            <if test="params.beginCallTime != null and params.beginCallTime != ''">and ar.call_time &gt;= #{params.beginCallTime}</if>
+            <if test="params.endCallTime != null and params.endCallTime != ''">and ar.call_time &lt;= #{params.endCallTime}</if>
+        </where>
+        order by ar.call_time desc, ar.record_id desc
+    </select>
+
+    <select id="selectArchiveByRecordId" parameterType="Long" resultMap="AiCallRecordArchiveResult">
+        <include refid="selectArchiveVo"/>
+        where ar.record_id = #{recordId}
+    </select>
+
+    <select id="countArchive" resultType="long">
+        select count(1) from ai_call_record_archive
+    </select>
+
+</mapper>

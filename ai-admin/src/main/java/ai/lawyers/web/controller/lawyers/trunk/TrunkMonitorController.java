@@ -51,6 +51,8 @@ public class TrunkMonitorController extends BaseController
         Map<String, Object> data = trunkMonitorService.todayOverview();
         data.put("queueSize", callDispatchService.getQueueSize());
         data.put("globalConcurrent", callDispatchService.getGlobalConcurrent());
+        // P3-C2：全集群去重在线坐席数（单机模式返回本机数）
+        data.put("wsOnlineCount", ai.lawyers.framework.websocket.CallWebSocketServer.globalOnlineCount());
         return success(data);
     }
 
