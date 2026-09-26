@@ -19,6 +19,7 @@ import ai.lawyers.system.domain.lawyers.trunk.AiTrunkAlarm;
 import ai.lawyers.system.domain.lawyers.trunk.AiTrunkMetric;
 import ai.lawyers.system.mapper.lawyers.trunk.AiTrunkAlarmMapper;
 import ai.lawyers.system.mapper.lawyers.trunk.AiTrunkMetricMapper;
+import ai.lawyers.system.service.lawyers.cluster.RedisLeaderLock;
 import ai.lawyers.system.service.lawyers.trunk.ICallDispatchService;
 import ai.lawyers.system.service.lawyers.trunk.ITrunkMonitorService;
 
@@ -41,6 +42,9 @@ public class TrunkMonitorController extends BaseController
     @Autowired
     private AiTrunkAlarmMapper trunkAlarmMapper;
 
+    @Autowired
+    private RedisLeaderLock redisLeaderLock;
+
     /**
      * 监控大屏总览：今日呼叫量、接通率、线路健康、并发使用率、告警数
      */
@@ -53,6 +57,8 @@ public class TrunkMonitorController extends BaseController
         data.put("globalConcurrent", callDispatchService.getGlobalConcurrent());
         // P3-C2：全集群去重在线坐席数（单机模式返回本机数）
         data.put("wsOnlineCount", ai.lawyers.framework.websocket.CallWebSocketServer.globalOnlineCount());
+        // P3-C3：当前正在执行的定时任务锁快照（任务名/持有者实例/剩余TTL），无锁时为空列表
+        data.put("scheduledLocks", redisLeaderLock.scanJobLocks());
         return success(data);
     }
 

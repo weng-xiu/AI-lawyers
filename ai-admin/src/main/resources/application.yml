@@ -90,6 +90,15 @@ spring:
       max-file-size: 10MB
       # 设置总上传的文件大小
       max-request-size: 20MB
+  # P3-C3：@Scheduled 定时任务调度线程池
+  # Spring 默认调度池仅 1 个线程，18 个定时任务（外呼扫描/SLA/分钟聚合/线路探测等）串行排队，
+  # 任一长任务（外呼一轮最多 50 个拨号）会饿死其余任务；扩为 5 线程并行。
+  # 同一任务 Spring 仍保证不并发（fixedDelay/cron 串行触发），跨实例互斥继续由 RedisLeaderLock 保证。
+  task:
+    scheduling:
+      pool:
+        size: ${TASK_SCHEDULING_POOL_SIZE:5}
+      thread-name-prefix: ai-sched-
   # redis 配置
   redis:
     # 地址

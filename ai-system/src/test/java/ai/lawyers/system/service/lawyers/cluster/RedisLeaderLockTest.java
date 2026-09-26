@@ -10,11 +10,17 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.data.redis.connection.RedisConnection;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.RedisCallback;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -128,5 +134,47 @@ class RedisLeaderLockTest
         when(redis.execute(any(DefaultRedisScript.class), anyList(), anyString(), anyString()))
                 .thenReturn(0L);
         assertThat(lock.renewLeader("leader:esl", Duration.ofSeconds(30))).isFalse();
+    }
+
+    @Test
+    void scanJobLocks_returnsSnapshotWithHolderAndTtl()
+    {
+        String fullKey = "ai-law:lock:job:data-archive";
+        String token = "gov-host-01-ab12cd34:550e8400-e29b";
+        byte[] keyBytes = fullKey.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] tokenBytes = token.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+
+        RedisConnection connection = Mockito.mock(RedisConnection.class);
+        @SuppressWarnings("resource")
+        Cursor<byte[]> cursor = Mockito.mock(Cursor.class);
+        when(cursor.hasNext()).thenReturn(true, false);
+        when(cursor.next()).thenReturn(keyBytes);
+        when(connection.scan(any(ScanOptions.class))).thenReturn(cursor);
+        when(connection.get(keyBytes)).thenReturn(tokenBytes);
+        when(connection.ttl(keyBytes)).thenReturn(1750L);
+        // execute 桩真实执行回调，覆盖锁名剥离/实例解析等内部逻辑
+        when(redis.execute(any(RedisCallback.class))).thenAnswer(inv ->
+                ((RedisCallback<?>) inv.getArgument(0)).doInRedis(connection));
+
+        List<Map<String, Object>> locks = lock.scanJobLocks();
+
+        assertThat(locks).hasSize(1);
+        Map<String, Object> item = locks.get(0);
+        // 锁名去掉 keyPrefix；实例标识取令牌最后一个冒号前
+        assertThat(item.get("lock")).isEqualTo("job:data-archive");
+        assertThat(item.get("holder")).isEqualTo(token);
+        assertThat(item.get("instance")).isEqualTo("gov-host-01-ab12cd34");
+        assertThat(item.get("ttlSeconds")).isEqualTo(1750L);
+    }
+
+    @Test
+    void scanJobLocks_redisDown_returnsEmptyList()
+    {
+        when(redis.execute(any(RedisCallback.class)))
+                .thenThrow(new RuntimeException("connection refused"));
+
+        List<Map<String, Object>> locks = lock.scanJobLocks();
+
+        assertThat(locks).isEmpty();
     }
 }

@@ -2,13 +2,20 @@ package ai.lawyers.system.service.lawyers.cluster;
 
 import java.net.InetAddress;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import javax.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.RedisCallback;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
@@ -151,6 +158,7 @@ public class RedisLeaderLock
             log.debug("分布式锁被其它实例持有，跳过 lock={}", lockName);
             return false;
         }
+        long startedAt = System.currentTimeMillis();
         try
         {
             task.run();
@@ -158,6 +166,16 @@ public class RedisLeaderLock
         }
         finally
         {
+            long elapsedMs = System.currentTimeMillis() - startedAt;
+            // TTL 安全观测：任务耗时达到租约 80% 即预警；超过租约说明锁可能已过期并被
+            // 其它实例取得（跨实例重叠执行风险），须调大该任务 TTL 或拆分任务。仅观测不改语义。
+            long ttlMs = ttl.toMillis();
+            if (ttlMs > 0 && elapsedMs * 100 >= ttlMs * 80)
+            {
+                log.warn("分布式任务耗时接近/超过锁租约 lock={} elapsed={}ms ttl={}ms"
+                        + "（存在锁提前过期致跨实例重叠风险，请调大 TTL 或拆分任务）",
+                        lockName, elapsedMs, ttlMs);
+            }
             try
             {
                 releaseOnce(lockName, token);
@@ -170,6 +188,56 @@ public class RedisLeaderLock
     }
 
     // ------------------------------------------------------------ 领导者租约
+
+    /**
+     * 定时任务锁快照（P3-C3 可观测性）：SCAN（cursor hint 200，不用 KEYS）
+     * {@code keyPrefix + "job:*"}，返回每个正在执行的定时任务锁——任务名 / 持有者 /
+     * 持有者实例 / 剩余 TTL（秒）。任务结束锁即释放，故快照仅含当前在跑的任务；
+     * Redis 异常返回空列表（不阻断调用方），单机回退模式无锁自然为空。
+     */
+    public List<Map<String, Object>> scanJobLocks()
+    {
+        try
+        {
+            String matchPattern = keyPrefix + "job:*";
+            return stringRedisTemplate.execute((RedisCallback<List<Map<String, Object>>>) connection ->
+            {
+                List<Map<String, Object>> locks = new ArrayList<>();
+                ScanOptions options = ScanOptions.scanOptions()
+                        .match(matchPattern)
+                        .count(200).build();
+                try (Cursor<byte[]> cursor = connection.scan(options))
+                {
+                    while (cursor.hasNext())
+                    {
+                        byte[] keyBytes = cursor.next();
+                        String fullKey = new String(keyBytes, java.nio.charset.StandardCharsets.UTF_8);
+                        Map<String, Object> item = new LinkedHashMap<>();
+                        item.put("lock", fullKey.startsWith(keyPrefix)
+                                ? fullKey.substring(keyPrefix.length()) : fullKey);
+                        byte[] tokenBytes = connection.get(keyBytes);
+                        String token = tokenBytes == null ? null
+                                : new String(tokenBytes, java.nio.charset.StandardCharsets.UTF_8);
+                        item.put("holder", token);
+                        // 令牌格式 instanceId:uuid，取最后一个冒号前为实例标识
+                        if (token != null)
+                        {
+                            int p = token.lastIndexOf(':');
+                            item.put("instance", p > 0 ? token.substring(0, p) : token);
+                        }
+                        item.put("ttlSeconds", connection.ttl(keyBytes));
+                        locks.add(item);
+                    }
+                }
+                return locks;
+            });
+        }
+        catch (Exception e)
+        {
+            log.warn("定时任务锁快照查询异常，返回空列表 err={}", e.getMessage());
+            return Collections.emptyList();
+        }
+    }
 
     /**
      * 竞选领导者：SET NX PX，持有者令牌为本实例稳定 ID。
