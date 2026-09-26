@@ -128,6 +128,36 @@ public class ChatWebSocketServer
         return room == null ? 0 : room.size();
     }
 
+    /**
+     * P3-C6：排空通知——向本机所有房间连接投递 SERVER_DRAINING（不走集群广播）。
+     *
+     * @return 实际投递的连接数
+     */
+    public static int notifyDrainingLocal()
+    {
+        String json = "{\"type\":\"SERVER_DRAINING\",\"message\":\"服务实例正在发布升级，对话将自动重连\"}";
+        int delivered = 0;
+        for (CopyOnWriteArraySet<Session> room : ROOMS.values())
+        {
+            for (Session s : room)
+            {
+                try
+                {
+                    if (s.isOpen())
+                    {
+                        s.getAsyncRemote().sendText(json);
+                        delivered++;
+                    }
+                }
+                catch (Exception e)
+                {
+                    log.error("ChatWS drain notify fail: connId={}", s.getId(), e);
+                }
+            }
+        }
+        return delivered;
+    }
+
     /** N5：鉴权失败以策略违例关闭握手连接，异常不外抛 */
     private static void closeQuietly(Session session, CloseReason.CloseCode code, String reason)
     {

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.trunk.AiCallEventDedupMapper">
+
+    <!-- P3-B4：事件幂等判重。dedup_key 主键冲突即重复事件，返回 0 -->
+    <insert id="insertIgnore">
+        insert ignore into ai_call_event_dedup
+        (dedup_key, source, event_key, event_name, create_time)
+        values
+        (#{dedupKey}, #{source}, #{eventKey}, #{eventName}, sysdate())
+    </insert>
+
+</mapper>

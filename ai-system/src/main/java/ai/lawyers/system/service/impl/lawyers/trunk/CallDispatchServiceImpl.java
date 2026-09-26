@@ -240,6 +240,16 @@ public class CallDispatchServiceImpl implements ICallDispatchService
             return;
         }
 
+        // B4 终态幂等（第二道防线）：呼叫已进入终态后忽略后续一切事件，
+        // 防止重复 HANGUP/FAILED（或幂等表故障时漏网的重复事件）造成
+        // finishCall 双释放线路/全局并发与指标双计
+        if (DialStatusEnum.isFinal(dialLog.getDialStatus()))
+        {
+            log.info("呼叫已处终态，忽略事件 uuid={} event={} status={}",
+                    callUuid, eventType, dialLog.getDialStatus());
+            return;
+        }
+
         AiCallDialLog update = new AiCallDialLog();
         update.setLogId(dialLog.getLogId());
         Date now = new Date();

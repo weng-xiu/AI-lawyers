@@ -100,6 +100,31 @@ public class LeaderElector
         return leader;
     }
 
+    /**
+     * 主动让位但不停止心跳：立即触发 onRevoked（断连防双主）并释放租约，
+     * 后续心跳可重新竞选。用于"领导者 Redis 心跳正常但下游依赖失活"
+     * （如到全部 FreeSWITCH 的连接持续失败）时，主动把领导权让给健康实例，
+     * 避免持锁不干活导致事件消费全停且无故障转移。
+     *
+     * @param reason 让位原因（日志）
+     */
+    public synchronized void yieldLeadership(String reason)
+    {
+        if (!leader)
+        {
+            return;
+        }
+        revoke(reason);
+        try
+        {
+            lock.resign(lockName);
+        }
+        catch (Exception ignored)
+        {
+            // 释放失败则等待租约 TTL 自然过期，状态已降级不会继续干活
+        }
+    }
+
     private void safeTick()
     {
         try

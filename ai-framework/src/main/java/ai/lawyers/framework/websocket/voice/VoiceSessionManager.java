@@ -8,6 +8,7 @@ import javax.annotation.PreDestroy;
 import javax.websocket.Session;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import ai.lawyers.framework.websocket.WsClusterRelay;
@@ -42,6 +43,10 @@ public class VoiceSessionManager
     @Value("${websocket.voice.send-queue-capacity:1000}")
     private int sendQueueCapacity;
 
+    /** A2/A3：流式引擎注册表（mock/dashscope），Spring 装配失败时兜底仅 mock */
+    @Autowired(required = false)
+    private VoiceEngineRegistry engineRegistry;
+
     @PostConstruct
     public void init()
     {
@@ -71,7 +76,8 @@ public class VoiceSessionManager
             log.warn("VoiceWS 连接数达上限 {}，拒绝 connId={}", maxSessions, wsSession.getId());
             return null;
         }
-        VoiceSession session = new VoiceSession(wsSession, sessionId, role, sendQueueCapacity);
+        VoiceSession session = new VoiceSession(wsSession, sessionId, role, sendQueueCapacity,
+                engineRegistry != null ? engineRegistry : new VoiceEngineRegistry());
         VoiceSession old = sessions.putIfAbsent(wsSession.getId(), session);
         if (old != null)
         {

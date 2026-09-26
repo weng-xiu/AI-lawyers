@@ -295,4 +295,20 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         from ai_call_dial_log
         where dial_time &gt;= curdate()
     </select>
+
+    <!-- P3-C6：在途通话计数：拨号中/振铃/已接通，未进入挂断/失败等终态 -->
+    <select id="countActiveDials" resultType="int">
+        select count(1)
+        from ai_call_dial_log
+        where dial_status in ('1', '2', '3')
+    </select>
+
+    <!-- P3-B4：卡死矫正扫描——非终态且创建时间早于 cutoff 的拨号日志（事件丢失兜底） -->
+    <select id="selectStaleActiveDials" resultMap="AiCallDialLogResult">
+        <include refid="selectAiCallDialLogVo"/>
+        where dial_status in ('1', '2', '3')
+          and create_time &lt; #{cutoff}
+        order by log_id
+        limit #{limit}
+    </select>
 </mapper>

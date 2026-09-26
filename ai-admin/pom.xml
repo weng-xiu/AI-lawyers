@@ -57,6 +57,19 @@
             <artifactId>ai-generator</artifactId>
         </dependency>
 
+        <!-- P3-C6：健康指示器等单测（JUnit/Mockito/spring-test），test 范围不进制品 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
     </dependencies>
 
     <build>

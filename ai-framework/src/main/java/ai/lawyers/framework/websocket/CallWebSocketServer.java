@@ -179,6 +179,28 @@ public class CallWebSocketServer
     }
 
     /**
+     * P3-C6：排空通知帧——仅投递给本机持有的坐席连接，不走 Redis 跨实例广播
+     * （其他实例仍正常服务，不应被通知重连）。前端收到后立即新建连接，
+     * 由 nginx 升级请求路由到存活实例。
+     *
+     * @return 实际投递的连接数
+     */
+    public static int notifyDrainingLocal()
+    {
+        String json = "{\"type\":\"SERVER_DRAINING\",\"message\":\"服务实例正在发布升级，工作台将自动重连\"}";
+        int delivered = 0;
+        for (CopyOnWriteArraySet<Session> conns : AGENTS.values())
+        {
+            for (Session s : conns)
+            {
+                send(s, json);
+                delivered++;
+            }
+        }
+        return delivered;
+    }
+
+    /**
      * P3-C2：全集群在线判定——本机持有连接直接 true，否则查 Redis presence。
      * 未开启集群时等价于本机判定。
      */

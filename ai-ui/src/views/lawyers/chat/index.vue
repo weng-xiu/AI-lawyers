@@ -250,6 +250,16 @@ export default {
       this.chatWs.onmessage = (evt) => {
         let msg = null
         try { msg = JSON.parse(evt.data) } catch (e) { return }
+        // P3-C6：实例排空/发布升级——快速重连到存活实例（仍停留当前会话时）
+        if (msg && msg.type === 'SERVER_DRAINING') {
+          const sid = sessionId
+          setTimeout(() => {
+            if (this.currentSession && this.currentSession.sessionId === sid) {
+              this.connectChatWs(sid)
+            }
+          }, 400)
+          return
+        }
         if (!msg || !msg.messageId) return
         // 去重：本端发送后 loadMessages 也会拉到同一条
         if (this.messageList.some(m => m.messageId === msg.messageId)) return

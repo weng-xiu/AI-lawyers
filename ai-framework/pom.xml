@@ -65,6 +65,14 @@
             <artifactId>ai-system</artifactId>
         </dependency>
 
+        <!-- P3-A2/A3：DashScope 全双工 WebSocket 客户端（okhttp 3.14.9 与 ai-system 大模型客户端同版本，
+             避免引入 dashscope-sdk 导致的 okhttp4/slf4j2 依赖污染，见综合文档 4.1 节"沿用 HTTP，避免 SDK 依赖"决策） -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>3.14.9</version>
+        </dependency>
+
         <!-- N5：WebSocket 握手鉴权单元测试（版本由 Spring Boot parent 统一管理，test 作用域不进产物） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -67,12 +67,22 @@ public class VoiceSession
 
     private volatile StreamSynthesis currentTts;
 
+    /** A2/A3：引擎注册表（null 时仅 mock 可用，保持 A1 行为） */
+    private final VoiceEngineRegistry engineRegistry;
+
     VoiceSession(Session wsSession, String sessionId, String role, int queueCapacity)
+    {
+        this(wsSession, sessionId, role, queueCapacity, null);
+    }
+
+    VoiceSession(Session wsSession, String sessionId, String role, int queueCapacity,
+            VoiceEngineRegistry engineRegistry)
     {
         this.wsSession = wsSession;
         this.connId = wsSession.getId();
         this.sessionId = sessionId;
         this.role = role;
+        this.engineRegistry = engineRegistry != null ? engineRegistry : new VoiceEngineRegistry();
         int cap = queueCapacity > 0 ? queueCapacity : 1000;
         this.sendQueue = new LinkedBlockingQueue<>(cap);
         this.sender = new Thread(this::runSender, "voice-sender-" + connId);
@@ -207,16 +217,16 @@ public class VoiceSession
             enqueue(Entry.Kind.OTHER, VoiceFrames.error("BAD_SAMPLE_RATE", "采样率仅支持 8000/16000: " + rate));
             return;
         }
-        if (!MockStreamAsrEngine.ENGINE_CODE.equalsIgnoreCase(reqEngine))
+        StreamAsrEngine engineInstance = engineRegistry.createAsr(reqEngine);
+        if (engineInstance == null)
         {
             // 显式拒绝，禁止静默降级成 Mock 造成"假成功"（L4 教训）
             enqueue(Entry.Kind.OTHER, VoiceFrames.error("ENGINE_UNAVAILABLE",
-                    "流式引擎 " + reqEngine + " 尚未接入（真实 Provider 随 P3-A2/A3），当前仅支持 engine=mock"));
+                    "流式引擎 " + reqEngine + " 不可用（未注册或凭证缺失），当前支持 mock/dashscope"));
             return;
         }
-        this.engine = MockStreamAsrEngine.ENGINE_CODE;
+        this.engine = engineInstance.engineCode();
         this.sampleRate = rate;
-        MockStreamAsrEngine engineInstance = new MockStreamAsrEngine();
         VoiceAsrContext ctx = new VoiceAsrContext(sessionId, role, "pcm", rate);
         engineInstance.open(ctx, new AsrStreamCallback()
         {
@@ -307,7 +317,15 @@ public class VoiceSession
             drainPendingTts();
         }
         final int ttsRate = this.sampleRate;
-        StreamSynthesis handle = MockStreamTtsEngine.INSTANCE.synthesizeStream(text, voice, ttsRate,
+        // A2/A3：TTS 引擎跟随 start 帧选定的引擎（mock/dashscope）
+        StreamTtsEngine ttsEngine = engineRegistry.createTts(this.engine);
+        if (ttsEngine == null)
+        {
+            enqueue(Entry.Kind.OTHER, VoiceFrames.error("ENGINE_UNAVAILABLE",
+                    "流式 TTS 引擎 " + this.engine + " 不可用（未注册或凭证缺失）"));
+            return;
+        }
+        StreamSynthesis handle = ttsEngine.synthesizeStream(text, voice, ttsRate,
                 new TtsStreamCallback()
                 {
                     @Override

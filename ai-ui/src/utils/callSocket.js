@@ -33,6 +33,8 @@ class CallSocket {
     this.manualClose = false
     this.reconnectAttempts = 0
     this.reloginShowing = false
+    // P3-C6：实例排空主动重连标记（onclose 期间抑制常规退避重连）
+    this.draining = false
   }
 
   connect(userId) {
@@ -64,12 +66,20 @@ class CallSocket {
     this.ws.onmessage = (evt) => {
       try {
         const msg = JSON.parse(evt.data)
+        // P3-C6：实例发布升级/排空——立即断开并快速重连（nginx 将升级请求路由到存活实例）
+        if (msg && msg.type === 'SERVER_DRAINING') {
+          console.info('[CallWS] 收到实例排空通知，快速重连')
+          this.forceReconnect()
+          return
+        }
         this.dispatch(msg.type, msg.data)
       } catch (e) {
         // 忽略非 JSON 消息
       }
     }
     this.ws.onclose = (evt) => {
+      // 排空主动重连：由 forceReconnect 立即接管，不走指数退避
+      if (this.draining) return
       // N5：鉴权失败（token 缺失/过期/越权）→ 不重连，通知业务层并引导重新登录
       if (evt && evt.code === CLOSE_POLICY_VIOLATION) {
         this.manualClose = true
@@ -130,6 +140,28 @@ class CallSocket {
     // 通配监听
     const all = this.handlers['*']
     if (all) all.forEach(h => { try { h(type, data) } catch (e) {} })
+  }
+
+  /**
+   * P3-C6：实例排空时的主动快速重连。
+   * 标记 draining 抑制 onclose 的常规退避调度，关闭旧连接，
+   * 短暂延迟（等待 nginx 摘流量传播/新主就绪）后立即重连到存活实例。
+   */
+  forceReconnect() {
+    const userId = this.userId
+    if (!userId) return
+    this.clearReconnectTimer()
+    this.draining = true
+    try { this.ws && this.ws.close() } catch (e) {}
+    this.ws = null
+    this.manualClose = false
+    this.reconnectAttempts = 0
+    setTimeout(() => {
+      this.draining = false
+      if (!this.manualClose && this.userId === userId && getToken()) {
+        this.connect(userId)
+      }
+    }, 400)
   }
 
   scheduleReconnect() {

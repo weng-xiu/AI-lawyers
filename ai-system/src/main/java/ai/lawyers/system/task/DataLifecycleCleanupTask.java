@@ -21,7 +21,8 @@ import ai.lawyers.system.service.lawyers.cluster.RedisLeaderLock;
  *
  * <p>政务热线长期运行后，拨号流水、IVR 执行日志、坐席状态流水、短信日志等热表持续膨胀，
  * 本任务按各表保留期（月）分批物理删除超期数据；话单表 {@code ai_call_record} 清理时
- * 同步删除磁盘录音文件；P3-F1 起纳管智能质检记录与智能体对话消息，共 9 张热表。
+ * 同步删除磁盘录音文件；P3-F1 起纳管智能质检记录与智能体对话消息，共 9 张热表；
+ * P3-B4 起纳管 PBX 事件幂等表 {@code ai_call_event_dedup}（按天保留，默认 7 天）。
  * 所有被清理表名/时间列均为代码内白名单常量，不接受外部拼入。</p>
  *
  * <p><b>三重保险，默认安全：</b></p>
@@ -57,6 +58,7 @@ public class DataLifecycleCleanupTask
     private static final String T_QUALITY_INSPECTION = "ai_quality_inspection";
     private static final String T_AGENT_MESSAGE = "ai_agent_message";
     private static final String T_CALL_RECORD = "ai_call_record";
+    private static final String T_CALL_EVENT_DEDUP = "ai_call_event_dedup";
 
     @Autowired
     private RedisLeaderLock leaderLock;
@@ -123,6 +125,10 @@ public class DataLifecycleCleanupTask
     @Value("${data.retention.delete-recording-file:true}")
     private boolean deleteRecordingFile;
 
+    /** P3-B4：PBX 事件幂等表保留天数（去重窗口以分钟/小时计，7 天足够覆盖延迟重放） */
+    @Value("${data.retention.call-event-dedup-days:7}")
+    private int callEventDedupDays;
+
     /** 录音文件基础目录（相对路径以此解析），复用 call.recording.base-path */
     @Value("${call.recording.base-path:}")
     private String recordingBasePath;
@@ -166,6 +172,19 @@ public class DataLifecycleCleanupTask
                 log.error("[Lifecycle] 清理表失败 table={}", spec.table, e);
             }
         }
+        // P3-B4：事件幂等表按天保留（不参与上方按月保留的表清单）
+        try
+        {
+            Timestamp dedupCutoff = Timestamp.valueOf(
+                    LocalDate.now().minusDays(callEventDedupDays).atStartOfDay());
+            totalRows += cleanupGenericTable(
+                    new TableSpec(T_CALL_EVENT_DEDUP, "create_time", 0, false, callEventDedupDays + " 天"),
+                    dedupCutoff);
+        }
+        catch (Exception e)
+        {
+            log.error("[Lifecycle] 清理表失败 table={}", T_CALL_EVENT_DEDUP, e);
+        }
         log.info("[Lifecycle] 数据清理结束，累计处理 {} 行，耗时 {} ms，dryRun={}",
                 totalRows, System.currentTimeMillis() - start, dryRun);
     }
@@ -205,7 +224,7 @@ public class DataLifecycleCleanupTask
                         "select count(1) from " + spec.table + " where " + spec.timeColumn + " < ?",
                         Long.class, cutoff);
                 long estimate = cnt == null ? 0 : Math.min(cnt, (long) maxBatches * batchSize);
-                log.info("[Lifecycle][DRY] {} 将清理约 {} 行（保留 {} 个月）", spec.table, estimate, spec.months);
+                log.info("[Lifecycle][DRY] {} 将清理约 {} 行（保留 {}）", spec.table, estimate, spec.retentionLabel);
                 return estimate;
             }
             int affected = jdbcTemplate.update(sql, cutoff, batchSize);
@@ -215,7 +234,7 @@ public class DataLifecycleCleanupTask
                 break;
             }
         }
-        log.info("[Lifecycle] {} 清理完成，删除 {} 行（保留 {} 个月）", spec.table, total, spec.months);
+        log.info("[Lifecycle] {} 清理完成，删除 {} 行（保留 {}）", spec.table, total, spec.retentionLabel);
         return total;
     }
 
@@ -335,13 +354,21 @@ public class DataLifecycleCleanupTask
         final String timeColumn;
         final int months;
         final boolean deleteFiles;
+        /** 日志展示的保留期描述（支持按天保留的表） */
+        final String retentionLabel;
 
         TableSpec(String table, String timeColumn, int months, boolean deleteFiles)
+        {
+            this(table, timeColumn, months, deleteFiles, months + " 个月");
+        }
+
+        TableSpec(String table, String timeColumn, int months, boolean deleteFiles, String retentionLabel)
         {
             this.table = table;
             this.timeColumn = timeColumn;
             this.months = months;
             this.deleteFiles = deleteFiles;
+            this.retentionLabel = retentionLabel;
         }
     }
 }

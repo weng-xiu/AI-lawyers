@@ -143,4 +143,38 @@ class LeaderElectorTest
         assertThat(revokes).hasValue(1);
         verify(lock).resign("leader:esl-bridge");
     }
+
+    @Test
+    void yieldLeadership_asLeader_revokesResignsAndCanReacquire()
+    {
+        when(lock.acquireLeader(eq("leader:esl-bridge"), any(Duration.class)))
+                .thenReturn(true)
+                .thenReturn(false)
+                .thenReturn(true);
+        when(lock.renewLeader(eq("leader:esl-bridge"), any(Duration.class))).thenReturn(true);
+
+        elector.tick(); // 成为 leader
+        elector.yieldLeadership("esl connections unhealthy");
+
+        assertThat(elector.isLeader()).isFalse();
+        assertThat(revokes).hasValue(1);
+        verify(lock).resign("leader:esl-bridge");
+
+        elector.tick(); // 尝试再竞选，被健康实例抢先 → 保持跟随
+        assertThat(elector.isLeader()).isFalse();
+        assertThat(grants).hasValue(1);
+
+        elector.tick(); // 重新获选（自身恢复）
+        assertThat(elector.isLeader()).isTrue();
+        assertThat(grants).hasValue(2);
+    }
+
+    @Test
+    void yieldLeadership_asFollower_isNoop()
+    {
+        elector.yieldLeadership("not leader");
+
+        assertThat(revokes).hasValue(0);
+        verify(lock, never()).resign(any(String.class));
+    }
 }

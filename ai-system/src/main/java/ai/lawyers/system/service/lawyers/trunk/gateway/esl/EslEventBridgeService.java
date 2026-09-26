@@ -6,6 +6,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import org.slf4j.Logger;
@@ -82,6 +85,20 @@ public class EslEventBridgeService implements EslEventListener
     @Value("${call.gateway.esl.leader-election.ttl-seconds:30}")
     private long leaderTtlSeconds;
 
+    /**
+     * C4：连接失活检测间隔（秒）。
+     */
+    @Value("${call.gateway.esl.leader-election.health-check-interval-seconds:5}")
+    private long healthCheckIntervalSeconds;
+
+    /**
+     * C4：全部 ESL 连接失活（无一条 isConnected）持续该秒数后，leader 主动让位，
+     * 让能连通 FreeSWITCH 的实例接管（弥补"Redis 心跳正常但 PBX 网络分区"时
+     * 租约不掉、无人接管的缺陷）。默认 15s：约 3 个检测周期、小于租约 30s。
+     */
+    @Value("${call.gateway.esl.leader-election.unhealthy-yield-seconds:15}")
+    private long unhealthyYieldSeconds;
+
     @Autowired
     private RedisLeaderLock leaderLock;
 
@@ -121,8 +138,24 @@ public class EslEventBridgeService implements EslEventListener
     @Autowired(required = false)
     private HotlineMetrics metrics;
 
+    /** B4：PBX 事件幂等守卫（第一道防线）；为空时退化为不判重（兼容旧行为） */
+    @Autowired(required = false)
+    private ai.lawyers.system.service.lawyers.trunk.CallEventIdempotencyGuard idempotencyGuard;
+
     /** host:port -> client */
     private final Map<String, FreeSwitchEslInboundClient> clients = new ConcurrentHashMap<>();
+
+    /** C4：失活检测调度器（仅竞选模式） */
+    private ScheduledExecutorService healthChecker;
+
+    /** C4：本次成为 leader 的时间（启动宽限判定） */
+    private volatile long grantedAtMs;
+
+    /** C4：首次观测到全部连接失活的时间；null=当前健康/未判定 */
+    private volatile Long unhealthySinceMs;
+
+    /** C4：是否存在应消费的 FreeSWITCH 线路（无线路时空 clients 不应触发让位） */
+    private volatile boolean connectionsExpected;
 
     @PostConstruct
     public void init()
@@ -137,8 +170,9 @@ public class EslEventBridgeService implements EslEventListener
             // N3：先竞选再建连，仅领导者持有入站 ESL 长连接；崩溃后租约到期自动故障切换
             Duration ttl = Duration.ofSeconds(leaderTtlSeconds);
             elector = new LeaderElector(leaderLock, leaderLockKey, ttl,
-                    ttl.dividedBy(3), this::startAsyncConnectAll, this::disconnectAll);
+                    ttl.dividedBy(3), this::handleGranted, this::handleRevoked);
             elector.start();
+            startHealthChecker();
         }
         else
         {
@@ -146,6 +180,44 @@ public class EslEventBridgeService implements EslEventListener
                     + "多实例将各自建连并重复消费事件，仅限单机/应急");
             startAsyncConnectAll();
         }
+    }
+
+    /** C4：成为 leader——记录时间并异步建连 */
+    private void handleGranted()
+    {
+        grantedAtMs = System.currentTimeMillis();
+        unhealthySinceMs = null;
+        startAsyncConnectAll();
+    }
+
+    /** C4：丢失领导权——重置失活状态并断连防双主 */
+    private void handleRevoked()
+    {
+        unhealthySinceMs = null;
+        disconnectAll();
+    }
+
+    /** C4：启动连接失活检测（daemon 单线程，固定速率） */
+    private void startHealthChecker()
+    {
+        long intervalMs = Math.max(1L, healthCheckIntervalSeconds) * 1000L;
+        healthChecker = Executors.newSingleThreadScheduledExecutor(r ->
+        {
+            Thread t = new Thread(r, "esl-bridge-health");
+            t.setDaemon(true);
+            return t;
+        });
+        healthChecker.scheduleAtFixedRate(() ->
+        {
+            try
+            {
+                checkUnhealthyAndMaybeYield(System.currentTimeMillis());
+            }
+            catch (Throwable t)
+            {
+                log.warn("[ESL-Bridge] 失活检测异常 err={}", t.getMessage());
+            }
+        }, intervalMs, intervalMs, TimeUnit.MILLISECONDS);
     }
 
     /** 建连放到独立 daemon 线程，避免阻塞竞选心跳线程/应用启动 */
@@ -159,12 +231,18 @@ public class EslEventBridgeService implements EslEventListener
     @PreDestroy
     public void destroy()
     {
-        // 先停止心跳并主动放弃领导权（加速对端接管），再断连
+        // 先停止失活检测与心跳并主动放弃领导权（加速对端接管），再断连
+        if (healthChecker != null)
+        {
+            healthChecker.shutdownNow();
+            healthChecker = null;
+        }
         if (elector != null)
         {
             elector.stop();
         }
         disconnectAll();
+        connectionsExpected = false;
     }
 
     /** 断开并清空全部 ESL 入站连接（丢失领导权/停机时调用） */
@@ -194,12 +272,15 @@ public class EslEventBridgeService implements EslEventListener
         List<AiCallTrunk> trunks = trunkMapper.selectAiCallTrunkList(query);
         if (trunks == null || trunks.isEmpty())
         {
+            connectionsExpected = false;
             log.info("[ESL-Bridge] 未发现 FREESWITCH 类型的中继线路");
             return;
         }
+        boolean expected = false;
         for (AiCallTrunk t : trunks)
         {
             if (StringUtils.isEmpty(t.getGatewayHost())) continue;
+            expected = true;
             String key = t.getGatewayHost() + ":" + defaultEslPort;
             if (clients.containsKey(key)) continue; // 已连接
             try
@@ -216,6 +297,81 @@ public class EslEventBridgeService implements EslEventListener
                 log.error("[ESL-Bridge] 连接 FreeSWITCH 失败: {}", key, e);
             }
         }
+        connectionsExpected = expected;
+    }
+
+    /**
+     * C4：单主失活检测——仅 leader、存在应消费线路时判定；全部连接失活持续
+     * {@code unhealthyYieldSeconds} 后主动让位。包级可见供单测按时间驱动。
+     *
+     * @param nowMs 当前时间戳
+     */
+    void checkUnhealthyAndMaybeYield(long nowMs)
+    {
+        if (elector == null || !elector.isLeader() || !connectionsExpected)
+        {
+            unhealthySinceMs = null;
+            return;
+        }
+        for (FreeSwitchEslInboundClient c : clients.values())
+        {
+            if (c.isConnected())
+            {
+                unhealthySinceMs = null;
+                return;
+            }
+        }
+        // 启动宽限：成为 leader 不足一个判定窗口不计时（建连/鉴权进行中）
+        if (nowMs - grantedAtMs < unhealthyYieldSeconds * 1000L)
+        {
+            return;
+        }
+        if (unhealthySinceMs == null)
+        {
+            unhealthySinceMs = nowMs;
+            log.warn("[ESL-Bridge] 全部 ESL 连接失活，{}s 内不恢复将主动让位", unhealthyYieldSeconds);
+            return;
+        }
+        if (nowMs - unhealthySinceMs >= unhealthyYieldSeconds * 1000L)
+        {
+            unhealthySinceMs = null;
+            elector.yieldLeadership("all ESL connections unhealthy beyond "
+                    + unhealthyYieldSeconds + "s");
+        }
+    }
+
+    /** C4：本实例是否为 ESL 事件消费者（非竞选模式下即自身消费） */
+    public boolean isEslLeader()
+    {
+        return elector == null || elector.isLeader();
+    }
+
+    /**
+     * C6：停机排空时主动让出 ESL 消费者角色（仅竞选模式且当前为 leader 时生效）。
+     * 让位后存活实例 ≤10s 接管，后续入站呼叫事件由存活实例处理；
+     * 让位时 onRevoked 回调断开本实例全部 ESL 连接，不会双主。
+     */
+    public void yieldForDrain()
+    {
+        if (elector != null && elector.isLeader())
+        {
+            elector.yieldLeadership("instance draining for shutdown");
+            log.info("[ESL-Bridge] 排空开始，已主动让出 ESL 消费者角色");
+        }
+    }
+
+    /** C4：当前在线（已鉴权+已订阅）的 ESL 连接数 */
+    public int connectedCount()
+    {
+        int n = 0;
+        for (FreeSwitchEslInboundClient c : clients.values())
+        {
+            if (c.isConnected())
+            {
+                n++;
+            }
+        }
+        return n;
     }
 
     /**
@@ -241,6 +397,63 @@ public class EslEventBridgeService implements EslEventListener
         String resp = client.sendCommand(cmd);
         log.info("[ESL-Bridge] 挂断命令已下发 host={} uuid={} resp={}", client.getHost(), uuid, resp);
         return true;
+    }
+
+    /**
+     * B4：汇总所有已连接 FreeSWITCH 节点的在途通道数（{@code api show channels count}），
+     * 供 PBX/DB 对账。无可用连接或全部节点查询失败时返回 -1（调用方跳过本轮对账）。
+     */
+    public int queryPbxChannelCount()
+    {
+        int total = 0;
+        boolean any = false;
+        for (FreeSwitchEslInboundClient c : clients.values())
+        {
+            if (!c.isConnected())
+            {
+                continue;
+            }
+            try
+            {
+                String resp = c.sendCommand("api show channels count");
+                int n = parseChannelCount(resp);
+                if (n >= 0)
+                {
+                    total += n;
+                    any = true;
+                }
+            }
+            catch (Exception e)
+            {
+                log.warn("[ESL-Bridge] 查询通道数失败 host={} err={}", c.getHost(), e.getMessage());
+            }
+        }
+        return any ? total : -1;
+    }
+
+    /**
+     * 解析 {@code api show channels count} 响应中的通道总数（响应形如 "\n3 total.\n"）。
+     * 包级静态便于单测；解析失败返回 -1。
+     */
+    static int parseChannelCount(String resp)
+    {
+        if (resp == null)
+        {
+            return -1;
+        }
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(\\d+)\\s+total").matcher(resp);
+        if (!m.find())
+        {
+            return -1;
+        }
+        try
+        {
+            return Integer.parseInt(m.group(1));
+        }
+        catch (NumberFormatException e)
+        {
+            return -1;
+        }
     }
 
     private FreeSwitchEslInboundClient pickClient(String host)
@@ -271,6 +484,19 @@ public class EslEventBridgeService implements EslEventListener
         String name = event.getEventName();
         String uuid = event.getCallUuid();
         if (name == null) return;
+
+        // B4：事件幂等（第一道防线）。CHANNEL_HANGUP_COMPLETE 归一为 CHANNEL_HANGUP——
+        // 一次挂断两个事件都会到达，双发会造成 finishCall 双释放并发；
+        // DTMF 同一通话可合法重复（多次按键），不参与判重
+        if (!"DTMF".equals(name) && idempotencyGuard != null)
+        {
+            String normalized = "CHANNEL_HANGUP_COMPLETE".equals(name) ? "CHANNEL_HANGUP" : name;
+            if (!idempotencyGuard.firstSeen("ESL:" + host, uuid, normalized))
+            {
+                log.info("[ESL-Bridge] 重复事件已忽略: host={} event={} uuid={}", host, normalized, uuid);
+                return;
+            }
+        }
 
         try
         {

@@ -31,6 +31,9 @@ public class VoiceProperties
 
     private String dashscopeTtsModel = "cosyvoice-v1";
 
+    /** A2：DashScope 流式 ASR 模型（全双工 WebSocket，paraformer-realtime 系列） */
+    private String dashscopeAsrModel = "paraformer-realtime-v2";
+
     private String dashscopeVoice = "longxiaochun";
 
     private String dashscopeFormat = "wav";
@@ -86,6 +89,16 @@ public class VoiceProperties
     public void setDashscopeBaseUrl(String dashscopeBaseUrl)
     {
         this.dashscopeBaseUrl = dashscopeBaseUrl;
+    }
+
+    public String getDashscopeAsrModel()
+    {
+        return dashscopeAsrModel;
+    }
+
+    public void setDashscopeAsrModel(String dashscopeAsrModel)
+    {
+        this.dashscopeAsrModel = dashscopeAsrModel;
     }
 
     public String getDashscopeTtsModel()

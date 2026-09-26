@@ -43,4 +43,16 @@ public interface AiCallDialLogMapper
 
     /** 今日总体概览 */
     public Map<String, Object> selectTodayOverview();
+
+    /**
+     * P3-C6：统计本系统在途通话数（拨号中/振铃/已接通），供优雅停机 drain 等待。
+     */
+    public int countActiveDials();
+
+    /**
+     * P3-B4：扫描卡在非终态（拨号中/振铃/已接通）且创建时间早于 cutoff 的拨号日志，
+     * 供 PBX 事件丢失时的对账矫正（按 FAILED 终态收敛并释放并发占用）。
+     */
+    public List<AiCallDialLog> selectStaleActiveDials(@Param("cutoff") Date cutoff,
+                                                      @Param("limit") int limit);
 }

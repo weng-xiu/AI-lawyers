@@ -45,6 +45,9 @@ public class TrunkMonitorController extends BaseController
     @Autowired
     private RedisLeaderLock redisLeaderLock;
 
+    @Autowired
+    private ai.lawyers.system.service.lawyers.trunk.gateway.esl.EslEventBridgeService eslEventBridgeService;
+
     /**
      * 监控大屏总览：今日呼叫量、接通率、线路健康、并发使用率、告警数
      */
@@ -59,6 +62,9 @@ public class TrunkMonitorController extends BaseController
         data.put("wsOnlineCount", ai.lawyers.framework.websocket.CallWebSocketServer.globalOnlineCount());
         // P3-C3：当前正在执行的定时任务锁快照（任务名/持有者实例/剩余TTL），无锁时为空列表
         data.put("scheduledLocks", redisLeaderLock.scanJobLocks());
+        // P3-C4：ESL 单主状态与在线连接数（多实例下验证"仅 leader 消费"：全集群应恰有一个 eslLeader=true）
+        data.put("eslLeader", eslEventBridgeService.isEslLeader());
+        data.put("eslConnected", eslEventBridgeService.connectedCount());
         return success(data);
     }
 

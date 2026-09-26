@@ -69,6 +69,17 @@ public class FreeSwitchEslInboundClient
     private final int reconnectIntervalMs;
     private final AtomicBoolean running = new AtomicBoolean(false);
 
+    /**
+     * 当前是否处于已鉴权+已订阅事件的在线态（断线重连期间为 false）。
+     * 供上层做单主失活检测与可观测，不能只看 {@link #running}（running 含重连中）。
+     */
+    private final AtomicBoolean connected = new AtomicBoolean(false);
+
+    public boolean isConnected()
+    {
+        return connected.get();
+    }
+
     private Socket socket;
     private InputStream in;
     private OutputStream out;
@@ -294,6 +305,10 @@ public class FreeSwitchEslInboundClient
         if (eventResp == null || !eventResp.toText().contains("+OK"))
         {
             log.warn("[ESL-{}] 事件订阅返回异常: {}", host, eventResp == null ? "连接被关闭" : eventResp.toText());
+        }
+        else
+        {
+            connected.set(true);
         }
 
         // 4. 帧循环：读取线程是输入流的唯一消费者
@@ -585,6 +600,7 @@ public class FreeSwitchEslInboundClient
         }
         try { if (socket != null) socket.close(); } catch (Exception ignored) {}
         socket = null; in = null; out = null;
+        connected.set(false);
     }
 
     /**

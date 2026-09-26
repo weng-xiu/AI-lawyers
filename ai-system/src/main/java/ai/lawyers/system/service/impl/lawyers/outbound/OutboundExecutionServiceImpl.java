@@ -44,6 +44,7 @@ import ai.lawyers.system.mapper.lawyers.outbound.AiOutboundTaskMapper;
 import ai.lawyers.system.mapper.lawyers.trunk.AiCallDialLogMapper;
 import ai.lawyers.system.service.ISysUserService;
 import ai.lawyers.system.service.lawyers.cluster.RedisLeaderLock;
+import ai.lawyers.system.service.lawyers.cluster.InstanceDrainState;
 import ai.lawyers.system.service.lawyers.IAiCallRecordService;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
 import ai.lawyers.system.service.lawyers.IAiHotspotSuppressService;
@@ -120,6 +121,10 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
 
     @Autowired(required = false)
     private ai.lawyers.system.service.lawyers.compliance.ComplianceGuard complianceGuard;
+
+    /** P3-C6：实例排空状态，排空中外呼扫描停领新任务 */
+    @Autowired(required = false)
+    private InstanceDrainState drainState;
 
     /** P3-D1 高频置底：外呼拨号前号码规则判定（REJECT 跳过 / PRIORITY 沉底） */
     @Autowired
@@ -341,6 +346,13 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
             if (complianceGuard != null && !complianceGuard.isCallingAllowed())
             {
                 log.info("当前为非外呼服务时段，本轮扫描跳过");
+                return;
+            }
+            // P3-C6：实例排空（优雅停机/无损发布）期间不领取新任务，
+            // 在途拨号继续执行至完成；多实例下由其他实例扫描接管
+            if (drainState != null && drainState.isDraining())
+            {
+                log.info("实例排空中，本轮外呼扫描跳过新任务");
                 return;
             }
             List<AiOutboundTask> running = taskMapper.selectRunningTasks();

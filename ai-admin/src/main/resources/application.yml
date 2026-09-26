@@ -21,6 +21,9 @@ file:
 server:
   # 服务器的HTTP端口，默认为8080
   port: 8080
+  # P3-C6：优雅停机——收到 SIGTERM 后停止接收新请求，等待在途 HTTP 请求/WS 升级结束
+  # （等待上限 spring.lifecycle.timeout-per-shutdown-phase），配合 nginx 摘流量实现无损发布
+  shutdown: graceful
   servlet:
     # 应用的访问路径
     context-path: /
@@ -55,6 +58,14 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+      # P3-C6：探针分组——nginx/负载均衡经 /actuator/health/readiness 决定是否路由：
+      # 停机时 readinessState 自动 REFUSING_TRAFFIC，drain 指示器同步翻 OUT_OF_SERVICE；
+      # /actuator/health/liveness 仅反映进程存活（异常才重启，停机不翻）
+      group:
+        readiness:
+          include: readinessState,drain
+        liveness:
+          include: livenessState
     prometheus:
       access: read-only
   metrics:
@@ -66,6 +77,17 @@ management:
         http.server.requests: true
       sla:
         http.server.requests: 50ms,100ms,200ms,500ms,1s,2s,5s
+
+# P3-C6：在途通话排空配置（无损发布 drain 参数）
+app:
+  shutdown:
+    drain:
+      # 等待在途通话结束的最长时间（秒），须 < spring.lifecycle.timeout-per-shutdown-phase
+      max-wait-seconds: ${DRAIN_MAX_WAIT_SECONDS:30}
+      # 在途通话计数轮询间隔（秒）
+      poll-interval-seconds: ${DRAIN_POLL_INTERVAL_SECONDS:1}
+      # 排空开始时通知本机 WS 客户端（坐席工作台）重连到其他实例
+      notify-websocket: ${DRAIN_NOTIFY_WEBSOCKET:true}
 
 # 用户配置
 user:
@@ -83,6 +105,9 @@ spring:
     basename: i18n/messages
   profiles:
     active: druid
+  # P3-C6：优雅停机每阶段等待上限；在途通话 drain 总时长须小于该值，超时强制退出
+  lifecycle:
+    timeout-per-shutdown-phase: ${SHUTDOWN_PHASE_TIMEOUT:45s}
   # 文件上传
   servlet:
     multipart:
@@ -268,6 +293,8 @@ voice:
   dashscope-api-key: ${VOICE_DASHSCOPE_API_KEY:}
   dashscope-base-url: ${VOICE_DASHSCOPE_BASE_URL:https://dashscope.aliyuncs.com/api/v1}
   dashscope-tts-model: ${VOICE_DASHSCOPE_TTS_MODEL:cosyvoice-v1}
+  # A2：流式 ASR 模型（全双工 WebSocket，/ws/voice engine=dashscope 时生效）
+  dashscope-asr-model: ${VOICE_DASHSCOPE_ASR_MODEL:paraformer-realtime-v2}
   dashscope-voice: ${VOICE_DASHSCOPE_VOICE:longxiaochun}
   # ASR（Whisper 兼容 /audio/transcriptions）：质检转写依赖，未部署时质检转写为空置失败
   asr-base-url: ${VOICE_ASR_BASE_URL:http://localhost:8000/v1}
