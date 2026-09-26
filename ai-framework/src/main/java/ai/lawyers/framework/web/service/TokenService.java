@@ -1,5 +1,7 @@
 package ai.lawyers.framework.web.service;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -20,8 +22,10 @@ import ai.lawyers.common.utils.ip.IpUtils;
 import ai.lawyers.common.utils.uuid.IdUtils;
 import eu.bitwalker.useragentutils.UserAgent;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
 
 /**
  * token验证处理
@@ -40,6 +44,11 @@ public class TokenService
     // 令牌秘钥
     @Value("${token.secret}")
     private String secret;
+
+    // 上一版令牌秘钥（密钥轮换过渡期使用：验签失败时回退尝试此密钥，
+    // 兼容轮换前签发的旧 token 直至其过期；空值表示无历史密钥）
+    @Value("${token.previous-secret:}")
+    private String previousSecret;
 
     // 令牌有效期（默认30分钟）
     @Value("${token.expireTime}")
@@ -186,31 +195,72 @@ public class TokenService
     }
 
     /**
-     * 从数据声明生成令牌
+     * 从数据声明生成令牌（JJWT 0.12.x）
      *
      * @param claims 数据声明
      * @return 令牌
      */
     private String createToken(Map<String, Object> claims)
     {
-        String token = Jwts.builder()
-                .setClaims(claims)
-                .signWith(SignatureAlgorithm.HS512, secret).compact();
-        return token;
+        return Jwts.builder()
+                .claims(claims)
+                .signWith(Keys.hmacShaKeyFor(resolveKeyBytes(secret)), Jwts.SIG.HS512)
+                .compact();
     }
 
     /**
-     * 从令牌中获取数据声明
+     * 从令牌中获取数据声明（JJWT 0.12.x + 密钥轮换降级）。
+     *
+     * <p>优先用当前 {@code secret} 验签；若签名不匹配（非过期）则回退用
+     * {@code previousSecret} 重试，兼容密钥轮换前签发的旧 token 直至其过期；
+     * 过期异常（ExpiredJwtException）直接抛出，不降级。</p>
      *
      * @param token 令牌
      * @return 数据声明
      */
     private Claims parseToken(String token)
     {
+        try
+        {
+            return parseWithKey(token, secret);
+        }
+        catch (ExpiredJwtException e)
+        {
+            throw e;
+        }
+        catch (JwtException e)
+        {
+            if (StringUtils.isNotEmpty(previousSecret))
+            {
+                return parseWithKey(token, previousSecret);
+            }
+            throw e;
+        }
+    }
+
+    private Claims parseWithKey(String token, String key)
+    {
         return Jwts.parser()
-                .setSigningKey(secret)
-                .parseClaimsJws(token)
-                .getBody();
+                .verifyWith(Keys.hmacShaKeyFor(resolveKeyBytes(key)))
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+    }
+
+    /**
+     * 密钥字节解析：兼容 base64 编码密钥（JJWT 0.9.x 的 signWith(String) 语义）
+     * 与原始 UTF-8 字符串密钥，确保迁移后旧 token 仍可验签。
+     */
+    private byte[] resolveKeyBytes(String key)
+    {
+        try
+        {
+            return Base64.getDecoder().decode(key);
+        }
+        catch (IllegalArgumentException e)
+        {
+            return key.getBytes(StandardCharsets.UTF_8);
+        }
     }
 
     /**

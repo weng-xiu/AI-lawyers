@@ -128,6 +128,9 @@ token:
   header: Authorization
   # 令牌密钥：生产环境必须通过环境变量 TOKEN_SECRET 注入 >=32字节随机密钥，禁止使用默认值入库入git
   secret: ${TOKEN_SECRET:Z2xwLWExMmwtbGF3eWVycy1qd3Qtc2VjcmV0LWtleS0yMDI2LWNoYW5nZS1tZS1pbi1wcm9kLTA5ODc2NTQz}
+  # 上一版令牌密钥（密钥轮换过渡期使用，留空则不启用降级验签）：
+  # 轮换流程——将旧 secret 移入 previous-secret，生成新 secret 填入，重启后旧 token 仍可验签至过期，平滑无感知
+  previous-secret: ${TOKEN_PREVIOUS_SECRET:}
   # 令牌有效期（默认30分钟）
   expireTime: 30
 
@@ -293,6 +296,13 @@ swagger:
   enabled: ${SWAGGER_ENABLED:false}
   # 请求前缀
   pathMapping: /dev-api
+
+# springdoc-openapi（替代 springfox）：跟随 swagger.enabled 开关
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:false}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:false}
 
 # 防止XSS攻击
 xss:
