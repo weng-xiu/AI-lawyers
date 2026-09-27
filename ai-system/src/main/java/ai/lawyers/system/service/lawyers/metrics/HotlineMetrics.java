@@ -42,6 +42,15 @@ import io.micrometer.core.instrument.Timer;
  *   <li>hotline_voice_llm_first_token_ms      E3：机器人 LLM 首 token（预算 600ms，非流式期口径=整段返回）</li>
  *   <li>hotline_voice_emotion_total{level}    E4：实时情绪识别触发（urgent/negative）</li>
  *   <li>hotline_copilot_assist_total          F4：Copilot 实时辅助回合数</li>
+ *   <li>hotline_pbx_fork_connect_total        M3-3：PBX fork 连接受理（鉴权通过）</li>
+ *   <li>hotline_pbx_fork_reject_total{reason} M3-3：onOpen 拒绝（bad_record/unavailable/disabled/auth_fail）</li>
+ *   <li>hotline_pbx_fork_close_total{reason}  M3-3：连接关闭（stop/abnormal/bad_frame/error）</li>
+ *   <li>hotline_pbx_fork_session_seconds      M3-3：fork 连接生命周期（受理→关闭）</li>
+ *   <li>hotline_pbx_fork_active               M3-3：start 已受理的活跃 fork（gauge）</li>
+ *   <li>hotline_pbx_fork_bytes_total          M3-3：入向 PCM 字节累计</li>
+ *   <li>hotline_pbx_fork_audio_frame_total{kind} M3-3：音频帧（binary/json）</li>
+ *   <li>hotline_pbx_fork_bad_frame_total{reason} M3-3：坏帧（bad_json/bad_base64）</li>
+ *   <li>hotline_pbx_fork_audio_silence_seconds M3-3：活跃 fork 最大音频静默年龄（gauge，断流/假活检测）</li>
  * </ul>
  *
  * <p>Prometheus 导出时 Timer 自动追加 {@code _seconds} 后缀（如
@@ -213,6 +222,70 @@ public class HotlineMetrics
     public void incrementCopilotAssist()
     {
         counter("copilot.assist.total").increment();
+    }
+
+    /* ================= M3-3：PBX fork 实机联调可观测性 ================= */
+
+    /** fork 连接已受理（recordId 合法 + 开关 + 共享密钥通过） */
+    public void incrementPbxConnect()
+    {
+        counter("pbx.fork.connect.total").increment();
+    }
+
+    /** onOpen 拒绝计数：reason ∈ bad_record/unavailable/disabled/auth_fail */
+    public void incrementPbxReject(String reason)
+    {
+        counter("pbx.fork.reject.total", "reason", reason).increment();
+    }
+
+    /** 已受理连接关闭：reason ∈ stop（PBX 正常结束）/abnormal（无 stop 断连）/bad_frame/error */
+    public void incrementPbxClose(String reason)
+    {
+        counter("pbx.fork.close.total", "reason", reason).increment();
+    }
+
+    /** fork 连接生命周期（受理→关闭，毫秒入参；Prometheus 导出自动追加 _seconds） */
+    public void recordPbxSession(long elapsedMs)
+    {
+        timer("pbx.fork.session").record(elapsedMs, TimeUnit.MILLISECONDS);
+    }
+
+    /** 入向 PCM 字节累计（二进制裸帧与 base64 解码帧合计） */
+    public void incrementPbxBytes(long bytes)
+    {
+        counter("pbx.fork.bytes.total").increment(bytes);
+    }
+
+    /** 音频帧计数：kind ∈ binary（mod_audio_fork 裸帧）/json（mod_audio_stream base64 帧） */
+    public void incrementPbxAudioFrame(String kind)
+    {
+        counter("pbx.fork.audio.frame.total", "kind", kind).increment();
+    }
+
+    /** 坏帧计数：reason ∈ bad_json（非法 JSON 被端点关闭）/bad_base64（音频 base64 解码失败） */
+    public void incrementPbxBadFrame(String reason)
+    {
+        counter("pbx.fork.bad.frame.total", "reason", reason).increment();
+    }
+
+    /** 注册活跃 fork gauge（start 已受理数；valueFunction 读 AtomicInteger） */
+    public void gaugePbxActive(Object obj, ToDoubleFunction<Object> valueFunction)
+    {
+        if (registry == null)
+        {
+            return;
+        }
+        registry.gauge(PREFIX + "_pbx_fork_active", Tags.empty(), obj, valueFunction);
+    }
+
+    /** 注册音频静默 gauge（活跃 fork 中"距最后音频帧"的最大秒数，超阈值=断流/假活） */
+    public void gaugePbxSilence(Object obj, ToDoubleFunction<Object> valueFunction)
+    {
+        if (registry == null)
+        {
+            return;
+        }
+        registry.gauge(PREFIX + "_pbx_fork_audio_silence_seconds", Tags.empty(), obj, valueFunction);
     }
 
     /** 队列死信计数 */

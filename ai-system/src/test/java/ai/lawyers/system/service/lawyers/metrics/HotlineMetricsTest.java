@@ -110,4 +110,74 @@ class HotlineMetricsTest
             m.recordVoiceE2eFirstMs(10, "robot", "s3");
         }).doesNotThrowAnyException();
     }
+
+    @Test
+    void pbxFork_metricsWithDocumentedNames() throws Exception
+    {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        HotlineMetrics m = withRegistry(registry);
+
+        m.incrementPbxConnect();
+        m.incrementPbxReject("auth_fail");
+        m.incrementPbxReject("disabled");
+        m.incrementPbxClose("stop");
+        m.incrementPbxClose("abnormal");
+        m.recordPbxSession(1200);
+        m.incrementPbxBytes(640);
+        m.incrementPbxAudioFrame("binary");
+        m.incrementPbxAudioFrame("json");
+        m.incrementPbxBadFrame("bad_json");
+        m.incrementPbxBadFrame("bad_base64");
+
+        // SimpleMeterRegistry 保留点分逻辑名；Prometheus 导出转下划线，Timer 再追加 _seconds
+        assertThat(registry.find("hotline_pbx.fork.connect.total").counter().count()).isEqualTo(1);
+        assertThat(registry.find("hotline_pbx.fork.reject.total")
+                .tag("reason", "auth_fail").counter().count()).isEqualTo(1);
+        assertThat(registry.find("hotline_pbx.fork.reject.total")
+                .tag("reason", "disabled").counter().count()).isEqualTo(1);
+        assertThat(registry.find("hotline_pbx.fork.close.total")
+                .tag("reason", "stop").counter().count()).isEqualTo(1);
+        assertThat(registry.find("hotline_pbx.fork.close.total")
+                .tag("reason", "abnormal").counter().count()).isEqualTo(1);
+        // 生命周期 Timer：1200ms = 1.2s，导出名 hotline_pbx_fork_session_seconds
+        Timer session = registry.find("hotline_pbx.fork.session").timer();
+        assertThat(session.count()).isEqualTo(1);
+        assertThat(session.totalTime(TimeUnit.MILLISECONDS)).isEqualTo(1200.0);
+        assertThat(registry.find("hotline_pbx.fork.bytes.total").counter().count())
+                .isEqualTo(640.0);
+        assertThat(registry.find("hotline_pbx.fork.audio.frame.total")
+                .tag("kind", "binary").counter().count()).isEqualTo(1);
+        assertThat(registry.find("hotline_pbx.fork.audio.frame.total")
+                .tag("kind", "json").counter().count()).isEqualTo(1);
+        assertThat(registry.find("hotline_pbx.fork.bad.frame.total")
+                .tag("reason", "bad_json").counter().count()).isEqualTo(1);
+        assertThat(registry.find("hotline_pbx.fork.bad.frame.total")
+                .tag("reason", "bad_base64").counter().count()).isEqualTo(1);
+
+        // 两个 gauge：名称即 Prometheus 导出名（gauge 不追加后缀）
+        Object holder = new Object();
+        m.gaugePbxActive(holder, o -> 3);
+        m.gaugePbxSilence(holder, o -> 1.5);
+        assertThat(registry.find("hotline_pbx_fork_active").gauge().value()).isEqualTo(3);
+        assertThat(registry.find("hotline_pbx_fork_audio_silence_seconds").gauge().value())
+                .isEqualTo(1.5);
+    }
+
+    @Test
+    void pbxFork_noRegistry_allNoop()
+    {
+        HotlineMetrics m = new HotlineMetrics();
+        Object holder = new Object();
+        assertThatCode(() -> {
+            m.incrementPbxConnect();
+            m.incrementPbxReject("auth_fail");
+            m.incrementPbxClose("abnormal");
+            m.recordPbxSession(10);
+            m.incrementPbxBytes(10);
+            m.incrementPbxAudioFrame("binary");
+            m.incrementPbxBadFrame("bad_json");
+            m.gaugePbxActive(holder, o -> 1);
+            m.gaugePbxSilence(holder, o -> 1);
+        }).doesNotThrowAnyException();
+    }
 }

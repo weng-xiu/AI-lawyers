@@ -4,6 +4,7 @@ import java.util.Base64;
 import javax.websocket.Session;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -41,19 +42,39 @@ public class PbxMediaForkHandler
 
     private final PbxMediaForkProperties properties;
 
+    /** M3-3：指标门面（可空，未装配时静默跳过） */
+    private final HotlineMetrics metrics;
+
     /** start 受理后桥接的 caller 语音会话 */
     private VoiceSession voiceSession;
 
     /** start 是否已受理（拒绝重复 start、start 前音频丢弃） */
     private boolean started;
 
+    /** 连接受理时间（会话生命周期 Timer 起点） */
+    private final long openNanos = System.nanoTime();
+
+    /** 最后一个音频帧到达时间（静默年龄 gauge 用，0=尚未收到任何音频） */
+    private long lastAudioNanos;
+
+    /** PBX 是否已发 stop/end（区分关闭原因 stop/abnormal） */
+    private boolean stopReceived;
+
     public PbxMediaForkHandler(String recordId, Session wsSession,
                                VoiceSessionManager manager, PbxMediaForkProperties properties)
+    {
+        this(recordId, wsSession, manager, properties, null);
+    }
+
+    public PbxMediaForkHandler(String recordId, Session wsSession,
+                               VoiceSessionManager manager, PbxMediaForkProperties properties,
+                               HotlineMetrics metrics)
     {
         this.recordId = recordId;
         this.wsSession = wsSession;
         this.manager = manager;
         this.properties = properties;
+        this.metrics = metrics;
     }
 
     /**
@@ -71,6 +92,10 @@ public class PbxMediaForkHandler
         catch (Exception e)
         {
             log.warn("[PbxMedia] 非法 JSON 帧 recordId={}: {}", recordId, e.getMessage());
+            if (metrics != null)
+            {
+                metrics.incrementPbxBadFrame("bad_json");
+            }
             return false;
         }
         String type = node.path("type").asText("");
@@ -109,6 +134,7 @@ public class PbxMediaForkHandler
             return;
         }
         voiceSession.handleBinary(pcm);
+        markAudio(pcm.length, "binary");
     }
 
     /** PBX/连接关闭时的兜底：若尚未 stop，先停识别（unregister 由端点统一执行） */
@@ -156,6 +182,7 @@ public class PbxMediaForkHandler
 
         this.voiceSession = session;
         this.started = true;
+        PbxMediaWebSocketServer.onForkStarted(this);
         log.info("[PbxMedia] caller 媒体链路已接通 recordId={} rate={} connId={}",
                 recordId, rate, wsSession.getId());
     }
@@ -168,6 +195,7 @@ public class PbxMediaForkHandler
         }
         voiceSession.handleText("{\"type\":\"stop\"}");
         started = false;
+        stopReceived = true;
         log.info("[PbxMedia] PBX 通知媒体结束 recordId={}", recordId);
     }
 
@@ -189,10 +217,15 @@ public class PbxMediaForkHandler
         {
             byte[] pcm = Base64.getDecoder().decode(base64);
             voiceSession.handleBinary(pcm);
+            markAudio(pcm.length, "json");
         }
         catch (IllegalArgumentException e)
         {
             log.warn("[PbxMedia] base64 音频解码失败 recordId={}: {}", recordId, e.getMessage());
+            if (metrics != null)
+            {
+                metrics.incrementPbxBadFrame("bad_base64");
+            }
         }
     }
 
@@ -216,6 +249,48 @@ public class PbxMediaForkHandler
         // 复用 yml 配置的默认引擎；通过系统属性/环境变量覆盖与 VoiceCaption 一致
         return System.getProperty("PBX_MEDIA_ENGINE",
                 System.getenv().getOrDefault("PBX_MEDIA_ENGINE", "mock"));
+    }
+
+    private void markAudio(int bytes, String kind)
+    {
+        lastAudioNanos = System.nanoTime();
+        if (metrics != null)
+        {
+            metrics.incrementPbxBytes(bytes);
+            metrics.incrementPbxAudioFrame(kind);
+        }
+    }
+
+    /* ---- M3-3：端点/静态 gauge 读取的包级访问器 ---- */
+
+    HotlineMetrics metrics()
+    {
+        return metrics;
+    }
+
+    long openNanos()
+    {
+        return openNanos;
+    }
+
+    boolean isStopReceived()
+    {
+        return stopReceived;
+    }
+
+    /**
+     * 静默年龄（秒）：距最后音频帧；start 后从未收到音频则从受理时刻起算；
+     * 已 stop 的 fork 返回 0（不计入异常静默）。
+     */
+    double silenceAgeSeconds(long nowNanos)
+    {
+        if (stopReceived)
+        {
+            return 0;
+        }
+        long base = lastAudioNanos > 0 ? lastAudioNanos : openNanos;
+        long ns = nowNanos - base;
+        return ns > 0 ? ns / 1_000_000_000.0 : 0;
     }
 
     private static String firstText(JsonNode node, String... keys)

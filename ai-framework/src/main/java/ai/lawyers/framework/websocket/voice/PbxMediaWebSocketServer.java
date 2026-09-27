@@ -3,6 +3,11 @@ package ai.lawyers.framework.websocket.voice;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.websocket.CloseReason;
 import javax.websocket.OnClose;
 import javax.websocket.OnError;
@@ -16,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.common.utils.spring.SpringUtils;
+import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
 
 /**
  * P3-B3：PBX 媒体接入 WebSocket 端点（来电者 PCM 源）。
@@ -37,12 +43,54 @@ public class PbxMediaWebSocketServer
 {
     private static final Logger log = LoggerFactory.getLogger(PbxMediaWebSocketServer.class);
 
+    /* ---- M3-3：进程内活跃 fork 状态（gauge 单一真源；handler start/close 绑定） ---- */
+    private static final AtomicInteger ACTIVE_COUNT = new AtomicInteger();
+
+    private static final Set<PbxMediaForkHandler> ACTIVE_HANDLERS =
+            Collections.newSetFromMap(new ConcurrentHashMap<>());
+
+    private static final Object SILENCE_HOLDER = new Object();
+
+    private static final AtomicBoolean GAUGES_REGISTERED = new AtomicBoolean();
+
+    /** start 受理：活跃数+1、纳入静默扫描、首次注册两个 gauge（幂等） */
+    static void onForkStarted(PbxMediaForkHandler handler)
+    {
+        ACTIVE_HANDLERS.add(handler);
+        ACTIVE_COUNT.incrementAndGet();
+        HotlineMetrics metrics = handler.metrics();
+        if (metrics != null && GAUGES_REGISTERED.compareAndSet(false, true))
+        {
+            metrics.gaugePbxActive(ACTIVE_COUNT, o -> ACTIVE_COUNT.get());
+            metrics.gaugePbxSilence(SILENCE_HOLDER,
+                    o -> ACTIVE_HANDLERS.stream()
+                            .mapToDouble(h -> h.silenceAgeSeconds(System.nanoTime()))
+                            .max().orElse(0));
+        }
+    }
+
+    /** 连接关闭：活跃数-1（仅当此前在集；stop/异常关闭都收敛到 0） */
+    static void onForkClosed(PbxMediaForkHandler handler)
+    {
+        if (ACTIVE_HANDLERS.remove(handler))
+        {
+            ACTIVE_COUNT.decrementAndGet();
+        }
+    }
+
+    /** 测试/巡检用：当前活跃 fork 数 */
+    static int activeCount()
+    {
+        return ACTIVE_COUNT.get();
+    }
+
     @OnOpen
     public void onOpen(Session session, @PathParam("recordId") String recordId)
     {
         if (recordId == null || !recordId.matches("\\d+"))
         {
-            closeQuietly(session, CloseReason.CloseCodes.VIOLATED_POLICY, "recordId must be numeric");
+            recordReject(session, "bad_record", CloseReason.CloseCodes.VIOLATED_POLICY,
+                    "recordId must be numeric");
             return;
         }
         PbxMediaForkProperties properties;
@@ -55,23 +103,43 @@ public class PbxMediaWebSocketServer
         catch (Exception e)
         {
             log.warn("[PbxMedia] 容器未就绪，拒绝连接 connId={}: {}", session.getId(), e.getMessage());
-            closeQuietly(session, CloseReason.CloseCodes.TRY_AGAIN_LATER, "service unavailable");
+            recordReject(session, "unavailable", CloseReason.CloseCodes.TRY_AGAIN_LATER,
+                    "service unavailable");
             return;
         }
         if (!properties.isEnabled())
         {
-            closeQuietly(session, CloseReason.CloseCodes.TRY_AGAIN_LATER, "pbx media disabled");
+            recordReject(session, "disabled", CloseReason.CloseCodes.TRY_AGAIN_LATER,
+                    "pbx media disabled");
             return;
         }
         if (!checkAuthKey(session.getQueryString(), properties.getAuthKey()))
         {
             log.warn("[PbxMedia] 共享密钥校验失败 recordId={} connId={}", recordId, session.getId());
-            closeQuietly(session, CloseReason.CloseCodes.VIOLATED_POLICY, "bad auth key");
+            recordReject(session, "auth_fail", CloseReason.CloseCodes.VIOLATED_POLICY,
+                    "bad auth key");
             return;
         }
 
-        PbxMediaForkHandler handler = new PbxMediaForkHandler(recordId, session, manager, properties);
+        HotlineMetrics metrics = null;
+        try
+        {
+            metrics = SpringUtils.getBean(HotlineMetrics.class);
+        }
+        catch (Exception e)
+        {
+            // 指标非关键路径：缺 bean 不影响媒体受理
+            log.debug("[PbxMedia] HotlineMetrics 未就绪，本次连接无指标: {}", e.getMessage());
+        }
+
+        PbxMediaForkHandler handler = new PbxMediaForkHandler(
+                recordId, session, manager, properties, metrics);
         session.getUserProperties().put("pbxHandler", handler);
+        session.getUserProperties().put("pbxAccepted", Boolean.TRUE);
+        if (metrics != null)
+        {
+            metrics.incrementPbxConnect();
+        }
         log.info("[PbxMedia] PBX 媒体连接已受理 recordId={} connId={}", recordId, session.getId());
     }
 
@@ -85,6 +153,7 @@ public class PbxMediaWebSocketServer
         }
         if (!handler.handleText(message))
         {
+            session.getUserProperties().put("pbxCloseReason", "bad_frame");
             closeQuietly(session, CloseReason.CloseCodes.VIOLATED_POLICY, "bad frame");
         }
     }
@@ -106,12 +175,13 @@ public class PbxMediaWebSocketServer
     @OnClose
     public void onClose(Session session)
     {
+        PbxMediaForkHandler handler = current(session);
+        boolean accepted = Boolean.TRUE.equals(session.getUserProperties().get("pbxAccepted"));
         try
         {
-            Object obj = session.getUserProperties().get("pbxHandler");
-            if (obj instanceof PbxMediaForkHandler)
+            if (handler != null)
             {
-                ((PbxMediaForkHandler) obj).finish();
+                handler.finish();
             }
             VoiceSessionManager manager = SpringUtils.getBean(VoiceSessionManager.class);
             manager.unregister(session.getId());
@@ -119,10 +189,30 @@ public class PbxMediaWebSocketServer
         catch (Exception e)
         {
             // 容器关闭时序 bean 可能已销毁：兜底停会话
-            Object obj = session.getUserProperties().get("pbxHandler");
-            if (obj instanceof PbxMediaForkHandler)
+            if (handler != null)
             {
-                ((PbxMediaForkHandler) obj).finish();
+                handler.finish();
+            }
+        }
+
+        // M3-3：已受理连接的关闭原因分类 + 生命周期指标（拒绝的连接不计）
+        if (accepted)
+        {
+            String reason = (String) session.getUserProperties().get("pbxCloseReason");
+            if (reason == null)
+            {
+                reason = handler != null && handler.isStopReceived() ? "stop" : "abnormal";
+            }
+            HotlineMetrics metrics = handler == null ? null : handler.metrics();
+            if (metrics != null)
+            {
+                metrics.recordPbxSession(
+                        (System.nanoTime() - handler.openNanos()) / 1_000_000);
+                metrics.incrementPbxClose(reason);
+            }
+            if (handler != null)
+            {
+                onForkClosed(handler);
             }
         }
     }
@@ -132,6 +222,13 @@ public class PbxMediaWebSocketServer
     {
         log.warn("[PbxMedia] error connId={}: {}",
                 session == null ? "" : session.getId(), error.getMessage());
+        if (session != null
+                && Boolean.TRUE.equals(session.getUserProperties().get("pbxAccepted"))
+                && !session.getUserProperties().containsKey("pbxCloseReason"))
+        {
+            // 端点主动关闭（bad_frame 等）已有原因，不覆盖
+            session.getUserProperties().put("pbxCloseReason", "error");
+        }
     }
 
     private PbxMediaForkHandler current(Session session)
@@ -184,6 +281,22 @@ public class PbxMediaWebSocketServer
             }
         }
         return null;
+    }
+
+    /** onOpen 拒绝：记拒绝原因（bean 未就绪时尽力取指标）+ 关闭连接 */
+    private void recordReject(Session session, String rejectReason,
+                              CloseReason.CloseCode code, String closeText)
+    {
+        try
+        {
+            HotlineMetrics metrics = SpringUtils.getBean(HotlineMetrics.class);
+            metrics.incrementPbxReject(rejectReason);
+        }
+        catch (Exception ignore)
+        {
+            // 容器未就绪本身就是一类拒绝原因，指标可能同样不可用
+        }
+        closeQuietly(session, code, closeText);
     }
 
     private void closeQuietly(Session session, CloseReason.CloseCode code, String reason)
