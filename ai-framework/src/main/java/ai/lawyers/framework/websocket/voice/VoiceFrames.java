@@ -49,6 +49,15 @@ final class VoiceFrames
     /** E4：实时情绪/意图命中（客户端展示预警条；warningId 关联风险预警） */
     static final String T_EMOTION = "emotion";
 
+    /** F4：实时案情要素（纠纷类型/诉求/紧急度/关键事实） */
+    static final String T_COPILOT_ELEMENT = "copilot_element";
+
+    /** F4：Copilot 推荐法条（含 chunkId，点击溯源） */
+    static final String T_COPILOT_LAWS = "copilot_laws";
+
+    /** F4：Copilot 相似工单 */
+    static final String T_COPILOT_TICKETS = "copilot_tickets";
+
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private VoiceFrames()
@@ -157,6 +166,40 @@ final class VoiceFrames
         {
             m.put("warningId", warningId);
         }
+        return write(m);
+    }
+
+    /* ================= F4：Copilot 帧 ================= */
+
+    /** F4：案情要素帧（seq 为 Copilot 回合号，客户端按新回合整体刷新） */
+    static String copilotElement(long seq, String disputeType, java.util.List<String> claims,
+                                 String urgency, java.util.List<String> keyFacts, boolean degraded)
+    {
+        Map<String, Object> m = base(T_COPILOT_ELEMENT);
+        m.put("seq", seq);
+        m.put("disputeType", disputeType == null ? "" : disputeType);
+        m.put("claims", claims == null ? java.util.Collections.emptyList() : claims);
+        m.put("urgency", urgency == null ? "normal" : urgency);
+        m.put("keyFacts", keyFacts == null ? java.util.Collections.emptyList() : keyFacts);
+        m.put("degraded", degraded);
+        return write(m);
+    }
+
+    /** F4：推荐法条帧（laws 元素含 chunkId/title/lawArticle/source） */
+    static String copilotLaws(long seq, java.util.List<Map<String, Object>> laws)
+    {
+        Map<String, Object> m = base(T_COPILOT_LAWS);
+        m.put("seq", seq);
+        m.put("laws", laws == null ? java.util.Collections.emptyList() : laws);
+        return write(m);
+    }
+
+    /** F4：相似工单帧（tickets 元素含 ticketId/ticketNo/title/status/contentSnippet） */
+    static String copilotTickets(long seq, java.util.List<Map<String, Object>> tickets)
+    {
+        Map<String, Object> m = base(T_COPILOT_TICKETS);
+        m.put("seq", seq);
+        m.put("tickets", tickets == null ? java.util.Collections.emptyList() : tickets);
         return write(m);
     }
 

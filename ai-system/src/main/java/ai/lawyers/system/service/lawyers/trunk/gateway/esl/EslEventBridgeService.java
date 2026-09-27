@@ -1,5 +1,6 @@
 package ai.lawyers.system.service.lawyers.trunk.gateway.esl;
 
+import java.io.File;
 import java.time.Duration;
 import java.util.Date;
 import java.util.HashMap;
@@ -137,6 +138,10 @@ public class EslEventBridgeService implements EslEventListener
 
     @Autowired(required = false)
     private HotlineMetrics metrics;
+
+    /** F2：录音对象存储上传服务（对象存储模式下接管上传） */
+    @Autowired(required = false)
+    private ai.lawyers.system.service.impl.lawyers.storage.RecordingUploadService recordingUploadService;
 
     /** B4：PBX 事件幂等守卫（第一道防线）；为空时退化为不判重（兼容旧行为） */
     @Autowired(required = false)
@@ -747,6 +752,7 @@ public class EslEventBridgeService implements EslEventListener
             update.setRecordId(recordId);
             if (StringUtils.isNotEmpty(recordPath))
             {
+                // F2：对象存储模式下，先暂存本地路径（供上传服务读取），上传成功后再回写 object key
                 update.setRecordFile(recordPath);
                 // 对外访问 URL 统一走后端播放接口，前端可直接用 <audio src=...>
                 update.setRecordingUrl("/lawyers/call/record/" + recordId + "/play");
@@ -758,6 +764,24 @@ public class EslEventBridgeService implements EslEventListener
             callRecordMapper.updateRecordingInfo(update);
             log.info("[ESL-Bridge] 已回写录音信息: recordId={} file={} duration={}s",
                     recordId, recordPath, recordSeconds);
+
+            // F2：对象存储模式，排队异步上传；上传成功后再更新 recordFile 为 object key
+            if (recordingUploadService != null && StringUtils.isNotEmpty(recordPath))
+            {
+                try
+                {
+                    File localFile = new File(recordPath);
+                    if (localFile.exists())
+                    {
+                        recordingUploadService.enqueue(recordId, localFile);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    log.warn("[ESL-Bridge] 录音上传排队失败 recordId={}: {}", recordId, ex.getMessage());
+                }
+            }
+
             // T4-1 录音文件已就绪，投递质检转写队列（队列不可用时内部同步降级）
             if (qualityTranscribeDispatcher != null && StringUtils.isNotEmpty(recordPath))
             {

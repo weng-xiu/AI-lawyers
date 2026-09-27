@@ -41,6 +41,7 @@ import io.micrometer.core.instrument.Timer;
  *   <li>hotline_voice_rag_ms                  E3：机器人 RAG 检索（预算 40ms）</li>
  *   <li>hotline_voice_llm_first_token_ms      E3：机器人 LLM 首 token（预算 600ms，非流式期口径=整段返回）</li>
  *   <li>hotline_voice_emotion_total{level}    E4：实时情绪识别触发（urgent/negative）</li>
+ *   <li>hotline_copilot_assist_total          F4：Copilot 实时辅助回合数</li>
  * </ul>
  *
  * <p>Prometheus 导出时 Timer 自动追加 {@code _seconds} 后缀（如
@@ -206,6 +207,12 @@ public class HotlineMetrics
     public void incrementVoiceEmotion(String level)
     {
         counter("voice.emotion.total", "level", level).increment();
+    }
+
+    /** F4：Copilot 实时辅助回合计数（一次要素+法条+工单辅助完成记一次） */
+    public void incrementCopilotAssist()
+    {
+        counter("copilot.assist.total").increment();
     }
 
     /** 队列死信计数 */

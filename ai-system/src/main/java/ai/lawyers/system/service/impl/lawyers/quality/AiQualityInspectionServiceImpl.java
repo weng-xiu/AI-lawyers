@@ -31,6 +31,7 @@ import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 import ai.lawyers.system.service.lawyers.quality.IAiQualityInspectionService;
 import ai.lawyers.system.service.lawyers.queue.MessageNotifyDispatcher;
+import ai.lawyers.system.service.lawyers.storage.RecordingStorageService;
 import ai.lawyers.system.service.lawyers.summary.IAiCallSummaryService;
 import ai.lawyers.system.service.lawyers.voice.VoiceEngineManager;
 import ai.lawyers.system.service.lawyers.voice.VoiceModelEnum;
@@ -106,6 +107,10 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
     /** 录音文件基础路径（对应 FreeSWITCH recordings_dir） */
     @Value("${call.recording.base-path:C:/Program Files/FreeSWITCH/recordings}")
     private String recordingBasePath;
+
+    /** F2：录音存储抽象（本地/对象存储），为空时退化到本地文件 */
+    @Autowired(required = false)
+    private RecordingStorageService recordingStorageService;
 
     @Override
     public void submitForRecord(Long recordId)
@@ -238,13 +243,46 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
     /** 读取录音文件并调 ASR 转写；录音文件不存在时抛异常（队列重投） */
     private String transcribeRecording(AiCallRecord record) throws Exception
     {
-        File file = resolveRecordingFile(record);
-        if (file == null || !file.exists() || !file.isFile())
+        byte[] audio;
+        String fileName;
+
+        // F2：对象存储模式，优先从对象存储读取
+        if (recordingStorageService != null && recordingStorageService.isObjectStorage())
         {
-            throw new IllegalStateException("录音文件尚未就绪 recordId=" + record.getRecordId());
+            String key = record.getRecordFile();
+            if (StringUtils.isEmpty(key))
+            {
+                throw new IllegalStateException("录音文件尚未就绪 recordId=" + record.getRecordId());
+            }
+            try (java.io.InputStream in = recordingStorageService.load(key))
+            {
+                if (in == null)
+                {
+                    throw new IllegalStateException("录音文件尚未就绪 recordId=" + record.getRecordId());
+                }
+                java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = in.read(buf)) != -1)
+                {
+                    bos.write(buf, 0, n);
+                }
+                audio = bos.toByteArray();
+            }
+            fileName = key;
         }
-        byte[] audio = Files.readAllBytes(file.toPath());
-        String format = guessFormat(file.getName());
+        else
+        {
+            File file = resolveRecordingFile(record);
+            if (file == null || !file.exists() || !file.isFile())
+            {
+                throw new IllegalStateException("录音文件尚未就绪 recordId=" + record.getRecordId());
+            }
+            audio = Files.readAllBytes(file.toPath());
+            fileName = file.getName();
+        }
+
+        String format = guessFormat(fileName);
         String text = voiceEngineManager.transcribe(
                 voiceEngineManager.defaultEngine(), audio, format, 16000, null);
         return text == null ? "" : text.trim();

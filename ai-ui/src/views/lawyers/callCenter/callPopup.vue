@@ -96,10 +96,14 @@
         </el-card>
 
         <!-- P3-A6：坐席实时字幕（/ws/voice，随通话接通激活，挂断自动卸载） -->
-        <voice-caption v-if="connected" :session-id="currentRecordId" @final="onCaptionFinal" />
+        <voice-caption v-if="connected" :session-id="currentRecordId" @final="onCaptionFinal"
+                       @copilot-element="onCopilotElement"
+                       @copilot-laws="onCopilotLaws"
+                       @copilot-tickets="onCopilotTickets" />
 
         <!-- 独立 AI 律师辅助面板（与人工接听链路分离，仅以 currentRecordId 关联） -->
-        <ai-assist-panel v-if="connected" :record-id="currentRecordId" :live-text="liveCaptionText" />
+        <ai-assist-panel v-if="connected" :record-id="currentRecordId"
+                         :live-text="liveCaptionText" :copilot="copilotData" />
       </el-col>
 
       <!-- 右侧：5 标签页 -->
@@ -293,7 +297,9 @@ export default {
       // 人工通话记录ID，仅作为人工链路与AI辅助链路的关联桥梁，不驱动人工状态
       currentRecordId: null,
       // P3-A6：实时字幕累计文本（供 AI 辅助面板联动分析）
-      liveCaptionText: ''
+      liveCaptionText: '',
+      // F4：实时 Copilot 数据（要素/法条/相似工单，按 seq 回合刷新）
+      copilotData: { seq: 0, element: null, laws: [], tickets: [] }
     }
   },
   computed: {
@@ -439,11 +445,37 @@ export default {
       this.callStatus = '0'
       this.clearTimer()
       this.liveCaptionText = ''
+      this.copilotData = { seq: 0, element: null, laws: [], tickets: [] }
     },
     // P3-A6：字幕 final 文本累计，桥接给 AI 辅助面板（截断保留最近 2000 字，避免超长上行）
     onCaptionFinal(text) {
       if (!text) return
       this.liveCaptionText = (this.liveCaptionText + '\n' + text).slice(-2000)
+    },
+    // F4：Copilot 帧桥接——同 seq 三帧组成一个辅助回合，整体刷新给面板
+    onCopilotElement(msg) {
+      if (!msg || msg.seq < this.copilotData.seq) return
+      if (msg.seq !== this.copilotData.seq) {
+        this.copilotData = { seq: msg.seq, element: msg, laws: [], tickets: [] }
+      } else {
+        this.copilotData.element = msg
+      }
+    },
+    onCopilotLaws(msg) {
+      if (!msg || msg.seq < this.copilotData.seq) return
+      if (msg.seq > this.copilotData.seq) {
+        this.copilotData = { seq: msg.seq, element: null, laws: msg.laws || [], tickets: [] }
+      } else {
+        this.copilotData.laws = msg.laws || []
+      }
+    },
+    onCopilotTickets(msg) {
+      if (!msg || msg.seq < this.copilotData.seq) return
+      if (msg.seq > this.copilotData.seq) {
+        this.copilotData = { seq: msg.seq, element: null, laws: [], tickets: msg.tickets || [] }
+      } else {
+        this.copilotData.tickets = msg.tickets || []
+      }
     },
     onWsDtmf(data) {
       // DTMF 事件可用于扩展按键交互（如满意度评价），目前仅记录

@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import ai.lawyers.system.mapper.lawyers.quality.AiAgentStatusLogMapper;
 import ai.lawyers.system.mapper.lawyers.stat.DashboardMapper;
 import ai.lawyers.system.service.lawyers.stat.IDashboardService;
+import ai.lawyers.system.service.lawyers.voice.copilot.IAiCopilotFeedbackService;
 
 /**
  * B4 运营大屏聚合服务实现
@@ -27,6 +28,10 @@ public class DashboardServiceImpl implements IDashboardService
 
     @Autowired
     private AiAgentStatusLogMapper agentStatusLogMapper;
+
+    /** F4：Copilot 采纳率统计 */
+    @Autowired
+    private IAiCopilotFeedbackService copilotFeedbackService;
 
     @Override
     public Map<String, Object> getDashboardData(Date beginTime, Date endTime)
@@ -51,7 +56,7 @@ public class DashboardServiceImpl implements IDashboardService
      * F10 公共法律服务业务类指标：语种分布 / 关怀模式使用率 / 条线转办统计 /
      * 渠道活跃与绑定 / 公众端满意度。全部实时聚合现有业务表；
      * P3-F3 ai_stat_minute 物化表落地后仅需切换 Mapper 数据源，接口与前端契约不变。
-     * Copilot 建议采纳率依赖 F4 埋点（坐席辅助深化未启动），本批先透出占位 null。
+     * Copilot 建议采纳率（F4）已接通 ai_copilot_feedback 埋点实时统计。
      */
     private Map<String, Object> buildBizMetrics(Date beginTime, Date endTime)
     {
@@ -117,8 +122,8 @@ public class DashboardServiceImpl implements IDashboardService
         // 公众端满意度（图文四维评价）
         biz.put("portalSatisfaction", nullToEmpty(dashboardMapper.selectPortalSatisfaction(beginTime, endTime)));
 
-        // Copilot 建议采纳率：依赖 F4 埋点，未启动前透出 null（前端不渲染该卡）
-        biz.put("copilotAdoption", null);
+        // Copilot 建议采纳率（F4：埋点已接通，total/adoptCount/modifyCount/ignoreCount/adoptRate）
+        biz.put("copilotAdoption", copilotFeedbackService.adoptionTotal(beginTime, endTime));
         return biz;
     }
 

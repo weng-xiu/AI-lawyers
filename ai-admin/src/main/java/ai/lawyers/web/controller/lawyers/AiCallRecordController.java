@@ -35,6 +35,7 @@ import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.common.utils.poi.ExcelUtil;
 import ai.lawyers.system.domain.lawyers.AiCallRecord;
 import ai.lawyers.system.service.lawyers.IAiCallRecordService;
+import ai.lawyers.system.service.lawyers.storage.RecordingStorageService;
 import ai.lawyers.system.service.lawyers.summary.IAiCallSummaryService;
 
 @RestController
@@ -52,6 +53,10 @@ public class AiCallRecordController extends BaseController
     /** 录音文件基础路径，对应 FreeSWITCH recordings_dir */
     @Value("${call.recording.base-path:C:/Program Files/FreeSWITCH/recordings}")
     private String recordingBasePath;
+
+    /** F2：录音存储抽象（本地/对象存储） */
+    @Autowired(required = false)
+    private RecordingStorageService recordingStorageService;
 
     @PreAuthorize("@ss.hasPermi('lawyers:call:record:list')")
     @GetMapping("/list")
@@ -187,12 +192,32 @@ public class AiCallRecordController extends BaseController
 
     /**
      * 在线播放录音（支持 HTTP Range，支持音频拖动进度条）。
+     * 对象存储模式：302 重定向到预签名 URL；本地模式：FileSystemResource 流式返回。
      */
     @PreAuthorize("@ss.hasPermi('lawyers:call:record:query')")
     @GetMapping("/{recordId}/play")
     public ResponseEntity<Resource> play(@PathVariable("recordId") Long recordId,
                                          HttpServletRequest request) throws IOException
     {
+        AiCallRecord record = aiCallRecordService.selectAiCallRecordByRecordId(recordId);
+        if (record == null || StringUtils.isEmpty(record.getRecordFile()))
+        {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+
+        // F2：对象存储模式 → 302 重定向到预签名 URL
+        if (recordingStorageService != null && recordingStorageService.isObjectStorage())
+        {
+            String playUrl = recordingStorageService.getPlayUrl(record.getRecordFile(), 3600);
+            if (StringUtils.isNotEmpty(playUrl))
+            {
+                return ResponseEntity.status(HttpStatus.FOUND)
+                        .header(HttpHeaders.LOCATION, playUrl)
+                        .build();
+            }
+        }
+
+        // 本地模式（或对象存储降级）：原有文件流逻辑
         File file = resolveRecordingFile(recordId);
         if (file == null || !file.exists() || !file.isFile())
         {
@@ -253,11 +278,31 @@ public class AiCallRecordController extends BaseController
 
     /**
      * 下载录音文件。
+     * 对象存储模式：302 重定向到预签名 URL；本地模式：FileSystemResource 下载。
      */
     @PreAuthorize("@ss.hasPermi('lawyers:call:record:query')")
     @GetMapping("/{recordId}/download")
     public ResponseEntity<Resource> download(@PathVariable("recordId") Long recordId) throws IOException
     {
+        AiCallRecord record = aiCallRecordService.selectAiCallRecordByRecordId(recordId);
+        if (record == null || StringUtils.isEmpty(record.getRecordFile()))
+        {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+
+        // F2：对象存储模式 → 302 重定向到预签名 URL
+        if (recordingStorageService != null && recordingStorageService.isObjectStorage())
+        {
+            String playUrl = recordingStorageService.getPlayUrl(record.getRecordFile(), 3600);
+            if (StringUtils.isNotEmpty(playUrl))
+            {
+                return ResponseEntity.status(HttpStatus.FOUND)
+                        .header(HttpHeaders.LOCATION, playUrl)
+                        .build();
+            }
+        }
+
+        // 本地模式（或对象存储降级）：原有文件下载逻辑
         File file = resolveRecordingFile(recordId);
         if (file == null || !file.exists() || !file.isFile())
         {

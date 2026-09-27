@@ -14,6 +14,75 @@
 
       <template v-else>
         <div v-if="session" class="ai-body">
+          <!-- F4：实时 Copilot（来自 /ws/voice 节流回合，辅助参考，不直接写工单） -->
+          <div v-if="copilot && copilot.seq > 0" class="ai-section ai-copilot">
+            <div class="ai-section-title"><i class="el-icon-cpu"></i> 实时案情要素</div>
+
+            <!-- 要素标签 -->
+            <div v-if="copilot.element" class="cp-block">
+              <div class="cp-tags">
+                <el-tag size="small" type="primary" effect="dark">
+                  {{ copilot.element.disputeType || '类型待定' }}
+                </el-tag>
+                <el-tag size="small" :type="copilot.element.urgency === 'urgent' ? 'danger' : 'success'"
+                        effect="plain">
+                  {{ copilot.element.urgency === 'urgent' ? '紧急' : '一般' }}
+                </el-tag>
+                <el-tag v-for="(c, i) in copilot.element.claims" :key="'c'+i" size="small"
+                        type="info" effect="plain">诉求：{{ c }}</el-tag>
+              </div>
+              <ul v-if="copilot.element.keyFacts && copilot.element.keyFacts.length" class="cp-facts">
+                <li v-for="(f, i) in copilot.element.keyFacts" :key="'f'+i">{{ f }}</li>
+              </ul>
+              <div v-if="copilot.element.degraded" class="cp-degraded">要素暂不可用（模型未响应），以下为历史推荐</div>
+              <div class="cp-actions">
+                <el-button size="mini" type="success"
+                           @click="sendFeedback('ELEMENT', 'element', 'ADOPT')">采纳标签</el-button>
+                <el-button size="mini"
+                           @click="sendFeedback('ELEMENT', 'element', 'MODIFY')">参考调整</el-button>
+                <el-button size="mini" type="info"
+                           @click="sendFeedback('ELEMENT', 'element', 'IGNORE')">忽略</el-button>
+              </div>
+            </div>
+
+            <!-- 推荐法条（点击溯源原文） -->
+            <div v-if="copilot.laws && copilot.laws.length" class="cp-block">
+              <div class="cp-sub-title"><i class="el-icon-notebook-2"></i> 推荐法条</div>
+              <div v-for="law in copilot.laws" :key="law.chunkId" class="cp-law">
+                <a class="cp-law-link" @click="openLaw(law)">
+                  {{ law.title }}<span v-if="law.lawArticle">（{{ law.lawArticle }}）</span>
+                  <i class="el-icon-view cp-view-icon"></i>
+                </a>
+                <span class="cp-law-actions">
+                  <el-button size="mini" type="text"
+                             @click="sendFeedback('LAW', String(law.chunkId), 'ADOPT')">采用</el-button>
+                  <el-button size="mini" type="text"
+                             @click="sendFeedback('LAW', String(law.chunkId), 'IGNORE')">忽略</el-button>
+                </span>
+              </div>
+            </div>
+
+            <!-- 相似工单 -->
+            <div v-if="copilot.tickets && copilot.tickets.length" class="cp-block">
+              <div class="cp-sub-title"><i class="el-icon-tickets"></i> 相似工单（已办结）</div>
+              <div v-for="ticket in copilot.tickets" :key="ticket.ticketId" class="cp-ticket">
+                <div class="cp-ticket-head">
+                  <el-tag size="mini" :type="ticketStatusTag(ticket.status)" effect="plain">
+                    {{ ticketStatusLabel(ticket.status) }}
+                  </el-tag>
+                  <span class="cp-ticket-title">{{ ticket.title || ticket.ticketNo }}</span>
+                </div>
+                <div v-if="ticket.contentSnippet" class="cp-ticket-snippet">{{ ticket.contentSnippet }}</div>
+                <span class="cp-law-actions">
+                  <el-button size="mini" type="text"
+                             @click="sendFeedback('TICKET', String(ticket.ticketId), 'ADOPT')">参考处理思路</el-button>
+                  <el-button size="mini" type="text"
+                             @click="sendFeedback('TICKET', String(ticket.ticketId), 'IGNORE')">忽略</el-button>
+                </span>
+              </div>
+            </div>
+          </div>
+
           <!-- 意图识别 -->
           <div class="ai-section">
             <div class="ai-section-title"><i class="el-icon-discover"></i> 识别意图</div>
@@ -60,11 +129,32 @@
         </div>
       </template>
     </el-card>
+
+    <!-- F4：法条溯源弹窗（法规名称/条号/出处/原文；效力状态随 F7 元数据补） -->
+    <el-dialog title="法条溯源" :visible.sync="lawDialogVisible" width="640px"
+               append-to-body custom-class="cp-law-dialog">
+      <div v-loading="lawLoading">
+        <template v-if="lawDetail">
+          <el-descriptions :column="1" border size="small">
+            <el-descriptions-item label="法规名称">{{ lawDetail.title || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="条号">{{ lawDetail.lawArticle || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="出处">{{ lawDetail.source || '-' }}</el-descriptions-item>
+          </el-descriptions>
+          <div class="cp-law-content">{{ lawDetail.chunkContent }}</div>
+        </template>
+      </div>
+      <span slot="footer">
+        <el-button @click="lawDialogVisible = false">关 闭</el-button>
+        <el-button type="primary"
+                   @click="adoptOpenedLaw">采用并关闭</el-button>
+      </span>
+    </el-dialog>
   </div>
 </template>
 
 <script>
 import { getAiAssistByRecord, analyzeAiAssist, summarizeAiAssist } from '@/api/lawyers/aiAssist'
+import { copilotFeedback, getCopilotChunk } from '@/api/lawyers/copilot'
 
 export default {
   name: 'AiAssistPanel',
@@ -78,13 +168,23 @@ export default {
     liveText: {
       type: String,
       default: ''
+    },
+    // F4：实时 Copilot 数据 {seq, element, laws[], tickets[]}（callPopup 桥接 WS 帧）
+    copilot: {
+      type: Object,
+      default: null
     }
   },
   data() {
     return {
       session: null,
       analyzing: false,
-      summarizing: false
+      summarizing: false,
+      // F4：法条溯源弹窗
+      lawDialogVisible: false,
+      lawLoading: false,
+      lawDetail: null,
+      openedChunkId: null
     }
   },
   computed: {
@@ -113,6 +213,10 @@ export default {
       immediate: true,
       handler(val) {
         if (val) this.loadSession(val)
+        // F4：切换通话复位溯源弹窗
+        this.lawDialogVisible = false
+        this.lawDetail = null
+        this.openedChunkId = null
       }
     }
   },
@@ -147,6 +251,55 @@ export default {
         })
         .catch(() => {})
         .finally(() => { this.summarizing = false })
+    },
+
+    /* ================= F4：采纳埋点 / 法条溯源 ================= */
+
+    /**
+     * 发送建议行为埋点（best-effort，不打扰坐席操作）。
+     * @param type ELEMENT/LAW/TICKET
+     * @param ref  chunkId/ticketId/element
+     * @param action ADOPT/MODIFY/IGNORE
+     */
+    sendFeedback(type, ref, action) {
+      copilotFeedback({
+        recordId: this.recordId ? Number(this.recordId) : null,
+        suggestionType: type,
+        suggestionRef: ref,
+        action: action
+      }).catch(() => {})
+    },
+
+    /** 打开法条溯源弹窗：按 chunkId 拉原文 */
+    openLaw(law) {
+      if (!law || !law.chunkId) {
+        this.$message.warning('该法条暂无溯源内容')
+        return
+      }
+      this.openedChunkId = law.chunkId
+      this.lawDetail = null
+      this.lawDialogVisible = true
+      this.lawLoading = true
+      getCopilotChunk(law.chunkId).then(res => {
+        this.lawDetail = res.data || null
+      }).catch(() => {
+        this.lawDetail = null
+      }).finally(() => { this.lawLoading = false })
+    },
+
+    /** 弹窗内"采用并关闭"：记 LAW 采纳后关闭 */
+    adoptOpenedLaw() {
+      if (this.openedChunkId) {
+        this.sendFeedback('LAW', String(this.openedChunkId), 'ADOPT')
+      }
+      this.lawDialogVisible = false
+    },
+
+    ticketStatusLabel(s) {
+      return { '0': '待处理', '1': '处理中', '2': '已完成', '3': '已归档' }[s] || '待处理'
+    },
+    ticketStatusTag(s) {
+      return { '0': 'info', '1': 'warning', '2': 'success', '3': '' }[s] || 'info'
     }
   }
 }
@@ -169,4 +322,25 @@ export default {
 .ai-script-list { margin: 0; padding-left: 18px; color: #5A6A7E; font-size: 13px; line-height: 1.8; }
 .ai-summary { background: #EDF5EF; border: 1px solid #D6E9DC; padding: 10px; border-radius: 4px; font-size: 12px; white-space: pre-wrap; color: #2B8C6E; }
 .ai-actions { display: flex; gap: 10px; margin-top: 12px; }
+
+/* F4：实时 Copilot */
+.ai-copilot { background: #f8faff; border: 1px solid #e4ecfb; border-radius: 6px; padding: 10px; }
+.cp-block { margin-bottom: 10px; }
+.cp-block:last-child { margin-bottom: 0; }
+.cp-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.cp-facts { margin: 0 0 6px; padding-left: 18px; color: #5A6A7E; font-size: 12px; line-height: 1.7; }
+.cp-degraded { color: #C0504D; font-size: 12px; margin-bottom: 6px; }
+.cp-sub-title { font-size: 12px; font-weight: 600; color: #1F2A3A; margin-bottom: 6px; }
+.cp-law { display: flex; align-items: center; justify-content: space-between;
+  background: #fff; border-left: 3px solid #1A3C6E; padding: 4px 8px; margin-bottom: 5px; border-radius: 0 4px 4px 0; }
+.cp-law-link { color: #1A3C6E; font-size: 12px; cursor: pointer; }
+.cp-law-link:hover { text-decoration: underline; }
+.cp-view-icon { font-size: 12px; margin-left: 4px; }
+.cp-law-actions { white-space: nowrap; margin-left: 8px; }
+.cp-ticket { background: #fff; border: 1px solid #e8eef7; border-radius: 4px; padding: 6px 8px; margin-bottom: 6px; }
+.cp-ticket-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.cp-ticket-title { font-size: 12px; font-weight: 600; color: #1F2A3A; }
+.cp-ticket-snippet { color: #5A6A7E; font-size: 12px; line-height: 1.6; margin-bottom: 2px; }
+.cp-law-content { margin-top: 12px; max-height: 320px; overflow-y: auto;
+  background: #f7f9fc; border-radius: 4px; padding: 10px; font-size: 13px; line-height: 1.8; color: #33415c; white-space: pre-wrap; }
 </style>

@@ -19,6 +19,14 @@ public interface AiLegalKnowledgeChunkMapper
     public List<AiLegalKnowledgeChunk> selectAllChunksForIndex();
 
     /**
+     * F4：按分块ID 查询溯源详情（不含 embedding 大字段）。
+     *
+     * @param chunkId 分块ID
+     * @return 分块（标题/法条/出处/原文），不存在返回 null
+     */
+    public AiLegalKnowledgeChunk selectChunkById(@Param("chunkId") Long chunkId);
+
+    /**
      * 关键词路（FULLTEXT ngram 自然语言模式）召回；FULLTEXT 不可用时由上层改调 like 兜底。
      *
      * @param keyword      原始问句/关键词

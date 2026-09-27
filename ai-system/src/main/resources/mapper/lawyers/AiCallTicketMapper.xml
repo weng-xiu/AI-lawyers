@@ -240,6 +240,31 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         limit 200
     </select>
 
+    <!-- F4：相似工单推荐——短语 LIKE 命中已完成/已归档工单，内容截断上屏 -->
+    <select id="selectSimilarTickets" resultMap="AiCallTicketResult">
+        select t.ticket_id, t.ticket_no, t.record_id, t.title,
+               substring(t.content, 1, 120) as content, t.status
+        from ai_call_ticket t
+        where t.status in ('2', '3')
+        <if test="excludeRecordId != null">
+          and t.record_id != #{excludeRecordId}
+        </if>
+        and (
+            <trim prefixOverrides="or">
+                <if test="phrase1 != null and phrase1 != ''">
+                    t.title like concat('%', #{phrase1}, '%')
+                    or t.content like concat('%', #{phrase1}, '%')
+                </if>
+                <if test="phrase2 != null and phrase2 != ''">
+                    or t.title like concat('%', #{phrase2}, '%')
+                    or t.content like concat('%', #{phrase2}, '%')
+                </if>
+            </trim>
+        )
+        order by t.ticket_id desc
+        limit #{limit}
+    </select>
+
     <delete id="deleteAiCallTicketByTicketId" parameterType="Long">
         delete from ai_call_ticket where ticket_id = #{ticketId}
     </delete>

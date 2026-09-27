@@ -17,6 +17,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import ai.lawyers.system.service.lawyers.cluster.RedisLeaderLock;
+import ai.lawyers.system.service.lawyers.storage.RecordingStorageService;
 
 /**
  * 话单冷热分离归档任务（P3-F1）。
@@ -96,6 +97,10 @@ public class DataArchiveTask
     /** 录音文件基础目录（相对路径以此解析），复用 call.recording.base-path */
     @Value("${call.recording.base-path:}")
     private String recordingBasePath;
+
+    /** F2：录音存储抽象（本地/对象存储），为空时退化到本地文件删除 */
+    @Autowired(required = false)
+    private RecordingStorageService recordingStorageService;
 
     /**
      * 每日凌晨低峰执行（默认 03:40，在 N12 清理 03:30 之后），可通过 data.archive.cron 调整。
@@ -260,6 +265,17 @@ public class DataArchiveTask
 
     private void deleteRecordingFile(String storedPath)
     {
+        // F2：对象存储模式，直接删对象
+        if (recordingStorageService != null && recordingStorageService.isObjectStorage())
+        {
+            boolean ok = recordingStorageService.delete(storedPath);
+            if (!ok)
+            {
+                log.warn("[Archive] 对象存储录音删除失败 key={}", storedPath);
+            }
+            return;
+        }
+
         File file = DataLifecycleCleanupTask.resolveRecordingFile(recordingBasePath, storedPath);
         if (file == null || !file.exists() || !file.isFile())
         {

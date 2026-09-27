@@ -188,4 +188,58 @@ class DataLifecycleCleanupTaskTest
                 sqls.stream().filter(s -> s.startsWith("delete from ai_call_dial_log")).findFirst().orElse(""));
         assertThat(qualityIdx).isGreaterThan(dialIdx);
     }
+
+    // ---------- F2：对象存储模式适配 ----------
+
+    @Test
+    void deleteRecordingFile_s3Mode_callsStorageDelete() throws Exception
+    {
+        // 注入对象存储 mock
+        ai.lawyers.system.service.lawyers.storage.RecordingStorageService storage =
+                Mockito.mock(ai.lawyers.system.service.lawyers.storage.RecordingStorageService.class);
+        when(storage.isObjectStorage()).thenReturn(true);
+        when(storage.delete("rec-1.wav")).thenReturn(true);
+        ReflectionTestUtils.setField(task, "recordingStorageService", storage);
+
+        java.lang.reflect.Method m = DataLifecycleCleanupTask.class.getDeclaredMethod(
+                "deleteRecordingFile", String.class);
+        m.setAccessible(true);
+        boolean result = (boolean) m.invoke(task, "rec-1.wav");
+
+        assertThat(result).isTrue();
+        verify(storage).delete("rec-1.wav");
+    }
+
+    @Test
+    void deleteRecordingFile_s3Mode_deleteFails_returnsFalse() throws Exception
+    {
+        ai.lawyers.system.service.lawyers.storage.RecordingStorageService storage =
+                Mockito.mock(ai.lawyers.system.service.lawyers.storage.RecordingStorageService.class);
+        when(storage.isObjectStorage()).thenReturn(true);
+        when(storage.delete("rec-1.wav")).thenReturn(false);
+        ReflectionTestUtils.setField(task, "recordingStorageService", storage);
+
+        java.lang.reflect.Method m = DataLifecycleCleanupTask.class.getDeclaredMethod(
+                "deleteRecordingFile", String.class);
+        m.setAccessible(true);
+        boolean result = (boolean) m.invoke(task, "rec-1.wav");
+
+        assertThat(result).isFalse();
+    }
+
+    @Test
+    void deleteRecordingFile_localMode_stillWorks() throws Exception
+    {
+        // 不注入 recordingStorageService（null），走本地逻辑
+        File rec = new File(tempDir, "rec-2.wav");
+        Files.write(rec.toPath(), "fake".getBytes());
+
+        java.lang.reflect.Method m = DataLifecycleCleanupTask.class.getDeclaredMethod(
+                "deleteRecordingFile", String.class);
+        m.setAccessible(true);
+        boolean result = (boolean) m.invoke(task, rec.getAbsolutePath());
+
+        assertThat(result).isTrue();
+        assertThat(rec).doesNotExist();
+    }
 }

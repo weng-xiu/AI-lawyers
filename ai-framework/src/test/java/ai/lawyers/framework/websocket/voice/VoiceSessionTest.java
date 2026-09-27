@@ -685,6 +685,121 @@ class VoiceSessionTest
                 org.mockito.ArgumentMatchers.any(), eq("1000"));
     }
 
+    // ---------- F4：Copilot 实时辅助 ----------
+
+    /** 构造带 Copilot 服务（mock，固定返回一组要素/法条/工单）的会话 */
+    private ai.lawyers.system.service.lawyers.voice.copilot.CopilotAssistService setupCopilotSession(
+            AsrStreamCallback[] cbHolder) throws Exception
+    {
+        ai.lawyers.system.service.lawyers.voice.copilot.CopilotAssistService svc =
+                mock(ai.lawyers.system.service.lawyers.voice.copilot.CopilotAssistService.class);
+        ai.lawyers.system.service.lawyers.voice.copilot.CopilotAssistResult r =
+                ai.lawyers.system.service.lawyers.voice.copilot.CopilotAssistResult.empty();
+        r.setDisputeType("劳动争议");
+        r.setClaims(java.util.Arrays.asList("支付拖欠工资"));
+        r.setUrgency("normal");
+        r.setKeyFacts(java.util.Arrays.asList("2026年8月入职"));
+        r.setLaws(java.util.Arrays.asList(
+                new ai.lawyers.system.service.lawyers.voice.copilot.CopilotLaw(
+                        9L, "劳动合同法", "第三十条", "全国人大常委会")));
+        r.setTickets(java.util.Arrays.asList(
+                new ai.lawyers.system.service.lawyers.voice.copilot.CopilotTicket(
+                        7L, "GD2026001", "工资拖欠工单", "2", "拖欠两个月工资")));
+        when(svc.assist(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString())).thenReturn(r);
+
+        StreamAsrEngine stub = new StreamAsrEngine()
+        {
+            @Override public String engineCode() { return "mock"; }
+            @Override public void open(VoiceAsrContext ctx, AsrStreamCallback cb) { cbHolder[0] = cb; }
+            @Override public void feed(byte[] frame) {}
+            @Override public void close() {}
+        };
+        VoiceEngineRegistry reg = new VoiceEngineRegistry()
+        {
+            @Override public StreamAsrEngine createAsr(String code) { return stub; }
+        };
+        session.shutdown();
+        session = new VoiceSession(wsSession, "2000", "agent", 1000, reg, true,
+                null, null, null, svc);
+        return svc;
+    }
+
+    @Test
+    void longFinal_copilotThreeFramesWithSameSeq() throws Exception
+    {
+        AsrStreamCallback[] cbHolder = new AsrStreamCallback[1];
+        setupCopilotSession(cbHolder);
+        session.handleText("{\"type\":\"start\"}");
+        await(n -> type(n, "started"));
+        cbHolder[0].onFinal("我们公司从八月份开始就一直拖欠工资不发，一共两个月了，多次催要都没有结果");
+
+        JsonNode element = await(n -> type(n, "copilot_element"));
+        assertThat(element.path("disputeType").asText()).isEqualTo("劳动争议");
+        assertThat(element.path("claims").get(0).asText()).isEqualTo("支付拖欠工资");
+        long seq = element.path("seq").asLong();
+
+        JsonNode laws = await(n -> type(n, "copilot_laws"));
+        assertThat(laws.path("seq").asLong()).isEqualTo(seq);
+        assertThat(laws.path("laws").get(0).path("chunkId").asLong()).isEqualTo(9L);
+        assertThat(laws.path("laws").get(0).path("lawArticle").asText()).isEqualTo("第三十条");
+
+        JsonNode tickets = await(n -> type(n, "copilot_tickets"));
+        assertThat(tickets.path("seq").asLong()).isEqualTo(seq);
+        assertThat(tickets.path("tickets").get(0).path("ticketId").asLong()).isEqualTo(7L);
+    }
+
+    @Test
+    void shortFinal_belowMinChars_noCopilotFrames() throws Exception
+    {
+        AsrStreamCallback[] cbHolder = new AsrStreamCallback[1];
+        setupCopilotSession(cbHolder);
+        session.handleText("{\"type\":\"start\"}");
+        await(n -> type(n, "started"));
+        cbHolder[0].onFinal("嗯好的知道了");
+        Thread.sleep(300);
+        for (JsonNode n : frames)
+        {
+            assertThat(type(n, "copilot_element")).isFalse();
+        }
+    }
+
+    @Test
+    void stop_afterBuffered_forceFlushesAdditionalCopilotRound() throws Exception
+    {
+        AsrStreamCallback[] cbHolder = new AsrStreamCallback[1];
+        setupCopilotSession(cbHolder);
+        session.handleText("{\"type\":\"start\"}");
+        await(n -> type(n, "started"));
+        cbHolder[0].onFinal("我们公司从八月份开始就一直拖欠工资不发，一共两个月了，多次催要都没有结果");
+        JsonNode first = await(n -> type(n, "copilot_element"));
+
+        session.handleText("{\"type\":\"stop\"}");
+        JsonNode second = await(n -> type(n, "copilot_element")
+                && n.path("seq").asLong() > first.path("seq").asLong());
+        assertThat(second.path("seq").asLong()).isEqualTo(first.path("seq").asLong() + 1);
+    }
+
+    @Test
+    void copilotServiceNull_evenWithLongFinal_noCopilotFrames() throws Exception
+    {
+        // setUp 默认会话（Copilot 服务未注入），驱动 mock 引擎产生 >30 字 final
+        session.handleText("{\"type\":\"start\"}");
+        await(n -> type(n, "started"));
+        String b64 = Base64.getEncoder().encodeToString(new byte[64]);
+        session.handleText("{\"type\":\"audio\",\"data\":\"" + b64 + "\"}");
+        await(n -> type(n, "asr_partial"));
+        session.handleText("{\"type\":\"stop\"}");
+        await(n -> type(n, "asr_final"));
+        Thread.sleep(300);
+        for (JsonNode n : frames)
+        {
+            assertThat(type(n, "copilot_element")).isFalse();
+            assertThat(type(n, "copilot_laws")).isFalse();
+            assertThat(type(n, "copilot_tickets")).isFalse();
+        }
+    }
+
     // ---------- 工具 ----------
 
     private boolean type(JsonNode n, String t)

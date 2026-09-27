@@ -63,4 +63,18 @@ public interface AiCallTicketMapper
      * F9：查询已超过 SLA 截止时间且仍未办结/归档的工单（含已标记超时，供逐级升级扫描）。
      */
     public List<AiCallTicket> selectEscalatableTickets();
+
+    /**
+     * F4：相似工单推荐——以短语 LIKE 匹配标题/内容，仅取已完成/已归档历史工单。
+     *
+     * @param phrase1         短语1（通常为纠纷类型，可空）
+     * @param phrase2         短语2（通常为首个诉求，可空）
+     * @param excludeRecordId 排除当前通话记录ID（可空）
+     * @param limit           返回条数
+     * @return 相似工单（content 已在 SQL 侧截断）
+     */
+    public List<AiCallTicket> selectSimilarTickets(@Param("phrase1") String phrase1,
+                                                   @Param("phrase2") String phrase2,
+                                                   @Param("excludeRecordId") Long excludeRecordId,
+                                                   @Param("limit") int limit);
 }

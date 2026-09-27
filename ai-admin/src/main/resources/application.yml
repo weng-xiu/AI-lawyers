@@ -298,6 +298,14 @@ ai:
     urgent-priority: ${AI_EMOTION_URGENT_PRIORITY:100}
     # negative 负面情绪排队优先级（高于普通、低于 urgent）
     negative-priority: ${AI_EMOTION_NEGATIVE_PRIORITY:50}
+  # P3-F4 坐席 Copilot 实时辅助（ASR final 节流 → 要素/法条/相似工单）
+  copilot:
+    # 总开关：关闭后不下发任何 Copilot 帧（无模型时服务内部静默降级，成本为零）
+    enabled: ${AI_COPILOT_ENABLED:true}
+    # 推荐法条条数（RAG Top-N）
+    law-limit: ${AI_COPILOT_LAW_LIMIT:3}
+    # 相似工单条数（已办结/已归档）
+    ticket-limit: ${AI_COPILOT_TICKET_LIMIT:3}
 
 # ============================================================
 # 语音引擎配置（TTS / ASR）。ASR 为 OpenAI/Whisper 兼容端点
@@ -376,6 +384,28 @@ call:
   recording:
     # 录音文件基础路径（对应 FreeSWITCH recordings_dir）
     base-path: ${CALL_RECORDING_BASE_PATH:C:/Program Files/FreeSWITCH/recordings}
+    # F2：存储类型（local=本地文件系统，s3=对象存储；默认 local 完全向后兼容）
+    type: ${CALL_RECORDING_TYPE:local}
+    # F2：对象存储配置（type=s3 时必填）
+    s3:
+      # 端点（如 oss-cn-guangzhou.aliyuncs.com / minio.gov.cn:9000）
+      endpoint: ${CALL_RECORDING_S3_ENDPOINT:}
+      # 存储桶
+      bucket: ${CALL_RECORDING_S3_BUCKET:}
+      # AccessKey
+      access-key: ${CALL_RECORDING_S3_ACCESS_KEY:}
+      # SecretKey
+      secret-key: ${CALL_RECORDING_S3_SECRET_KEY:}
+      # 区域（如 cn-guangzhou / us-east-1）
+      region: ${CALL_RECORDING_S3_REGION:cn-guangzhou}
+      # 路径风格（MinIO 为 true，OSS/OBS/COS 为 false）
+      path-style: ${CALL_RECORDING_S3_PATH_STYLE:false}
+      # 预签名 URL 有效时长（秒）
+      url-expiry-seconds: ${CALL_RECORDING_S3_URL_EXPIRY_SECONDS:3600}
+      # 对象 key 前缀
+      key-prefix: ${CALL_RECORDING_S3_KEY_PREFIX:recordings/}
+      # 上传成功后是否删除本地文件
+      delete-local-after-upload: ${CALL_RECORDING_S3_DELETE_LOCAL:true}
 
   # ---------- 呼叫调度 ----------
   dispatch:

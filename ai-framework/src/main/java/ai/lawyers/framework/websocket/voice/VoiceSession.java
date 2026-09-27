@@ -39,6 +39,15 @@ public class VoiceSession
     /** 发送队列满时入队等待上限（ms） */
     private static final long ENQUEUE_TIMEOUT_MS = 200L;
 
+    /** F4：Copilot 辅助触发最小间隔（ms，节流控制 LLM 调用频次） */
+    static final long COPILOT_INTERVAL_MS = 8000L;
+
+    /** F4：触发辅助的滚动缓冲最小字符数（短确认话术不触发） */
+    static final int COPILOT_MIN_CHARS = 30;
+
+    /** F4：送辅助服务的文本滚动窗口上限（字，防超 token） */
+    static final int COPILOT_TEXT_MAX = 3000;
+
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final Session wsSession;
@@ -108,6 +117,20 @@ public class VoiceSession
     /** E4：本会话 negative 已动作（urgent 命中后不再发 negative） */
     private final AtomicBoolean negativeEmotionActed = new AtomicBoolean();
 
+    /* ---- F4：坐席 Copilot 实时辅助（要素/法条/相似工单） ---- */
+    /** F4：Copilot 辅助服务（null 时 final 文本不触发辅助） */
+    private final ai.lawyers.system.service.lawyers.voice.copilot.CopilotAssistService copilotService;
+    /** F4：辅助回合单线程执行器（LLM/RAG 调用不阻塞 ASR 回调） */
+    private final java.util.concurrent.ExecutorService copilotExecutor;
+    /** F4：辅助回合肥号器 */
+    private final java.util.concurrent.atomic.AtomicLong copilotTurnSeq = new java.util.concurrent.atomic.AtomicLong();
+    /** F4：当前有效回合号（stop/shutdown 递增作废迟到结果） */
+    private final java.util.concurrent.atomic.AtomicLong activeCopilotSeq = new java.util.concurrent.atomic.AtomicLong();
+    /** F4：final 文本滚动累计缓冲（rolling window） */
+    private final StringBuilder copilotBuffer = new StringBuilder();
+    /** F4：上次辅助触发时间（节流，最小间隔 COPILOT_INTERVAL_MS） */
+    private volatile long lastCopilotMs;
+
     /* ---- A5 时间戳/一次性标记（纳秒，System.nanoTime） ---- */
     /** start 帧受理时刻（ASR 首包/E2E 首响起点） */
     private volatile long startNanos;
@@ -158,6 +181,16 @@ public class VoiceSession
             ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotService robotService,
             ai.lawyers.system.service.lawyers.voice.emotion.VoiceRiskActionService emotionAction)
     {
+        this(wsSession, sessionId, role, queueCapacity, engineRegistry, vadEnabled, metrics,
+                robotService, emotionAction, null);
+    }
+
+    VoiceSession(Session wsSession, String sessionId, String role, int queueCapacity,
+            VoiceEngineRegistry engineRegistry, boolean vadEnabled, HotlineMetrics metrics,
+            ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotService robotService,
+            ai.lawyers.system.service.lawyers.voice.emotion.VoiceRiskActionService emotionAction,
+            ai.lawyers.system.service.lawyers.voice.copilot.CopilotAssistService copilotService)
+    {
         this.wsSession = wsSession;
         this.connId = wsSession.getId();
         this.sessionId = sessionId;
@@ -167,6 +200,7 @@ public class VoiceSession
         this.metrics = metrics;
         this.robotService = robotService;
         this.emotionAction = emotionAction;
+        this.copilotService = copilotService;
         int cap = queueCapacity > 0 ? queueCapacity : 1000;
         this.sendQueue = new LinkedBlockingQueue<>(cap);
         this.sender = new Thread(this::runSender, "voice-sender-" + connId);
@@ -174,6 +208,11 @@ public class VoiceSession
         this.sender.start();
         this.robotExecutor = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "voice-robot-" + connId);
+            t.setDaemon(true);
+            return t;
+        });
+        this.copilotExecutor = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "voice-copilot-" + connId);
             t.setDaemon(true);
             return t;
         });
@@ -282,6 +321,9 @@ public class VoiceSession
         // E3：作废旧回合并停回合执行器（阻塞中的 LLM 调用结果产出时被 turnId 校验丢弃）
         activeRobotTurn.incrementAndGet();
         robotExecutor.shutdownNow();
+        // F4：作废迟到 Copilot 回合并停辅助执行器
+        activeCopilotSeq.incrementAndGet();
+        copilotExecutor.shutdownNow();
         StreamSynthesis tts = currentTts;
         if (tts != null)
         {
@@ -382,6 +424,8 @@ public class VoiceSession
                     {
                         submitRobotTurn(text.trim());
                     }
+                    // F4：final 文本滚动入缓冲，满足节流窗口时触发 Copilot 辅助（服务坐席，不区分角色）
+                    queueCopilot(text);
                 }
             }
 
@@ -599,6 +643,134 @@ public class VoiceSession
         startTts(result.getAnswer(), null);
     }
 
+    /* ================= F4：Copilot 实时辅助 ================= */
+
+    /**
+     * final 文本滚动入缓冲；缓冲达最小字数且距上次触发 ≥ 节流间隔时提交辅助。
+     *
+     * <p>与 E4 不同，Copilot 服务对象是坐席，不做 caller 门禁——当前生产链路
+     * 为坐席麦克风（role=agent），坐席语音本身含案情复述。</p>
+     */
+    private void queueCopilot(String text)
+    {
+        if (copilotService == null || text == null)
+        {
+            return;
+        }
+        String t = text.trim();
+        if (t.isEmpty())
+        {
+            return;
+        }
+        boolean fire;
+        long now = System.currentTimeMillis();
+        synchronized (copilotBuffer)
+        {
+            if (copilotBuffer.length() > 0)
+            {
+                copilotBuffer.append('\n');
+            }
+            copilotBuffer.append(t);
+            fire = copilotBuffer.length() >= COPILOT_MIN_CHARS
+                    && now - lastCopilotMs >= COPILOT_INTERVAL_MS;
+        }
+        if (fire)
+        {
+            submitCopilot(false);
+        }
+    }
+
+    /**
+     * 提交一个 Copilot 辅助回合（单线程执行，迟到结果按 seq 丢弃）。
+     *
+     * @param force true=stop 前强制（忽略间隔/最小字数）
+     */
+    private void submitCopilot(boolean force)
+    {
+        if (shutdown.get() || copilotService == null)
+        {
+            return;
+        }
+        final long seq;
+        final String payload;
+        synchronized (copilotBuffer)
+        {
+            if (copilotBuffer.length() == 0)
+            {
+                return;
+            }
+            if (!force && copilotBuffer.length() < COPILOT_MIN_CHARS)
+            {
+                return;
+            }
+            // 滚动窗口：超长按尾部截取，并把窗口保留进下一回合
+            String all = copilotBuffer.toString();
+            payload = all.length() > COPILOT_TEXT_MAX
+                    ? all.substring(all.length() - COPILOT_TEXT_MAX) : all;
+            copilotBuffer.setLength(0);
+            copilotBuffer.append(payload);
+            lastCopilotMs = System.currentTimeMillis();
+            seq = copilotTurnSeq.incrementAndGet();
+            activeCopilotSeq.set(seq);
+        }
+        try
+        {
+            copilotExecutor.execute(() -> runCopilotTurn(seq, payload));
+        }
+        catch (java.util.concurrent.RejectedExecutionException e)
+        {
+            log.warn("VoiceWS Copilot 回合提交失败（已关闭）conn={}", connId);
+        }
+    }
+
+    /** 执行辅助：要素/法条/工单三帧下发；服务自身全兜底，此处仅防御性兜底 */
+    private void runCopilotTurn(long seq, String payload)
+    {
+        ai.lawyers.system.service.lawyers.voice.copilot.CopilotAssistResult result;
+        try
+        {
+            result = copilotService.assist(payload, sessionId);
+        }
+        catch (Exception e)
+        {
+            log.warn("VoiceWS Copilot 回合异常 conn={}, seq={}: {}", connId, seq, e.getMessage());
+            return;
+        }
+        // 迟到回合丢弃（stop/shutdown 已作废）
+        if (shutdown.get() || seq != activeCopilotSeq.get())
+        {
+            return;
+        }
+        enqueue(Entry.Kind.OTHER, VoiceFrames.copilotElement(seq, result.getDisputeType(),
+                result.getClaims(), result.getUrgency(), result.getKeyFacts(),
+                result.isElementDegraded()));
+
+        List<java.util.Map<String, Object>> laws = new ArrayList<>();
+        for (ai.lawyers.system.service.lawyers.voice.copilot.CopilotLaw law : result.getLaws())
+        {
+            java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("chunkId", law.getChunkId());
+            m.put("title", law.getTitle());
+            m.put("lawArticle", law.getLawArticle());
+            m.put("source", law.getSource());
+            laws.add(m);
+        }
+        enqueue(Entry.Kind.OTHER, VoiceFrames.copilotLaws(seq, laws));
+
+        List<java.util.Map<String, Object>> tickets = new ArrayList<>();
+        for (ai.lawyers.system.service.lawyers.voice.copilot.CopilotTicket ticket : result.getTickets())
+        {
+            java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("ticketId", ticket.getTicketId());
+            m.put("ticketNo", ticket.getTicketNo());
+            m.put("title", ticket.getTitle());
+            m.put("status", ticket.getStatus());
+            m.put("contentSnippet", ticket.getContentSnippet());
+            tickets.add(m);
+        }
+        enqueue(Entry.Kind.OTHER, VoiceFrames.copilotTickets(seq, tickets));
+    }
+
     /* ================= E4：情绪/意图识别联动 ================= */
 
     /**
@@ -747,8 +919,10 @@ public class VoiceSession
         asrEngine = null;
         vad = null;
         robotMode = false;
-        // E3：停止识别即作废旧机器人回合（在途 LLM 结果产出时丢弃）
+        // E3：停止识别即作废机器人回合（在途 LLM 结果产出时丢弃）
         activeRobotTurn.incrementAndGet();
+        // F4：作废在途 Copilot 回合（close 内部 final 仍会入缓冲，随后强制补最后一回合）
+        activeCopilotSeq.incrementAndGet();
         try
         {
             engineRef.close();
@@ -757,6 +931,8 @@ public class VoiceSession
         {
             enqueue(Entry.Kind.OTHER, VoiceFrames.error("ASR_CLOSE_ERROR", e.getMessage()));
         }
+        // F4：停止前以累计缓冲强制辅助一次（不受间隔/最小字数限制），让挂断前要素完整
+        submitCopilot(true);
     }
 
     /** A5：纳秒差转毫秒（System.nanoTime 差值 → ms，截断取整） */

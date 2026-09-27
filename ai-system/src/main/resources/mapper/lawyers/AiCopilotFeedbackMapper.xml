@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiCopilotFeedbackMapper">
+
+    <insert id="insertFeedback" parameterType="ai.lawyers.system.domain.lawyers.AiCopilotFeedback"
+            useGeneratedKeys="true" keyProperty="feedbackId">
+        insert into ai_copilot_feedback
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="recordId != null">record_id,</if>
+            <if test="sessionId != null and sessionId != ''">session_id,</if>
+            <if test="agentId != null">agent_id,</if>
+            <if test="agentName != null and agentName != ''">agent_name,</if>
+            <if test="deptId != null">dept_id,</if>
+            suggestion_type,
+            <if test="suggestionRef != null and suggestionRef != ''">suggestion_ref,</if>
+            action,
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="recordId != null">#{recordId},</if>
+            <if test="sessionId != null and sessionId != ''">#{sessionId},</if>
+            <if test="agentId != null">#{agentId},</if>
+            <if test="agentName != null and agentName != ''">#{agentName},</if>
+            <if test="deptId != null">#{deptId},</if>
+            #{suggestionType},
+            <if test="suggestionRef != null and suggestionRef != ''">#{suggestionRef},</if>
+            #{action},
+            now()
+        </trim>
+    </insert>
+
+    <select id="selectAdoptionTotal" resultType="java.util.Map">
+        select count(*) as total,
+               sum(case when action = 'ADOPT' then 1 else 0 end) as adoptCount,
+               sum(case when action = 'MODIFY' then 1 else 0 end) as modifyCount,
+               sum(case when action = 'IGNORE' then 1 else 0 end) as ignoreCount
+        from ai_copilot_feedback
+        where create_time &gt;= #{beginTime}
+          and create_time &lt; #{endTime}
+    </select>
+
+    <select id="selectAdoptionByAgent" resultType="java.util.Map">
+        select agent_id as agentId,
+               max(agent_name) as agentName,
+               max(dept_id) as deptId,
+               count(*) as total,
+               sum(case when action = 'ADOPT' then 1 else 0 end) as adoptCount,
+               sum(case when action = 'MODIFY' then 1 else 0 end) as modifyCount,
+               sum(case when action = 'IGNORE' then 1 else 0 end) as ignoreCount
+        from ai_copilot_feedback
+        where create_time &gt;= #{beginTime}
+          and create_time &lt; #{endTime}
+          and agent_id is not null
+        group by agent_id
+        order by total desc
+    </select>
+</mapper>

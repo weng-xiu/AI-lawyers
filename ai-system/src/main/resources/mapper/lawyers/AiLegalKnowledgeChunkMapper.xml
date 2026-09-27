@@ -33,6 +33,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where status = '0'
     </select>
 
+    <!-- F4：法条溯源详情（轻量列，不含 embedding） -->
+    <select id="selectChunkById" resultMap="AiLegalKnowledgeChunkResult">
+        select <include refid="lightColumns"/>
+        from ai_legal_knowledge_chunk
+        where chunk_id = #{chunkId}
+    </select>
+
     <!-- 关键词路：FULLTEXT ngram 自然语言模式，按相关度打分排序 -->
     <select id="searchByFulltext" resultMap="AiLegalKnowledgeChunkResult">
         select <include refid="lightColumns"/>,

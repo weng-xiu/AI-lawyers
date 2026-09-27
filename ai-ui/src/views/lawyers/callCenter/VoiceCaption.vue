@@ -267,6 +267,16 @@ export default {
           }
           break
         }
+        case 'copilot_element':
+          // F4：案情要素（新回合整体覆盖）
+          this.$emit('copilot-element', msg)
+          break
+        case 'copilot_laws':
+          this.$emit('copilot-laws', msg)
+          break
+        case 'copilot_tickets':
+          this.$emit('copilot-tickets', msg)
+          break
         default:
           break
       }

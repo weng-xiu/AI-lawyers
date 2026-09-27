@@ -64,6 +64,10 @@ public class VoiceSessionManager
     @Autowired(required = false)
     private ai.lawyers.system.service.lawyers.voice.emotion.VoiceRiskActionService voiceRiskActionService;
 
+    /** F4：坐席 Copilot 实时辅助服务（未装配时 final 不触发辅助） */
+    @Autowired(required = false)
+    private ai.lawyers.system.service.lawyers.voice.copilot.CopilotAssistService copilotAssistService;
+
     @PostConstruct
     public void init()
     {
@@ -96,7 +100,7 @@ public class VoiceSessionManager
         VoiceSession session = new VoiceSession(wsSession, sessionId, role, sendQueueCapacity,
                 engineRegistry != null ? engineRegistry : new VoiceEngineRegistry(),
                 voiceProperties == null || voiceProperties.isVadEnabled(),
-                hotlineMetrics, voiceRobotService, voiceRiskActionService);
+                hotlineMetrics, voiceRobotService, voiceRiskActionService, copilotAssistService);
         VoiceSession old = sessions.putIfAbsent(wsSession.getId(), session);
         if (old != null)
         {
