@@ -95,8 +95,11 @@
           </div>
         </el-card>
 
+        <!-- P3-A6：坐席实时字幕（/ws/voice，随通话接通激活，挂断自动卸载） -->
+        <voice-caption v-if="connected" :session-id="currentRecordId" @final="onCaptionFinal" />
+
         <!-- 独立 AI 律师辅助面板（与人工接听链路分离，仅以 currentRecordId 关联） -->
-        <ai-assist-panel v-if="connected" :record-id="currentRecordId" />
+        <ai-assist-panel v-if="connected" :record-id="currentRecordId" :live-text="liveCaptionText" />
       </el-col>
 
       <!-- 右侧：5 标签页 -->
@@ -259,12 +262,13 @@
 import { getCallerProfile, getCallerHistory, getCallerTickets, getCallerTrack, updateCallerProfile } from "@/api/lawyers/callPopup"
 import { autoFillLedger, addLedger, transferCall, holdCall, resumeCall, hangupCall, afterWork, listAgent } from "@/api/lawyers/callCenter"
 import AiAssistPanel from "./AiAssistPanel.vue"
+import VoiceCaption from "./VoiceCaption.vue"
 import callSocket from "@/utils/callSocket"
 import { getSipPhone } from "@/utils/webrtcSipPhone"
 
 export default {
   name: "CallPopup",
-  components: { AiAssistPanel },
+  components: { AiAssistPanel, VoiceCaption },
   data() {
     return {
       direction: 'in',
@@ -287,7 +291,9 @@ export default {
       editOpen: false,
       profileForm: {},
       // 人工通话记录ID，仅作为人工链路与AI辅助链路的关联桥梁，不驱动人工状态
-      currentRecordId: null
+      currentRecordId: null,
+      // P3-A6：实时字幕累计文本（供 AI 辅助面板联动分析）
+      liveCaptionText: ''
     }
   },
   computed: {
@@ -432,6 +438,12 @@ export default {
       this.callEnded = true
       this.callStatus = '0'
       this.clearTimer()
+      this.liveCaptionText = ''
+    },
+    // P3-A6：字幕 final 文本累计，桥接给 AI 辅助面板（截断保留最近 2000 字，避免超长上行）
+    onCaptionFinal(text) {
+      if (!text) return
+      this.liveCaptionText = (this.liveCaptionText + '\n' + text).slice(-2000)
     },
     onWsDtmf(data) {
       // DTMF 事件可用于扩展按键交互（如满意度评价），目前仅记录

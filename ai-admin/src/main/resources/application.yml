@@ -301,6 +301,8 @@ voice:
   asr-api-key: ${VOICE_ASR_API_KEY:}
   asr-model: ${VOICE_ASR_MODEL:whisper-1}
   asr-language: ${VOICE_ASR_LANGUAGE:zh}
+  # A4：/ws/voice 服务端 VAD（能量+过零率，语音起始≤80ms/尾静默400ms），关闭后不做自动 barge-in
+  vad-enabled: ${VOICE_VAD_ENABLED:true}
 
 # MyBatis配置
 mybatis:

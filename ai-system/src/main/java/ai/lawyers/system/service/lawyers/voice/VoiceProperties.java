@@ -61,6 +61,19 @@ public class VoiceProperties
     /** F1 粤语 ASR 语种码（Whisper 协议用 yue，供应商私有协议按其文档调整） */
     private String cantoneseAsrLanguage = "yue";
 
+    /** A4：/ws/voice 服务端 VAD（能量+过零率）开关，关闭后不做自动 barge-in 打断 */
+    private boolean vadEnabled = true;
+
+    public boolean isVadEnabled()
+    {
+        return vadEnabled;
+    }
+
+    public void setVadEnabled(boolean vadEnabled)
+    {
+        this.vadEnabled = vadEnabled;
+    }
+
     public String getEngine()
     {
         return engine;

@@ -47,6 +47,10 @@ public class VoiceSessionManager
     @Autowired(required = false)
     private VoiceEngineRegistry engineRegistry;
 
+    /** A4：语音配置（VAD 开关）；缺省装配时按开启处理 */
+    @Autowired(required = false)
+    private ai.lawyers.system.service.lawyers.voice.VoiceProperties voiceProperties;
+
     @PostConstruct
     public void init()
     {
@@ -77,7 +81,8 @@ public class VoiceSessionManager
             return null;
         }
         VoiceSession session = new VoiceSession(wsSession, sessionId, role, sendQueueCapacity,
-                engineRegistry != null ? engineRegistry : new VoiceEngineRegistry());
+                engineRegistry != null ? engineRegistry : new VoiceEngineRegistry(),
+                voiceProperties == null || voiceProperties.isVadEnabled());
         VoiceSession old = sessions.putIfAbsent(wsSession.getId(), session);
         if (old != null)
         {

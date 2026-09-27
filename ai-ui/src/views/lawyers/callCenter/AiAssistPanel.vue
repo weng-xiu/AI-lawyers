@@ -73,6 +73,11 @@ export default {
     recordId: {
       type: [Number, String],
       default: null
+    },
+    // P3-A6：VoiceCaption 实时字幕累计文本，分析/小结时作为通话内容上送
+    liveText: {
+      type: String,
+      default: ''
     }
   },
   data() {
@@ -123,7 +128,7 @@ export default {
     handleAnalyze() {
       if (!this.session) return
       this.analyzing = true
-      analyzeAiAssist({ sessionId: this.session.sessionId, callSummary: '' })
+      analyzeAiAssist({ sessionId: this.session.sessionId, callSummary: this.liveText || '' })
         .then(res => {
           if (res && res.data) this.session = res.data
           this.$message.success('AI 分析完成')
@@ -135,7 +140,7 @@ export default {
     handleSummarize() {
       if (!this.session) return
       this.summarizing = true
-      summarizeAiAssist({ sessionId: this.session.sessionId, callSummary: '' })
+      summarizeAiAssist({ sessionId: this.session.sessionId, callSummary: this.liveText || '' })
         .then(res => {
           if (res && res.data) this.session = res.data
           this.$message.success('AI 小结已生成')

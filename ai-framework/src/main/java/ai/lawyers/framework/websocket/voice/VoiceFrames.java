@@ -34,6 +34,12 @@ final class VoiceFrames
 
     static final String T_ERROR = "error";
 
+    /** A4：VAD 语音起始（播报期间客户端应立即清空播放队列） */
+    static final String T_VAD_SPEECH_START = "vad_speech_start";
+
+    /** A4：VAD 语音结束 */
+    static final String T_VAD_SPEECH_END = "vad_speech_end";
+
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private VoiceFrames()
@@ -99,6 +105,12 @@ final class VoiceFrames
         m.put("code", code);
         m.put("message", message);
         return write(m);
+    }
+
+    /** A4：VAD 事件帧（type 取 {@link #T_VAD_SPEECH_START}/{@link #T_VAD_SPEECH_END}） */
+    static String vad(String type)
+    {
+        return write(base(type));
     }
 
     private static Map<String, Object> base(String type)

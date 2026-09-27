@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import ai.lawyers.system.service.lawyers.voice.vad.VoiceActivityDetector;
 
 /**
  * 单条 /ws/voice 连接的语音会话编排（P3-A1）。
@@ -70,6 +71,12 @@ public class VoiceSession
     /** A2/A3：引擎注册表（null 时仅 mock 可用，保持 A1 行为） */
     private final VoiceEngineRegistry engineRegistry;
 
+    /** A4：VAD 开关（voice.vad-enabled），关闭时不创建检测器、不做自动打断 */
+    private final boolean vadEnabled;
+
+    /** A4：能量+过零率 VAD，start 帧后按 sampleRate 创建，stop/shutdown 释放 */
+    private volatile VoiceActivityDetector vad;
+
     VoiceSession(Session wsSession, String sessionId, String role, int queueCapacity)
     {
         this(wsSession, sessionId, role, queueCapacity, null);
@@ -78,11 +85,18 @@ public class VoiceSession
     VoiceSession(Session wsSession, String sessionId, String role, int queueCapacity,
             VoiceEngineRegistry engineRegistry)
     {
+        this(wsSession, sessionId, role, queueCapacity, engineRegistry, true);
+    }
+
+    VoiceSession(Session wsSession, String sessionId, String role, int queueCapacity,
+            VoiceEngineRegistry engineRegistry, boolean vadEnabled)
+    {
         this.wsSession = wsSession;
         this.connId = wsSession.getId();
         this.sessionId = sessionId;
         this.role = role;
         this.engineRegistry = engineRegistry != null ? engineRegistry : new VoiceEngineRegistry();
+        this.vadEnabled = vadEnabled;
         int cap = queueCapacity > 0 ? queueCapacity : 1000;
         this.sendQueue = new LinkedBlockingQueue<>(cap);
         this.sender = new Thread(this::runSender, "voice-sender-" + connId);
@@ -161,6 +175,7 @@ public class VoiceSession
             enqueue(Entry.Kind.OTHER, VoiceFrames.error("NOT_STARTED", "请先发送 start 帧再传音频"));
             return;
         }
+        feedVad(pcm);
         asrEngine.feed(pcm);
     }
 
@@ -185,6 +200,7 @@ public class VoiceSession
             }
         }
         asrActive = false;
+        vad = null;
         StreamSynthesis tts = currentTts;
         if (tts != null)
         {
@@ -227,6 +243,21 @@ public class VoiceSession
         }
         this.engine = engineInstance.engineCode();
         this.sampleRate = rate;
+        // A4：start 时按采样率创建 VAD（能量+过零率），语音起始 ≤80ms、尾静默 400ms 判结束
+        this.vad = vadEnabled ? new VoiceActivityDetector(rate, new VoiceActivityDetector.Listener()
+        {
+            @Override
+            public void onSpeechStart()
+            {
+                onVadSpeechStart();
+            }
+
+            @Override
+            public void onSpeechEnd()
+            {
+                onVadSpeechEnd();
+            }
+        }) : null;
         VoiceAsrContext ctx = new VoiceAsrContext(sessionId, role, "pcm", rate);
         engineInstance.open(ctx, new AsrStreamCallback()
         {
@@ -289,6 +320,7 @@ public class VoiceSession
             enqueue(Entry.Kind.OTHER, VoiceFrames.error("BAD_AUDIO", "音频帧为空"));
             return;
         }
+        feedVad(pcm);
         asrEngine.feed(pcm);
     }
 
@@ -361,6 +393,53 @@ public class VoiceSession
 
     /* ================= bargein / stop ================= */
 
+    /** A4：音频帧喂 VAD（独立于 ASR 引擎，Mock/真实引擎下均生效） */
+    private void feedVad(byte[] pcm)
+    {
+        VoiceActivityDetector detector = vad;
+        if (detector != null)
+        {
+            try
+            {
+                detector.feed(pcm);
+            }
+            catch (Exception e)
+            {
+                log.warn("VoiceWS VAD 处理异常 conn={}: {}", connId, e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * A4：VAD 语音起始——下发 vad_speech_start 帧（客户端立即清播放队列抢 ≤300ms），
+     * 播报期间自动 barge-in：取消合成 + 丢弃队列中未发分片 + interrupted tts_end。
+     * 已合成未播音频随取消丢弃，不落录音（4.1 节约束）。
+     */
+    private void onVadSpeechStart()
+    {
+        if (shutdown.get())
+        {
+            return;
+        }
+        enqueue(Entry.Kind.OTHER, VoiceFrames.vad(VoiceFrames.T_VAD_SPEECH_START));
+        StreamSynthesis tts = currentTts;
+        if (tts != null && !tts.isCancelled())
+        {
+            tts.cancel();
+            drainPendingTts();
+            enqueue(Entry.Kind.OTHER, VoiceFrames.ttsEnd(true, "vad_speech_start"));
+        }
+    }
+
+    /** A4：VAD 语音结束——仅通知客户端（UI 状态/可驱动后续话术时机） */
+    private void onVadSpeechEnd()
+    {
+        if (!shutdown.get())
+        {
+            enqueue(Entry.Kind.OTHER, VoiceFrames.vad(VoiceFrames.T_VAD_SPEECH_END));
+        }
+    }
+
     private void handleBargein()
     {
         StreamSynthesis tts = currentTts;
@@ -383,6 +462,7 @@ public class VoiceSession
         }
         asrActive = false;
         asrEngine = null;
+        vad = null;
         try
         {
             engineRef.close();

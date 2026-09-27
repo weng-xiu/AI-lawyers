@@ -236,6 +236,78 @@ class VoiceSessionTest
         }
     }
 
+    // ---------- A4：VAD 自动 barge-in ----------
+
+    /** 生成 frames 个 20ms 帧的 440Hz 正弦 PCM（16kHz S16LE，RMS/ZCR 均在有声区间） */
+    private static byte[] sine16k(int frames)
+    {
+        byte[] pcm = new byte[frames * 320 * 2];
+        for (int i = 0; i < frames * 320; i++)
+        {
+            short v = (short) (10000 * Math.sin(2 * Math.PI * 440 * i / 16000.0));
+            pcm[i * 2] = (byte) (v & 0xFF);
+            pcm[i * 2 + 1] = (byte) (v >> 8);
+        }
+        return pcm;
+    }
+
+    @Test
+    void vadSpeechStart_duringTts_interruptsWithVadReason() throws Exception
+    {
+        session.handleText("{\"type\":\"start\"}");
+        await(n -> type(n, "started"));
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 50; i++)
+        {
+            sb.append('法');
+        }
+        session.handleText("{\"type\":\"tts\",\"text\":\"" + sb + "\"}");
+        assertThat(await(n -> type(n, "tts_audio"))).isNotNull();
+
+        // 播报中喂入 3 帧（60ms）语音 → 自动打断
+        session.handleBinary(sine16k(3));
+        await(n -> type(n, "vad_speech_start"));
+        JsonNode end = await(n -> type(n, "tts_end") && n.path("interrupted").asBoolean(false));
+        assertThat(end.path("reason").asText()).isEqualTo("vad_speech_start");
+    }
+
+    @Test
+    void vadSpeechCycle_withoutTts_onlyVadFramesNoTtsEnd() throws Exception
+    {
+        session.handleText("{\"type\":\"start\"}");
+        await(n -> type(n, "started"));
+
+        session.handleBinary(sine16k(3));
+        await(n -> type(n, "vad_speech_start"));
+        // 400ms 尾静默判结束
+        session.handleBinary(new byte[20 * 320 * 2]);
+        await(n -> type(n, "vad_speech_end"));
+
+        // 全程无 TTS：不得出现任何 tts_end
+        for (JsonNode n : frames)
+        {
+            assertThat(type(n, "tts_end")).isFalse();
+        }
+    }
+
+    @Test
+    void vadDisabled_noVadFrames() throws Exception
+    {
+        session.shutdown();
+        session = new VoiceSession(wsSession, "sess-1", "agent", 1000, null, false);
+        session.handleText("{\"type\":\"start\"}");
+        await(n -> type(n, "started"));
+
+        session.handleBinary(sine16k(5));
+        Thread.sleep(500);
+        for (JsonNode n : frames)
+        {
+            assertThat(type(n, "vad_speech_start")).isFalse();
+            assertThat(type(n, "vad_speech_end")).isFalse();
+        }
+    }
+
     // ---------- 工具 ----------
 
     private boolean type(JsonNode n, String t)
