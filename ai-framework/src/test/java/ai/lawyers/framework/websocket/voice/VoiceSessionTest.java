@@ -536,6 +536,155 @@ class VoiceSessionTest
         }
     }
 
+    // ---------- E4：情绪/意图实时识别联动 ----------
+
+    /**
+     * 构建带情绪联动服务的会话：ASR 用可控 stub（engineCode=mock），
+     * action mock 固定返回 warningId=55；sessionId 用数字串模拟话单ID。
+     */
+    private ai.lawyers.system.service.lawyers.voice.emotion.VoiceRiskActionService setupEmotionSession(
+            String role, AsrStreamCallback[] cbHolder) throws Exception
+    {
+        ai.lawyers.system.service.lawyers.voice.emotion.VoiceRiskActionService action =
+                mock(ai.lawyers.system.service.lawyers.voice.emotion.VoiceRiskActionService.class);
+        when(action.handleEmotion(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(55L);
+        StreamAsrEngine stub = new StreamAsrEngine()
+        {
+            @Override
+            public String engineCode()
+            {
+                return "mock";
+            }
+
+            @Override
+            public void open(VoiceAsrContext ctx, AsrStreamCallback cb)
+            {
+                cbHolder[0] = cb;
+            }
+
+            @Override
+            public void feed(byte[] frame)
+            {
+            }
+
+            @Override
+            public void close()
+            {
+            }
+        };
+        VoiceEngineRegistry reg = new VoiceEngineRegistry()
+        {
+            @Override
+            public StreamAsrEngine createAsr(String code)
+            {
+                return stub;
+            }
+        };
+        session.shutdown();
+        session = new VoiceSession(wsSession, "1000", role, 1000, reg, true, null, null, action);
+        return action;
+    }
+
+    @Test
+    void callerRole_urgentPartial_emotionFrameAndActionOnce() throws Exception
+    {
+        AsrStreamCallback[] cbHolder = new AsrStreamCallback[1];
+        ai.lawyers.system.service.lawyers.voice.emotion.VoiceRiskActionService action =
+                setupEmotionSession("caller", cbHolder);
+
+        session.handleText("{\"type\":\"start\"}");
+        await(n -> type(n, "started"));
+        cbHolder[0].onPartial("我不想活了");
+
+        JsonNode emo = await(n -> type(n, "emotion"));
+        assertThat(emo.path("level").asText()).isEqualTo("urgent");
+        assertThat(emo.path("intent").asText()).isEqualTo("URGENT");
+        assertThat(emo.path("keywords").get(0).asText()).isEqualTo("不想活");
+        assertThat(emo.path("warningId").asLong()).isEqualTo(55L);
+
+        // 再次 partial 命中 urgent：去重，动作只执行一次
+        cbHolder[0].onPartial("还是不想活");
+        Thread.sleep(400);
+        verify(action, org.mockito.Mockito.timeout(2000).times(1)).handleEmotion(
+                eq("urgent"), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), eq("1000"));
+    }
+
+    @Test
+    void robotMode_negativeFinal_partialNotActed() throws Exception
+    {
+        AsrStreamCallback[] cbHolder = new AsrStreamCallback[1];
+        ai.lawyers.system.service.lawyers.voice.emotion.VoiceRiskActionService action =
+                setupEmotionSession("agent", cbHolder);
+
+        // agent 角色 + robot 模式 → 通道生效；partial negative 不动作，final 才动作
+        session.handleText("{\"type\":\"start\",\"robot\":true}");
+        await(n -> type(n, "started"));
+        cbHolder[0].onPartial("我要投诉");
+        Thread.sleep(400);
+        verify(action, org.mockito.Mockito.never()).handleEmotion(
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyString());
+
+        cbHolder[0].onFinal("我要投诉你们态度差");
+        JsonNode emo = await(n -> type(n, "emotion"));
+        assertThat(emo.path("level").asText()).isEqualTo("negative");
+        assertThat(emo.path("intent").asText()).isEqualTo("COMPLAINT");
+        verify(action, org.mockito.Mockito.timeout(2000).times(1)).handleEmotion(
+                eq("negative"), eq("COMPLAINT"), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), eq("1000"));
+    }
+
+    @Test
+    void agentRoleWithoutRobot_noEmotionAction() throws Exception
+    {
+        AsrStreamCallback[] cbHolder = new AsrStreamCallback[1];
+        ai.lawyers.system.service.lawyers.voice.emotion.VoiceRiskActionService action =
+                setupEmotionSession("agent", cbHolder);
+
+        // agent 角色、非 robot 模式：坐席自身语音不做情绪联动
+        session.handleText("{\"type\":\"start\"}");
+        await(n -> type(n, "started"));
+        cbHolder[0].onFinal("我要投诉你们");
+        Thread.sleep(400);
+
+        verify(action, org.mockito.Mockito.never()).handleEmotion(
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyString());
+        for (JsonNode n : frames)
+        {
+            assertThat(type(n, "emotion")).isFalse();
+        }
+    }
+
+    @Test
+    void negativeThenUrgent_urgentOverridesAndStillFires() throws Exception
+    {
+        AsrStreamCallback[] cbHolder = new AsrStreamCallback[1];
+        ai.lawyers.system.service.lawyers.voice.emotion.VoiceRiskActionService action =
+                setupEmotionSession("caller", cbHolder);
+
+        session.handleText("{\"type\":\"start\"}");
+        await(n -> type(n, "started"));
+        // 先 negative 后 urgent：urgent 覆盖 negative 仍发高级预警
+        cbHolder[0].onFinal("我要投诉");
+        await(n -> type(n, "emotion") && n.path("level").asText().equals("negative"));
+        cbHolder[0].onPartial("我不想活了");
+        await(n -> type(n, "emotion") && n.path("level").asText().equals("urgent"));
+
+        verify(action, org.mockito.Mockito.timeout(2000).times(1)).handleEmotion(
+                eq("negative"), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), eq("1000"));
+        verify(action, org.mockito.Mockito.timeout(2000).times(1)).handleEmotion(
+                eq("urgent"), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), eq("1000"));
+    }
+
     // ---------- 工具 ----------
 
     private boolean type(JsonNode n, String t)

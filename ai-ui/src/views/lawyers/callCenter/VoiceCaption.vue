@@ -12,6 +12,14 @@
       </div>
     </div>
 
+    <!-- E4：实时情绪预警横幅（urgent 红 / negative 橙，可关闭） -->
+    <el-alert v-if="emotionAlert"
+              :class="['vc-emotion', careClass && 'vc-emotion-care']"
+              :type="emotionAlert.level === 'urgent' ? 'error' : 'warning'"
+              :closable="true" show-icon
+              :title="emotionTitle"
+              @close="emotionAlert = null" />
+
     <!-- 字幕流：partial 进行态（灰斜体）→ final 固化；区分坐席/AI/来电者 -->
     <div ref="captionBox" class="vc-captions">
       <div v-if="captions.length === 0 && !partialText" class="vc-empty">
@@ -103,7 +111,9 @@ export default {
       ttsPlaying: false,
       playSampleRate: TARGET_SAMPLE_RATE,
       // A4：服务端 VAD 说话状态（vad_speech_start/end 驱动，用于"说话中"指示）
-      peerSpeaking: false
+      peerSpeaking: false,
+      // E4：实时情绪预警（null 不展示横幅；urgent 覆盖 negative）
+      emotionAlert: null
     }
   },
   computed: {
@@ -116,6 +126,15 @@ export default {
       if (this.listening) return 'success'
       if (this.connected) return 'primary'
       return 'info'
+    },
+    // E4：预警横幅文案
+    emotionTitle() {
+      if (!this.emotionAlert) return ''
+      const a = this.emotionAlert
+      const levelText = a.level === 'urgent' ? '紧急情绪' : '负面情绪'
+      const intentText = a.intent ? `，意图：${a.intent}` : ''
+      const kw = a.keywords && a.keywords.length ? `，命中：${a.keywords.join('、')}` : ''
+      return `来电者${levelText}预警${intentText}${kw}（已通知班长/风险预警页）`
     },
     // 关怀模式（坐席端 localStorage，V2.11：fontSize standard/large/xlarge）
     careClass() {
@@ -237,6 +256,17 @@ export default {
         case 'error':
           this.lastError = `${msg.code}: ${msg.message}`
           break
+        case 'emotion': {
+          // E4：情绪命中——urgent 覆盖 negative；横幅已显示 urgent 时不再降级覆盖
+          if (this.emotionAlert && this.emotionAlert.level === 'urgent') break
+          this.emotionAlert = {
+            level: msg.level,
+            intent: msg.intent || null,
+            keywords: msg.keywords || [],
+            warningId: msg.warningId || null
+          }
+          break
+        }
         default:
           break
       }
@@ -438,6 +468,7 @@ export default {
       this.connected = false
       this.listening = false
       this.peerSpeaking = false
+      this.emotionAlert = null
     }
   }
 }
@@ -445,6 +476,9 @@ export default {
 
 <style scoped>
 .vc-card { margin-bottom: 12px; }
+.vc-emotion { margin: 8px 0; }
+/* E4：关怀模式下预警标题加大（scoped 穿透 element 内部类） */
+.vc-emotion-care ::v-deep .el-alert__title { font-size: 18px; }
 .vc-header { display: flex; align-items: center; justify-content: space-between; }
 .vc-header-right { display: flex; align-items: center; gap: 8px; }
 .vc-title { font-weight: 600; }

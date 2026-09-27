@@ -60,6 +60,10 @@ public class VoiceSessionManager
     @Autowired(required = false)
     private ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotService voiceRobotService;
 
+    /** E4：情绪/意图联动动作服务（未装配时实时识别不挂钩） */
+    @Autowired(required = false)
+    private ai.lawyers.system.service.lawyers.voice.emotion.VoiceRiskActionService voiceRiskActionService;
+
     @PostConstruct
     public void init()
     {
@@ -92,7 +96,7 @@ public class VoiceSessionManager
         VoiceSession session = new VoiceSession(wsSession, sessionId, role, sendQueueCapacity,
                 engineRegistry != null ? engineRegistry : new VoiceEngineRegistry(),
                 voiceProperties == null || voiceProperties.isVadEnabled(),
-                hotlineMetrics, voiceRobotService);
+                hotlineMetrics, voiceRobotService, voiceRiskActionService);
         VoiceSession old = sessions.putIfAbsent(wsSession.getId(), session);
         if (old != null)
         {

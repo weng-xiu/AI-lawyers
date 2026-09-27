@@ -290,6 +290,14 @@ ai:
     answer-max-chars: ${AI_VOICE_ROBOT_ANSWER_MAX_CHARS:150}
     # RAG 上下文装配长度上限（字，防超 token）
     context-max-chars: ${AI_VOICE_ROBOT_CONTEXT_MAX_CHARS:1200}
+  # P3-E4 实时情绪/意图识别与路由/SLA 联动（纯词库，零额外成本）
+  emotion-detector:
+    # 总开关：仅 caller 角色/robot 模式通道挂钩（坐席自身语音不识别）
+    enabled: ${AI_EMOTION_DETECTOR_ENABLED:true}
+    # urgent 紧急危机排队优先级（普通来电 priority=0，ACD 按 priority desc 取队）
+    urgent-priority: ${AI_EMOTION_URGENT_PRIORITY:100}
+    # negative 负面情绪排队优先级（高于普通、低于 urgent）
+    negative-priority: ${AI_EMOTION_NEGATIVE_PRIORITY:50}
 
 # ============================================================
 # 语音引擎配置（TTS / ASR）。ASR 为 OpenAI/Whisper 兼容端点

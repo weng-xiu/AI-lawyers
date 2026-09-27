@@ -40,6 +40,7 @@ import io.micrometer.core.instrument.Timer;
  *   <li>hotline_voice_bargein_stop_ms         A5：打断停止耗时（VAD/bargein→tts_end 入队，预算 300ms）</li>
  *   <li>hotline_voice_rag_ms                  E3：机器人 RAG 检索（预算 40ms）</li>
  *   <li>hotline_voice_llm_first_token_ms      E3：机器人 LLM 首 token（预算 600ms，非流式期口径=整段返回）</li>
+ *   <li>hotline_voice_emotion_total{level}    E4：实时情绪识别触发（urgent/negative）</li>
  * </ul>
  *
  * <p>Prometheus 导出时 Timer 自动追加 {@code _seconds} 后缀（如
@@ -199,6 +200,12 @@ public class HotlineMetrics
             log.warn("[A5预算超支] barge-in 停止 {}ms > {}ms, trigger={}, sessionId={}",
                     elapsedMs, BUDGET_VOICE_BARGEIN_STOP_MS, trigger, sessionId);
         }
+    }
+
+    /** E4：实时情绪识别触发计数：level ∈ urgent/negative（预警/提优动作发生时记一次） */
+    public void incrementVoiceEmotion(String level)
+    {
+        counter("voice.emotion.total", "level", level).increment();
     }
 
     /** 队列死信计数 */

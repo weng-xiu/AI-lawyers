@@ -97,6 +97,17 @@ public class VoiceSession
     /** E3：本回合 E2E 已埋点标记（新回合重置） */
     private final AtomicBoolean robotE2eMarked = new AtomicBoolean(true);
 
+    /* ---- E4：情绪/意图实时识别与联动 ---- */
+    /** E4：联动动作服务（null 时不执行预警/提优，识别不挂钩） */
+    private final ai.lawyers.system.service.lawyers.voice.emotion.VoiceRiskActionService emotionAction;
+    /** E4：纯词库识别器（无状态、微秒级） */
+    private final ai.lawyers.system.service.lawyers.voice.emotion.EmotionIntentDetector emotionDetector =
+            new ai.lawyers.system.service.lawyers.voice.emotion.EmotionIntentDetector();
+    /** E4：本会话 urgent 已动作（每通话只发一次高级预警） */
+    private final AtomicBoolean urgentEmotionActed = new AtomicBoolean();
+    /** E4：本会话 negative 已动作（urgent 命中后不再发 negative） */
+    private final AtomicBoolean negativeEmotionActed = new AtomicBoolean();
+
     /* ---- A5 时间戳/一次性标记（纳秒，System.nanoTime） ---- */
     /** start 帧受理时刻（ASR 首包/E2E 首响起点） */
     private volatile long startNanos;
@@ -138,6 +149,15 @@ public class VoiceSession
             VoiceEngineRegistry engineRegistry, boolean vadEnabled, HotlineMetrics metrics,
             ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotService robotService)
     {
+        this(wsSession, sessionId, role, queueCapacity, engineRegistry, vadEnabled, metrics,
+                robotService, null);
+    }
+
+    VoiceSession(Session wsSession, String sessionId, String role, int queueCapacity,
+            VoiceEngineRegistry engineRegistry, boolean vadEnabled, HotlineMetrics metrics,
+            ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotService robotService,
+            ai.lawyers.system.service.lawyers.voice.emotion.VoiceRiskActionService emotionAction)
+    {
         this.wsSession = wsSession;
         this.connId = wsSession.getId();
         this.sessionId = sessionId;
@@ -146,6 +166,7 @@ public class VoiceSession
         this.vadEnabled = vadEnabled;
         this.metrics = metrics;
         this.robotService = robotService;
+        this.emotionAction = emotionAction;
         int cap = queueCapacity > 0 ? queueCapacity : 1000;
         this.sendQueue = new LinkedBlockingQueue<>(cap);
         this.sender = new Thread(this::runSender, "voice-sender-" + connId);
@@ -343,6 +364,8 @@ public class VoiceSession
                         metrics.recordVoiceAsrFirstMs(nanosToMs(System.nanoTime() - startNanos), sessionId);
                     }
                     enqueue(Entry.Kind.OTHER, VoiceFrames.asr(VoiceFrames.T_ASR_PARTIAL, asrSeq.incrementAndGet(), text));
+                    // E4：partial 仅做 urgent 早预警（negative 等 final，防部分转写噪声误报）
+                    detectEmotion(text, false);
                 }
             }
 
@@ -352,6 +375,8 @@ public class VoiceSession
                 if (!shutdown.get())
                 {
                     enqueue(Entry.Kind.OTHER, VoiceFrames.asr(VoiceFrames.T_ASR_FINAL, asrSeq.incrementAndGet(), text));
+                    // E4：final 完整识别（urgent/negative）
+                    detectEmotion(text, true);
                     // E3：robot 模式下 ASR final 自动触发对话引擎回合（空文本不触发）
                     if (robotMode && text != null && !text.trim().isEmpty())
                     {
@@ -572,6 +597,63 @@ public class VoiceSession
         this.robotQuestionNanos = questionNanos;
         this.robotE2eMarked.set(false);
         startTts(result.getAnswer(), null);
+    }
+
+    /* ================= E4：情绪/意图识别联动 ================= */
+
+    /**
+     * 对一段 ASR 文本执行情绪/意图联动。
+     *
+     * <p>门禁：仅"说话人=来电者"的通道（role=caller 或 robot 模式）挂钩——
+     * 坐席自身语音不作为风险来源。去重：urgent 每通话动作一次；negative
+     * 每通话一次且 urgent 已命中后不再动作；urgent 可覆盖在先的 negative
+     * （紧急高级预警优先，宁错报不遗漏）。</p>
+     *
+     * @param text    ASR 文本
+     * @param isFinal true=final（urgent/negative 均可）；false=partial（仅 urgent）
+     */
+    private void detectEmotion(String text, boolean isFinal)
+    {
+        if (emotionAction == null || text == null || text.trim().isEmpty())
+        {
+            return;
+        }
+        if (!emotionChannel())
+        {
+            return;
+        }
+        ai.lawyers.system.service.lawyers.voice.emotion.EmotionIntentResult r = emotionDetector.analyze(text);
+        if (r.isUrgent())
+        {
+            if (!urgentEmotionActed.compareAndSet(false, true))
+            {
+                return;
+            }
+            fireEmotion(r, text);
+        }
+        else if (isFinal && r.isNegative())
+        {
+            if (urgentEmotionActed.get() || !negativeEmotionActed.compareAndSet(false, true))
+            {
+                return;
+            }
+            fireEmotion(r, text);
+        }
+    }
+
+    /** 来电者通道判定：caller 角色或 robot 模式（robot ASR 即来电者语音） */
+    private boolean emotionChannel()
+    {
+        return "caller".equalsIgnoreCase(role) || robotMode;
+    }
+
+    /** 执行联动动作（预警+提优+计数）并下发 emotion 帧；动作服务内部全兜底 */
+    private void fireEmotion(ai.lawyers.system.service.lawyers.voice.emotion.EmotionIntentResult r, String hitText)
+    {
+        Long warningId = emotionAction.handleEmotion(r.getEmotion(), r.getIntent(),
+                hitText, r.getEmotionKeywords(), sessionId);
+        enqueue(Entry.Kind.OTHER,
+                VoiceFrames.emotion(r.getEmotion(), r.getIntent(), r.getEmotionKeywords(), warningId));
     }
 
     /* ================= bargein / stop ================= */

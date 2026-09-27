@@ -46,6 +46,9 @@ final class VoiceFrames
     /** E3：机器人应答完成（含 RAG 命中数/溯源/降级标记） */
     static final String T_ANSWER_DONE = "answer_done";
 
+    /** E4：实时情绪/意图命中（客户端展示预警条；warningId 关联风险预警） */
+    static final String T_EMOTION = "emotion";
+
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private VoiceFrames()
@@ -137,6 +140,23 @@ final class VoiceFrames
         m.put("ragHits", ragHits);
         m.put("sources", sources == null ? java.util.Collections.emptyList() : sources);
         m.put("degraded", degraded);
+        return write(m);
+    }
+
+    /** E4：情绪/意图命中帧（level ∈ urgent/negative；keywords 为命中情绪词） */
+    static String emotion(String level, String intent, java.util.List<String> keywords, Long warningId)
+    {
+        Map<String, Object> m = base(T_EMOTION);
+        m.put("level", level);
+        if (intent != null)
+        {
+            m.put("intent", intent);
+        }
+        m.put("keywords", keywords == null ? java.util.Collections.emptyList() : keywords);
+        if (warningId != null)
+        {
+            m.put("warningId", warningId);
+        }
         return write(m);
     }
 
