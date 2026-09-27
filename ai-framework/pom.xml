@@ -73,6 +73,14 @@
             <version>3.14.9</version>
         </dependency>
 
+        <!-- P3-A5：VoiceSession 注入 HotlineMetrics（ai-system 的 micrometer-core 为 optional 不传递），
+             同 ai-system 模式声明 optional——运行期由 ai-admin 的 micrometer-registry-prometheus 提供 -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- N5：WebSocket 握手鉴权单元测试（版本由 Spring Boot parent 统一管理，test 作用域不进产物） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

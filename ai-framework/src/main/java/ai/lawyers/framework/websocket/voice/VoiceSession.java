@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
 import ai.lawyers.system.service.lawyers.voice.vad.VoiceActivityDetector;
 
 /**
@@ -77,6 +78,39 @@ public class VoiceSession
     /** A4：能量+过零率 VAD，start 帧后按 sampleRate 创建，stop/shutdown 释放 */
     private volatile VoiceActivityDetector vad;
 
+    /** A5：指标门面（null 时埋点静默跳过，不抛异常） */
+    private final HotlineMetrics metrics;
+
+    /* ---- E3：语音机器人（RAG+LLM 对话引擎） ---- */
+    /** E3：对话引擎服务（null 时 ask/robot 回 ROBOT_UNAVAILABLE） */
+    private final ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotService robotService;
+    /** E3：start 帧 "robot":true 开启 ASR final 自动应答 */
+    private volatile boolean robotMode;
+    /** E3：机器人回合单线程执行器（回合串行，不阻塞 WS/ASR 回调线程） */
+    private final java.util.concurrent.ExecutorService robotExecutor;
+    /** E3：回合号发号器 */
+    private final java.util.concurrent.atomic.AtomicLong robotTurnSeq = new java.util.concurrent.atomic.AtomicLong();
+    /** E3：当前有效回合号（新回合/新 final/stop/shutdown 时递增作废旧回合） */
+    private final java.util.concurrent.atomic.AtomicLong activeRobotTurn = new java.util.concurrent.atomic.AtomicLong();
+    /** E3：本回合问题就绪时刻（ASR final / ask 受理，robot E2E 起点） */
+    private volatile long robotQuestionNanos;
+    /** E3：本回合 E2E 已埋点标记（新回合重置） */
+    private final AtomicBoolean robotE2eMarked = new AtomicBoolean(true);
+
+    /* ---- A5 时间戳/一次性标记（纳秒，System.nanoTime） ---- */
+    /** start 帧受理时刻（ASR 首包/E2E 首响起点） */
+    private volatile long startNanos;
+    /** 首个 asr_partial 已上报标记 */
+    private final AtomicBoolean asrFirstMarked = new AtomicBoolean();
+    /** 最近一次 tts 帧受理时刻 */
+    private volatile long ttsStartNanos;
+    /** 当前 tts 首包已上报标记（新 tts 帧重置） */
+    private final AtomicBoolean ttsFirstMarked = new AtomicBoolean();
+    /** start 后首包 TTS 音频已上报标记（E2E 只记一次） */
+    private final AtomicBoolean e2eFirstMarked = new AtomicBoolean();
+    /** 本次 VAD 起始判定起点（首个有声帧进入时刻） */
+    private volatile long vadSpeechBeginNanos;
+
     VoiceSession(Session wsSession, String sessionId, String role, int queueCapacity)
     {
         this(wsSession, sessionId, role, queueCapacity, null);
@@ -91,17 +125,37 @@ public class VoiceSession
     VoiceSession(Session wsSession, String sessionId, String role, int queueCapacity,
             VoiceEngineRegistry engineRegistry, boolean vadEnabled)
     {
+        this(wsSession, sessionId, role, queueCapacity, engineRegistry, vadEnabled, null);
+    }
+
+    VoiceSession(Session wsSession, String sessionId, String role, int queueCapacity,
+            VoiceEngineRegistry engineRegistry, boolean vadEnabled, HotlineMetrics metrics)
+    {
+        this(wsSession, sessionId, role, queueCapacity, engineRegistry, vadEnabled, metrics, null);
+    }
+
+    VoiceSession(Session wsSession, String sessionId, String role, int queueCapacity,
+            VoiceEngineRegistry engineRegistry, boolean vadEnabled, HotlineMetrics metrics,
+            ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotService robotService)
+    {
         this.wsSession = wsSession;
         this.connId = wsSession.getId();
         this.sessionId = sessionId;
         this.role = role;
         this.engineRegistry = engineRegistry != null ? engineRegistry : new VoiceEngineRegistry();
         this.vadEnabled = vadEnabled;
+        this.metrics = metrics;
+        this.robotService = robotService;
         int cap = queueCapacity > 0 ? queueCapacity : 1000;
         this.sendQueue = new LinkedBlockingQueue<>(cap);
         this.sender = new Thread(this::runSender, "voice-sender-" + connId);
         this.sender.setDaemon(true);
         this.sender.start();
+        this.robotExecutor = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "voice-robot-" + connId);
+            t.setDaemon(true);
+            return t;
+        });
     }
 
     /* ================= 生命周期 ================= */
@@ -144,6 +198,9 @@ public class VoiceSession
                     break;
                 case "tts":
                     handleTts(node);
+                    break;
+                case "ask":
+                    handleAsk(node);
                     break;
                 case "bargein":
                     handleBargein();
@@ -201,6 +258,9 @@ public class VoiceSession
         }
         asrActive = false;
         vad = null;
+        // E3：作废旧回合并停回合执行器（阻塞中的 LLM 调用结果产出时被 turnId 校验丢弃）
+        activeRobotTurn.incrementAndGet();
+        robotExecutor.shutdownNow();
         StreamSynthesis tts = currentTts;
         if (tts != null)
         {
@@ -243,6 +303,12 @@ public class VoiceSession
         }
         this.engine = engineInstance.engineCode();
         this.sampleRate = rate;
+        // E3：start 帧可声明 robot:true 开启 ASR final 自动应答（服务未装配时仅记日志，ask 仍会明确报错）
+        this.robotMode = node.path("robot").asBoolean(false);
+        if (this.robotMode && this.robotService == null)
+        {
+            log.warn("VoiceWS robot 模式已请求但对话引擎未装配 sessionId={}，ASR final 不会触发应答", sessionId);
+        }
         // A4：start 时按采样率创建 VAD（能量+过零率），语音起始 ≤80ms、尾静默 400ms 判结束
         this.vad = vadEnabled ? new VoiceActivityDetector(rate, new VoiceActivityDetector.Listener()
         {
@@ -258,6 +324,11 @@ public class VoiceSession
                 onVadSpeechEnd();
             }
         }) : null;
+        // A5：记录 start 受理时刻（ASR 首包/E2E 首响起点）
+        this.startNanos = System.nanoTime();
+        this.asrFirstMarked.set(false);
+        this.ttsFirstMarked.set(false);
+        this.e2eFirstMarked.set(false);
         VoiceAsrContext ctx = new VoiceAsrContext(sessionId, role, "pcm", rate);
         engineInstance.open(ctx, new AsrStreamCallback()
         {
@@ -266,6 +337,11 @@ public class VoiceSession
             {
                 if (!shutdown.get())
                 {
+                    // A5：首个 asr_partial → 记录 ASR 流式首包耗时
+                    if (metrics != null && asrFirstMarked.compareAndSet(false, true))
+                    {
+                        metrics.recordVoiceAsrFirstMs(nanosToMs(System.nanoTime() - startNanos), sessionId);
+                    }
                     enqueue(Entry.Kind.OTHER, VoiceFrames.asr(VoiceFrames.T_ASR_PARTIAL, asrSeq.incrementAndGet(), text));
                 }
             }
@@ -276,6 +352,11 @@ public class VoiceSession
                 if (!shutdown.get())
                 {
                     enqueue(Entry.Kind.OTHER, VoiceFrames.asr(VoiceFrames.T_ASR_FINAL, asrSeq.incrementAndGet(), text));
+                    // E3：robot 模式下 ASR final 自动触发对话引擎回合（空文本不触发）
+                    if (robotMode && text != null && !text.trim().isEmpty())
+                    {
+                        submitRobotTurn(text.trim());
+                    }
                 }
             }
 
@@ -341,7 +422,15 @@ public class VoiceSession
                     "tts 文本上限 " + TTS_TEXT_MAX + " 字符，当前 " + text.length()));
             return;
         }
-        // 新合成请求覆盖旧的：旧句柄静默取消（新任务自带 tts_end，客户端按 seq 重新计数）
+        startTts(text, voice);
+    }
+
+    /**
+     * 启动一次流式合成（客户端 tts 帧与 E3 机器人应答共用）。
+     * 新合成请求覆盖旧的：旧句柄静默取消（新任务自带 tts_end，客户端按 seq 重新计数）。
+     */
+    private void startTts(String text, String voice)
+    {
         StreamSynthesis prev = currentTts;
         if (prev != null)
         {
@@ -349,6 +438,9 @@ public class VoiceSession
             drainPendingTts();
         }
         final int ttsRate = this.sampleRate;
+        // A5：TTS 首包计时起点（新请求重置，覆盖旧任务）
+        this.ttsStartNanos = System.nanoTime();
+        this.ttsFirstMarked.set(false);
         // A2/A3：TTS 引擎跟随 start 帧选定的引擎（mock/dashscope）
         StreamTtsEngine ttsEngine = engineRegistry.createTts(this.engine);
         if (ttsEngine == null)
@@ -367,6 +459,21 @@ public class VoiceSession
                         if (self != null && self.isCancelled())
                         {
                             return;
+                        }
+                        // A5：TTS 首包 + E2E 首响埋点（各自仅首分片记一次）
+                        if (metrics != null && ttsFirstMarked.compareAndSet(false, true))
+                        {
+                            metrics.recordVoiceTtsFirstMs(nanosToMs(System.nanoTime() - ttsStartNanos), sessionId);
+                        }
+                        if (metrics != null && e2eFirstMarked.compareAndSet(false, true))
+                        {
+                            metrics.recordVoiceE2eFirstMs(nanosToMs(System.nanoTime() - startNanos), sessionId);
+                        }
+                        // E3：机器人回合 E2E（问题就绪→应答首个音频分片）
+                        if (metrics != null && robotQuestionNanos > 0 && robotE2eMarked.compareAndSet(false, true))
+                        {
+                            metrics.recordVoiceE2eFirstMs(nanosToMs(System.nanoTime() - robotQuestionNanos),
+                                    "robot", sessionId);
                         }
                         enqueue(Entry.Kind.TTS, VoiceFrames.ttsAudio(seq, chunkCount, ttsRate, pcm));
                     }
@@ -389,6 +496,82 @@ public class VoiceSession
                     }
                 });
         this.currentTts = handle;
+    }
+
+    /* ================= E3：语音机器人（ask 帧 / robot 自动应答） ================= */
+
+    /** E3：ask 帧显式提问（text 必填；robot 模式外也可用于调试/坐席侧主动提问） */
+    private void handleAsk(JsonNode node)
+    {
+        String question = node.path("text").asText("").trim();
+        if (question.isEmpty())
+        {
+            enqueue(Entry.Kind.OTHER, VoiceFrames.error("INVALID_PARAM", "ask 帧缺少 text"));
+            return;
+        }
+        if (question.length() > 500)
+        {
+            enqueue(Entry.Kind.OTHER, VoiceFrames.error("TEXT_TOO_LONG",
+                    "ask 问题上限 500 字符，当前 " + question.length()));
+            return;
+        }
+        if (robotService == null)
+        {
+            enqueue(Entry.Kind.OTHER, VoiceFrames.error("ROBOT_UNAVAILABLE", "对话引擎未装配"));
+            return;
+        }
+        submitRobotTurn(question);
+    }
+
+    /**
+     * E3：提交一个机器人回合（最新回合取代旧回合——旧回合结果产出前发现 turnId
+     * 已失效即丢弃，保证"新问题就是新回合"，迟到应答不下发、不播报）。
+     */
+    private void submitRobotTurn(String question)
+    {
+        if (shutdown.get() || robotService == null)
+        {
+            return;
+        }
+        final long turnId = robotTurnSeq.incrementAndGet();
+        activeRobotTurn.set(turnId);
+        final long questionNanos = System.nanoTime();
+        try
+        {
+            robotExecutor.execute(() -> runRobotTurn(turnId, question, questionNanos));
+        }
+        catch (java.util.concurrent.RejectedExecutionException e)
+        {
+            log.warn("VoiceWS robot 回合提交失败（已关闭）conn={}", connId);
+        }
+    }
+
+    /** E3：执行机器人回合：RAG+LLM → answer_delta/done 帧 → 自动 TTS 播报 */
+    private void runRobotTurn(long turnId, String question, long questionNanos)
+    {
+        ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotResult result;
+        try
+        {
+            result = robotService.answer(question, sessionId);
+        }
+        catch (Exception e)
+        {
+            // 服务自身已兜底，这里仅防御性兜底
+            log.warn("VoiceWS robot 回合异常 conn={}, turn={}: {}", connId, turnId, e.getMessage());
+            return;
+        }
+        // 迟到回合丢弃（新问题/打断/停机已取代）
+        if (shutdown.get() || turnId != activeRobotTurn.get())
+        {
+            return;
+        }
+        enqueue(Entry.Kind.OTHER, VoiceFrames.answerDelta(turnId, 0, result.getAnswer()));
+        enqueue(Entry.Kind.OTHER, VoiceFrames.answerDone(turnId, result.getRagHits(),
+                result.getSources(), result.isDegraded()));
+        // 自动播报：机器人 E2E 起点=问题就绪时刻
+        this.robotQuestionNanos = questionNanos;
+        this.robotE2eMarked.set(false);
+        startTts(result.getAnswer(), null);
     }
 
     /* ================= bargein / stop ================= */
@@ -421,13 +604,25 @@ public class VoiceSession
         {
             return;
         }
+        // A5：VAD 起始判定耗时（首个有声帧进入 → 判定触发）
+        VoiceActivityDetector detector = vad;
+        if (metrics != null && detector != null)
+        {
+            metrics.recordVoiceVadMs(detector.getLastDetectionMs(), sessionId);
+        }
         enqueue(Entry.Kind.OTHER, VoiceFrames.vad(VoiceFrames.T_VAD_SPEECH_START));
         StreamSynthesis tts = currentTts;
         if (tts != null && !tts.isCancelled())
         {
+            long bargeinBegin = System.nanoTime();
             tts.cancel();
             drainPendingTts();
             enqueue(Entry.Kind.OTHER, VoiceFrames.ttsEnd(true, "vad_speech_start"));
+            // A5：VAD 触发的打断停止耗时
+            if (metrics != null)
+            {
+                metrics.recordVoiceBargeinStopMs(nanosToMs(System.nanoTime() - bargeinBegin), "vad", sessionId);
+            }
         }
     }
 
@@ -442,6 +637,7 @@ public class VoiceSession
 
     private void handleBargein()
     {
+        long bargeinBegin = System.nanoTime();
         StreamSynthesis tts = currentTts;
         if (tts != null)
         {
@@ -450,6 +646,11 @@ public class VoiceSession
         drainPendingTts();
         // 明确发一帧 interrupted tts_end，客户端复位 AudioContext 播放队列
         enqueue(Entry.Kind.OTHER, VoiceFrames.ttsEnd(true, "bargein"));
+        // A5：客户端主动打断停止耗时
+        if (metrics != null)
+        {
+            metrics.recordVoiceBargeinStopMs(nanosToMs(System.nanoTime() - bargeinBegin), "bargein", sessionId);
+        }
     }
 
     private void handleStop()
@@ -463,6 +664,9 @@ public class VoiceSession
         asrActive = false;
         asrEngine = null;
         vad = null;
+        robotMode = false;
+        // E3：停止识别即作废旧机器人回合（在途 LLM 结果产出时丢弃）
+        activeRobotTurn.incrementAndGet();
         try
         {
             engineRef.close();
@@ -471,6 +675,12 @@ public class VoiceSession
         {
             enqueue(Entry.Kind.OTHER, VoiceFrames.error("ASR_CLOSE_ERROR", e.getMessage()));
         }
+    }
+
+    /** A5：纳秒差转毫秒（System.nanoTime 差值 → ms，截断取整） */
+    private static long nanosToMs(long nanos)
+    {
+        return nanos / 1_000_000L;
     }
 
     /* ================= 发送队列 ================= */

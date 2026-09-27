@@ -282,6 +282,14 @@ ai:
     enabled: ${AI_CALL_SUMMARY_ENABLED:true}
     # 质检完成（转写已就绪）后自动联动生成小结
     auto-on-inspect: ${AI_CALL_SUMMARY_AUTO_ON_INSPECT:true}
+  # P3-E3（二阶段）/ws/voice 语音机器人对话引擎：ASR final → RAG → LLM → TTS 播报
+  voice-robot:
+    # 总开关：默认关闭（政务内网模型就绪后再开）；关闭时 ask/robot 回合返回转人工兜底话术
+    enabled: ${AI_VOICE_ROBOT_ENABLED:false}
+    # 播报答复长度上限（字，超出截断）
+    answer-max-chars: ${AI_VOICE_ROBOT_ANSWER_MAX_CHARS:150}
+    # RAG 上下文装配长度上限（字，防超 token）
+    context-max-chars: ${AI_VOICE_ROBOT_CONTEXT_MAX_CHARS:1200}
 
 # ============================================================
 # 语音引擎配置（TTS / ASR）。ASR 为 OpenAI/Whisper 兼容端点

@@ -59,6 +59,8 @@ public class AiModelCallLogRecorder
     public static final String SCENE_CONSULTATION = "consultation";
     public static final String SCENE_RAG = "rag";
     public static final String SCENE_RAG_INDEX = "rag_index";
+    /** P3-E3：/ws/voice 语音机器人对话（RAG+LLM 应答） */
+    public static final String SCENE_VOICE_ROBOT = "voice_robot";
     public static final String SCENE_TEST = "test";
     public static final String SCENE_OTHER = "other";
 

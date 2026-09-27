@@ -69,6 +69,12 @@ public class VoiceActivityDetector
 
     private int consecutiveSilence;
 
+    /** A5：当前有声段首个候选帧时刻（System.nanoTime），用于起始判定耗时统计 */
+    private long runBeginNanos;
+
+    /** A5：最近一次起始判定耗时（纳秒），onSpeechStart 触发时刷新 */
+    private volatile long lastDetectionNanos;
+
     public VoiceActivityDetector(int sampleRate, Listener listener)
     {
         this(sampleRate, DEFAULT_ENERGY_THRESHOLD, DEFAULT_ZCR_MIN, DEFAULT_ZCR_MAX,
@@ -142,6 +148,12 @@ public class VoiceActivityDetector
         return speaking;
     }
 
+    /** A5：最近一次语音起始判定耗时（毫秒）；未触发过时为 0 */
+    public long getLastDetectionMs()
+    {
+        return lastDetectionNanos / 1_000_000L;
+    }
+
     /* ================= 内部 ================= */
 
     private void processFrame(byte[] buf, int off)
@@ -170,12 +182,24 @@ public class VoiceActivityDetector
     {
         if (!speaking)
         {
-            consecutiveVoice = voiced ? consecutiveVoice + 1 : 0;
+            if (voiced)
+            {
+                if (consecutiveVoice == 0)
+                {
+                    runBeginNanos = System.nanoTime();
+                }
+                consecutiveVoice++;
+            }
+            else
+            {
+                consecutiveVoice = 0;
+            }
             if (consecutiveVoice >= startFrames)
             {
                 speaking = true;
                 consecutiveVoice = 0;
                 consecutiveSilence = 0;
+                lastDetectionNanos = System.nanoTime() - runBeginNanos;
                 if (listener != null)
                 {
                     listener.onSpeechStart();

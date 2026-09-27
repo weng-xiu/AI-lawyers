@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import ai.lawyers.framework.websocket.WsClusterRelay;
+import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
 
 /**
  * /ws/voice 本机连接注册表（P3-A1）。
@@ -51,6 +52,14 @@ public class VoiceSessionManager
     @Autowired(required = false)
     private ai.lawyers.system.service.lawyers.voice.VoiceProperties voiceProperties;
 
+    /** A5：语音链路延迟首响/打断埋点门面（未装配时静默跳过） */
+    @Autowired(required = false)
+    private HotlineMetrics hotlineMetrics;
+
+    /** E3：语音机器人对话引擎（未装配时 ask 帧回 ROBOT_UNAVAILABLE，robot 模式静默降级） */
+    @Autowired(required = false)
+    private ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotService voiceRobotService;
+
     @PostConstruct
     public void init()
     {
@@ -82,7 +91,8 @@ public class VoiceSessionManager
         }
         VoiceSession session = new VoiceSession(wsSession, sessionId, role, sendQueueCapacity,
                 engineRegistry != null ? engineRegistry : new VoiceEngineRegistry(),
-                voiceProperties == null || voiceProperties.isVadEnabled());
+                voiceProperties == null || voiceProperties.isVadEnabled(),
+                hotlineMetrics, voiceRobotService);
         VoiceSession old = sessions.putIfAbsent(wsSession.getId(), session);
         if (old != null)
         {

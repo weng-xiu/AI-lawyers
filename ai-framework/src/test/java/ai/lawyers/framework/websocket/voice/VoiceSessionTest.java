@@ -1,8 +1,11 @@
 package ai.lawyers.framework.websocket.voice;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Base64;
@@ -19,6 +22,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
 
 /**
  * {@link VoiceSession} 帧协议与生命周期测试（P3-A1）：
@@ -305,6 +309,230 @@ class VoiceSessionTest
         {
             assertThat(type(n, "vad_speech_start")).isFalse();
             assertThat(type(n, "vad_speech_end")).isFalse();
+        }
+    }
+
+    // ---------- A5：延迟预算埋点 ----------
+
+    @Test
+    void metrics_fullPipelineRecorded() throws Exception
+    {
+        HotlineMetrics m = mock(HotlineMetrics.class);
+        session.shutdown();
+        session = new VoiceSession(wsSession, "sess-1", "agent", 1000, null, true, m);
+        session.handleText("{\"type\":\"start\"}");
+        await(n -> type(n, "started"));
+
+        // VAD 语音起始 → recordVoiceVadMs
+        session.handleBinary(sine16k(3));
+        await(n -> type(n, "vad_speech_start"));
+        verify(m, org.mockito.Mockito.timeout(2000).times(1)).recordVoiceVadMs(anyLong(), eq("sess-1"));
+
+        // TTS 首包 → recordVoiceTtsFirstMs + recordVoiceE2eFirstMs（仅一次）
+        session.handleText("{\"type\":\"tts\",\"text\":\"你好\"}");
+        await(n -> type(n, "tts_audio"));
+        verify(m, org.mockito.Mockito.timeout(2000).times(1)).recordVoiceTtsFirstMs(anyLong(), eq("sess-1"));
+        verify(m, org.mockito.Mockito.timeout(2000).times(1)).recordVoiceE2eFirstMs(anyLong(), eq("sess-1"));
+
+        // 手动 bargein → recordVoiceBargeinStopMs(trigger=bargein)
+        session.handleText("{\"type\":\"bargein\"}");
+        verify(m, org.mockito.Mockito.timeout(2000).times(1))
+                .recordVoiceBargeinStopMs(anyLong(), eq("bargein"), eq("sess-1"));
+    }
+
+    @Test
+    void metrics_vadBargeinTriggerRecorded() throws Exception
+    {
+        HotlineMetrics m = mock(HotlineMetrics.class);
+        session.shutdown();
+        session = new VoiceSession(wsSession, "sess-1", "agent", 1000, null, true, m);
+        session.handleText("{\"type\":\"start\"}");
+        await(n -> type(n, "started"));
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 50; i++)
+        {
+            sb.append('法');
+        }
+        session.handleText("{\"type\":\"tts\",\"text\":\"" + sb + "\"}");
+        await(n -> type(n, "tts_audio"));
+
+        // 播报中 VAD 自动打断 → trigger=vad
+        session.handleBinary(sine16k(3));
+        await(n -> type(n, "vad_speech_start"));
+        verify(m, org.mockito.Mockito.timeout(2000).times(1))
+                .recordVoiceBargeinStopMs(anyLong(), eq("vad"), eq("sess-1"));
+    }
+
+    @Test
+    void metrics_nullSafeWhenAbsent() throws Exception
+    {
+        // metrics=null（6 参构造兜底）全链路不抛异常
+        session.shutdown();
+        session = new VoiceSession(wsSession, "sess-1", "agent", 1000, null, true, null);
+        session.handleText("{\"type\":\"start\"}");
+        await(n -> type(n, "started"));
+        session.handleBinary(sine16k(3));
+        await(n -> type(n, "vad_speech_start"));
+        session.handleText("{\"type\":\"tts\",\"text\":\"你好\"}");
+        await(n -> type(n, "tts_audio"));
+        session.handleText("{\"type\":\"bargein\"}");
+        await(n -> type(n, "tts_end") && n.path("interrupted").asBoolean(false));
+    }
+
+    // ---------- E3：语音机器人（ask 帧 / robot 自动应答） ----------
+
+    /** 构建带机器人服务的会话（robotService mock 固定返回 result） */
+    private ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotService setupRobotSession(
+            ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotResult result) throws Exception
+    {
+        ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotService robot =
+                mock(ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotService.class);
+        when(robot.answer(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(result);
+        session.shutdown();
+        session = new VoiceSession(wsSession, "sess-1", "agent", 1000, null, true, null, robot);
+        return robot;
+    }
+
+    @Test
+    void askFrame_answerDeltaDoneThenAutoTts() throws Exception
+    {
+        ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotResult r =
+                ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotResult.ok("您可以主张经济补偿。");
+        r.setRagHits(1);
+        r.setSources(java.util.Collections.singletonList("劳动合同法 第四十六条"));
+        ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotService robot = setupRobotSession(r);
+
+        session.handleText("{\"type\":\"start\"}");
+        await(n -> type(n, "started"));
+        session.handleText("{\"type\":\"ask\",\"text\":\"被辞退怎么赔偿\"}");
+
+        JsonNode delta = await(n -> type(n, "answer_delta"));
+        assertThat(delta.path("turnId").asLong()).isEqualTo(1L);
+        assertThat(delta.path("text").asText()).isEqualTo("您可以主张经济补偿。");
+        JsonNode done = await(n -> type(n, "answer_done"));
+        assertThat(done.path("ragHits").asInt()).isEqualTo(1);
+        assertThat(done.path("sources").get(0).asText()).isEqualTo("劳动合同法 第四十六条");
+        assertThat(done.path("degraded").asBoolean()).isFalse();
+        // 应答自动进入 TTS 播报
+        assertThat(await(n -> type(n, "tts_audio"))).isNotNull();
+        verify(robot, org.mockito.Mockito.timeout(2000).times(1)).answer(eq("被辞退怎么赔偿"), eq("sess-1"));
+    }
+
+    @Test
+    void askValidations_andRobotUnavailable() throws Exception
+    {
+        // 默认会话（robotService=null）：参数校验先于可用性
+        session.handleText("{\"type\":\"ask\",\"text\":\"\"}");
+        assertThat(await(n -> type(n, "error")).path("code").asText()).isEqualTo("INVALID_PARAM");
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 501; i++)
+        {
+            sb.append('问');
+        }
+        session.handleText("{\"type\":\"ask\",\"text\":\"" + sb + "\"}");
+        assertThat(await(n -> type(n, "error")).path("code").asText()).isEqualTo("TEXT_TOO_LONG");
+
+        session.handleText("{\"type\":\"ask\",\"text\":\"合法问题\"}");
+        assertThat(await(n -> type(n, "error")).path("code").asText()).isEqualTo("ROBOT_UNAVAILABLE");
+    }
+
+    @Test
+    void robotMode_asrFinalAutoTriggersAnswer() throws Exception
+    {
+        ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotService robot = setupRobotSession(
+                ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotResult.ok("建议先协商，协商不成可申请劳动仲裁。"));
+
+        // 自定义注册表：ASR 用可控 stub（engineCode=mock 使 TTS 仍走 mock）
+        final AsrStreamCallback[] cbHolder = new AsrStreamCallback[1];
+        StreamAsrEngine stubAsr = new StreamAsrEngine()
+        {
+            @Override
+            public String engineCode()
+            {
+                return "mock";
+            }
+
+            @Override
+            public void open(VoiceAsrContext ctx, AsrStreamCallback cb)
+            {
+                cbHolder[0] = cb;
+            }
+
+            @Override
+            public void feed(byte[] frame)
+            {
+            }
+
+            @Override
+            public void close()
+            {
+            }
+        };
+        VoiceEngineRegistry reg = new VoiceEngineRegistry()
+        {
+            @Override
+            public StreamAsrEngine createAsr(String code)
+            {
+                return stubAsr;
+            }
+        };
+        session.shutdown();
+        session = new VoiceSession(wsSession, "sess-1", "caller", 1000, reg, true, null, robot);
+
+        session.handleText("{\"type\":\"start\",\"robot\":true}");
+        await(n -> type(n, "started"));
+        // 模拟真实引擎产出 final → robot 模式自动触发回合
+        cbHolder[0].onFinal("借钱不还怎么办");
+
+        JsonNode delta = await(n -> type(n, "answer_delta"));
+        assertThat(delta.path("text").asText()).contains("劳动仲裁");
+        verify(robot, org.mockito.Mockito.timeout(2000).times(1)).answer(eq("借钱不还怎么办"), eq("sess-1"));
+    }
+
+    @Test
+    void newAsk_supersedesStaleTurn_noLateAnswer() throws Exception
+    {
+        // 第一次调用阻塞直至放行，模拟慢 LLM；第二次立即返回
+        final java.util.concurrent.CountDownLatch slow = new java.util.concurrent.CountDownLatch(1);
+        ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotService robot =
+                mock(ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotService.class);
+        when(robot.answer(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString()))
+                .thenAnswer(inv -> {
+                    String q = inv.getArgument(0, String.class);
+                    if (q.contains("第一问"))
+                    {
+                        slow.await(5, TimeUnit.SECONDS);
+                        return ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotResult.ok("第一问答复");
+                    }
+                    return ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotResult.ok("第二问答复");
+                });
+        session.shutdown();
+        session = new VoiceSession(wsSession, "sess-1", "agent", 1000, null, true, null, robot);
+
+        session.handleText("{\"type\":\"start\"}");
+        await(n -> type(n, "started"));
+        session.handleText("{\"type\":\"ask\",\"text\":\"第一问\"}");
+        // 等回合1进入阻塞的 LLM 调用，再发第二问取代之
+        verify(robot, org.mockito.Mockito.timeout(2000).times(1))
+                .answer(eq("第一问"), eq("sess-1"));
+        session.handleText("{\"type\":\"ask\",\"text\":\"第二问\"}");
+        slow.countDown();
+
+        // 回合1 结果产出时已被取代 → 不下发；只见 turnId=2 的应答
+        JsonNode delta = await(n -> type(n, "answer_delta"));
+        assertThat(delta.path("turnId").asLong()).isEqualTo(2L);
+        assertThat(delta.path("text").asText()).isEqualTo("第二问答复");
+        await(n -> type(n, "answer_done"));
+        Thread.sleep(300);
+        for (JsonNode n : frames)
+        {
+            if (type(n, "answer_delta"))
+            {
+                assertThat(n.path("turnId").asLong()).isEqualTo(2L);
+            }
         }
     }
 

@@ -18,10 +18,13 @@
         <i class="el-icon-chat-dot-square"></i>
         <p>开启识别后，坐席语音将实时转写为字幕（当前为链路联调通道）。</p>
       </div>
-      <div v-for="(item, idx) in captions" :key="idx" class="vc-line" :class="'vc-' + item.speaker">
-        <span class="vc-speaker">{{ speakerLabel(item.speaker) }}</span>
-        <span class="vc-text">{{ item.text }}</span>
-        <span class="vc-time">{{ item.time }}</span>
+      <div v-for="(item, idx) in captions" :key="idx" class="vc-item">
+        <div class="vc-line" :class="'vc-' + item.speaker">
+          <span class="vc-speaker">{{ speakerLabel(item.speaker) }}</span>
+          <span class="vc-text">{{ item.text }}</span>
+          <span class="vc-time">{{ item.time }}</span>
+        </div>
+        <div v-if="item.sources && item.sources.length" class="vc-sources">依据：{{ item.sources.join('；') }}</div>
       </div>
       <div v-if="partialText" class="vc-line vc-agent vc-partial">
         <span class="vc-speaker">坐席</span>
@@ -208,6 +211,29 @@ export default {
         case 'vad_speech_end':
           this.peerSpeaking = false
           break
+        case 'answer_delta': {
+          // E3：机器人应答文本（当前 LLM 非流式单帧全量；turnId 变化即新回合另起一行）
+          const t = msg.text || ''
+          if (!t) break
+          const last = this.captions[this.captions.length - 1]
+          if (this._aiTurnId === msg.turnId && last && last.speaker === 'ai') {
+            last.text = t
+          } else {
+            this.pushCaption('ai', t)
+            this._aiTurnId = msg.turnId
+          }
+          this.scrollBottom()
+          break
+        }
+        case 'answer_done': {
+          // E3：应答完成——附法条溯源；degraded 为兜底话术（文本本身已提示转人工）
+          const last = this.captions[this.captions.length - 1]
+          if (this._aiTurnId === msg.turnId && last && last.speaker === 'ai' &&
+              msg.sources && msg.sources.length) {
+            this.$set(last, 'sources', msg.sources)
+          }
+          break
+        }
         case 'error':
           this.lastError = `${msg.code}: ${msg.message}`
           break
@@ -268,6 +294,7 @@ export default {
     clearCaptions() {
       this.captions = []
       this.partialText = ''
+      this._aiTurnId = null
     },
 
     /* ================= 麦克风采集（Float32 → 16kHz S16LE） ================= */
@@ -437,6 +464,7 @@ export default {
 .vc-ai .vc-speaker { background: #764ba2; }
 .vc-text { flex: 1; color: #1F2A3A; word-break: break-all; }
 .vc-partial .vc-text { color: #8C8C8C; font-style: italic; }
+.vc-sources { padding: 0 6px 4px 52px; font-size: 12px; color: #5B7DB8; line-height: 1.5; }
 .vc-time { flex-shrink: 0; font-size: 11px; color: #B0BCCA; }
 .vc-actions { display: flex; gap: 10px; margin-top: 10px; }
 .vc-error {

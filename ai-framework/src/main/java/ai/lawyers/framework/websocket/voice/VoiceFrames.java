@@ -40,6 +40,12 @@ final class VoiceFrames
     /** A4：VAD 语音结束 */
     static final String T_VAD_SPEECH_END = "vad_speech_end";
 
+    /** E3：机器人应答文本增量（当前 LLM 非流式，单帧全量；seq 预留给流式） */
+    static final String T_ANSWER_DELTA = "answer_delta";
+
+    /** E3：机器人应答完成（含 RAG 命中数/溯源/降级标记） */
+    static final String T_ANSWER_DONE = "answer_done";
+
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private VoiceFrames()
@@ -111,6 +117,27 @@ final class VoiceFrames
     static String vad(String type)
     {
         return write(base(type));
+    }
+
+    /** E3：机器人应答文本帧（turnId 供客户端丢弃已被新回合取代的迟到应答） */
+    static String answerDelta(long turnId, long seq, String text)
+    {
+        Map<String, Object> m = base(T_ANSWER_DELTA);
+        m.put("turnId", turnId);
+        m.put("seq", seq);
+        m.put("text", text);
+        return write(m);
+    }
+
+    /** E3：机器人应答完成帧（degraded=true 表示兜底话术，sources 为法条溯源清单） */
+    static String answerDone(long turnId, int ragHits, java.util.List<String> sources, boolean degraded)
+    {
+        Map<String, Object> m = base(T_ANSWER_DONE);
+        m.put("turnId", turnId);
+        m.put("ragHits", ragHits);
+        m.put("sources", sources == null ? java.util.Collections.emptyList() : sources);
+        m.put("degraded", degraded);
+        return write(m);
     }
 
     private static Map<String, Object> base(String type)
