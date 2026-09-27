@@ -67,6 +67,13 @@ public class FreeSwitchEslInboundClient
     private final String password;
     private final int connectTimeoutMs;
     private final int reconnectIntervalMs;
+    /**
+     * B3 命令面池化：false 时建立"纯命令通道"（不订阅事件），供命令面连接池复用
+     * 同一套路由/回执配对/重连机制；true（默认）保持原事件订阅行为不变。
+     */
+    private final boolean subscribeEvents;
+    /** B3：纯命令通道连接就绪（已鉴权）瞬时可观测，与 connected 同样随断连回落 */
+    private final AtomicBoolean ready = new AtomicBoolean(false);
     private final AtomicBoolean running = new AtomicBoolean(false);
 
     /**
@@ -100,17 +107,25 @@ public class FreeSwitchEslInboundClient
 
     public FreeSwitchEslInboundClient(String host, int port, String password)
     {
-        this(host, port, password, 5000, (int) RECONNECT_BACKOFF_BASE_MS);
+        this(host, port, password, 5000, (int) RECONNECT_BACKOFF_BASE_MS, true);
     }
 
     public FreeSwitchEslInboundClient(String host, int port, String password,
                                      int connectTimeoutMs, int reconnectIntervalMs)
+    {
+        this(host, port, password, connectTimeoutMs, reconnectIntervalMs, true);
+    }
+
+    public FreeSwitchEslInboundClient(String host, int port, String password,
+                                     int connectTimeoutMs, int reconnectIntervalMs,
+                                     boolean subscribeEvents)
     {
         this.host = host;
         this.port = port;
         this.password = password;
         this.connectTimeoutMs = connectTimeoutMs;
         this.reconnectIntervalMs = reconnectIntervalMs;
+        this.subscribeEvents = subscribeEvents;
     }
 
     public void addListener(EslEventListener listener)
@@ -119,6 +134,30 @@ public class FreeSwitchEslInboundClient
     }
 
     public String getHost() { return host; }
+
+    public int getPort() { return port; }
+
+    /**
+     * B3：纯命令通道是否就绪（已鉴权；事件模式下等价于 connected）。
+     * 供命令面连接池的熔断器半开探测使用。
+     */
+    public boolean isReady()
+    {
+        return ready.get();
+    }
+
+    /** B3：连接就绪回调（鉴权/订阅成功后触发一次），用于熔断器成功复位 */
+    public interface ReadyListener
+    {
+        void onReady();
+    }
+
+    private volatile ReadyListener readyListener;
+
+    public void setReadyListener(ReadyListener listener)
+    {
+        this.readyListener = listener;
+    }
 
     /**
      * 启动长连接（异步、自动重连）。幂等。
@@ -294,21 +333,39 @@ public class FreeSwitchEslInboundClient
         {
             throw new IOException("ESL 鉴权失败: " + (authResp == null ? "连接被关闭" : authResp.toText()));
         }
-        log.info("[ESL-{}] 鉴权成功，订阅呼叫事件", host);
-
-        // 3. 事件订阅（plain 文本格式，便于无第三方库解析）
-        //    关注：通道生命周期、DTMF 按键、后台任务返回、录音停止
-        write("event plain CHANNEL_CREATE CHANNEL_ANSWER CHANNEL_HANGUP "
-                + "CHANNEL_HANGUP_COMPLETE CHANNEL_BRIDGE CHANNEL_UNBRIDGE "
-                + "DTMF BACKGROUND_JOB RECORD_STOP\n\n");
-        EslFrame eventResp = readFrame();
-        if (eventResp == null || !eventResp.toText().contains("+OK"))
+        if (subscribeEvents)
         {
-            log.warn("[ESL-{}] 事件订阅返回异常: {}", host, eventResp == null ? "连接被关闭" : eventResp.toText());
+            log.info("[ESL-{}] 鉴权成功，订阅呼叫事件", host);
+
+            // 3. 事件订阅（plain 文本格式，便于无第三方库解析）
+            //    关注：通道生命周期、DTMF 按键、后台任务返回、录音停止
+            write("event plain CHANNEL_CREATE CHANNEL_ANSWER CHANNEL_HANGUP "
+                    + "CHANNEL_HANGUP_COMPLETE CHANNEL_BRIDGE CHANNEL_UNBRIDGE "
+                    + "DTMF BACKGROUND_JOB RECORD_STOP\n\n");
+            EslFrame eventResp = readFrame();
+            if (eventResp == null || !eventResp.toText().contains("+OK"))
+            {
+                log.warn("[ESL-{}] 事件订阅返回异常: {}", host, eventResp == null ? "连接被关闭" : eventResp.toText());
+            }
+            else
+            {
+                connected.set(true);
+            }
+            ready.set(connected.get());
         }
         else
         {
-            connected.set(true);
+            // B3 纯命令通道：鉴权成功即就绪，不订阅事件
+            log.info("[ESL-{}] 鉴权成功，纯命令通道就绪", host);
+            ready.set(true);
+        }
+        if (ready.get())
+        {
+            ReadyListener rl = readyListener;
+            if (rl != null)
+            {
+                try { rl.onReady(); } catch (Exception ignored) {}
+            }
         }
 
         // 4. 帧循环：读取线程是输入流的唯一消费者
@@ -601,6 +658,7 @@ public class FreeSwitchEslInboundClient
         try { if (socket != null) socket.close(); } catch (Exception ignored) {}
         socket = null; in = null; out = null;
         connected.set(false);
+        ready.set(false);
     }
 
     /**

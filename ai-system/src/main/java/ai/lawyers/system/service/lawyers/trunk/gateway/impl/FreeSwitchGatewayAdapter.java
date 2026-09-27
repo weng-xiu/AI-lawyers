@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import ai.lawyers.system.domain.lawyers.trunk.AiCallTrunk;
@@ -18,6 +19,7 @@ import ai.lawyers.system.domain.lawyers.trunk.DialResult;
 import ai.lawyers.system.enums.DialStatusEnum;
 import ai.lawyers.system.service.lawyers.trunk.gateway.GatewayHealth;
 import ai.lawyers.system.service.lawyers.trunk.gateway.ICallGatewayAdapter;
+import ai.lawyers.system.service.lawyers.trunk.gateway.esl.PooledEslClient;
 import ai.lawyers.system.utils.trunk.NumberTransformUtils;
 
 /**
@@ -52,6 +54,13 @@ public class FreeSwitchGatewayAdapter implements ICallGatewayAdapter
     /** 呼叫落地的 dialplan context */
     @Value("${call.gateway.freeswitch.context:default}")
     private String context;
+
+    /**
+     * B3 命令面池化：ESL 长连接池（默认启用；{@code call.gateway.pool.esl-enabled=false}
+     * 时回退历史"每命令一短连"实现，单机/排障可应急回退）。
+     */
+    @Autowired
+    private PooledEslClient pooledEslClient;
 
     @Override
     public String getVendor()
@@ -219,7 +228,13 @@ public class FreeSwitchGatewayAdapter implements ICallGatewayAdapter
     }
 
     /**
-     * 通过 ESL 明文协议发送一条 api 命令并读取响应。
+     * 通过 ESL 发送一条命令并读取响应。
+     *
+     * <p>B3 命令面池化：默认走 {@link PooledEslClient} 长连接（originate/uuid_kill/
+     * uuid_transfer/sofia status 全部复用同一条纯命令连接，断连自动重建、熔断期间
+     * 快速失败）；连接池关闭时回退历史短连接实现。池化路径无响应统一抛
+     * {@link IOException}，保持与短连接一致的失败语义（originate→GATEWAY_ERROR、
+     * hangup→false、checkHealth→down）。</p>
      */
     private String sendEslCommand(AiCallTrunk trunk, String command) throws IOException
     {
@@ -227,6 +242,21 @@ public class FreeSwitchGatewayAdapter implements ICallGatewayAdapter
     }
 
     private String sendEslCommand(AiCallTrunk trunk, String command, String prefix) throws IOException
+    {
+        if (pooledEslClient != null && pooledEslClient.isEnabled())
+        {
+            String resp = pooledEslClient.sendCommand(trunk.getGatewayHost(), prefix + command);
+            if (resp == null)
+            {
+                throw new IOException("ESL 池化连接不可用或命令无响应（断连重连中/熔断打开）");
+            }
+            return resp;
+        }
+        return sendEslCommandShort(trunk, command, prefix);
+    }
+
+    /** 历史短连接实现（每次新建 Socket），保留为连接池关闭时的应急回退 */
+    private String sendEslCommandShort(AiCallTrunk trunk, String command, String prefix) throws IOException
     {
         String host = trunk.getGatewayHost();
         try (Socket socket = new Socket())

@@ -522,6 +522,14 @@ call:
       amiPassword: ${AMI_PASSWORD:amp111}
       timeout: 5000
       context: from-internal
+    # B3 命令面池化（V2.49）：originate/hangup/transfer 复用 ESL/AMI 长连接 + 命令队列，
+    # 消除高话务下每动作新建 Socket 的建连风暴；连接断开自动重建，连续 5s 未就绪开熔断
+    # （冷却 circuit-open-ms 后半开探测），打开期间命令快速失败并 WARN 告警。
+    # 置 false 回退历史短连接模式（每命令独立建连）
+    pool:
+      esl-enabled: ${ESL_CMD_POOL_ENABLED:true}
+      ami-enabled: ${AMI_CMD_POOL_ENABLED:true}
+      circuit-open-ms: ${GATEWAY_CMD_POOL_CIRCUIT_OPEN_MS:60000}
     # 通用 HTTP OpenAPI 网关（云 CTI / SBC 北向接口）
     http:
       originatePath: /call/originate

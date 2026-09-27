@@ -51,6 +51,8 @@ import io.micrometer.core.instrument.Timer;
  *   <li>hotline_pbx_fork_audio_frame_total{kind} M3-3：音频帧（binary/json）</li>
  *   <li>hotline_pbx_fork_bad_frame_total{reason} M3-3：坏帧（bad_json/bad_base64）</li>
  *   <li>hotline_pbx_fork_audio_silence_seconds M3-3：活跃 fork 最大音频静默年龄（gauge，断流/假活检测）</li>
+ *   <li>hotline_gateway_cmdpool_down_total{proto}      B3：命令面池化连接断开翻转（esl/ami）</li>
+ *   <li>hotline_gateway_cmdpool_circuit_open_total{proto} B3：命令面熔断器打开（esl/ami）</li>
  * </ul>
  *
  * <p>Prometheus 导出时 Timer 自动追加 {@code _seconds} 后缀（如
@@ -286,6 +288,20 @@ public class HotlineMetrics
             return;
         }
         registry.gauge(PREFIX + "_pbx_fork_audio_silence_seconds", Tags.empty(), obj, valueFunction);
+    }
+
+    /* ================= B3：网关命令面连接池 ================= */
+
+    /** 命令面池化连接"就绪→断开"翻转计数：proto ∈ esl/ami */
+    public void incrementGatewayCmdPoolDown(String proto)
+    {
+        counter("gateway.cmdpool.down.total", "proto", proto).increment();
+    }
+
+    /** 命令面熔断器打开计数：proto ∈ esl/ami */
+    public void incrementGatewayCmdPoolCircuitOpen(String proto)
+    {
+        counter("gateway.cmdpool.circuit.open.total", "proto", proto).increment();
     }
 
     /** 队列死信计数 */

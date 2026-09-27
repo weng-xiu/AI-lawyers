@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import ai.lawyers.system.domain.lawyers.trunk.AiCallTrunk;
@@ -18,6 +19,7 @@ import ai.lawyers.system.domain.lawyers.trunk.DialResult;
 import ai.lawyers.system.enums.DialStatusEnum;
 import ai.lawyers.system.service.lawyers.trunk.gateway.GatewayHealth;
 import ai.lawyers.system.service.lawyers.trunk.gateway.ICallGatewayAdapter;
+import ai.lawyers.system.service.lawyers.trunk.gateway.ami.PooledAmiClient;
 import ai.lawyers.system.utils.trunk.NumberTransformUtils;
 
 /**
@@ -46,6 +48,13 @@ public class AsteriskGatewayAdapter implements ICallGatewayAdapter
 
     @Value("${call.gateway.asterisk.context:from-internal}")
     private String context;
+
+    /**
+     * B3 命令面池化：AMI 长连接池（默认启用；{@code call.gateway.pool.ami-enabled=false}
+     * 时回退历史"每动作一短连 + Login/Logoff"实现，单机/排障可应急回退）。
+     */
+    @Autowired
+    private PooledAmiClient pooledAmiClient;
 
     @Override
     public String getVendor()
@@ -176,7 +185,30 @@ public class AsteriskGatewayAdapter implements ICallGatewayAdapter
         }
     }
 
+    /**
+     * 发送一个 AMI 动作并读取响应。
+     *
+     * <p>B3 命令面池化：默认走 {@link PooledAmiClient} 长连接（Login 一次后常驻，
+     * Originate/Hangup/Redirect/SIPshowpeer 全部复用，断连自动重建、熔断期间快速
+     * 失败）；连接池关闭时回退历史短连接实现。池化路径无响应统一抛
+     * {@link IOException}，保持与短连接一致的失败语义。</p>
+     */
     private String sendAmiAction(AiCallTrunk trunk, String action) throws IOException
+    {
+        if (pooledAmiClient != null && pooledAmiClient.isEnabled())
+        {
+            String resp = pooledAmiClient.sendAction(trunk.getGatewayHost(), action);
+            if (resp == null)
+            {
+                throw new IOException("AMI 池化连接不可用或动作无响应（断连重连中/熔断打开）");
+            }
+            return resp;
+        }
+        return sendAmiActionShort(trunk, action);
+    }
+
+    /** 历史短连接实现（每次新建 Socket + Login/Logoff），保留为连接池关闭时的应急回退 */
+    private String sendAmiActionShort(AiCallTrunk trunk, String action) throws IOException
     {
         try (Socket socket = new Socket())
         {
