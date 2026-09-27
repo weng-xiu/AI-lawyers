@@ -407,6 +407,16 @@ call:
       # 上传成功后是否删除本地文件
       delete-local-after-upload: ${CALL_RECORDING_S3_DELETE_LOCAL:true}
 
+  # ---------- P3-B3：PBX 媒体接入（mod_audio_fork，来电者 PCM 源） ----------
+  pbx:
+    media:
+      # 媒体接入总开关
+      enabled: ${CALL_PBX_MEDIA_ENABLED:true}
+      # 共享密钥（PBX dialplan URL 带 ?key=；为空不校验，仅限完全隔离内网+IP白名单）
+      auth-key: ${CALL_PBX_MEDIA_AUTH_KEY:}
+      # fork start 未携带采样率时的默认值
+      default-rate: ${CALL_PBX_MEDIA_DEFAULT_RATE:16000}
+
   # ---------- 呼叫调度 ----------
   dispatch:
     # 全局最大并发呼叫数（应小于所有线路 max_concurrent 之和）
