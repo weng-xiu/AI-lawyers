@@ -48,6 +48,9 @@ public class TrunkMonitorController extends BaseController
     @Autowired
     private ai.lawyers.system.service.lawyers.trunk.gateway.esl.EslEventBridgeService eslEventBridgeService;
 
+    @Autowired(required = false)
+    private ai.lawyers.system.service.lawyers.trunk.gateway.ami.AmiEventBridgeService amiEventBridgeService;
+
     /**
      * 监控大屏总览：今日呼叫量、接通率、线路健康、并发使用率、告警数
      */
@@ -65,6 +68,9 @@ public class TrunkMonitorController extends BaseController
         // P3-C4：ESL 单主状态与在线连接数（多实例下验证"仅 leader 消费"：全集群应恰有一个 eslLeader=true）
         data.put("eslLeader", eslEventBridgeService.isEslLeader());
         data.put("eslConnected", eslEventBridgeService.connectedCount());
+        // P3-B1：AMI 单主状态与在线连接数（同款语义；未启用 Asterisk 时恒 leader=true/0 连接）
+        data.put("amiLeader", amiEventBridgeService == null || amiEventBridgeService.isAmiLeader());
+        data.put("amiConnected", amiEventBridgeService == null ? 0 : amiEventBridgeService.connectedCount());
         return success(data);
     }
 

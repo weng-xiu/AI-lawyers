@@ -12,6 +12,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import ai.lawyers.system.mapper.lawyers.trunk.AiCallDialLogMapper;
 import ai.lawyers.system.service.lawyers.cluster.InstanceDrainState;
+import ai.lawyers.system.service.lawyers.trunk.gateway.ami.AmiEventBridgeService;
 import ai.lawyers.system.service.lawyers.trunk.gateway.esl.EslEventBridgeService;
 import ai.lawyers.framework.websocket.CallWebSocketServer;
 import ai.lawyers.framework.websocket.ChatWebSocketServer;
@@ -48,6 +49,10 @@ public class GracefulDrainCoordinator implements ApplicationListener<ContextClos
     @Autowired(required = false)
     private EslEventBridgeService eslBridge;
 
+    /** P3-B1：AMI 事件桥（启用 Asterisk 时同款让位） */
+    @Autowired(required = false)
+    private AmiEventBridgeService amiBridge;
+
     @Value("${app.shutdown.drain.max-wait-seconds:30}")
     private int maxWaitSeconds;
 
@@ -82,7 +87,7 @@ public class GracefulDrainCoordinator implements ApplicationListener<ContextClos
                 log.info("排空 WS 通知已投递: 坐席连接={} 对话连接={}", callConns, chatConns);
             }
 
-            // 3) 让出 ESL 消费者，存活实例接收入站呼叫事件
+            // 3) 让出 ESL/AMI 消费者，存活实例接收入站呼叫事件
             if (eslBridge != null)
             {
                 try
@@ -92,6 +97,17 @@ public class GracefulDrainCoordinator implements ApplicationListener<ContextClos
                 catch (Exception e)
                 {
                     log.warn("排空时让出 ESL 角色异常（不阻断停机）: {}", e.getMessage());
+                }
+            }
+            if (amiBridge != null)
+            {
+                try
+                {
+                    amiBridge.yieldForDrain();
+                }
+                catch (Exception e)
+                {
+                    log.warn("排空时让出 AMI 角色异常（不阻断停机）: {}", e.getMessage());
                 }
             }
 

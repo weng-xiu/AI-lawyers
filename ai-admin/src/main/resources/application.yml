@@ -522,6 +522,17 @@ call:
       amiPassword: ${AMI_PASSWORD:amp111}
       timeout: 5000
       context: from-internal
+    # B1 AMI 事件桥（V2.50）：常驻连接订阅 AMI 事件（Login 后 Events: all），事件经
+    # Newchannel/Dial/Newstate/BridgeEnter/Hangup/QueueMemberStatus 映射后驱动 B4 状态机
+    # 与坐席状态同步（与 ESL 桥同构）。部署真实 Asterisk 时置 true；事件/命令双通道分离，
+    # 命令面仍走 pool 长连接（Events: off）
+    ami:
+      enabled: ${AMI_EVENT_ENABLED:false}
+      # N3 同款单主竞选：多实例时仅领导者建立 AMI 事件连接，锁键与 ESL 桥独立
+      leader-election:
+        enabled: ${AMI_LEADER_ELECTION_ENABLED:true}
+        key: ${AMI_LEADER_ELECTION_KEY:ai-law:leader:ami-bridge}
+        ttl-seconds: ${AMI_LEADER_ELECTION_TTL_SECONDS:30}
     # B3 命令面池化（V2.49）：originate/hangup/transfer 复用 ESL/AMI 长连接 + 命令队列，
     # 消除高话务下每动作新建 Socket 的建连风暴；连接断开自动重建，连续 5s 未就绪开熔断
     # （冷却 circuit-open-ms 后半开探测），打开期间命令快速失败并 WARN 告警。
