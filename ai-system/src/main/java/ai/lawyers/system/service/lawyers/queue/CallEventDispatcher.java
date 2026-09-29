@@ -41,6 +41,9 @@ public class CallEventDispatcher
     /** 事件类型：更新拨号日志 */
     public static final String UPDATE_DIAL_LOG = "UPDATE_DIAL_LOG";
 
+    /** 事件类型：P3-B2 统一 PBX 呼叫事件（载荷为 CallEvent，路由到 CallEventBus） */
+    public static final String PBX_EVENT = "PBX_EVENT";
+
     @Autowired
     private StreamQueueService streamQueueService;
 
@@ -49,6 +52,10 @@ public class CallEventDispatcher
 
     @Autowired
     private AiCallDialLogMapper dialLogMapper;
+
+    /** P3-B2：统一事件总线（消费侧路由入口） */
+    @Autowired
+    private ai.lawyers.system.service.lawyers.trunk.event.CallEventBus callEventBus;
 
     @PostConstruct
     public void init()
@@ -136,6 +143,13 @@ public class CallEventDispatcher
                 if (event.getDialLog() != null)
                 {
                     dialLogMapper.updateAiCallDialLog(event.getDialLog());
+                }
+                break;
+            case PBX_EVENT:
+                // P3-B2：统一 PBX 事件路由回总线 → CallEventProcessor（状态机/坐席推送/自动化工单）
+                if (event.getCallEvent() != null)
+                {
+                    callEventBus.onStreamEvent(event.getCallEvent());
                 }
                 break;
             default:

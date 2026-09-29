@@ -407,6 +407,13 @@ call:
       # 上传成功后是否删除本地文件
       delete-local-after-upload: ${CALL_RECORDING_S3_DELETE_LOCAL:true}
 
+  # ---------- P3-B2：统一 PBX 事件入 Stream 开关 ----------
+  # true（默认）：ESL/AMI 两侧桥的事件统一投递 stream:call-event 异步消费（CallEventBus 入队 →
+  #   CallEventDispatcher 消费组路由 → CallEventProcessor 状态机/坐席推送/自动化工单）；
+  # false：回退同步直调（应急回退用，与 V2.50 语义一致）。
+  event:
+    stream-enabled: ${CALL_EVENT_STREAM_ENABLED:true}
+
   # ---------- P3-B3：PBX 媒体接入（mod_audio_fork，来电者 PCM 源） ----------
   pbx:
     media:

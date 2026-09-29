@@ -1,7 +1,6 @@
 package ai.lawyers.system.service.lawyers.trunk.gateway.ami;
 
 import java.time.Duration;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,17 +18,11 @@ import org.springframework.stereotype.Service;
 import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.system.service.lawyers.cluster.LeaderElector;
 import ai.lawyers.system.service.lawyers.cluster.RedisLeaderLock;
-import ai.lawyers.system.domain.lawyers.AiCallAgentStatus;
-import ai.lawyers.system.domain.lawyers.trunk.AiCallDialLog;
 import ai.lawyers.system.domain.lawyers.trunk.AiCallTrunk;
-import ai.lawyers.system.mapper.lawyers.trunk.AiCallDialLogMapper;
 import ai.lawyers.system.mapper.lawyers.trunk.AiCallTrunkMapper;
-import ai.lawyers.system.service.lawyers.CallEventPublisher;
-import ai.lawyers.system.service.lawyers.IAiCallAgentStatusService;
-import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
 import ai.lawyers.system.service.lawyers.trunk.CallEventIdempotencyGuard;
-import ai.lawyers.system.service.lawyers.trunk.ICallDispatchService;
-import ai.lawyers.system.service.lawyers.trunk.gateway.esl.InboundCallHandler;
+import ai.lawyers.system.service.lawyers.trunk.event.CallEvent;
+import ai.lawyers.system.service.lawyers.trunk.event.CallEventBus;
 
 /**
  * P3-B1：Asterisk AMI 事件桥接服务（N9 收口：Asterisk 侧补齐事件监听）。
@@ -39,18 +32,19 @@ import ai.lawyers.system.service.lawyers.trunk.gateway.esl.InboundCallHandler;
  *   <li>启动时连接所有 {@code vendor=ASTERISK} 的中继线路，建立常驻 AMI 事件连接
  *       （Login 后 {@code Events: all}）；命令面动作仍走 {@link PooledAmiClient}
  *       （Events: off），事件/命令双通道分离、互不影响；</li>
- *   <li>事件映射（对齐 ESL 侧语义，供 B4 状态机/坐席栏共同消费）：</li>
+ *   <li>事件映射（B2 起归一为统一 {@link CallEvent} 经 {@link CallEventBus} 投递
+ *       {@code stream:call-event}，消费侧与 ESL 共用 {@code CallEventProcessor}）：</li>
  *   <ul>
  *     <li>Newchannel：携带 AI_CALL_UUID 变量 = 平台外呼通道（登记 leg 关联），
- *         否则视为入站来话 → {@link InboundCallHandler}（来电弹屏/排队/IVR）；</li>
+ *         否则视为入站来话 → INBOUND 事件（消费侧进入电弹屏/排队/IVR）；</li>
  *     <li>VarSet(AI_CALL_UUID)：登记 Asterisk UniqueID → 业务 callUuid 关联；</li>
- *     <li>Dial(Begin)：外呼振铃 → onCallEvent(RINGING)；被叫 leg 继承业务 uuid；</li>
- *     <li>Newstate(Up)：接通 → onCallEvent(ANSWERED) + 坐席推送（≈CHANNEL_ANSWER）；</li>
- *     <li>BridgeEnter：桥接 → 坐席 BRIDGED 推送；</li>
- *     <li>Hangup：挂断 → onCallEvent(HANGUP)（Cause 映射 + 接通时长）+ 坐席推送
+ *     <li>Dial(Begin)：外呼振铃 → RINGING 事件；被叫 leg 继承业务 uuid；</li>
+ *     <li>Newstate(Up)：接通 → ANSWERED 事件（≈CHANNEL_ANSWER）；</li>
+ *     <li>BridgeEnter：桥接 → BRIDGED 事件；</li>
+ *     <li>Hangup：挂断 → HANGUP 事件（Cause 映射 + 接通时长）
  *         （≈CHANNEL_HANGUP_COMPLETE）；</li>
- *     <li>QueueMemberStatus/QueueMember：队列成员设备态 → 同步坐席状态
- *         （暂停=忙碌、NOT_INUSE=空闲、UNAVAILABLE=离线）；</li>
+ *     <li>QueueMemberStatus/QueueMember：队列成员设备态 → AGENT_STATUS 事件
+ *         （消费侧同步坐席状态：暂停=忙碌、NOT_INUSE=空闲、UNAVAILABLE=离线）；</li>
  *   </ul>
  *   <li>N3/C4 同款单主竞选：多实例仅 leader 建连消费（独立锁键
  *       {@code ai-law:leader:ami-bridge}），全部连接失活持续 15s 主动让位；</li>
@@ -107,27 +101,13 @@ public class AmiEventBridgeService implements AmiEventListener
     @Autowired
     private AiCallTrunkMapper trunkMapper;
 
-    @Autowired
-    private AiCallDialLogMapper dialLogMapper;
-
-    @Autowired
-    private ICallDispatchService callDispatchService;
-
-    @Autowired
-    private IAiCallAgentStatusService agentStatusService;
-
-    @Autowired(required = false)
-    private InboundCallHandler inboundCallHandler;
-
-    @Autowired(required = false)
-    private CallEventPublisher callEventPublisher;
-
     /** B4：事件幂等守卫（source=AMI:host）；为空时退化为不判重 */
     @Autowired(required = false)
     private CallEventIdempotencyGuard idempotencyGuard;
 
-    @Autowired(required = false)
-    private HotlineMetrics metrics;
+    /** B2：统一事件总线（归一事件投递 stream:call-event，入队失败内部同步降级） */
+    @Autowired
+    private CallEventBus callEventBus;
 
     /** host:port -> 常驻事件连接 */
     private final Map<String, PersistentAmiEventClient> clients = new ConcurrentHashMap<>();
@@ -383,20 +363,20 @@ public class AmiEventBridgeService implements AmiEventListener
                     onVarSet(event);
                     break;
                 case "Dial":
-                    onDial(event);
+                    onDial(host, event);
                     break;
                 case "Newstate":
-                    onNewstate(event);
+                    onNewstate(host, event);
                     break;
                 case "BridgeEnter":
-                    onBridgeEnter(event);
+                    onBridgeEnter(host, event);
                     break;
                 case "Hangup":
                     onHangup(host, event);
                     break;
                 case "QueueMemberStatus":
                 case "QueueMember":
-                    onQueueMember(event);
+                    onQueueMember(host, event);
                     break;
                 default:
                     break;
@@ -408,7 +388,7 @@ public class AmiEventBridgeService implements AmiEventListener
         }
     }
 
-    /** Newchannel：外呼通道（携带 AI_CALL_UUID）登记 leg 关联；入站来话触发入站处理 */
+    /** Newchannel：外呼通道（携带 AI_CALL_UUID）登记 leg 关联；入站来话归一为 INBOUND 事件入总线 */
     private void onNewchannel(String host, AmiEvent event)
     {
         String uniqueId = event.get("Uniqueid");
@@ -433,16 +413,16 @@ public class AmiEventBridgeService implements AmiEventListener
         String caller = event.get("CallerIDNum");
         String callee = event.get("Exten");
         log.info("[AMI] 入站来话: uniqueId={} {} -> {} ctx={}", uniqueId, caller, callee, context);
-        if (inboundCallHandler != null)
-        {
-            Map<String, Object> ctx = new HashMap<>();
-            ctx.put("host", host);
-            ctx.put("uuid", uniqueId);
-            ctx.put("caller", caller);
-            ctx.put("callee", callee);
-            ctx.put("dnis", callee);
-            inboundCallHandler.handleIncomingCall(ctx);
-        }
+        CallEvent ce = CallEvent.of("AMI:" + host, CallEvent.INBOUND, uniqueId);
+        ce.setChannel(uniqueId);
+        ce.setLinkedid(event.get("Linkedid"));
+        ce.setCaller(caller);
+        ce.setCallee(callee);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("rawEventName", "Newchannel");
+        putIfNotEmpty(payload, "context", context);
+        ce.setPayload(payload);
+        callEventBus.dispatch(ce);
     }
 
     /** VarSet(AI_CALL_UUID)：登记 Asterisk UniqueID → 业务 callUuid 关联 */
@@ -460,8 +440,8 @@ public class AmiEventBridgeService implements AmiEventListener
         }
     }
 
-    /** Dial(Begin)：外呼振铃 → RINGING；被叫 leg 继承业务 uuid（后续事件按其路由） */
-    private void onDial(AmiEvent event)
+    /** Dial(Begin)：外呼振铃 → 归一 RINGING 事件；被叫 leg 继承业务 uuid（后续事件按其路由） */
+    private void onDial(String host, AmiEvent event)
     {
         String subEvent = event.get("SubEvent");
         if (StringUtils.isNotEmpty(subEvent) && !"Begin".equalsIgnoreCase(subEvent))
@@ -480,12 +460,17 @@ public class AmiEventBridgeService implements AmiEventListener
             uuidByLeg.putIfAbsent(destLeg, uuid);
         }
         log.info("[AMI] 外呼振铃: uuid={}", uuid);
-        Map<String, Object> params = new HashMap<>();
-        callDispatchService.onCallEvent(uuid, "RINGING", params);
+        CallEvent ce = CallEvent.of("AMI:" + host, CallEvent.RINGING, uuid);
+        ce.setChannel(callerLeg);
+        ce.setLinkedid(destLeg);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("rawEventName", "Dial");
+        ce.setPayload(payload);
+        callEventBus.dispatch(ce);
     }
 
-    /** Newstate(ChannelStateDesc=Up)：接通 → ANSWERED（≈ESL CHANNEL_ANSWER） */
-    private void onNewstate(AmiEvent event)
+    /** Newstate(ChannelStateDesc=Up)：接通 → 归一 ANSWERED 事件（≈ESL CHANNEL_ANSWER） */
+    private void onNewstate(String host, AmiEvent event)
     {
         if (!"Up".equalsIgnoreCase(event.get("ChannelStateDesc")))
         {
@@ -502,29 +487,40 @@ public class AmiEventBridgeService implements AmiEventListener
             answeredAtMs.putIfAbsent(uniqueId, System.currentTimeMillis());
         }
         log.info("[AMI] 通道接通: uuid={}", uuid);
-        if (metrics != null)
-        {
-            metrics.incrementCall("answered");
-        }
-        pushEventToAgent(uuid, "ANSWERED", null);
-        Map<String, Object> params = new HashMap<>();
-        params.put("answerTime", new Date());
-        callDispatchService.onCallEvent(uuid, "ANSWERED", params);
+        CallEvent ce = CallEvent.of("AMI:" + host, CallEvent.ANSWERED, uuid);
+        ce.setChannel(uniqueId);
+        ce.setLinkedid(event.get("Linkedid"));
+        ce.setCaller(event.get("CallerIDNum"));
+        ce.setCallee(event.get("Exten"));
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("rawEventName", "Newstate");
+        ce.setPayload(payload);
+        callEventBus.dispatch(ce);
     }
 
-    /** BridgeEnter：桥接 → 坐席 BRIDGED 推送 */
-    private void onBridgeEnter(AmiEvent event)
+    /** BridgeEnter：桥接 → 归一 BRIDGED 事件（坐席推送） */
+    private void onBridgeEnter(String host, AmiEvent event)
     {
-        String uuid = resolveUuid(firstNonEmpty(event, "Uniqueid1", "Uniqueid2", "Uniqueid"), event);
+        String leg = firstNonEmpty(event, "Uniqueid1", "Uniqueid2", "Uniqueid");
+        String uuid = resolveUuid(leg, event);
         if (StringUtils.isEmpty(uuid))
         {
             return;
         }
         log.info("[AMI] 通道桥接: uuid={}", uuid);
-        pushEventToAgent(uuid, "BRIDGED", null);
+        CallEvent ce = CallEvent.of("AMI:" + host, CallEvent.BRIDGED, uuid);
+        ce.setChannel(leg);
+        ce.setLinkedid(event.get("Linkedid"));
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("rawEventName", "BridgeEnter");
+        ce.setPayload(payload);
+        callEventBus.dispatch(ce);
     }
 
-    /** Hangup：挂断 → HANGUP（Cause 映射 + 接通时长），清除 leg 关联 */
+    /**
+     * Hangup：挂断 → 归一 HANGUP 事件（Cause 映射 + 接通时长），清除 leg 关联。
+     * 不置 autoTicket 旗标——保持 V2.50 边界：入站自动建工单仅 ESL 侧。
+     */
     private void onHangup(String host, AmiEvent event)
     {
         String uniqueId = event.get("Uniqueid");
@@ -540,21 +536,21 @@ public class AmiEventBridgeService implements AmiEventListener
         // 查不到 dial_log 仅 WARN，不影响其它呼叫）
         log.info("[AMI] 通道挂断: uuid={} cause={} billsec={}", uuid, cause, talkDuration);
 
-        Map<String, Object> params = new HashMap<>();
-        params.put("hangupCause", cause);
-        params.put("talkDuration", (int) talkDuration);
-        callDispatchService.onCallEvent(uuid, "HANGUP", params);
-
-        if (metrics != null && talkDuration == 0)
-        {
-            metrics.incrementCall("abandoned");
-        }
-        pushEventToAgent(uuid, "HANGUP", cause);
+        CallEvent ce = CallEvent.of("AMI:" + host, CallEvent.HANGUP, uuid);
+        ce.setChannel(uniqueId);
+        ce.setLinkedid(event.get("Linkedid"));
+        ce.setCaller(event.get("CallerIDNum"));
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("rawEventName", "Hangup");
+        payload.put("hangupCause", cause);
+        payload.put("talkDuration", (int) talkDuration);
+        ce.setPayload(payload);
+        callEventBus.dispatch(ce);
         cleanupLeg(uniqueId);
     }
 
-    /** QueueMemberStatus/QueueMember：队列成员设备态 → 同步坐席状态 */
-    private void onQueueMember(AmiEvent event)
+    /** QueueMemberStatus/QueueMember：队列成员设备态 → 归一 AGENT_STATUS 事件（坐席状态同步在消费侧） */
+    private void onQueueMember(String host, AmiEvent event)
     {
         String ext = extractExtension(firstNonEmpty(event, "Interface", "MemberName"));
         if (StringUtils.isEmpty(ext))
@@ -568,30 +564,14 @@ public class AmiEventBridgeService implements AmiEventListener
         {
             return;
         }
-        try
-        {
-            AiCallAgentStatus query = new AiCallAgentStatus();
-            query.setSipExtension(ext);
-            List<AiCallAgentStatus> agents = agentStatusService.selectAiCallAgentStatusList(query);
-            if (agents == null)
-            {
-                return;
-            }
-            for (AiCallAgentStatus agent : agents)
-            {
-                if (agent == null || target.equals(agent.getStatus()))
-                {
-                    continue;
-                }
-                log.info("[AMI] 队列成员状态同步坐席: ext={} agentId={} {} -> {} (member={})",
-                        ext, agent.getAgentId(), agent.getStatus(), target, memberStatus);
-                agentStatusService.updateAgentStatus(agent.getAgentId(), target);
-            }
-        }
-        catch (Exception e)
-        {
-            log.warn("[AMI-Bridge] 队列成员状态同步坐席失败 ext={} err={}", ext, e.getMessage());
-        }
+        CallEvent ce = CallEvent.of("AMI:" + host, CallEvent.AGENT_STATUS, null);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("rawEventName", event.getName());
+        payload.put("ext", ext);
+        payload.put("targetStatus", target);
+        putIfNotEmpty(payload, "memberStatus", memberStatus);
+        ce.setPayload(payload);
+        callEventBus.dispatch(ce);
     }
 
     private void cleanupLeg(String uniqueId)
@@ -626,40 +606,12 @@ public class AmiEventBridgeService implements AmiEventListener
         return uniqueId;
     }
 
-    private void pushEventToAgent(String uuid, String eventType, String extra)
+    /** 值非空才放入 payload（保持事件载荷精简） */
+    private static void putIfNotEmpty(Map<String, Object> payload, String key, String value)
     {
-        if (StringUtils.isEmpty(uuid) || callEventPublisher == null)
+        if (StringUtils.isNotEmpty(value))
         {
-            return;
-        }
-        try
-        {
-            AiCallDialLog dialLog = dialLogMapper.selectByCallUuid(uuid);
-            Long agentId = null;
-            Long recordId = null;
-            String caller = null;
-            String callee = null;
-            if (dialLog != null)
-            {
-                agentId = dialLog.getAgentId();
-                recordId = dialLog.getRecordId();
-                caller = dialLog.getCallerNumber();
-                callee = dialLog.getCalleeNumber();
-            }
-            Map<String, Object> data = new HashMap<>();
-            data.put("uuid", uuid);
-            data.put("event", eventType);
-            data.put("recordId", recordId);
-            data.put("agentId", agentId);
-            data.put("caller", caller);
-            data.put("callee", callee);
-            data.put("extra", extra);
-            data.put("ts", System.currentTimeMillis());
-            callEventPublisher.broadcast(eventType, data);
-        }
-        catch (Exception e)
-        {
-            log.error("[AMI-Bridge] 推送事件失败: uuid={} type={}", uuid, eventType, e);
+            payload.put(key, value);
         }
     }
 

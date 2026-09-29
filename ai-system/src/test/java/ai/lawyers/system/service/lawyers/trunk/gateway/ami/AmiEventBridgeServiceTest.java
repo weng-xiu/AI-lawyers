@@ -1,20 +1,13 @@
 package ai.lawyers.system.service.lawyers.trunk.gateway.ami;
 
-import java.util.Collections;
-import java.util.Map;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
+import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import ai.lawyers.system.domain.lawyers.AiCallAgentStatus;
-import ai.lawyers.system.mapper.lawyers.trunk.AiCallDialLogMapper;
-import ai.lawyers.system.service.lawyers.CallEventPublisher;
-import ai.lawyers.system.service.lawyers.IAiCallAgentStatusService;
 import ai.lawyers.system.service.lawyers.trunk.CallEventIdempotencyGuard;
-import ai.lawyers.system.service.lawyers.trunk.ICallDispatchService;
-import ai.lawyers.system.service.lawyers.trunk.gateway.esl.InboundCallHandler;
+import ai.lawyers.system.service.lawyers.trunk.event.CallEvent;
+import ai.lawyers.system.service.lawyers.trunk.event.CallEventBus;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -25,34 +18,25 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** B1：AMI 事件桥单测——静态映射器 + 事件分发流程 */
+/**
+ * B1：AMI 事件桥单测——静态映射器 + 事件分发流程。
+ * B2 起分发流程断言统一事件总线入参（消费语义见 CallEventProcessorTest）。
+ */
 class AmiEventBridgeServiceTest
 {
     private AmiEventBridgeService bridge;
-    private InboundCallHandler inboundCallHandler;
-    private ICallDispatchService callDispatchService;
-    private CallEventPublisher callEventPublisher;
-    private AiCallDialLogMapper dialLogMapper;
+    private CallEventBus callEventBus;
     private CallEventIdempotencyGuard idempotencyGuard;
-    private IAiCallAgentStatusService agentStatusService;
 
     @BeforeEach
     void setUp()
     {
         bridge = new AmiEventBridgeService();
-        inboundCallHandler = mock(InboundCallHandler.class);
-        callDispatchService = mock(ICallDispatchService.class);
-        callEventPublisher = mock(CallEventPublisher.class);
-        dialLogMapper = mock(AiCallDialLogMapper.class);
+        callEventBus = mock(CallEventBus.class);
         idempotencyGuard = mock(CallEventIdempotencyGuard.class);
-        agentStatusService = mock(IAiCallAgentStatusService.class);
 
-        ReflectionTestUtils.setField(bridge, "inboundCallHandler", inboundCallHandler);
-        ReflectionTestUtils.setField(bridge, "callDispatchService", callDispatchService);
-        ReflectionTestUtils.setField(bridge, "callEventPublisher", callEventPublisher);
-        ReflectionTestUtils.setField(bridge, "dialLogMapper", dialLogMapper);
+        ReflectionTestUtils.setField(bridge, "callEventBus", callEventBus);
         ReflectionTestUtils.setField(bridge, "idempotencyGuard", idempotencyGuard);
-        ReflectionTestUtils.setField(bridge, "agentStatusService", agentStatusService);
         when(idempotencyGuard.firstSeen(anyString(), anyString(), anyString())).thenReturn(true);
     }
 
@@ -108,17 +92,23 @@ class AmiEventBridgeServiceTest
         assertThat(AmiEventBridgeService.isCallFlowEvent(null)).isFalse();
     }
 
-    // ------------------------------------------------------------ 分发流程
+    // ------------------------------------------------------------ 分发流程（B2：统一事件入总线）
 
     @Test
-    void inboundNewchannelTriggersInboundHandler()
+    void inboundNewchannelDispatchesInboundEvent()
     {
         AmiEvent event = AmiEventParser.parse("Event: Newchannel\nUniqueid: 1719.1\n"
                 + "CallerIDNum: 13800138000\nExten: 12348\nContext: from-pstn\n\n");
         bridge.onEvent("10.0.0.8", event);
 
-        verify(inboundCallHandler).handleIncomingCall(any());
-        verify(callDispatchService, never()).onCallEvent(anyString(), anyString(), any());
+        ArgumentCaptor<CallEvent> captor = ArgumentCaptor.forClass(CallEvent.class);
+        verify(callEventBus).dispatch(captor.capture());
+        CallEvent dispatched = captor.getValue();
+        assertThat(dispatched.getEventName()).isEqualTo(CallEvent.INBOUND);
+        assertThat(dispatched.getSource()).isEqualTo("AMI:10.0.0.8");
+        assertThat(dispatched.getSessionId()).isEqualTo("1719.1");
+        assertThat(dispatched.getCaller()).isEqualTo("13800138000");
+        assertThat(dispatched.getCallee()).isEqualTo("12348");
     }
 
     @Test
@@ -126,12 +116,17 @@ class AmiEventBridgeServiceTest
     {
         bridge.onEvent("10.0.0.8", AmiEventParser.parse(
                 "Event: Newchannel\nUniqueid: 1719.1\nContext: from-internal\nAI_CALL_UUID: uuid-abc\n\n"));
-        verify(inboundCallHandler, never()).handleIncomingCall(any());
+        // 外呼通道仅登记 leg，不产生事件
+        verify(callEventBus, never()).dispatch(any());
 
         bridge.onEvent("10.0.0.8", AmiEventParser.parse(
                 "Event: Dial\nUniqueid: 1719.1\nDestUniqueid: 1719.2\nSubEvent: Begin\n\n"));
 
-        verify(callDispatchService).onCallEvent(eq("uuid-abc"), eq("RINGING"), any());
+        ArgumentCaptor<CallEvent> captor = ArgumentCaptor.forClass(CallEvent.class);
+        verify(callEventBus).dispatch(captor.capture());
+        assertThat(captor.getValue().getEventName()).isEqualTo(CallEvent.RINGING);
+        assertThat(captor.getValue().getSessionId()).isEqualTo("uuid-abc");
+        assertThat(captor.getValue().getLinkedid()).isEqualTo("1719.2");
     }
 
     @Test
@@ -141,7 +136,11 @@ class AmiEventBridgeServiceTest
                 "Event: VarSet\nUniqueid: 1719.1\nVariable: AI_CALL_UUID\nValue: uuid-abc\n\n"));
         bridge.onEvent("10.0.0.8", AmiEventParser.parse(
                 "Event: Dial\nUniqueid: 1719.1\nDestUniqueid: 1719.2\nSubEvent: Begin\n\n"));
-        verify(callDispatchService).onCallEvent(eq("uuid-abc"), eq("RINGING"), any());
+
+        ArgumentCaptor<CallEvent> captor = ArgumentCaptor.forClass(CallEvent.class);
+        verify(callEventBus).dispatch(captor.capture());
+        assertThat(captor.getValue().getEventName()).isEqualTo(CallEvent.RINGING);
+        assertThat(captor.getValue().getSessionId()).isEqualTo("uuid-abc");
     }
 
     @Test
@@ -156,12 +155,16 @@ class AmiEventBridgeServiceTest
         bridge.onEvent("10.0.0.8", AmiEventParser.parse(
                 "Event: Hangup\nUniqueid: 1719.1\nCause: 16\nCause-txt: Normal Clearing\n\n"));
 
-        org.mockito.ArgumentCaptor<Map<String, Object>> captor =
-                org.mockito.ArgumentCaptor.forClass(Map.class);
-        verify(callDispatchService).onCallEvent(eq("uuid-abc"), eq("HANGUP"), captor.capture());
-        assertThat(captor.getValue().get("hangupCause")).isEqualTo("NORMAL_CLEARING");
-        assertThat((Integer) captor.getValue().get("talkDuration")).isGreaterThanOrEqualTo(0);
-        verify(callEventPublisher).broadcast(eq("HANGUP"), any());
+        ArgumentCaptor<CallEvent> captor = ArgumentCaptor.forClass(CallEvent.class);
+        // ANSWERED + HANGUP 两次投递
+        verify(callEventBus, org.mockito.Mockito.times(2)).dispatch(captor.capture());
+        CallEvent hangup = captor.getAllValues().get(1);
+        assertThat(hangup.getEventName()).isEqualTo(CallEvent.HANGUP);
+        assertThat(hangup.getSessionId()).isEqualTo("uuid-abc");
+        assertThat(hangup.getPayload().get("hangupCause")).isEqualTo("NORMAL_CLEARING");
+        assertThat((Integer) hangup.getPayload().get("talkDuration")).isGreaterThanOrEqualTo(0);
+        // AMI 侧不置自动建工单旗标（V2.50 边界保持）
+        assertThat(hangup.getPayload().get("autoTicket")).isNull();
     }
 
     @Test
@@ -171,48 +174,35 @@ class AmiEventBridgeServiceTest
         bridge.onEvent("10.0.0.8", AmiEventParser.parse(
                 "Event: Newchannel\nUniqueid: 1719.1\nCallerIDNum: 13800138000\nContext: from-pstn\n\n"));
 
-        verify(inboundCallHandler, never()).handleIncomingCall(any());
+        verify(callEventBus, never()).dispatch(any());
         verify(idempotencyGuard).firstSeen(eq("AMI:10.0.0.8"), eq("1719.1"), eq("Newchannel"));
     }
 
     @Test
-    void queueMemberSyncsAgentStatus()
+    void queueMemberDispatchesAgentStatusEvent()
     {
-        AiCallAgentStatus agent = new AiCallAgentStatus();
-        agent.setAgentId(7L);
-        agent.setSipExtension("1001");
-        agent.setStatus("1");
-        when(agentStatusService.selectAiCallAgentStatusList(any(AiCallAgentStatus.class)))
-                .thenReturn(Collections.singletonList(agent));
-
         bridge.onEvent("10.0.0.8", AmiEventParser.parse(
                 "Event: QueueMemberStatus\nQueue: 12348\nInterface: SIP/1001\nPaused: yes\nMemberStatus: INUSE\n\n"));
 
-        verify(agentStatusService).updateAgentStatus(7L, "2");
-    }
-
-    @Test
-    void queueMemberSameStatusDoesNotUpdate()
-    {
-        AiCallAgentStatus agent = new AiCallAgentStatus();
-        agent.setAgentId(7L);
-        agent.setStatus("2");
-        when(agentStatusService.selectAiCallAgentStatusList(any(AiCallAgentStatus.class)))
-                .thenReturn(Collections.singletonList(agent));
-
-        bridge.onEvent("10.0.0.8", AmiEventParser.parse(
-                "Event: QueueMemberStatus\nInterface: PJSIP/1001@trunks\nPaused: yes\n\n"));
-
-        verify(agentStatusService, never()).updateAgentStatus(any(), anyString());
+        ArgumentCaptor<CallEvent> captor = ArgumentCaptor.forClass(CallEvent.class);
+        verify(callEventBus).dispatch(captor.capture());
+        CallEvent dispatched = captor.getValue();
+        assertThat(dispatched.getEventName()).isEqualTo(CallEvent.AGENT_STATUS);
+        assertThat(dispatched.getPayload().get("ext")).isEqualTo("1001");
+        assertThat(dispatched.getPayload().get("targetStatus")).isEqualTo("2");
     }
 
     @Test
     void unknownLegHangupFallsBackToAsteriskUniqueId()
     {
         // 与 ESL 侧对齐：非本平台通道的挂断同样进状态机（uuid=Asterisk UniqueID），
-        // 由 dispatch 按拨号日志对账兜底（查不到仅 WARN），不特殊拦截
+        // 由消费侧 dispatch 按拨号日志对账兜底（查不到仅 WARN），不特殊拦截
         bridge.onEvent("10.0.0.8", AmiEventParser.parse(
                 "Event: Hangup\nUniqueid: 9999.9\nCause: 16\n\n"));
-        verify(callDispatchService).onCallEvent(eq("9999.9"), eq("HANGUP"), any());
+
+        ArgumentCaptor<CallEvent> captor = ArgumentCaptor.forClass(CallEvent.class);
+        verify(callEventBus).dispatch(captor.capture());
+        assertThat(captor.getValue().getEventName()).isEqualTo(CallEvent.HANGUP);
+        assertThat(captor.getValue().getSessionId()).isEqualTo("9999.9");
     }
 }

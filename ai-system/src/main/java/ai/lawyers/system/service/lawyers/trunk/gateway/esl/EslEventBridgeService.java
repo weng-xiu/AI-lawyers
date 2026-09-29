@@ -1,8 +1,6 @@
 package ai.lawyers.system.service.lawyers.trunk.gateway.esl;
 
-import java.io.File;
 import java.time.Duration;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,21 +18,14 @@ import org.springframework.stereotype.Service;
 import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.system.service.lawyers.cluster.LeaderElector;
 import ai.lawyers.system.service.lawyers.cluster.RedisLeaderLock;
-import ai.lawyers.system.domain.lawyers.AiCallAgentStatus;
 import ai.lawyers.system.domain.lawyers.AiCallRecord;
-import ai.lawyers.system.domain.lawyers.AiCallTicket;
 import ai.lawyers.system.domain.lawyers.trunk.AiCallDialLog;
 import ai.lawyers.system.domain.lawyers.trunk.AiCallTrunk;
 import ai.lawyers.system.mapper.lawyers.AiCallRecordMapper;
-import ai.lawyers.system.mapper.lawyers.AiCallTicketMapper;
 import ai.lawyers.system.mapper.lawyers.trunk.AiCallDialLogMapper;
 import ai.lawyers.system.mapper.lawyers.trunk.AiCallTrunkMapper;
-import ai.lawyers.system.service.lawyers.CallEventPublisher;
-import ai.lawyers.system.service.lawyers.IAiCallAgentStatusService;
-import ai.lawyers.system.service.lawyers.IAiCallTicketService;
-import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
-import ai.lawyers.system.service.lawyers.queue.QualityTranscribeDispatcher;
-import ai.lawyers.system.service.lawyers.trunk.ICallDispatchService;
+import ai.lawyers.system.service.lawyers.trunk.event.CallEvent;
+import ai.lawyers.system.service.lawyers.trunk.event.CallEventBus;
 
 /**
  * FreeSWITCH ESL 事件桥接服务
@@ -43,11 +34,12 @@ import ai.lawyers.system.service.lawyers.trunk.ICallDispatchService;
  * <ol>
  *   <li>启动时连接所有 {@code vendor=FREESWITCH} 的中继线路，建立入站长连接；</li>
  *   <li>接收 CHANNEL_CREATE / CHANNEL_ANSWER / CHANNEL_HANGUP_COMPLETE /
- *       DTMF 等事件，转换为内部业务事件；</li>
- *   <li>外呼：通过拨号日志关联 recordId/agentId，更新话单状态并把事件
- *       经 {@link CallWebSocketServer} 推送给坐席工作台；</li>
- *   <li>入站：识别到来自网关的来话（Call-Direction=inbound）时，触发
- *       入站处理（来电弹屏 → 排队 → 分配坐席）。</li>
+ *       DTMF / RECORD_STOP 等事件，B2 起归一为统一 {@link CallEvent}
+ *       经 {@link CallEventBus} 投递 {@code stream:call-event}；</li>
+ *   <li>消费侧 {@code CallEventProcessor} 统一驱动：状态机更新、坐席 WebSocket 推送、
+ *       入站处理（来电弹屏 → 排队 → 分配坐席）、录音回写与质检投递、入站自动建工单；</li>
+ *   <li>生产侧保留：幂等守卫（第一道防线）、RECORD_STOP 话单关联解析、
+ *       C4 单主竞选/失活让位、命令面 hangupCall/queryPbxChannelCount。</li>
  * </ol>
  *
  * <p>本类是 README 架构中 "SIP 网关 → IVR/排队机 → 坐席工作台" 事件链路的核心胶水层。</p>
@@ -109,39 +101,16 @@ public class EslEventBridgeService implements EslEventListener
     @Autowired
     private AiCallTrunkMapper trunkMapper;
 
+    /** RECORD_STOP 话单关联解析（多候选 UUID 反查，留生产侧） */
     @Autowired
     private AiCallDialLogMapper dialLogMapper;
 
     @Autowired
     private AiCallRecordMapper callRecordMapper;
 
+    /** B2：统一事件总线（归一事件投递 stream:call-event，入队失败内部同步降级） */
     @Autowired
-    private ICallDispatchService callDispatchService;
-
-    @Autowired
-    private IAiCallAgentStatusService agentStatusService;
-
-    @Autowired(required = false)
-    private InboundCallHandler inboundCallHandler;
-
-    @Autowired(required = false)
-    private CallEventPublisher callEventPublisher;
-
-    @Autowired
-    private IAiCallTicketService callTicketService;
-
-    @Autowired
-    private AiCallTicketMapper callTicketMapper;
-
-    @Autowired(required = false)
-    private QualityTranscribeDispatcher qualityTranscribeDispatcher;
-
-    @Autowired(required = false)
-    private HotlineMetrics metrics;
-
-    /** F2：录音对象存储上传服务（对象存储模式下接管上传） */
-    @Autowired(required = false)
-    private ai.lawyers.system.service.impl.lawyers.storage.RecordingUploadService recordingUploadService;
+    private CallEventBus callEventBus;
 
     /** B4：PBX 事件幂等守卫（第一道防线）；为空时退化为不判重（兼容旧行为） */
     @Autowired(required = false)
@@ -511,20 +480,20 @@ public class EslEventBridgeService implements EslEventListener
                     onChannelCreate(host, event, uuid);
                     break;
                 case "CHANNEL_ANSWER":
-                    onChannelAnswer(uuid, event);
+                    onChannelAnswer(host, event, uuid);
                     break;
                 case "CHANNEL_BRIDGE":
-                    onChannelBridge(uuid, event);
+                    onChannelBridge(host, event, uuid);
                     break;
                 case "CHANNEL_HANGUP_COMPLETE":
                 case "CHANNEL_HANGUP":
-                    onChannelHangup(uuid, event);
+                    onChannelHangup(host, event, uuid, name);
                     break;
                 case "DTMF":
-                    onDtmf(uuid, event);
+                    onDtmf(host, event, uuid);
                     break;
                 case "RECORD_STOP":
-                    onRecordStop(uuid, event);
+                    onRecordStop(host, event, uuid);
                     break;
                 default:
                     break;
@@ -536,6 +505,7 @@ public class EslEventBridgeService implements EslEventListener
         }
     }
 
+    /** CHANNEL_CREATE：入站来话归一为 INBOUND 事件入总线；出站通道仅日志 */
     private void onChannelCreate(String host, EslEvent event, String uuid)
     {
         String direction = event.get("Call-Direction");
@@ -545,16 +515,15 @@ public class EslEventBridgeService implements EslEventListener
         if ("inbound".equalsIgnoreCase(direction))
         {
             log.info("[ESL] 入站来话: uuid={} {} -> {}", uuid, caller, callee);
-            if (inboundCallHandler != null)
-            {
-                Map<String, Object> ctx = new HashMap<>();
-                ctx.put("host", host);
-                ctx.put("uuid", uuid);
-                ctx.put("caller", caller);
-                ctx.put("callee", callee);
-                ctx.put("dnis", callee);
-                inboundCallHandler.handleIncomingCall(ctx);
-            }
+            CallEvent ce = CallEvent.of("ESL:" + host, CallEvent.INBOUND, uuid);
+            ce.setChannel(uuid);
+            ce.setCaller(caller);
+            ce.setCallee(callee);
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("rawEventName", "CHANNEL_CREATE");
+            payload.put("direction", direction);
+            ce.setPayload(payload);
+            callEventBus.dispatch(ce);
         }
         else
         {
@@ -562,28 +531,40 @@ public class EslEventBridgeService implements EslEventListener
         }
     }
 
-    private void onChannelAnswer(String uuid, EslEvent event)
+    /** CHANNEL_ANSWER：归一 ANSWERED 事件（指标/坐席推送/状态机统一在消费侧） */
+    private void onChannelAnswer(String host, EslEvent event, String uuid)
     {
         log.info("[ESL] 通道接通: uuid={}", uuid);
-        if (metrics != null)
-        {
-            metrics.incrementCall("answered");
-        }
-        // 外呼场景：通过拨号日志找到关联坐席并推送
-        pushEventToAgent(uuid, "ANSWERED", event, null);
-        // 通知调度服务更新状态
-        Map<String, Object> params = new HashMap<>();
-        params.put("answerTime", new Date());
-        callDispatchService.onCallEvent(uuid, "ANSWERED", params);
+        CallEvent ce = CallEvent.of("ESL:" + host, CallEvent.ANSWERED, uuid);
+        ce.setChannel(uuid);
+        ce.setCaller(event.get("Caller-Caller-ID-Number"));
+        ce.setCallee(event.get("Caller-Destination-Number"));
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("rawEventName", "CHANNEL_ANSWER");
+        putIfNotEmpty(payload, "varRecordId", event.get("variable_ai_record_id"));
+        ce.setPayload(payload);
+        callEventBus.dispatch(ce);
     }
 
-    private void onChannelBridge(String uuid, EslEvent event)
+    /** CHANNEL_BRIDGE：归一 BRIDGED 事件（坐席推送） */
+    private void onChannelBridge(String host, EslEvent event, String uuid)
     {
         log.info("[ESL] 通道桥接: uuid={}", uuid);
-        pushEventToAgent(uuid, "BRIDGED", event, null);
+        CallEvent ce = CallEvent.of("ESL:" + host, CallEvent.BRIDGED, uuid);
+        ce.setChannel(uuid);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("rawEventName", "CHANNEL_BRIDGE");
+        putIfNotEmpty(payload, "varRecordId", event.get("variable_ai_record_id"));
+        ce.setPayload(payload);
+        callEventBus.dispatch(ce);
     }
 
-    private void onChannelHangup(String uuid, EslEvent event)
+    /**
+     * CHANNEL_HANGUP[_COMPLETE]：归一 HANGUP 事件（挂断原因 + 通话时长）。
+     * 入站正常挂断（NORMAL_CLEARING 且有通话时长）置 payload.autoTicket 旗标，
+     * 由消费侧执行自动建工单——该旗标仅 ESL 侧产生，保持 AMI 侧无自动建工单的边界。
+     */
+    private void onChannelHangup(String host, EslEvent event, String uuid, String rawName)
     {
         String cause = event.get("Hangup-Cause");
         String billSec = event.get("variable_billsec");
@@ -601,105 +582,46 @@ public class EslEventBridgeService implements EslEventListener
             try { talkDuration = Integer.parseInt(duration); } catch (Exception ignored) {}
         }
 
-        Map<String, Object> params = new HashMap<>();
-        params.put("hangupCause", cause);
-        params.put("talkDuration", talkDuration);
-        callDispatchService.onCallEvent(uuid, "HANGUP", params);
-
-        // T5-1：未接/丢弃（无通话时长）计数
-        if (metrics != null && talkDuration == 0)
-        {
-            metrics.incrementCall("abandoned");
-        }
-
-        // 推送挂断事件给坐席
-        pushEventToAgent(uuid, "HANGUP", event, cause);
-
+        CallEvent ce = CallEvent.of("ESL:" + host, CallEvent.HANGUP, uuid);
+        ce.setChannel(uuid);
+        ce.setCaller(event.get("Caller-Caller-ID-Number"));
+        ce.setCallee(event.get("Caller-Destination-Number"));
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("rawEventName", rawName);
+        payload.put("hangupCause", cause);
+        payload.put("talkDuration", talkDuration);
+        payload.put("direction", direction);
+        putIfNotEmpty(payload, "varRecordId", event.get("variable_ai_record_id"));
         // 入站通话正常结束且有通话时长时，自动创建工单（外呼已有 maybeCreateTicket 逻辑，不重复）
         if ("inbound".equalsIgnoreCase(direction)
                 && "NORMAL_CLEARING".equalsIgnoreCase(cause)
                 && talkDuration > 0)
         {
-            tryAutoCreateInboundTicket(uuid);
+            payload.put("autoTicket", true);
         }
+        ce.setPayload(payload);
+        callEventBus.dispatch(ce);
     }
 
-    /**
-     * 入站通话挂断后自动创建工单。
-     * <p>条件：能通过 uuid 找到 ai_call_record；该 recordId 尚未生成工单；
-     * 通话状态为已完成（非未接）。已存在工单则跳过，避免重复创建。</p>
-     */
-    private void tryAutoCreateInboundTicket(String uuid)
-    {
-        try
-        {
-            AiCallRecord record = callRecordMapper.selectAiCallRecordByCallUuid(uuid);
-            if (record == null)
-            {
-                // 入站 PSTN 通话可能未写 call_uuid，尝试通过拨号日志反查
-                AiCallDialLog dialLog = dialLogMapper.selectByCallUuid(uuid);
-                if (dialLog != null && dialLog.getRecordId() != null)
-                {
-                    record = callRecordMapper.selectAiCallRecordByRecordId(dialLog.getRecordId());
-                }
-            }
-            if (record == null || record.getRecordId() == null)
-            {
-                return;
-            }
-            // 未接通话不创建工单
-            if ("3".equals(record.getStatus()))
-            {
-                return;
-            }
-            // 已存在工单则跳过
-            AiCallTicket existQuery = new AiCallTicket();
-            existQuery.setRecordId(record.getRecordId());
-            List<AiCallTicket> exist = callTicketMapper.selectAiCallTicketList(existQuery);
-            if (exist != null && !exist.isEmpty())
-            {
-                log.info("[ESL-Bridge] 入站话单 recordId={} 已存在工单，跳过自动创建", record.getRecordId());
-                return;
-            }
-
-            AiCallTicket ticket = new AiCallTicket();
-            ticket.setTicketNo(callTicketService.generateTicketNo());
-            ticket.setRecordId(record.getRecordId());
-            String caller = record.getCallerNumber();
-            ticket.setTitle("来电咨询-" + (caller == null ? "未知号码" : caller));
-            String content = record.getContent();
-            if (StringUtils.isEmpty(content))
-            {
-                content = "来电号码:" + (caller == null ? "" : caller)
-                        + (StringUtils.isNotEmpty(record.getCallerName()) ? " 来电人:" + record.getCallerName() : "")
-                        + " 通话时长:" + (record.getDuration() == null ? 0 : record.getDuration()) + "秒";
-            }
-            ticket.setContent(content);
-            ticket.setCallerNumber(caller);
-            ticket.setCallerName(record.getCallerName());
-            ticket.setPriority("2");
-            ticket.setStatus("0");
-            ticket.setCreateBy("esl-bridge");
-            callTicketService.insertAiCallTicket(ticket);
-            log.info("[ESL-Bridge] 入站通话自动创建工单 recordId={} ticketNo={}",
-                    record.getRecordId(), ticket.getTicketNo());
-        }
-        catch (Exception e)
-        {
-            log.warn("[ESL-Bridge] 入站通话自动创建工单失败 uuid={} err={}", uuid, e.getMessage());
-        }
-    }
-
-    private void onDtmf(String uuid, EslEvent event)
+    /** DTMF：归一 DTMF 事件（payload.digit 透传按键） */
+    private void onDtmf(String host, EslEvent event, String uuid)
     {
         String digit = event.get("DTMF-Digit");
         if (digit == null) digit = event.get("DTMF-Source");
         log.debug("[ESL] DTMF: uuid={} digit={}", uuid, digit);
-        pushEventToAgent(uuid, "DTMF", event, digit);
+        CallEvent ce = CallEvent.of("ESL:" + host, CallEvent.DTMF, uuid);
+        ce.setChannel(uuid);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("rawEventName", "DTMF");
+        putIfNotEmpty(payload, "digit", digit);
+        putIfNotEmpty(payload, "varRecordId", event.get("variable_ai_record_id"));
+        ce.setPayload(payload);
+        callEventBus.dispatch(ce);
     }
 
     /**
-     * 处理 FreeSWITCH RECORD_STOP 事件：把录音文件路径与时长回写到话单。
+     * RECORD_STOP：生产侧解析录音路径/时长与关联话单 recordId（多候选 UUID 反查），
+     * 归一 RECORD_STOP 事件入总线；回写/上传/质检统一在消费侧执行。
      *
      * <p>事件字段兼容：</p>
      * <ul>
@@ -711,7 +633,7 @@ public class EslEventBridgeService implements EslEventListener
      *       {@code call_uuid}，未命中时再尝试通过拨号日志的 recordId 关联。</li>
      * </ul>
      */
-    private void onRecordStop(String uuid, EslEvent event)
+    private void onRecordStop(String host, EslEvent event, String uuid)
     {
         String recordPath = event.get("Record-File-Path");
         if (StringUtils.isEmpty(recordPath))
@@ -746,59 +668,19 @@ public class EslEventBridgeService implements EslEventListener
             return;
         }
 
-        try
+        CallEvent ce = CallEvent.of("ESL:" + host, CallEvent.RECORD_STOP, uuid);
+        ce.setChannel(uuid);
+        ce.setLinkedid(otherLeg);
+        ce.setRecordId(recordId);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("rawEventName", "RECORD_STOP");
+        putIfNotEmpty(payload, "recordPath", recordPath);
+        if (recordSeconds != null)
         {
-            AiCallRecord update = new AiCallRecord();
-            update.setRecordId(recordId);
-            if (StringUtils.isNotEmpty(recordPath))
-            {
-                // F2：对象存储模式下，先暂存本地路径（供上传服务读取），上传成功后再回写 object key
-                update.setRecordFile(recordPath);
-                // 对外访问 URL 统一走后端播放接口，前端可直接用 <audio src=...>
-                update.setRecordingUrl("/lawyers/call/record/" + recordId + "/play");
-            }
-            if (recordSeconds != null)
-            {
-                update.setRecordDuration(recordSeconds);
-            }
-            callRecordMapper.updateRecordingInfo(update);
-            log.info("[ESL-Bridge] 已回写录音信息: recordId={} file={} duration={}s",
-                    recordId, recordPath, recordSeconds);
-
-            // F2：对象存储模式，排队异步上传；上传成功后再更新 recordFile 为 object key
-            if (recordingUploadService != null && StringUtils.isNotEmpty(recordPath))
-            {
-                try
-                {
-                    File localFile = new File(recordPath);
-                    if (localFile.exists())
-                    {
-                        recordingUploadService.enqueue(recordId, localFile);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    log.warn("[ESL-Bridge] 录音上传排队失败 recordId={}: {}", recordId, ex.getMessage());
-                }
-            }
-
-            // T4-1 录音文件已就绪，投递质检转写队列（队列不可用时内部同步降级）
-            if (qualityTranscribeDispatcher != null && StringUtils.isNotEmpty(recordPath))
-            {
-                try
-                {
-                    qualityTranscribeDispatcher.enqueue(recordId);
-                }
-                catch (Exception ex)
-                {
-                    log.warn("[ESL-Bridge] 投递质检任务失败 recordId={}: {}", recordId, ex.getMessage());
-                }
-            }
+            payload.put("recordSeconds", recordSeconds);
         }
-        catch (Exception e)
-        {
-            log.error("[ESL-Bridge] 回写录音信息失败: recordId={} file={}", recordId, recordPath, e);
-        }
+        ce.setPayload(payload);
+        callEventBus.dispatch(ce);
     }
 
     /**
@@ -889,83 +771,12 @@ public class EslEventBridgeService implements EslEventListener
         }
     }
 
-    /**
-     * 通过拨号日志找到外呼对应的坐席，把事件推送给其 WebSocket。
-     */
-    private void pushEventToAgent(String uuid, String eventType, EslEvent event, String extra)
+    /** 值非空才放入 payload（保持事件载荷精简） */
+    private static void putIfNotEmpty(Map<String, Object> payload, String key, String value)
     {
-        if (uuid == null) return;
-        try
+        if (StringUtils.isNotEmpty(value))
         {
-            AiCallDialLog dialLog = dialLogMapper.selectByCallUuid(uuid);
-            Long agentId = null;
-            Long recordId = null;
-            String caller = null;
-            String callee = null;
-            if (dialLog != null)
-            {
-                agentId = dialLog.getAgentId();
-                recordId = dialLog.getRecordId();
-                caller = dialLog.getCallerNumber();
-                callee = dialLog.getCalleeNumber();
-            }
-
-            // 若外呼事件携带了业务变量 ai_record_id（originate 时透传），也可关联话单
-            if (recordId == null)
-            {
-                String varRecordId = event.get("variable_ai_record_id");
-                if (varRecordId != null && varRecordId.matches("\\d+"))
-                {
-                    recordId = Long.parseLong(varRecordId);
-                }
-            }
-
-            // 入站 PSTN 通话只写了 ai_call_record（含 agentId），没有 dial_log，
-            // 这里通过 recordId 反查坐席，避免挂断时只能广播
-            if (agentId == null && recordId != null)
-            {
-                try
-                {
-                    AiCallRecord record = callRecordMapper.selectAiCallRecordByRecordId(recordId);
-                    if (record != null && record.getAgentId() != null)
-                    {
-                        agentId = record.getAgentId();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    log.warn("[ESL-Bridge] 反查 recordId={} 坐席失败: {}", recordId, ex.getMessage());
-                }
-            }
-
-            Map<String, Object> data = new HashMap<>();
-            data.put("uuid", uuid);
-            data.put("event", eventType);
-            data.put("recordId", recordId);
-            data.put("agentId", agentId);
-            data.put("caller", caller);
-            data.put("callee", callee);
-            data.put("extra", extra);
-            data.put("ts", System.currentTimeMillis());
-
-            // 如果能找到坐席的 userId，定向推送；否则广播给所有在线坐席
-            if (callEventPublisher != null)
-            {
-                if (agentId != null)
-                {
-                    AiCallAgentStatus agent = agentStatusService.selectAiCallAgentStatusByAgentId(agentId);
-                    if (agent != null && agent.getUserId() != null)
-                    {
-                        callEventPublisher.publishToUser(agent.getUserId(), eventType, data);
-                        return;
-                    }
-                }
-                callEventPublisher.broadcast(eventType, data);
-            }
-        }
-        catch (Exception e)
-        {
-            log.error("[ESL-Bridge] 推送事件失败: uuid={} type={}", uuid, eventType, e);
+            payload.put(key, value);
         }
     }
 }

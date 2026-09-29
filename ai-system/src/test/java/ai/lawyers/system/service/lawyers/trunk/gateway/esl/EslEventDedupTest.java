@@ -1,10 +1,7 @@
 package ai.lawyers.system.service.lawyers.trunk.gateway.esl;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -15,35 +12,34 @@ import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import ai.lawyers.system.mapper.lawyers.trunk.AiCallDialLogMapper;
 import ai.lawyers.system.service.lawyers.trunk.CallEventIdempotencyGuard;
-import ai.lawyers.system.service.lawyers.trunk.ICallDispatchService;
+import ai.lawyers.system.service.lawyers.trunk.event.CallEvent;
+import ai.lawyers.system.service.lawyers.trunk.event.CallEventBus;
 
 /**
  * P3-B4：{@link EslEventBridgeService} 事件幂等接入与 PBX 通道数查询测试。
  *
  * <p>核心场景：一次挂断产生 CHANNEL_HANGUP_COMPLETE + CHANNEL_HANGUP 两个事件，
- * 归一化判重后只允许处理一次（否则 finishCall 双释放并发）。</p>
+ * 归一化判重后只允许处理一次（否则 finishCall 双释放并发）。
+ * B2 起分发断言统一事件总线入参（消费语义见 CallEventProcessorTest）。</p>
  */
 class EslEventDedupTest
 {
     private EslEventBridgeService bridge;
     private CallEventIdempotencyGuard guard;
-    private ICallDispatchService callDispatchService;
-    private AiCallDialLogMapper dialLogMapper;
+    private CallEventBus callEventBus;
 
     @BeforeEach
     void setUp()
     {
         bridge = new EslEventBridgeService();
         guard = mock(CallEventIdempotencyGuard.class);
-        callDispatchService = mock(ICallDispatchService.class);
-        dialLogMapper = mock(AiCallDialLogMapper.class);
+        callEventBus = mock(CallEventBus.class);
         ReflectionTestUtils.setField(bridge, "idempotencyGuard", guard);
-        ReflectionTestUtils.setField(bridge, "callDispatchService", callDispatchService);
-        ReflectionTestUtils.setField(bridge, "dialLogMapper", dialLogMapper);
+        ReflectionTestUtils.setField(bridge, "callEventBus", callEventBus);
     }
 
     private static EslEvent event(String name, String uuid)
@@ -55,7 +51,6 @@ class EslEventDedupTest
     }
 
     @Test
-    @SuppressWarnings("unchecked")
     void hangupCompleteThenHangup_normalized_onlyProcessedOnce()
     {
         // 归一化后两个事件同键：首次放行、第二次判重命中
@@ -64,7 +59,12 @@ class EslEventDedupTest
         bridge.onEvent("h1", event("CHANNEL_HANGUP_COMPLETE", "u1"));
         bridge.onEvent("h1", event("CHANNEL_HANGUP", "u1"));
 
-        verify(callDispatchService, times(1)).onCallEvent(eq("u1"), eq("HANGUP"), anyMap());
+        // 仅首次放行投递 HANGUP 事件
+        ArgumentCaptor<CallEvent> captor = ArgumentCaptor.forClass(CallEvent.class);
+        verify(callEventBus, times(1)).dispatch(captor.capture());
+        assertThat(captor.getValue().getEventName()).isEqualTo(CallEvent.HANGUP);
+        assertThat(captor.getValue().getSessionId()).isEqualTo("u1");
+        assertThat(captor.getValue().getSource()).isEqualTo("ESL:h1");
         // 两次都以归一化事件名判重
         verify(guard, times(2)).firstSeen("ESL:h1", "u1", "CHANNEL_HANGUP");
     }
@@ -77,12 +77,14 @@ class EslEventDedupTest
 
         // DTMF 同一通话可合法重复（多次按键），不参与判重
         verify(guard, never()).firstSeen(anyString(), anyString(), anyString());
-        // 两次按键都进入坐席推送（dialLog 不存在时安全跳过）
-        verify(dialLogMapper, times(2)).selectByCallUuid("u1");
+        // 两次按键都投递 DTMF 事件
+        ArgumentCaptor<CallEvent> captor = ArgumentCaptor.forClass(CallEvent.class);
+        verify(callEventBus, times(2)).dispatch(captor.capture());
+        assertThat(captor.getAllValues())
+                .allSatisfy(e -> assertThat(e.getEventName()).isEqualTo(CallEvent.DTMF));
     }
 
     @Test
-    @SuppressWarnings("unchecked")
     void guardAbsent_processesNormally()
     {
         ReflectionTestUtils.setField(bridge, "idempotencyGuard", null);
@@ -91,7 +93,10 @@ class EslEventDedupTest
         bridge.onEvent("h1", event("CHANNEL_ANSWER", "u1"));
 
         // 无守卫时退化为旧行为（不判重），兼容单机等场景
-        verify(callDispatchService, times(2)).onCallEvent(eq("u1"), eq("ANSWERED"), anyMap());
+        ArgumentCaptor<CallEvent> captor = ArgumentCaptor.forClass(CallEvent.class);
+        verify(callEventBus, times(2)).dispatch(captor.capture());
+        assertThat(captor.getAllValues())
+                .allSatisfy(e -> assertThat(e.getEventName()).isEqualTo(CallEvent.ANSWERED));
     }
 
     @Test
