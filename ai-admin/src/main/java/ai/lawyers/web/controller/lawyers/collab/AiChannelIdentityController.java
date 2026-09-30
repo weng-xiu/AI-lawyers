@@ -16,6 +16,7 @@ import ai.lawyers.common.core.domain.AjaxResult;
 import ai.lawyers.common.core.page.TableDataInfo;
 import ai.lawyers.common.enums.BusinessType;
 import ai.lawyers.common.utils.StringUtils;
+import ai.lawyers.common.utils.sign.PiiCryptoUtils;
 import ai.lawyers.system.domain.lawyers.AiCallerProfile;
 import ai.lawyers.system.domain.lawyers.AiChannelIdentity;
 import ai.lawyers.system.domain.lawyers.AiUnifiedSession;
@@ -104,7 +105,8 @@ public class AiChannelIdentityController extends BaseController
         Long resolvedProfileId = profileId;
         if (resolvedProfileId == null && StringUtils.isNotEmpty(callerNumber))
         {
-            AiCallerProfile profile = callerProfileMapper.selectAiCallerProfileByCallerNumber(callerNumber);
+            AiCallerProfile profile = callerProfileMapper.selectAiCallerProfileByCallerNumberIndex(
+                    PiiCryptoUtils.blindIndex(callerNumber));
             if (profile != null)
             {
                 resolvedProfileId = profile.getProfileId();

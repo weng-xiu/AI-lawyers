@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import ai.lawyers.common.core.controller.BaseController;
 import ai.lawyers.common.core.domain.AjaxResult;
 import ai.lawyers.common.utils.StringUtils;
+import ai.lawyers.common.utils.sign.PiiCryptoUtils;
 import ai.lawyers.system.domain.lawyers.AiCallerProfile;
 import ai.lawyers.system.domain.lawyers.AiUnifiedSession;
 import ai.lawyers.system.mapper.lawyers.AiCallerProfileMapper;
@@ -57,7 +58,8 @@ public class AiSessionOccupyController extends BaseController
         Long resolvedProfileId = profileId;
         if (resolvedProfileId == null && StringUtils.isNotEmpty(callerNumber))
         {
-            AiCallerProfile profile = callerProfileMapper.selectAiCallerProfileByCallerNumber(callerNumber);
+            AiCallerProfile profile = callerProfileMapper.selectAiCallerProfileByCallerNumberIndex(
+                    PiiCryptoUtils.blindIndex(callerNumber));
             if (profile != null)
             {
                 resolvedProfileId = profile.getProfileId();

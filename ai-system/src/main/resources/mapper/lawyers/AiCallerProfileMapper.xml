@@ -57,19 +57,22 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where profile_id = #{profileId}
     </select>
 
-    <select id="selectAiCallerProfileByCallerNumber" parameterType="String" resultMap="AiCallerProfileResult">
+    <!-- G1-b：caller_number 已存 SM4-GCM 密文，等值查询改走盲索引列 -->
+    <select id="selectAiCallerProfileByCallerNumberIndex" parameterType="String" resultMap="AiCallerProfileResult">
         <include refid="selectAiCallerProfileVo"/>
-        where caller_number = #{callerNumber}
+        where caller_number_index = #{callerNumberIndex}
     </select>
 
     <insert id="insertAiCallerProfile" parameterType="AiCallerProfile" useGeneratedKeys="true" keyProperty="profileId">
         insert into ai_caller_profile
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="callerNumber != null and callerNumber != ''">caller_number,</if>
+            <if test="callerNumberIndex != null and callerNumberIndex != ''">caller_number_index,</if>
             <if test="callerName != null">caller_name,</if>
             <if test="callerGender != null">caller_gender,</if>
             <if test="callerAge != null">caller_age,</if>
             <if test="callerIdCard != null">caller_id_card,</if>
+            <if test="callerIdCardIndex != null and callerIdCardIndex != ''">caller_id_card_index,</if>
             <if test="callerAddress != null">caller_address,</if>
             <if test="customerLevel != null">customer_level,</if>
             <if test="tags != null">tags,</if>
@@ -90,10 +93,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="callerNumber != null and callerNumber != ''">#{callerNumber},</if>
+            <if test="callerNumberIndex != null and callerNumberIndex != ''">#{callerNumberIndex},</if>
             <if test="callerName != null">#{callerName},</if>
             <if test="callerGender != null">#{callerGender},</if>
             <if test="callerAge != null">#{callerAge},</if>
             <if test="callerIdCard != null">#{callerIdCard},</if>
+            <if test="callerIdCardIndex != null and callerIdCardIndex != ''">#{callerIdCardIndex},</if>
             <if test="callerAddress != null">#{callerAddress},</if>
             <if test="customerLevel != null">#{customerLevel},</if>
             <if test="tags != null">#{tags},</if>
@@ -118,10 +123,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         update ai_caller_profile
         <trim prefix="SET" suffixOverrides=",">
             <if test="callerNumber != null and callerNumber != ''">caller_number = #{callerNumber},</if>
+            <if test="callerNumberIndex != null and callerNumberIndex != ''">caller_number_index = #{callerNumberIndex},</if>
             <if test="callerName != null">caller_name = #{callerName},</if>
             <if test="callerGender != null">caller_gender = #{callerGender},</if>
             <if test="callerAge != null">caller_age = #{callerAge},</if>
             <if test="callerIdCard != null">caller_id_card = #{callerIdCard},</if>
+            <if test="callerIdCardIndex != null and callerIdCardIndex != ''">caller_id_card_index = #{callerIdCardIndex},</if>
             <if test="callerAddress != null">caller_address = #{callerAddress},</if>
             <if test="customerLevel != null">customer_level = #{customerLevel},</if>
             <if test="tags != null">tags = #{tags},</if>

@@ -76,6 +76,12 @@ public class AiCallerProfile extends BaseEntity
     @Excel(name = "关怀模式", readConverterExp = "0=标准,1=关怀")
     private Integer careMode;
 
+    /** 来电号码盲索引：HMAC-SM3 截断 128 位（G1-b，落库与等值查询用，非导出项） */
+    private String callerNumberIndex;
+
+    /** 身份证号盲索引：HMAC-SM3 截断 128 位（G1-b，落库与等值查询用，非导出项） */
+    private String callerIdCardIndex;
+
     public void setProfileId(Long profileId) { this.profileId = profileId; }
     public Long getProfileId() { return profileId; }
     public void setCallerNumber(String callerNumber) { this.callerNumber = callerNumber; }
@@ -116,6 +122,10 @@ public class AiCallerProfile extends BaseEntity
     public String getLanguagePreference() { return languagePreference; }
     public void setCareMode(Integer careMode) { this.careMode = careMode; }
     public Integer getCareMode() { return careMode; }
+    public void setCallerNumberIndex(String callerNumberIndex) { this.callerNumberIndex = callerNumberIndex; }
+    public String getCallerNumberIndex() { return callerNumberIndex; }
+    public void setCallerIdCardIndex(String callerIdCardIndex) { this.callerIdCardIndex = callerIdCardIndex; }
+    public String getCallerIdCardIndex() { return callerIdCardIndex; }
 
     @Override
     public String toString() {

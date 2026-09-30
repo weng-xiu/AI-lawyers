@@ -8,7 +8,8 @@ public interface AiCallerProfileMapper
 {
     public AiCallerProfile selectAiCallerProfileByProfileId(Long profileId);
 
-    public AiCallerProfile selectAiCallerProfileByCallerNumber(String callerNumber);
+    /** G1-b：按来电号码盲索引等值查询（caller_number 已存 SM4-GCM 密文，明文不可直接查） */
+    public AiCallerProfile selectAiCallerProfileByCallerNumberIndex(@Param("callerNumberIndex") String callerNumberIndex);
 
     public List<AiCallerProfile> selectAiCallerProfileList(AiCallerProfile aiCallerProfile);
 

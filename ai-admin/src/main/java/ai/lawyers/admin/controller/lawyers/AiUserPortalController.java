@@ -18,6 +18,7 @@ import ai.lawyers.common.enums.BusinessType;
 import ai.lawyers.common.exception.ServiceException;
 import ai.lawyers.common.utils.SecurityUtils;
 import ai.lawyers.common.utils.StringUtils;
+import ai.lawyers.common.utils.sign.PiiCryptoUtils;
 import ai.lawyers.system.domain.lawyers.AiCallTicket;
 import ai.lawyers.system.domain.lawyers.AiCallerProfile;
 import ai.lawyers.system.domain.lawyers.AiChannelIdentity;
@@ -98,12 +99,15 @@ public class AiUserPortalController extends BaseController
         {
             throw new ServiceException("没有需要保存的偏好项");
         }
-        AiCallerProfile profile = callerProfileMapper.selectAiCallerProfileByCallerNumber(phone);
+        AiCallerProfile profile = callerProfileMapper.selectAiCallerProfileByCallerNumberIndex(
+                PiiCryptoUtils.blindIndex(phone));
         String username = SecurityUtils.getUsername();
         if (profile == null)
         {
             profile = new AiCallerProfile();
-            profile.setCallerNumber(phone);
+            // G1-b：明文号码落库前 SM4-GCM 加密并回填盲索引
+            profile.setCallerNumber(PiiCryptoUtils.encrypt(phone));
+            profile.setCallerNumberIndex(PiiCryptoUtils.blindIndex(phone));
             profile.setLanguagePreference(StringUtils.isNotEmpty(language) ? language : "zh-CN");
             profile.setCareMode(careMode == null ? 0 : careMode);
             profile.setCreateBy(username);
@@ -185,7 +189,8 @@ public class AiUserPortalController extends BaseController
 
     private AiCallerProfile requireOwnProfile()
     {
-        AiCallerProfile profile = callerProfileMapper.selectAiCallerProfileByCallerNumber(currentPhone());
+        AiCallerProfile profile = callerProfileMapper.selectAiCallerProfileByCallerNumberIndex(
+                PiiCryptoUtils.blindIndex(currentPhone()));
         if (profile == null)
         {
             throw new ServiceException("暂无来电档案");

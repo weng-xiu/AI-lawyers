@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import ai.lawyers.common.utils.StringUtils;
+import ai.lawyers.common.utils.sign.PiiCryptoUtils;
 import ai.lawyers.system.domain.lawyers.AiCallRecord;
 import ai.lawyers.system.domain.lawyers.AiCallTicket;
 import ai.lawyers.system.domain.lawyers.AiCallerProfile;
@@ -46,8 +48,8 @@ public class CallPopupServiceImpl implements ICallPopupService
         result.put("monthCallCount", monthCallCount);
         result.put("lastCallTime", lastCallTime);
 
-        // 档案 + AI 分析字段
-        AiCallerProfile profile = aiCallerProfileMapper.selectAiCallerProfileByCallerNumber(callerNumber);
+        // 档案 + AI 分析字段（G1-b：盲索引查询，读后解密回明文供展示层脱敏）
+        AiCallerProfile profile = findProfileByCallerNumber(callerNumber);
         result.put("profile", profile);
         if (profile == null) {
             // 无档案时给出默认分析
@@ -144,13 +146,44 @@ public class CallPopupServiceImpl implements ICallPopupService
     @Override
     public AiCallerProfile selectAiCallerProfileByCallerNumber(String callerNumber)
     {
-        return aiCallerProfileMapper.selectAiCallerProfileByCallerNumber(callerNumber);
+        return findProfileByCallerNumber(callerNumber);
     }
 
     @Override
     public int updateAiCallerProfile(AiCallerProfile aiCallerProfile)
     {
+        encryptPiiForWrite(aiCallerProfile);
         return aiCallerProfileMapper.updateAiCallerProfile(aiCallerProfile);
+    }
+
+    /** G1-b：盲索引等值查询 + 读后解密（域对象保持明文语义，展示层脱敏逻辑不变） */
+    private AiCallerProfile findProfileByCallerNumber(String callerNumber)
+    {
+        AiCallerProfile profile = aiCallerProfileMapper.selectAiCallerProfileByCallerNumberIndex(
+                PiiCryptoUtils.blindIndex(callerNumber));
+        if (profile != null)
+        {
+            profile.setCallerNumber(PiiCryptoUtils.decrypt(profile.getCallerNumber()));
+            profile.setCallerIdCard(PiiCryptoUtils.decrypt(profile.getCallerIdCard()));
+        }
+        return profile;
+    }
+
+    /** G1-b：写前加密（幂等——重提交密文时先解密再加密并重算盲索引） */
+    private void encryptPiiForWrite(AiCallerProfile profile)
+    {
+        if (StringUtils.isNotEmpty(profile.getCallerNumber()))
+        {
+            String plain = PiiCryptoUtils.decrypt(profile.getCallerNumber());
+            profile.setCallerNumber(PiiCryptoUtils.encrypt(plain));
+            profile.setCallerNumberIndex(PiiCryptoUtils.blindIndex(plain));
+        }
+        if (StringUtils.isNotEmpty(profile.getCallerIdCard()))
+        {
+            String plain = PiiCryptoUtils.decrypt(profile.getCallerIdCard());
+            profile.setCallerIdCard(PiiCryptoUtils.encrypt(plain));
+            profile.setCallerIdCardIndex(PiiCryptoUtils.blindIndex(plain));
+        }
     }
 
     private long toLong(Object obj)
