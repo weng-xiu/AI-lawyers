@@ -175,6 +175,63 @@ class PooledAmiClientTest
         assertEquals(0, server.acceptCount.get());
     }
 
+    @Test
+    void sendActionCollectEvents_collectsEventsUntilComplete() throws Exception
+    {
+        server = new FakeAmiServer();
+        // 模拟 PJSIPShowEndpoints 真实响应形态：Response 块 + N×EndpointList 事件块 + Complete 事件块
+        server.pjsipShowScript = "Response: Success\r\nEventList: start\r\nMessage: Following Endpoints\r\n\r\n"
+                + "Event: EndpointList\r\nObjectType: endpoint\r\nObjectName: 6001\r\nDeviceState: Not in use\r\n\r\n"
+                + "Event: EndpointList\r\nObjectType: endpoint\r\nObjectName: 6002\r\nDeviceState: Unavailable\r\n\r\n"
+                + "Event: EndpointListComplete\r\nEventList: Complete\r\n\r\n";
+        pool = newPool(server.port(), true);
+
+        String resp = waitCollect("127.0.0.1", "Action: PJSIPShowEndpoints\r\n\r\n", 8000);
+        assertNotNull(resp, "多事件收集应返回合并文本");
+        assertTrue(resp.contains("EventList: start"), "首个 Response 块应包含在收集文本中: " + resp);
+        assertEquals(2, resp.split("Event: EndpointList\n", -1).length - 1,
+                "应收集到两个 EndpointList 事件块（Complete 事件不误配）: " + resp);
+        assertTrue(resp.contains("Event: EndpointListComplete"), "应以 Complete 事件收尾");
+        assertTrue(resp.indexOf("ObjectName: 6001") < resp.indexOf("ObjectName: 6002"), "事件到达顺序应保持");
+
+        // 收集完成后，同连接后续单响应块动作仍正常 FIFO 配对
+        assertNotNull(pool.sendAction("127.0.0.1", "Action: Ping\r\n\r\n"), "收集结束后动作应恢复正常");
+        assertEquals(2, server.actionCount.get());
+    }
+
+    @Test
+    void sendActionCollectEvents_errorResponse_completesImmediately() throws Exception
+    {
+        server = new FakeAmiServer();
+        // 错误响应不伴随事件列表与 Complete 事件——应立即返回而非等满超时
+        server.pjsipShowScript = "Response: Error\r\nMessage: Permission denied\r\n\r\n";
+        pool = newPool(server.port(), true);
+
+        long start = System.currentTimeMillis();
+        String resp = waitCollect("127.0.0.1", "Action: PJSIPShowEndpoints\r\n\r\n", 8000);
+        long elapsed = System.currentTimeMillis() - start;
+        assertNotNull(resp, "错误响应也应立即返回而非等待超时");
+        assertTrue(resp.contains("Response: Error"), "应透传错误响应块: " + resp);
+        assertTrue(elapsed < 3000L, "应立即结束而非超时，实际 " + elapsed + "ms");
+    }
+
+    /** 轮询发送收集动作直到拿到非空响应（等待异步建连+登录就绪），超时 timeoutMs */
+    private String waitCollect(String host, String action, long timeoutMs)
+    {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        String resp = null;
+        while (System.currentTimeMillis() < deadline)
+        {
+            resp = pool.sendActionCollectEvents(host, action, "EndpointListComplete", timeoutMs);
+            if (resp != null)
+            {
+                return resp;
+            }
+            try { Thread.sleep(100L); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); return null; }
+        }
+        return resp;
+    }
+
     private AtomicBoolean waitCircuitOpen(String host, int port, long timeoutMs) throws Exception
     {
         long deadline = System.currentTimeMillis() + timeoutMs;
@@ -227,6 +284,8 @@ class PooledAmiClientTest
         volatile String loginBlock;
         volatile boolean running = true;
         volatile boolean sendEventBeforeResponse = false;
+        /** 非空时：收到 PJSIPShowEndpoints 动作按该脚本原文回写（V2.53 模拟多事件/错误响应） */
+        volatile String pjsipShowScript;
         volatile Socket current;
         final Thread acceptThread;
 
@@ -291,6 +350,12 @@ class PooledAmiClientTest
                     }
                     received.add(action);
                     actionCount.incrementAndGet();
+                    if (action.contains("PJSIPShowEndpoints") && pjsipShowScript != null)
+                    {
+                        out.write(pjsipShowScript.getBytes(StandardCharsets.UTF_8));
+                        out.flush();
+                        continue;
+                    }
                     if (sendEventBeforeResponse && !action.contains("Action: Ping"))
                     {
                         out.write("Event: Newchannel\r\nChannel: SIP/x-0001\r\n\r\n"

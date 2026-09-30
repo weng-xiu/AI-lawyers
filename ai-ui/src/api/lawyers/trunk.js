@@ -178,6 +178,36 @@ export function trunkHealthCheck() {
   })
 }
 
+// ==================== P3-B5：PJSIP/队列只读（配置文件解析） ====================
+export function pjsipEndpoints() {
+  return request({
+    url: '/lawyers/trunk/monitor/pjsip/endpoints',
+    method: 'get'
+  })
+}
+
+export function pjsipQueues() {
+  return request({
+    url: '/lawyers/trunk/monitor/pjsip/queues',
+    method: 'get'
+  })
+}
+
+export function pjsipSummary() {
+  return request({
+    url: '/lawyers/trunk/monitor/pjsip/summary',
+    method: 'get'
+  })
+}
+
+// V2.53：端点实时注册态（命令面 PJSIPShowEndpoints 多事件收集）
+export function pjsipRegistrations() {
+  return request({
+    url: '/lawyers/trunk/monitor/pjsip/registrations',
+    method: 'get'
+  })
+}
+
 // ==================== 外呼调度 & 拨号日志 ====================
 export function dispatchStatus() {
   return request({

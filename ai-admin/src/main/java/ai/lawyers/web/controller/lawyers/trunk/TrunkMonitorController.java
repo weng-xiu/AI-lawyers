@@ -168,4 +168,53 @@ public class TrunkMonitorController extends BaseController
         trunkMonitorService.healthCheckAll();
         return success("健康探测已执行");
     }
+
+    // ------------------------------------------------ P3-B5：PJSIP/队列只读
+
+    @Autowired
+    private ai.lawyers.system.service.lawyers.trunk.gateway.ami.pjsip.PjsipConfigQueryService pjsipConfigQueryService;
+
+    @Autowired
+    private ai.lawyers.system.service.lawyers.trunk.gateway.ami.pjsip.PjsipRegistrationService pjsipRegistrationService;
+
+    /**
+     * PJSIP 端点只读列表（来源 pjsip.conf 及 #include 链，静态配置视图）
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:trunk:monitor')")
+    @GetMapping("/pjsip/endpoints")
+    public AjaxResult pjsipEndpoints()
+    {
+        return success(pjsipConfigQueryService.listEndpoints());
+    }
+
+    /**
+     * 呼叫队列只读列表（来源 queues.conf 及 #include 链）
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:trunk:monitor')")
+    @GetMapping("/pjsip/queues")
+    public AjaxResult pjsipQueues()
+    {
+        return success(pjsipConfigQueryService.listQueues());
+    }
+
+    /**
+     * 配置只读模型摘要：配置目录、文件是否存在、端点/队列数、包含文件清单
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:trunk:monitor')")
+    @GetMapping("/pjsip/summary")
+    public AjaxResult pjsipSummary()
+    {
+        return success(pjsipConfigQueryService.summary());
+    }
+
+    /**
+     * PJSIP 端点实时注册态（V2.53：命令面 PJSIPShowEndpoints 多事件收集；
+     * AMI 不可达/池未启用时 available=false，不 500）
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:trunk:monitor')")
+    @GetMapping("/pjsip/registrations")
+    public AjaxResult pjsipRegistrations()
+    {
+        return success(pjsipRegistrationService.listRegistrations());
+    }
 }

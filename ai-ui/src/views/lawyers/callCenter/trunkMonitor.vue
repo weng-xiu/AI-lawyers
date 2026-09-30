@@ -89,13 +89,86 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <el-row :gutter="12" style="margin-top: 12px">
+      <el-col :span="24">
+        <el-card shadow="never" class="panel-card">
+          <div slot="header" class="clearfix">
+            <span>PJSIP 端点 / 呼叫队列（只读）</span>
+            <span class="pjsip-hint">{{ pjsipHint }}</span>
+          </div>
+          <el-tabs v-model="pjsipTab">
+            <el-tab-pane name="endpoints">
+              <span slot="label">端点 <el-badge :value="pjsipEndpoints.length" type="primary" /></span>
+              <el-table :data="pjsipEndpoints" size="mini" border max-height="300">
+                <el-table-column label="端点" prop="name" width="140" />
+                <el-table-column label="上下文" prop="context" width="120" />
+                <el-table-column label="主叫标识" prop="callerId" min-width="120" show-overflow-tooltip />
+                <el-table-column label="AOR" prop="aors" width="120" />
+                <el-table-column label="静态 Contact" min-width="200" show-overflow-tooltip>
+                  <template slot-scope="s">{{ (s.row.contacts || []).join('，') || '-' }}</template>
+                </el-table-column>
+                <el-table-column label="编解码" prop="allow" min-width="130" show-overflow-tooltip />
+                <el-table-column label="Transport" prop="transport" width="100" />
+                <el-table-column label="直连媒体" prop="directMedia" width="80" align="center" />
+                <el-table-column label="rport" prop="forceRport" width="70" align="center" />
+                <el-table-column label="重写Contact" prop="rewriteContact" width="90" align="center" />
+              </el-table>
+            </el-tab-pane>
+            <el-tab-pane name="queues">
+              <span slot="label">队列 <el-badge :value="pjsipQueues.length" type="primary" /></span>
+              <el-table :data="pjsipQueues" size="mini" border max-height="300">
+                <el-table-column label="队列" prop="name" width="150" />
+                <el-table-column label="策略" prop="strategy" width="110" />
+                <el-table-column label="振铃超时(s)" prop="timeout" width="100" align="center" />
+                <el-table-column label="最大人数" prop="maxlen" width="80" align="center" />
+                <el-table-column label="服务水平(s)" prop="serviceLevel" width="100" align="center" />
+                <el-table-column label="保持音乐" prop="musicClass" width="100" />
+                <el-table-column label="成员（静态配置）" min-width="220">
+                  <template slot-scope="s">
+                    <div v-if="s.row.members && s.row.members.length">
+                      <div v-for="(m, i) in s.row.members" :key="i" class="member-line">{{ m }}</div>
+                    </div>
+                    <span v-else>-</span>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </el-tab-pane>
+            <el-tab-pane name="registrations">
+              <span slot="label">注册态 <el-badge :value="pjsipRegCount" type="primary" /></span>
+              <div v-if="!pjsipRegInfo.available" class="pjsip-hint" style="padding: 4px 0">
+                AMI 实时查询不可用：{{ pjsipRegInfo.error || '未知原因' }}
+              </div>
+              <el-table v-else :data="pjsipRegs" size="mini" border max-height="300">
+                <el-table-column label="端点" prop="name" width="140" />
+                <el-table-column label="设备状态" width="120" align="center">
+                  <template slot-scope="s"><el-tag :type="regStateTag(s.row.deviceState)" size="mini">{{ s.row.deviceState || '-' }}</el-tag></template>
+                </el-table-column>
+                <el-table-column label="活动通道" prop="activeChannels" width="80" align="center" />
+                <el-table-column label="实时 Contact 状态" min-width="320">
+                  <template slot-scope="s">
+                    <div v-if="s.row.contacts && s.row.contacts.length">
+                      <div v-for="(c, i) in s.row.contacts" :key="i" class="member-line">
+                        <el-tag :type="contactTag(c.status)" size="mini" style="margin-right: 6px">{{ c.status || '未知' }}</el-tag>{{ c.uri }}
+                      </div>
+                    </div>
+                    <span v-else>无注册</span>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </el-tab-pane>
+          </el-tabs>
+        </el-card>
+      </el-col>
+    </el-row>
   </div>
 </template>
 
 <script>
 import {
   trunkOverview, trunkStatusList, carrierStat as carrierStatApi, trunkTrend,
-  trunkAlarmList, handleTrunkAlarm, trunkHealthCheck
+  trunkAlarmList, handleTrunkAlarm, trunkHealthCheck,
+  pjsipEndpoints, pjsipQueues, pjsipSummary, pjsipRegistrations
 } from '@/api/lawyers/trunk'
 
 export default {
@@ -108,7 +181,28 @@ export default {
       alarms: [],
       trendTrunkId: undefined,
       timer: null,
-      chart: null
+      chart: null,
+      // P3-B5：PJSIP/队列只读模型
+      pjsipTab: 'endpoints',
+      pjsipEndpoints: [],
+      pjsipQueues: [],
+      pjsipSummary: {},
+      // V2.53：端点实时注册态
+      pjsipRegInfo: {},
+      pjsipRegs: []
+    }
+  },
+  computed: {
+    pjsipHint() {
+      const s = this.pjsipSummary || {}
+      if (s.error) return '配置解析异常：' + s.error
+      const parts = [s.configDir || '']
+      parts.push('pjsip.conf ' + (s.pjsipExists ? '已找到' : '未找到'))
+      parts.push('queues.conf ' + (s.queuesExists ? '已找到' : '未找到'))
+      return parts.join(' · ')
+    },
+    pjsipRegCount() {
+      return this.pjsipRegInfo.available ? this.pjsipRegs.length : 0
     }
   },
   created() {
@@ -126,6 +220,16 @@ export default {
       this.loadCarrier()
       this.loadTrend()
       this.loadAlarms()
+      this.loadPjsip()
+    },
+    loadPjsip() {
+      pjsipSummary().then(res => { this.pjsipSummary = res.data || {} })
+      pjsipEndpoints().then(res => { this.pjsipEndpoints = res.data || [] })
+      pjsipQueues().then(res => { this.pjsipQueues = res.data || [] })
+      pjsipRegistrations().then(res => {
+        this.pjsipRegInfo = res.data || {}
+        this.pjsipRegs = this.pjsipRegInfo.registrations || []
+      })
     },
     loadOverview() {
       trunkOverview().then(res => { this.overview = res.data || {} })
@@ -194,6 +298,17 @@ export default {
     alarmTag(sev) {
       const m = { HIGH: 'danger', MIDDLE: 'warning', LOW: 'info' }
       return m[sev] || 'info'
+    },
+    regStateTag(state) {
+      const s = state || ''
+      if (s.indexOf('Not in use') === 0) return 'success'
+      if (s.indexOf('In use') === 0 || s === 'Busy' || s === 'Ringing') return 'primary'
+      if (s === 'Unavailable' || s === 'Invalid' || s === 'Uninitialized') return 'danger'
+      return 'info'
+    },
+    contactTag(status) {
+      const m = { Avail: 'success', Unavail: 'info', NonQualified: 'warning', Rejected: 'danger' }
+      return m[status] || 'info'
     }
   }
 }
@@ -212,4 +327,6 @@ export default {
 .ov-primary { background: #3B73B3; }
 .ov-danger { background: #C63D4A; }
 .panel-card { margin-bottom: 0; }
+.pjsip-hint { margin-left: 12px; font-size: 12px; color: #909399; font-weight: normal; }
+.member-line { font-size: 12px; line-height: 1.6; word-break: break-all; }
 </style>

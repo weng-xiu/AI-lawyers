@@ -2,7 +2,6 @@ package ai.lawyers.common.utils.sign;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.security.SecureRandom;
 import java.util.Base64;
 
 import javax.crypto.Cipher;
@@ -14,27 +13,33 @@ import ai.lawyers.common.utils.StringUtils;
 /**
  * 敏感配置凭据（API Key / Access Secret 等）落库加密工具（S6 安全收口）。
  *
- * <p>算法：AES/CBC/PKCS5Padding，每条密文使用随机 16 字节 IV，
- * 存储格式为 {@code enc: + Base64(IV + 密文)}；未带前缀的值视为存量明文，
- * 解密时原样返回，保证平滑兼容。</p>
+ * <p>算法（P3-G1 V2.54 国密化）：<b>新写入一律 SM4-GCM（GB/T 32907-2016，国密）</b>，
+ * 存储格式 {@code enc2: + Base64(IV(12) + 密文 + GCM tag)}；历史 {@code enc: + Base64(IV(16) + 密文)}
+ * （AES/CBC/PKCS5Padding，随机 16 字节 IV）在解密侧保持兼容，存量密文无需迁移即可继续读取；
+ * 未带任何前缀的值视为存量明文，解密时原样返回，保证平滑兼容。GCM 为认证加密，
+ * 密文被篡改时解密抛异常（防静默改包）。</p>
  *
  * <p>密钥来源：环境变量 {@code APP_SECRET_KEY}（推荐 >=32 字节随机串）；
- * 未配置时使用内置开发默认值，<b>生产环境必须通过环境变量注入</b>。</p>
+ * 未配置时使用内置开发默认值，<b>生产环境必须通过环境变量注入</b>。
+ * 密钥派生：SHA-256 → 32 字节，AES 用全 32 字节，SM4 取前 16 字节（SM4 密钥固定 128 位）。</p>
  *
  * @author ai-lawyers
  */
 public final class SecretCryptoUtils
 {
-    /** 密文前缀，用于区分加密值与历史明文 */
-    private static final String CIPHER_PREFIX = "enc:";
+    /** 国密密文前缀（V2.54 G1 起 encrypt 输出）：SM4-GCM */
+    private static final String CIPHER_PREFIX_SM4 = "enc2:";
 
-    private static final String ALGORITHM = "AES";
+    /** 历史 AES 密文前缀：仅解密侧兼容，不再新写入 */
+    private static final String CIPHER_PREFIX_AES = "enc:";
 
-    private static final String TRANSFORMATION = "AES/CBC/PKCS5Padding";
+    private static final String AES_ALGORITHM = "AES";
 
-    private static final int IV_LENGTH = 16;
+    private static final String AES_TRANSFORMATION = "AES/CBC/PKCS5Padding";
 
-    private static final SecureRandom RANDOM = new SecureRandom();
+    private static final int AES_IV_LENGTH = 16;
+
+    private static final int SM4_KEY_LENGTH = 16;
 
     /** 回显脱敏占位：已配置密钥但不返回明文 */
     private static final String MASK_PLACEHOLDER = "******";
@@ -43,7 +48,8 @@ public final class SecretCryptoUtils
     {
     }
 
-    private static byte[] secretKey()
+    /** SHA-256 派生 32 字节根密钥（AES 全量使用；SM4 取前 16 字节） */
+    private static byte[] derivedKey32()
     {
         String key = System.getenv("APP_SECRET_KEY");
         if (StringUtils.isEmpty(key))
@@ -66,8 +72,24 @@ public final class SecretCryptoUtils
         }
     }
 
+    /** AES/CBC 密钥（历史兼容，32 字节） */
+    private static byte[] aesKey()
+    {
+        return derivedKey32();
+    }
+
+    /** SM4 密钥（G1 新写入路径，取派生根密钥前 16 字节） */
+    private static byte[] sm4Key()
+    {
+        byte[] root = derivedKey32();
+        byte[] key = new byte[SM4_KEY_LENGTH];
+        System.arraycopy(root, 0, key, 0, SM4_KEY_LENGTH);
+        return key;
+    }
+
     /**
-     * 加密明文。null/空串原样返回；已是密文（enc: 前缀）原样返回避免重复加密；
+     * 加密明文（V2.54 起输出国密 enc2: SM4-GCM）。null/空串原样返回；
+     * 已是密文（enc2:/enc: 前缀）原样返回避免重复加密；
      * 前端回显占位符 ****** 原样返回（表示未修改）。
      */
     public static String encrypt(String plain)
@@ -78,17 +100,7 @@ public final class SecretCryptoUtils
         }
         try
         {
-            byte[] iv = new byte[IV_LENGTH];
-            RANDOM.nextBytes(iv);
-            Cipher cipher = Cipher.getInstance(TRANSFORMATION);
-            cipher.init(Cipher.ENCRYPT_MODE,
-                    new SecretKeySpec(secretKey(), ALGORITHM),
-                    new IvParameterSpec(iv));
-            byte[] encrypted = cipher.doFinal(plain.getBytes(StandardCharsets.UTF_8));
-            byte[] combined = new byte[iv.length + encrypted.length];
-            System.arraycopy(iv, 0, combined, 0, iv.length);
-            System.arraycopy(encrypted, 0, combined, iv.length, encrypted.length);
-            return CIPHER_PREFIX + Base64.getEncoder().encodeToString(combined);
+            return CIPHER_PREFIX_SM4 + SmCryptoUtils.sm4GcmEncryptToBase64(plain, sm4Key());
         }
         catch (Exception e)
         {
@@ -97,24 +109,46 @@ public final class SecretCryptoUtils
     }
 
     /**
-     * 解密密文。null/空串原样返回；历史明文（无 enc: 前缀）原样返回。
+     * 解密密文。三态兼容（P3-G1）：enc2: → SM4-GCM（国密）；enc: → 历史 AES/CBC；
+     * 无前缀 → 存量明文原样返回。
      */
     public static String decrypt(String stored)
     {
-        if (StringUtils.isEmpty(stored) || !isEncrypted(stored))
+        if (StringUtils.isEmpty(stored))
         {
             return stored;
         }
+        if (stored.startsWith(CIPHER_PREFIX_SM4))
+        {
+            try
+            {
+                return SmCryptoUtils.sm4GcmDecryptFromBase64(stored.substring(CIPHER_PREFIX_SM4.length()), sm4Key());
+            }
+            catch (Exception e)
+            {
+                throw new IllegalStateException("凭据解密失败（国密）", e);
+            }
+        }
+        if (stored.startsWith(CIPHER_PREFIX_AES))
+        {
+            return decryptAes(stored);
+        }
+        return stored;
+    }
+
+    /** 历史 AES/CBC 解密（enc: 前缀，仅兼容存量） */
+    private static String decryptAes(String stored)
+    {
         try
         {
-            byte[] combined = Base64.getDecoder().decode(stored.substring(CIPHER_PREFIX.length()));
-            byte[] iv = new byte[IV_LENGTH];
-            byte[] encrypted = new byte[combined.length - IV_LENGTH];
-            System.arraycopy(combined, 0, iv, 0, IV_LENGTH);
-            System.arraycopy(combined, IV_LENGTH, encrypted, 0, encrypted.length);
-            Cipher cipher = Cipher.getInstance(TRANSFORMATION);
+            byte[] combined = Base64.getDecoder().decode(stored.substring(CIPHER_PREFIX_AES.length()));
+            byte[] iv = new byte[AES_IV_LENGTH];
+            byte[] encrypted = new byte[combined.length - AES_IV_LENGTH];
+            System.arraycopy(combined, 0, iv, 0, AES_IV_LENGTH);
+            System.arraycopy(combined, AES_IV_LENGTH, encrypted, 0, encrypted.length);
+            Cipher cipher = Cipher.getInstance(AES_TRANSFORMATION);
             cipher.init(Cipher.DECRYPT_MODE,
-                    new SecretKeySpec(secretKey(), ALGORITHM),
+                    new SecretKeySpec(aesKey(), AES_ALGORITHM),
                     new IvParameterSpec(iv));
             return new String(cipher.doFinal(encrypted), StandardCharsets.UTF_8);
         }
@@ -143,6 +177,7 @@ public final class SecretCryptoUtils
 
     private static boolean isEncrypted(String value)
     {
-        return value != null && value.startsWith(CIPHER_PREFIX);
+        return value != null
+                && (value.startsWith(CIPHER_PREFIX_SM4) || value.startsWith(CIPHER_PREFIX_AES));
     }
 }

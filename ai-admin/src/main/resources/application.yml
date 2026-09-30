@@ -524,11 +524,18 @@ call:
       context: default
     # Asterisk AMI：生产环境通过环境变量注入强口令，禁止使用默认 admin/amp111
     asterisk:
+      # V2.53：命令面实时查询（PJSIPShowEndpoints 注册态等）目标主机；命令面池按 host:amiPort 建连，
+      # 部署时后端与 Asterisk 同机默认 127.0.0.1，跨机时通过环境变量注入
+      host: ${ASTERISK_HOST:127.0.0.1}
       amiPort: ${AMI_PORT:5038}
       amiUser: ${AMI_USER:admin}
       amiPassword: ${AMI_PASSWORD:amp111}
       timeout: 5000
       context: from-internal
+      # P3-B5（V2.52）：PJSIP/队列只读模型配置目录——后端解析该目录下 pjsip.conf/queues.conf
+      # （含 #include 展开）只读展示端点与队列，平台不下发配置；部署时后端与 Asterisk 同机或挂载
+      # 其配置目录。文件不存在时接口返回空结果并标注未找到，不影响启动与监控页
+      config-dir: ${ASTERISK_CONFIG_DIR:/etc/asterisk}
     # B1 AMI 事件桥（V2.50）：常驻连接订阅 AMI 事件（Login 后 Events: all），事件经
     # Newchannel/Dial/Newstate/BridgeEnter/Hangup/QueueMemberStatus 映射后驱动 B4 状态机
     # 与坐席状态同步（与 ESL 桥同构）。部署真实 Asterisk 时置 true；事件/命令双通道分离，

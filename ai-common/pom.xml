@@ -99,6 +99,13 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- P3-G1 国密算法库（SM2/SM3/SM4，单一 jar 无传递依赖；等保/信创测评认可的标准实现） -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk15on</artifactId>
+            <version>1.70</version>
+        </dependency>
+
         <!-- Jaxb -->
         <dependency>
             <groupId>javax.xml.bind</groupId>
@@ -127,6 +134,13 @@
         <dependency>
             <groupId>javax.servlet</groupId>
             <artifactId>javax.servlet-api</artifactId>
+        </dependency>
+
+        <!-- P3-G1：单元测试（版本由 spring-boot-dependencies 管理；surefire 2.22.2 支持 JUnit5 平台） -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
         </dependency>
 
     </dependencies>

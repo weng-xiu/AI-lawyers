@@ -34,7 +34,11 @@ import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
  * <p>协议与可靠性（与 ESL 池同构）：</p>
  * <ul>
  *   <li>AMI 响应以空行结束，Action 无 ActionID 时响应按到达顺序与请求一一对应
- *       （TCP 保序），故采用 FIFO 待回执队列配对——与 ESL 池 pendingReplies 同机制；</li>
+ *       （TCP 保序），故采用 FIFO 待回执队列配对——与 ESL 池 pendingReplies 同机制；
+ *       V2.53 扩展多事件收集：{@link #sendActionCollectEvents} 支持"响应块 + N 个
+ *       事件块 + Complete 事件"型动作（如 PJSIPShowEndpoints），按 FIFO 头部条目
+ *       持续收集直至指定 Complete 事件（或首块为 Response: Error）后返回合并文本，
+ *       单响应块动作行为不变；</li>
  *   <li>唯一读消费者：仅读线程从输入流读响应块，写命令与回执入队 synchronized 原子；</li>
  *   <li>心跳 + 指数退避重连：soTimeout=30s，空闲超时发 {@code Action: Ping}，
  *       半开连接在读/写异常时发现；重连 2s 起指数退避、上限 60s；</li>
@@ -103,6 +107,27 @@ public class PooledAmiClient implements DisposableBean
      */
     public String sendAction(String host, String action)
     {
+        return sendInternal(host, action, null, ACTION_TIMEOUT_MS);
+    }
+
+    /**
+     * V2.53 多事件收集：发送动作后持续收集响应块与后续事件块，直至出现指定
+     * Complete 事件（如 {@code EndpointListComplete}）或首块为 {@code Response: Error}
+     * （错误响应不伴随事件列表，立即结束），返回合并文本（块间空行分隔）。
+     * 适用于 PJSIPShowEndpoints 等"Response + N × Event + Complete"型列表动作；
+     * 期间本连接后续动作的响应仍按 TCP 顺序排在 Complete 之后，FIFO 配对不受影响。
+     *
+     * @param completeEvent Complete 事件名（不含 "Event: " 前缀）
+     * @param timeoutMs     总超时（含收集期）；超时移除条目，后续残余事件块按无等待者丢弃
+     * @return 合并文本；池关闭 / 熔断打开 / 断连 / 超时返回 null
+     */
+    public String sendActionCollectEvents(String host, String action, String completeEvent, long timeoutMs)
+    {
+        return sendInternal(host, action, completeEvent, timeoutMs);
+    }
+
+    private String sendInternal(String host, String action, String completeEvent, long timeoutMs)
+    {
         if (!poolEnabled)
         {
             return null;
@@ -112,7 +137,7 @@ public class PooledAmiClient implements DisposableBean
         {
             return null;
         }
-        return entry.send(action);
+        return entry.send(action, completeEvent, timeoutMs);
     }
 
     /** 可观测：当前池内连接条目数（不同 host:port 数） */
@@ -137,6 +162,19 @@ public class PooledAmiClient implements DisposableBean
         return host + ":" + port;
     }
 
+    /** 块中是否存在指定事件行（整行精确匹配 "Event: <name>"，避免 EndpointList 误配 EndpointListComplete） */
+    private static boolean containsEvent(String block, String eventName)
+    {
+        for (String line : block.split("\n"))
+        {
+            if (("Event: " + eventName).equals(line.trim()))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // ---------------------------------------------------------------- 内部
 
     /** 单个 AMI 地址的池化连接条目：长连接 + 读写线程 + 熔断器 */
@@ -148,8 +186,8 @@ public class PooledAmiClient implements DisposableBean
         final AtomicBoolean running = new AtomicBoolean(true);
         /** 已登录就绪（可下发动作） */
         final AtomicBoolean ready = new AtomicBoolean(false);
-        /** 待配对的动作响应 FIFO：写动作与入队原子，TCP 保序保证顺序一致 */
-        final Queue<CompletableFuture<String>> pendingReplies = new ConcurrentLinkedQueue<>();
+        /** 待配对的动作回执 FIFO：写动作与入队原子，TCP 保序保证顺序一致 */
+        final Queue<Pending> pendingReplies = new ConcurrentLinkedQueue<>();
         /** 连续未就绪采样计数（鉴权成功清零） */
         final AtomicInteger consecutiveFails = new AtomicInteger(0);
         final AtomicBoolean circuitOpen = new AtomicBoolean(false);
@@ -180,22 +218,26 @@ public class PooledAmiClient implements DisposableBean
             return circuitOpen.get();
         }
 
-        /** 发送动作并等待读线程路由回来的响应块；未连接/超时返回 null */
-        String send(String action)
+        /**
+         * 发送动作并等待读线程路由回来的回执：单响应块模式等待一个响应块，
+         * 收集模式（completeEvent 非空）等待"响应 + 事件块 + Complete"合并文本；
+         * 未连接/超时返回 null
+         */
+        String send(String action, String completeEvent, long timeoutMs)
         {
             OutputStream o = out;
             if (o == null || !ready.get())
             {
                 return null;
             }
-            CompletableFuture<String> reply = new CompletableFuture<>();
+            Pending pending = new Pending(completeEvent);
             synchronized (this)
             {
                 try
                 {
                     o.write(action.getBytes(StandardCharsets.UTF_8));
                     o.flush();
-                    pendingReplies.offer(reply);
+                    pendingReplies.offer(pending);
                 }
                 catch (IOException e)
                 {
@@ -206,16 +248,16 @@ public class PooledAmiClient implements DisposableBean
             // 写入后连接已断开（onDown 已在入队前清空队列）时快速失败，避免空等超时
             if (!ready.get())
             {
-                pendingReplies.remove(reply);
+                pendingReplies.remove(pending);
                 return null;
             }
             try
             {
-                return reply.get(ACTION_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                return pending.future.get(timeoutMs, TimeUnit.MILLISECONDS);
             }
             catch (Exception e)
             {
-                pendingReplies.remove(reply);
+                pendingReplies.remove(pending);
                 log.warn("[AMI-POOL] 等待动作响应超时或中断 {} ({})", label, e.toString());
                 return null;
             }
@@ -246,10 +288,10 @@ public class PooledAmiClient implements DisposableBean
         void onDown()
         {
             ready.set(false);
-            CompletableFuture<String> pending;
+            Pending pending;
             while ((pending = pendingReplies.poll()) != null)
             {
-                pending.complete(null);
+                pending.future.complete(null);
             }
             if (lastUp.compareAndSet(true, false))
             {
@@ -357,30 +399,53 @@ public class PooledAmiClient implements DisposableBean
             return true;
         }
 
-        /** 读线程的响应路由：按 FIFO 交回 send 调用方 */
+        /**
+         * 读线程的回执路由：单响应块模式按 FIFO 交回 send 调用方（Event 块兜底丢弃）；
+         * 收集模式持续追加事件块直至 Complete 事件（V2.53）
+         */
         void routeBlock(String block)
         {
-            // 命令通道未订阅事件，正常只会有 Response 块；Event 块兜底丢弃并告警
-            if (block.contains("Event:"))
-            {
-                log.debug("[AMI-POOL] 忽略非预期事件块 {}", label);
-                return;
-            }
-            CompletableFuture<String> reply = pendingReplies.poll();
-            if (reply != null)
-            {
-                reply.complete(block);
-            }
-            else
+            Pending head = pendingReplies.peek();
+            if (head == null)
             {
                 log.debug("[AMI-POOL] 收到无等待者的响应块 {}", label);
+                return;
             }
+            if (head.completeEvent == null)
+            {
+                // 单响应块模式：命令通道未订阅事件，Event 块兜底丢弃（多事件收集见 sendActionCollectEvents）
+                if (block.contains("Event:"))
+                {
+                    log.debug("[AMI-POOL] 忽略非预期事件块 {}", label);
+                    return;
+                }
+                pendingReplies.poll();
+                head.future.complete(block);
+                return;
+            }
+            // 多事件收集模式：追加块直至指定 Complete 事件
+            if (containsEvent(block, head.completeEvent))
+            {
+                pendingReplies.poll();
+                head.collected.append(block);
+                head.future.complete(head.collected.toString());
+                return;
+            }
+            if (!head.started && block.contains("Response: Error"))
+            {
+                // 错误响应不伴随事件列表，立即结束避免空等超时
+                pendingReplies.poll();
+                head.future.complete(block);
+                return;
+            }
+            head.started = true;
+            head.collected.append(block).append('\n');
         }
 
         /** 空闲心跳：Action: Ping，回执同样走 FIFO 配对 */
         void sendPing()
         {
-            CompletableFuture<String> pingReply = new CompletableFuture<>();
+            Pending pingPending = new Pending(null);
             try
             {
                 synchronized (this)
@@ -392,12 +457,12 @@ public class PooledAmiClient implements DisposableBean
                     }
                     o.write(("Action: Ping" + CRLF + CRLF).getBytes(StandardCharsets.UTF_8));
                     o.flush();
-                    pendingReplies.offer(pingReply);
+                    pendingReplies.offer(pingPending);
                 }
             }
             catch (IOException e)
             {
-                pendingReplies.remove(pingReply);
+                pendingReplies.remove(pingPending);
                 log.warn("[AMI-POOL] Ping 发送失败，连接可能已断开 {}: {}", label, e.getMessage());
             }
         }
@@ -498,6 +563,26 @@ public class PooledAmiClient implements DisposableBean
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * FIFO 待回执条目（V2.53）：单响应块模式（completeEvent=null）一个块即完成；
+     * 收集模式持续累积响应+事件块文本直至 Complete 事件，由 IO 线程独占写入
+     */
+    private static final class Pending
+    {
+        final CompletableFuture<String> future = new CompletableFuture<>();
+        /** Complete 事件名（如 EndpointListComplete）；null=单响应块模式 */
+        final String completeEvent;
+        /** 收集模式：已收集的响应+事件块文本（块间以空行分隔） */
+        final StringBuilder collected = new StringBuilder();
+        /** 收集模式：是否已收到首块（用于识别首块 Response: Error 立即结束） */
+        volatile boolean started;
+
+        Pending(String completeEvent)
+        {
+            this.completeEvent = completeEvent;
         }
     }
 }
