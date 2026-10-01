@@ -57,7 +57,7 @@ class SecretCryptoUtilsTest
     {
         String secret = "sk-test-apikey-2026-中文";
         String stored = SecretCryptoUtils.encrypt(secret);
-        assertTrue(stored.startsWith("enc2:"), "新写入应为国密 enc2: 前缀，实际: " + stored.substring(0, 8));
+        assertTrue(stored.startsWith("enc3:"), "新写入应为版本化国密 enc3: 前缀，实际: " + stored.substring(0, 8));
         assertNotEquals(secret, stored);
         assertEquals(secret, SecretCryptoUtils.decrypt(stored), "SM4-GCM 解密应还原明文");
 

@@ -21,6 +21,7 @@ import ai.lawyers.system.mapper.lawyers.AiCallerProfileMapper;
 import ai.lawyers.system.mapper.lawyers.AiCallRecordArchiveMapper;
 import ai.lawyers.system.service.lawyers.IPiiCryptoMigrationService;
 import ai.lawyers.system.service.lawyers.IPiiSearchTokenService;
+import ai.lawyers.system.service.lawyers.storage.RecordingStorageService;
 
 /**
  * P3-G1-b（V2.55）/ P3-G1-b2（V2.56）：存量 PII 明文 → SM4-GCM 密文 +
@@ -52,6 +53,10 @@ public class PiiCryptoMigrationServiceImpl implements IPiiCryptoMigrationService
 
     @Autowired(required = false)
     private IPiiSearchTokenService piiSearchTokenService;
+
+    /** 录音存储（本地/对象存储），用于密钥轮换时重加密录音文件 */
+    @Autowired(required = false)
+    private RecordingStorageService recordingStorageService;
 
     @Override
     public Map<String, Object> migrateCallerProfiles()
@@ -279,6 +284,199 @@ public class PiiCryptoMigrationServiceImpl implements IPiiCryptoMigrationService
         {
             update.setCallerIdCard(encrypted);
             update.setCallerIdCardIndex(index);
+        }
+    }
+
+    // ------------------------------------------------------------ G1-b3 密钥轮换
+
+    @Override
+    public Map<String, Object> rotateKey()
+    {
+        int profiles = 0;
+        int records = 0;
+        int archives = 0;
+        int ledgers = 0;
+        int recordingEncrypted = 0;
+        int failed = 0;
+
+        // 1. 来电人档案：号码 + 身份证重加密 + 盲索引重建 + token 重建
+        List<AiCallerProfile> profileRows = callerProfileMapper.selectAiCallerProfileList(new AiCallerProfile());
+        for (AiCallerProfile row : profileRows)
+        {
+            try
+            {
+                AiCallerProfile update = new AiCallerProfile();
+                update.setProfileId(row.getProfileId());
+                reEncryptField(row.getCallerNumber(), (cipher, idx) -> {
+                    update.setCallerNumber(cipher);
+                    update.setCallerNumberIndex(idx);
+                });
+                reEncryptField(row.getCallerIdCard(), (cipher, idx) -> {
+                    update.setCallerIdCard(cipher);
+                    update.setCallerIdCardIndex(idx);
+                });
+                if (update.getCallerNumber() != null || update.getCallerIdCard() != null
+                        || update.getCallerNumberIndex() != null || update.getCallerIdCardIndex() != null)
+                {
+                    callerProfileMapper.updateAiCallerProfile(update);
+                }
+                rebuildToken(IPiiSearchTokenService.OWNER_CALLER_PROFILE, row.getProfileId(),
+                        decryptPlain(row.getCallerNumber()));
+                profiles++;
+            }
+            catch (Exception e)
+            {
+                failed++;
+                log.warn("密钥轮换-档案失败 profileId={}: {}", row.getProfileId(), e.getMessage());
+            }
+        }
+
+        // 2. 话单热表：号码重加密 + 盲索引重建 + token 重建 + 录音重加密
+        List<AiCallRecord> hotRows = callRecordMapper.selectAiCallRecordList(new AiCallRecord());
+        for (AiCallRecord row : hotRows)
+        {
+            try
+            {
+                String plain = decryptPlain(row.getCallerNumber());
+                if (plain != null)
+                {
+                    AiCallRecord update = new AiCallRecord();
+                    update.setRecordId(row.getRecordId());
+                    update.setCallerNumber(PiiCryptoUtils.encrypt(plain));
+                    update.setCallerNumberIndex(PiiCryptoUtils.blindIndex(plain));
+                    callRecordMapper.updateAiCallRecord(update);
+                    rebuildToken(IPiiSearchTokenService.OWNER_CALL_RECORD, row.getRecordId(), plain);
+                }
+                reEncryptRecording(row.getRecordFile());
+                recordingEncrypted++;
+                records++;
+            }
+            catch (Exception e)
+            {
+                failed++;
+                log.warn("密钥轮换-话单失败 recordId={}: {}", row.getRecordId(), e.getMessage());
+            }
+        }
+
+        // 3. 话单归档表：镜像热表处理（token 属主仍为 CALL_RECORD）
+        List<AiCallRecord> archiveRows = archiveMapper.selectArchiveList(new AiCallRecord());
+        for (AiCallRecord row : archiveRows)
+        {
+            try
+            {
+                String plain = decryptPlain(row.getCallerNumber());
+                if (plain != null)
+                {
+                    archiveMapper.updateArchiveEncryption(row.getRecordId(),
+                            PiiCryptoUtils.encrypt(plain), PiiCryptoUtils.blindIndex(plain));
+                    rebuildToken(IPiiSearchTokenService.OWNER_CALL_RECORD, row.getRecordId(), plain);
+                }
+                archives++;
+            }
+            catch (Exception e)
+            {
+                failed++;
+                log.warn("密钥轮换-归档失败 recordId={}: {}", row.getRecordId(), e.getMessage());
+            }
+        }
+
+        // 4. 台账：电话 + 身份证重加密 + token 重建
+        List<AiCallLedger> ledgerRows = callLedgerMapper.selectAiCallLedgerList(new AiCallLedger());
+        for (AiCallLedger row : ledgerRows)
+        {
+            try
+            {
+                AiCallLedger update = new AiCallLedger();
+                update.setLedgerId(row.getLedgerId());
+                String phone = decryptPlain(row.getCallerPhone());
+                String idCard = decryptPlain(row.getCallerIdCard());
+                if (phone != null)
+                {
+                    update.setCallerPhone(PiiCryptoUtils.encrypt(phone));
+                    rebuildToken(IPiiSearchTokenService.OWNER_CALL_LEDGER, row.getLedgerId(), phone);
+                }
+                if (idCard != null)
+                {
+                    update.setCallerIdCard(PiiCryptoUtils.encrypt(idCard));
+                }
+                if (update.getCallerPhone() != null || update.getCallerIdCard() != null)
+                {
+                    callLedgerMapper.updateAiCallLedger(update);
+                }
+                ledgers++;
+            }
+            catch (Exception e)
+            {
+                failed++;
+                log.warn("密钥轮换-台账失败 ledgerId={}: {}", row.getLedgerId(), e.getMessage());
+            }
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("profiles", profiles);
+        result.put("records", records);
+        result.put("archives", archives);
+        result.put("ledgers", ledgers);
+        result.put("recordingEncrypted", recordingEncrypted);
+        result.put("failed", failed);
+        return result;
+    }
+
+    /** 字段重加密回调：接受新密文与盲索引 */
+    private interface FieldCipherSetter
+    {
+        void set(String cipher, String blindIndex);
+    }
+
+    /** 解密字段值（兼容拦截器已解密为明文/或仍为密文两种情况） */
+    private String decryptPlain(String value)
+    {
+        if (StringUtils.isEmpty(value))
+        {
+            return null;
+        }
+        return PiiCryptoUtils.isEncrypted(value) ? PiiCryptoUtils.decrypt(value) : value;
+    }
+
+    /** 单字段重加密 + 盲索引重建 */
+    private void reEncryptField(String value, FieldCipherSetter setter)
+    {
+        String plain = decryptPlain(value);
+        if (plain == null)
+        {
+            return;
+        }
+        setter.set(PiiCryptoUtils.encrypt(plain), PiiCryptoUtils.blindIndex(plain));
+    }
+
+    /** 录音文件重加密：load（明文）→ save（加密覆盖） */
+    private void reEncryptRecording(String recordFile)
+    {
+        if (recordingStorageService == null || StringUtils.isEmpty(recordFile))
+        {
+            return;
+        }
+        try (java.io.InputStream in = recordingStorageService.load(recordFile))
+        {
+            if (in == null)
+            {
+                return;
+            }
+            java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) != -1)
+            {
+                bos.write(buf, 0, n);
+            }
+            byte[] plain = bos.toByteArray();
+            // save 内部会加密（encrypt-enabled 开启时）；未开启则为空操作
+            recordingStorageService.save(recordFile, new java.io.ByteArrayInputStream(plain),
+                    plain.length, "application/octet-stream");
+        }
+        catch (Exception e)
+        {
+            log.warn("密钥轮换-录音重加密失败 file={}: {}", recordFile, e.getMessage());
         }
     }
 }

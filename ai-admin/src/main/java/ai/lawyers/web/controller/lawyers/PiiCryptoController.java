@@ -66,4 +66,19 @@ public class PiiCryptoController extends BaseController
         Map<String, Object> result = piiCryptoMigrationService.migrateCallLedgers();
         return success(result);
     }
+
+    /**
+     * G1-b3：密钥轮换——全量重加密（PII 字段+盲索引+模糊 token+录音文件）。
+     * <p>前置条件：已将新根密钥写入 {@code APP_SECRET_KEY}，旧根密钥写入
+     * {@code APP_PREVIOUS_SECRET_KEY} 并重启应用（双密钥解密兼容窗口）。
+     * 执行完成并确认无误后，可清除 {@code APP_PREVIOUS_SECRET_KEY}。</p>
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:pii:crypt')")
+    @Log(title = "PII密钥轮换重加密", businessType = BusinessType.UPDATE)
+    @PostMapping("/rotateKey")
+    public AjaxResult rotateKey()
+    {
+        Map<String, Object> result = piiCryptoMigrationService.rotateKey();
+        return success(result);
+    }
 }

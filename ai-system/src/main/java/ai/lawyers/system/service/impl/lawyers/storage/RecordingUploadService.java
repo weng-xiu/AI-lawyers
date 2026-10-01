@@ -79,20 +79,34 @@ public class RecordingUploadService
     }
 
     /**
-     * 排队上传录音文件。本地模式直接忽略。
+     * 排队处理录音文件。
+     * <ul>
+     *   <li>S3 模式：上传到对象存储（加密由 storageService.save 内部处理）；</li>
+     *   <li>本地模式：触发本地文件原地加密（G1-b3 encrypt-enabled 时）。</li>
+     * </ul>
      *
      * @param recordId   通话记录ID
      * @param localFile  FreeSWITCH 录制完成的本地文件
      */
     public void enqueue(Long recordId, File localFile)
     {
-        if (!storageService.isObjectStorage())
-        {
-            return;
-        }
         if (recordId == null || localFile == null || !localFile.exists())
         {
-            log.warn("[RecordingUpload] 参数异常，跳过上传 recordId={} file={}", recordId, localFile);
+            log.warn("[RecordingUpload] 参数异常，跳过 recordId={} file={}", recordId, localFile);
+            return;
+        }
+        // 本地模式无上传队列；直接调用 save 触发原地加密（加密未启用时为空操作）
+        if (!storageService.isObjectStorage())
+        {
+            try
+            {
+                storageService.save(localFile.getName(), localFile);
+            }
+            catch (Exception e)
+            {
+                log.error("[RecordingUpload] 本地录音加密失败 recordId={} file={}: {}",
+                        recordId, localFile.getAbsolutePath(), e.getMessage());
+            }
             return;
         }
         try

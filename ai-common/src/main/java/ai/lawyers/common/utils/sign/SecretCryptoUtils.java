@@ -30,6 +30,9 @@ public final class SecretCryptoUtils
     /** 国密密文前缀（V2.54 G1 起 encrypt 输出）：SM4-GCM */
     private static final String CIPHER_PREFIX_SM4 = "enc2:";
 
+    /** 版本化国密密文前缀（V2.57 密钥轮换起）：Base64(version(1) + IV(12) + 密文 + tag) */
+    private static final String CIPHER_PREFIX_SM4_V2 = "enc3:";
+
     /** 历史 AES 密文前缀：仅解密侧兼容，不再新写入 */
     private static final String CIPHER_PREFIX_AES = "enc:";
 
@@ -39,7 +42,12 @@ public final class SecretCryptoUtils
 
     private static final int AES_IV_LENGTH = 16;
 
+    private static final int SM4_IV_LENGTH = 12;
+
     private static final int SM4_KEY_LENGTH = 16;
+
+    /** 当前根密钥版本号（密钥轮换时递增） */
+    private static final byte KEY_VERSION = 1;
 
     /** 回显脱敏占位：已配置密钥但不返回明文 */
     private static final String MASK_PLACEHOLDER = "******";
@@ -51,15 +59,41 @@ public final class SecretCryptoUtils
     /** SHA-256 派生 32 字节根密钥（AES 全量使用；SM4 取前 16 字节） */
     private static byte[] derivedKey32()
     {
-        String key = System.getenv("APP_SECRET_KEY");
-        if (StringUtils.isEmpty(key))
+        return derivedKey32(KEY_VERSION);
+    }
+
+    /** 按版本派生根密钥：当前版本用 APP_SECRET_KEY，历史版本用 APP_PREVIOUS_SECRET_KEY */
+    private static byte[] derivedKey32(byte version)
+    {
+        String key;
+        if (version == KEY_VERSION)
         {
-            key = System.getProperty("app.secret.key");
+            key = System.getenv("APP_SECRET_KEY");
+            if (StringUtils.isEmpty(key))
+            {
+                key = System.getProperty("app.secret.key");
+            }
+        }
+        else
+        {
+            key = System.getenv("APP_PREVIOUS_SECRET_KEY");
+            if (StringUtils.isEmpty(key))
+            {
+                key = System.getProperty("app.previous-secret-key");
+            }
         }
         if (StringUtils.isEmpty(key))
         {
-            // 仅开发兜底；生产必须注入 APP_SECRET_KEY
-            key = "ai-lawyers-dev-secret-change-me-in-production-2026";
+            if (version == KEY_VERSION)
+            {
+                // 仅开发兜底；生产必须注入 APP_SECRET_KEY
+                key = "ai-lawyers-dev-secret-change-me-in-production-2026";
+            }
+            else
+            {
+                // 历史密钥未配置，回退当前根密钥（单密钥环境）
+                return derivedKey32(KEY_VERSION);
+            }
         }
         try
         {
@@ -81,15 +115,21 @@ public final class SecretCryptoUtils
     /** SM4 密钥（G1 新写入路径，取派生根密钥前 16 字节） */
     private static byte[] sm4Key()
     {
-        byte[] root = derivedKey32();
+        return sm4Key(KEY_VERSION);
+    }
+
+    /** SM4 密钥（按版本选根密钥） */
+    private static byte[] sm4Key(byte version)
+    {
+        byte[] root = derivedKey32(version);
         byte[] key = new byte[SM4_KEY_LENGTH];
         System.arraycopy(root, 0, key, 0, SM4_KEY_LENGTH);
         return key;
     }
 
     /**
-     * 加密明文（V2.54 起输出国密 enc2: SM4-GCM）。null/空串原样返回；
-     * 已是密文（enc2:/enc: 前缀）原样返回避免重复加密；
+     * 加密明文（V2.57 起输出版本化国密 enc3: SM4-GCM）。null/空串原样返回；
+     * 已是密文（enc3:/enc2:/enc: 前缀）原样返回避免重复加密；
      * 前端回显占位符 ****** 原样返回（表示未修改）。
      */
     public static String encrypt(String plain)
@@ -100,7 +140,14 @@ public final class SecretCryptoUtils
         }
         try
         {
-            return CIPHER_PREFIX_SM4 + SmCryptoUtils.sm4GcmEncryptToBase64(plain, sm4Key());
+            byte[] iv = new byte[SM4_IV_LENGTH];
+            new java.security.SecureRandom().nextBytes(iv);
+            byte[] cipher = SmCryptoUtils.sm4Gcm(plain.getBytes(StandardCharsets.UTF_8), sm4Key(), iv, true);
+            byte[] combined = new byte[1 + iv.length + cipher.length];
+            combined[0] = KEY_VERSION;
+            System.arraycopy(iv, 0, combined, 1, iv.length);
+            System.arraycopy(cipher, 0, combined, 1 + iv.length, cipher.length);
+            return CIPHER_PREFIX_SM4_V2 + Base64.getEncoder().encodeToString(combined);
         }
         catch (Exception e)
         {
@@ -109,8 +156,13 @@ public final class SecretCryptoUtils
     }
 
     /**
-     * 解密密文。三态兼容（P3-G1）：enc2: → SM4-GCM（国密）；enc: → 历史 AES/CBC；
-     * 无前缀 → 存量明文原样返回。
+     * 解密密文。多态兼容：
+     * <ul>
+     *   <li>enc3: 版本化国密 → 按 version 选根密钥 SM4-GCM 解密；</li>
+     *   <li>enc2: 存量国密 → 先 current 后 previous；</li>
+     *   <li>enc: 历史 AES/CBC；</li>
+     *   <li>无前缀 → 存量明文原样返回。</li>
+     * </ul>
      */
     public static String decrypt(String stored)
     {
@@ -118,15 +170,41 @@ public final class SecretCryptoUtils
         {
             return stored;
         }
-        if (stored.startsWith(CIPHER_PREFIX_SM4))
+        if (stored.startsWith(CIPHER_PREFIX_SM4_V2))
         {
             try
             {
-                return SmCryptoUtils.sm4GcmDecryptFromBase64(stored.substring(CIPHER_PREFIX_SM4.length()), sm4Key());
+                byte[] combined = Base64.getDecoder().decode(stored.substring(CIPHER_PREFIX_SM4_V2.length()));
+                byte version = combined[0];
+                byte[] iv = new byte[SM4_IV_LENGTH];
+                System.arraycopy(combined, 1, iv, 0, SM4_IV_LENGTH);
+                byte[] cipher = new byte[combined.length - 1 - SM4_IV_LENGTH];
+                System.arraycopy(combined, 1 + SM4_IV_LENGTH, cipher, 0, cipher.length);
+                return new String(SmCryptoUtils.sm4Gcm(cipher, sm4Key(version), iv, false), StandardCharsets.UTF_8);
             }
             catch (Exception e)
             {
-                throw new IllegalStateException("凭据解密失败（国密）", e);
+                throw new IllegalStateException("凭据解密失败（版本化国密）", e);
+            }
+        }
+        if (stored.startsWith(CIPHER_PREFIX_SM4))
+        {
+            // 存量 enc2: 无 version，先 current 后 previous
+            String body = stored.substring(CIPHER_PREFIX_SM4.length());
+            try
+            {
+                return SmCryptoUtils.sm4GcmDecryptFromBase64(body, sm4Key());
+            }
+            catch (Exception curFail)
+            {
+                try
+                {
+                    return SmCryptoUtils.sm4GcmDecryptFromBase64(body, sm4Key((byte) 0));
+                }
+                catch (Exception e)
+                {
+                    throw new IllegalStateException("凭据解密失败（国密）", e);
+                }
             }
         }
         if (stored.startsWith(CIPHER_PREFIX_AES))
@@ -178,6 +256,8 @@ public final class SecretCryptoUtils
     private static boolean isEncrypted(String value)
     {
         return value != null
-                && (value.startsWith(CIPHER_PREFIX_SM4) || value.startsWith(CIPHER_PREFIX_AES));
+                && (value.startsWith(CIPHER_PREFIX_SM4_V2)
+                || value.startsWith(CIPHER_PREFIX_SM4)
+                || value.startsWith(CIPHER_PREFIX_AES));
     }
 }

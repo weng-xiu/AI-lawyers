@@ -37,4 +37,22 @@ public interface IPiiCryptoMigrationService
      *          tokenRebuilt: token 回填行数, failed: 单行异常计数}
      */
     public Map<String, Object> migrateCallLedgers();
+
+    /**
+     * G1-b3：密钥轮换——全量重加密。
+     * <p>前置条件：已将新根密钥写入 {@code APP_SECRET_KEY}，旧根密钥写入
+     * {@code APP_PREVIOUS_SECRET_KEY}（应用同时支持双密钥解密）。</p>
+     * <p>处理范围：</p>
+     * <ul>
+     *   <li>PII 字段（档案/话单热表+归档/台账）：旧密钥解密 → 新密钥重加密（密文升级为版本化 encp2:）；</li>
+     *   <li>盲索引列：全量重建（密钥变更后索引值全变）；</li>
+     *   <li>模糊检索 token 表：全量重建；</li>
+     *   <li>录音文件（本地/对象存储）：解密 → 重加密。</li>
+     * </ul>
+     * 幂等：已是新密钥版本的密文 IV 会变化但语义等价，可安全重复执行。
+     *
+     * @return {profiles/records/archives/ledgers: 各类处理行数, recordingEncrypted: 录音重加密数,
+     *          failed: 异常计数}
+     */
+    public Map<String, Object> rotateKey();
 }

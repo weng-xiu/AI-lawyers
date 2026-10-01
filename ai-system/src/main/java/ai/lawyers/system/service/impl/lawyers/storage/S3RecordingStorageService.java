@@ -1,5 +1,6 @@
 package ai.lawyers.system.service.impl.lawyers.storage;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -13,10 +14,12 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import ai.lawyers.common.utils.StringUtils;
+import ai.lawyers.system.service.lawyers.storage.RecordingCryptoService;
 import ai.lawyers.system.service.lawyers.storage.RecordingStorageService;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -73,6 +76,13 @@ public class S3RecordingStorageService implements RecordingStorageService
     @Value("${call.recording.s3.key-prefix:recordings/}")
     private String keyPrefix;
 
+    /** G1-b3：是否启用录音 SM4 加密（默认关闭，灰度） */
+    @Value("${call.recording.encrypt-enabled:false}")
+    private boolean encryptEnabled;
+
+    @Autowired(required = false)
+    private RecordingCryptoService recordingCryptoService;
+
     /** HTTP 客户端（项目无全局 OkHttpClient Bean，自维护单例） */
     private volatile OkHttpClient client;
 
@@ -105,13 +115,18 @@ public class S3RecordingStorageService implements RecordingStorageService
         {
             throw new IllegalStateException("S3 配置不完整（endpoint/bucket/accessKey/secretKey）");
         }
+        // 先读取明文全部字节
+        byte[] bodyBytes = readAllBytes(inputStream);
+        // G1-b3：加密启用时加密后再上传
+        if (encryptEnabled && recordingCryptoService != null)
+        {
+            bodyBytes = recordingCryptoService.encrypt(new ByteArrayInputStream(bodyBytes));
+        }
         String objectKey = buildKey(key);
         String url = buildObjectUrl(objectKey);
         String now = iso8601();
         String date = now.substring(0, 8);
 
-        // 先读取字节，确保 Content-Length 与实际一致
-        byte[] bodyBytes = readAllBytes(inputStream);
         String mimeType = contentType != null ? contentType : "application/octet-stream";
 
         Map<String, String> headers = new HashMap<>();
@@ -138,7 +153,7 @@ public class S3RecordingStorageService implements RecordingStorageService
                 String body = response.body() != null ? response.body().string() : "";
                 throw new IOException("S3 PUT 失败 HTTP " + response.code() + ": " + body);
             }
-            log.info("[RecordingStorage] S3 上传成功 key={} size={}", objectKey, contentLength);
+            log.info("[RecordingStorage] S3 上传成功 key={} size={}", objectKey, bodyBytes.length);
         }
     }
 
@@ -185,8 +200,15 @@ public class S3RecordingStorageService implements RecordingStorageService
             response.close();
             return null;
         }
-        // 返回包装流，关闭时同时关闭 Response
-        return new ResponseClosingInputStream(responseBody.byteStream(), response);
+        byte[] raw = readAllBytes(responseBody.byteStream());
+        response.close();
+        // G1-b3：加密启用时解密；非加密（无 magic）原样返回
+        if (encryptEnabled && recordingCryptoService != null)
+        {
+            byte[] plain = recordingCryptoService.decrypt(new ByteArrayInputStream(raw));
+            return new ByteArrayInputStream(plain);
+        }
+        return new ByteArrayInputStream(raw);
     }
 
     @Override
@@ -278,6 +300,12 @@ public class S3RecordingStorageService implements RecordingStorageService
     @Override
     public String getPlayUrl(String key, int expirySeconds)
     {
+        // G1-b3：加密启用时不返回预签名 URL（加密对象浏览器无法直接播放），
+        // 强制走后端流式解密接口 /lawyers/call/record/{id}/play
+        if (encryptEnabled)
+        {
+            return null;
+        }
         if (StringUtils.isEmpty(key))
         {
             return null;
@@ -540,43 +568,5 @@ public class S3RecordingStorageService implements RecordingStorageService
         if (name.endsWith(".ogg")) return "audio/ogg";
         if (name.endsWith(".webm")) return "audio/webm";
         return "application/octet-stream";
-    }
-
-    /** 包装 Response 的输入流，关闭时同时关闭 Response 释放连接 */
-    private static final class ResponseClosingInputStream extends InputStream
-    {
-        private final InputStream delegate;
-        private final Response response;
-
-        ResponseClosingInputStream(InputStream delegate, Response response)
-        {
-            this.delegate = delegate;
-            this.response = response;
-        }
-
-        @Override
-        public int read() throws IOException
-        {
-            return delegate.read();
-        }
-
-        @Override
-        public int read(byte[] b, int off, int len) throws IOException
-        {
-            return delegate.read(b, off, len);
-        }
-
-        @Override
-        public void close() throws IOException
-        {
-            try
-            {
-                delegate.close();
-            }
-            finally
-            {
-                response.close();
-            }
-        }
     }
 }

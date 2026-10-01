@@ -41,8 +41,9 @@ class RecordingUploadServiceTest
     }
 
     @Test
-    void enqueue_localMode_noop() throws Exception
+    void enqueue_localMode_triggersSaveForEncryption() throws Exception
     {
+        // G1-b3：本地模式下 enqueue 调用 save 触发原地加密（encrypt-enabled 未开启时为空操作）
         when(storageService.isObjectStorage()).thenReturn(false);
         service.init();
         File tmp = File.createTempFile("rec", ".wav");
@@ -51,7 +52,7 @@ class RecordingUploadServiceTest
         service.enqueue(1000L, tmp);
         Thread.sleep(100);
 
-        verify(storageService, never()).save(anyString(), any(File.class));
+        verify(storageService).save(tmp.getName(), tmp);
         verify(callRecordMapper, never()).updateRecordingInfo(any(AiCallRecord.class));
         assertThat(tmp).exists();
     }

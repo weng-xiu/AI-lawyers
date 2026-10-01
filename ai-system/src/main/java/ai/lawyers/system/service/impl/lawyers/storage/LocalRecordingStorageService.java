@@ -1,6 +1,8 @@
 package ai.lawyers.system.service.impl.lawyers.storage;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -8,10 +10,12 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import ai.lawyers.common.utils.StringUtils;
+import ai.lawyers.system.service.lawyers.storage.RecordingCryptoService;
 import ai.lawyers.system.service.lawyers.storage.RecordingStorageService;
 
 /**
@@ -33,19 +37,52 @@ public class LocalRecordingStorageService implements RecordingStorageService
     @Value("${call.recording.base-path:C:/Program Files/FreeSWITCH/recordings}")
     private String recordingBasePath;
 
+    /** G1-b3：是否启用录音 SM4 加密（默认关闭，灰度） */
+    @Value("${call.recording.encrypt-enabled:false}")
+    private boolean encryptEnabled;
+
+    @Autowired(required = false)
+    private RecordingCryptoService recordingCryptoService;
+
     @Override
     public void save(String key, File file) throws IOException
     {
-        // 本地模式：FreeSWITCH 已把文件写到目标位置，无需重复保存
-        log.debug("[RecordingStorage] 本地模式无需额外保存 key={}", key);
+        // 本地模式：FreeSWITCH 已把文件写到目标位置。
+        // 加密启用时：读明文 → 加密 → 原地覆盖为密文（已加密则跳过）
+        if (!encryptEnabled || recordingCryptoService == null || file == null || !file.exists())
+        {
+            log.debug("[RecordingStorage] 本地模式无需额外保存 key={}", key);
+            return;
+        }
+        encryptLocalFileInPlace(file);
     }
 
     @Override
     public void save(String key, InputStream inputStream, long contentLength, String contentType)
             throws IOException
     {
-        // 本地模式：同上，仅支持 File 传入
-        log.debug("[RecordingStorage] 本地模式无需额外保存 key={}", key);
+        // 本地模式流式保存：加密启用时把密文写到目标文件
+        if (!encryptEnabled || recordingCryptoService == null || inputStream == null)
+        {
+            log.debug("[RecordingStorage] 本地模式无需额外保存 key={}", key);
+            return;
+        }
+        File target = resolveFile(key);
+        if (target == null)
+        {
+            return;
+        }
+        byte[] cipher = recordingCryptoService.encrypt(inputStream);
+        File parent = target.getParentFile();
+        if (parent != null && !parent.exists())
+        {
+            parent.mkdirs();
+        }
+        try (FileOutputStream fos = new FileOutputStream(target))
+        {
+            fos.write(cipher);
+        }
+        log.debug("[RecordingStorage] 本地加密保存 key={} cipherLen={}", key, cipher.length);
     }
 
     @Override
@@ -56,7 +93,54 @@ public class LocalRecordingStorageService implements RecordingStorageService
         {
             return null;
         }
-        return Files.newInputStream(file.toPath());
+        if (!encryptEnabled || recordingCryptoService == null)
+        {
+            return Files.newInputStream(file.toPath());
+        }
+        // 加密模式：读文件 → 检测 magic → 已加密则解密，未加密原样返回
+        try (InputStream in = new FileInputStream(file))
+        {
+            byte[] plain = recordingCryptoService.decrypt(in);
+            return new java.io.ByteArrayInputStream(plain);
+        }
+    }
+
+    /**
+     * 原地加密本地文件：读明文 → 加密 → 写临时文件 → 原子替换。
+     * 已加密（头部 magic）则跳过，保证幂等。
+     */
+    private void encryptLocalFileInPlace(File file) throws IOException
+    {
+        byte[] raw = Files.readAllBytes(file.toPath());
+        if (recordingCryptoService.isEncrypted(raw))
+        {
+            log.debug("[RecordingStorage] 文件已加密，跳过 key={}", file.getAbsolutePath());
+            return;
+        }
+        byte[] cipher = recordingCryptoService.encrypt(new java.io.ByteArrayInputStream(raw));
+        File tmp = new File(file.getAbsolutePath() + ".enc.tmp");
+        try (FileOutputStream fos = new FileOutputStream(tmp))
+        {
+            fos.write(cipher);
+        }
+        // 原子替换（Windows 下 Files.move 可能失败，退化为删旧改名）
+        try
+        {
+            Files.move(tmp.toPath(), file.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
+        catch (IOException e)
+        {
+            if (file.delete() && tmp.renameTo(file))
+            {
+                log.debug("[RecordingStorage] 本地文件加密完成（降级替换） key={}", file.getAbsolutePath());
+            }
+            else
+            {
+                tmp.delete();
+                throw e;
+            }
+        }
+        log.debug("[RecordingStorage] 本地文件加密完成 key={}", file.getAbsolutePath());
     }
 
     @Override

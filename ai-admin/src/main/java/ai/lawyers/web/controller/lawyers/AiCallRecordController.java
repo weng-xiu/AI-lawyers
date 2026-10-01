@@ -192,7 +192,8 @@ public class AiCallRecordController extends BaseController
 
     /**
      * 在线播放录音（支持 HTTP Range，支持音频拖动进度条）。
-     * 对象存储模式：302 重定向到预签名 URL；本地模式：FileSystemResource 流式返回。
+     * 对象存储模式且未加密：302 重定向到预签名 URL；
+     * 加密模式 / 本地模式：后端流式解密返回。
      */
     @PreAuthorize("@ss.hasPermi('lawyers:call:record:query')")
     @GetMapping("/{recordId}/play")
@@ -205,7 +206,7 @@ public class AiCallRecordController extends BaseController
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
 
-        // F2：对象存储模式 → 302 重定向到预签名 URL
+        // F2：对象存储模式且未加密 → 302 重定向到预签名 URL
         if (recordingStorageService != null && recordingStorageService.isObjectStorage())
         {
             String playUrl = recordingStorageService.getPlayUrl(record.getRecordFile(), 3600);
@@ -217,7 +218,17 @@ public class AiCallRecordController extends BaseController
             }
         }
 
-        // 本地模式（或对象存储降级）：原有文件流逻辑
+        // G1-b3：加密模式（getPlayUrl 返回 null）或本地模式 → 后端流式解密
+        if (recordingStorageService != null)
+        {
+            byte[] audioBytes = loadRecordingBytes(record.getRecordFile());
+            if (audioBytes != null)
+            {
+                return streamAudio(audioBytes, record.getRecordFile(), request, false);
+            }
+        }
+
+        // 降级：本地文件直接流式（兼容存量明文）
         File file = resolveRecordingFile(recordId);
         if (file == null || !file.exists() || !file.isFile())
         {
@@ -230,7 +241,6 @@ public class AiCallRecordController extends BaseController
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.parseMediaType(contentType));
-        // 允许浏览器内联播放；Accept-Ranges 声明支持字节范围
         headers.set(HttpHeaders.ACCEPT_RANGES, "bytes");
 
         String rangeHeader = request.getHeader(HttpHeaders.RANGE);
@@ -278,7 +288,8 @@ public class AiCallRecordController extends BaseController
 
     /**
      * 下载录音文件。
-     * 对象存储模式：302 重定向到预签名 URL；本地模式：FileSystemResource 下载。
+     * 对象存储模式且未加密：302 重定向到预签名 URL；
+     * 加密模式 / 本地模式：后端流式解密下载。
      */
     @PreAuthorize("@ss.hasPermi('lawyers:call:record:query')")
     @GetMapping("/{recordId}/download")
@@ -290,7 +301,7 @@ public class AiCallRecordController extends BaseController
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
 
-        // F2：对象存储模式 → 302 重定向到预签名 URL
+        // F2：对象存储模式且未加密 → 302 重定向到预签名 URL
         if (recordingStorageService != null && recordingStorageService.isObjectStorage())
         {
             String playUrl = recordingStorageService.getPlayUrl(record.getRecordFile(), 3600);
@@ -302,7 +313,17 @@ public class AiCallRecordController extends BaseController
             }
         }
 
-        // 本地模式（或对象存储降级）：原有文件下载逻辑
+        // G1-b3：加密模式或本地模式 → 后端流式解密下载
+        if (recordingStorageService != null)
+        {
+            byte[] audioBytes = loadRecordingBytes(record.getRecordFile());
+            if (audioBytes != null)
+            {
+                return streamAudio(audioBytes, record.getRecordFile(), null, true);
+            }
+        }
+
+        // 降级：本地文件直接下载
         File file = resolveRecordingFile(recordId);
         if (file == null || !file.exists() || !file.isFile())
         {
@@ -311,7 +332,6 @@ public class AiCallRecordController extends BaseController
 
         FileSystemResource resource = new FileSystemResource(file);
         String fileName = file.getName();
-        // 中文文件名需要 URL 编码，避免 Content-Disposition 乱码
         String encoded = java.net.URLEncoder.encode(fileName, "UTF-8").replaceAll("\\+", "%20");
 
         HttpHeaders headers = new HttpHeaders();
@@ -321,6 +341,114 @@ public class AiCallRecordController extends BaseController
                 "attachment; filename=\"" + encoded + "\"; filename*=UTF-8''" + encoded);
 
         return ResponseEntity.ok().headers(headers).body(resource);
+    }
+
+    /**
+     * 通过 storageService 读取录音（自动解密）。返回明文字节；读取失败返回 null。
+     */
+    private byte[] loadRecordingBytes(String recordFile)
+    {
+        try (InputStream in = recordingStorageService.load(recordFile))
+        {
+            if (in == null)
+            {
+                return null;
+            }
+            java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) != -1)
+            {
+                bos.write(buf, 0, n);
+            }
+            return bos.toByteArray();
+        }
+        catch (Exception e)
+        {
+            log.warn("录音读取/解密失败 file={}: {}", recordFile, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * 将明文字节流化为 HTTP 响应（支持 Range / 内联播放 / 下载）。
+     *
+     * @param audioBytes  明文字节
+     * @param recordFile  原始文件名（用于推断 MIME 与下载文件名）
+     * @param request     HTTP 请求（解析 Range；下载时传 null）
+     * @param asDownload  true=下载（Content-Disposition: attachment），false=内联播放
+     */
+    private ResponseEntity<Resource> streamAudio(byte[] audioBytes, String recordFile,
+                                                 HttpServletRequest request, boolean asDownload)
+    {
+        String fileName = new File(recordFile).getName();
+        String contentType = guessContentType(fileName);
+        long fileLength = audioBytes.length;
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(contentType));
+        headers.set(HttpHeaders.ACCEPT_RANGES, "bytes");
+
+        if (asDownload)
+        {
+            try
+            {
+                String encoded = java.net.URLEncoder.encode(fileName, "UTF-8").replaceAll("\\+", "%20");
+                headers.set(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + encoded + "\"; filename*=UTF-8''" + encoded);
+            }
+            catch (java.io.UnsupportedEncodingException ignored)
+            {
+                headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"");
+            }
+        }
+
+        // Range 请求（仅播放场景）
+        if (request != null)
+        {
+            String rangeHeader = request.getHeader(HttpHeaders.RANGE);
+            if (StringUtils.isNotEmpty(rangeHeader))
+            {
+                try
+                {
+                    long[] range = parseRange(rangeHeader, fileLength);
+                    if (range != null)
+                    {
+                        long start = range[0];
+                        long end = range[1];
+                        long rangeLength = end - start + 1;
+                        byte[] partial = new byte[(int) rangeLength];
+                        System.arraycopy(audioBytes, (int) start, partial, 0, (int) rangeLength);
+
+                        headers.add("Content-Range", "bytes " + start + "-" + end + "/" + fileLength);
+                        headers.setContentLength(rangeLength);
+                        return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
+                                .headers(headers)
+                                .body(new org.springframework.core.io.ByteArrayResource(partial));
+                    }
+                }
+                catch (IllegalArgumentException ex)
+                {
+                    return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+                            .header(HttpHeaders.CONTENT_RANGE, "bytes */" + fileLength)
+                            .build();
+                }
+            }
+        }
+
+        headers.setContentLength(fileLength);
+        return ResponseEntity.ok().headers(headers)
+                .body(new org.springframework.core.io.ByteArrayResource(audioBytes));
+    }
+
+    private String guessContentType(String fileName)
+    {
+        String name = fileName == null ? "" : fileName.toLowerCase();
+        if (name.endsWith(".wav")) return "audio/wav";
+        if (name.endsWith(".mp3")) return "audio/mpeg";
+        if (name.endsWith(".ogg")) return "audio/ogg";
+        if (name.endsWith(".webm")) return "audio/webm";
+        return MediaType.APPLICATION_OCTET_STREAM_VALUE;
     }
 
     /**

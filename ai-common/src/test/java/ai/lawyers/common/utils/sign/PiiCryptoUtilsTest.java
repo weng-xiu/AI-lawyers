@@ -19,17 +19,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class PiiCryptoUtilsTest
 {
-    private static final String PREFIX = "encp:";
+    private static final String PREFIX = "encp2:";
 
     @Test
     void encrypt_decryptRoundtrip_randomIv()
     {
         String phone = "13812345678";
         String stored = PiiCryptoUtils.encrypt(phone);
-        assertTrue(stored.startsWith(PREFIX), "PII 密文应为 encp: 前缀，实际: " + stored.substring(0, 5));
+        assertTrue(stored.startsWith(PREFIX), "PII 密文应为 encp2: 前缀，实际: " + stored.substring(0, 6));
         assertNotEquals(phone, stored);
-        // encp:(5) + Base64(IV 12 + 密文 11 + tag 16 = 39B → 52 字符) = 57，列宽 128 足够
-        assertEquals(57, stored.length(), "手机号密文长度应可预估（DDL 列宽依据）");
+        // encp2:(6) + Base64(version 1 + IV 12 + 密文 11 + tag 16 = 40B → 56 字符) = 62
+        assertEquals(62, stored.length(), "手机号密文长度应可预估（DDL 列宽依据）");
         assertEquals(phone, PiiCryptoUtils.decrypt(stored), "SM4-GCM 解密应还原明文");
         // 随机 IV：同明文两次密文不同
         assertNotEquals(stored, PiiCryptoUtils.encrypt(phone), "随机 IV 下两次密文应不同");

@@ -40,14 +40,14 @@ import ai.lawyers.common.utils.StringUtils;
  */
 public final class PiiCryptoUtils
 {
-    /** PII 密文前缀：与凭据加密（enc2:）、历史 AES（enc:）互相区分 */
-    private static final String CIPHER_PREFIX = "encp:";
-
     /** 密钥域分离标签：字段加密密钥 */
     private static final String SM4_KEY_DOMAIN = "pii-sm4-v1";
 
     /** 密钥域分离标签：盲索引 HMAC 密钥 */
     private static final String BLIND_KEY_DOMAIN = "pii-blind-v1";
+
+    /** 密钥域分离标签：录音文件 SM4 密钥（与字段加密密钥互不相关） */
+    private static final String RECORDING_KEY_DOMAIN = "pii-recording-sm4-v1";
 
     /** SM4 密钥长度（128 位） */
     private static final int SM4_KEY_LENGTH = 16;
@@ -58,8 +58,29 @@ public final class PiiCryptoUtils
     /** 标准号码长度（手机号 11 位；模糊检索 token 分组的位置空间依据） */
     private static final int PHONE_LENGTH = 11;
 
+    /** 录音密文魔数：ASCII "AIRC"（AI Recording Cipher），用于识别加密录音 */
+    private static final byte[] RECORDING_MAGIC = new byte[]{'A', 'I', 'R', 'C'};
+
+    /** 录音密文封装格式版本号（当前 1；为密钥轮换预留，解密时按版本选密钥） */
+    private static final byte RECORDING_VERSION = 1;
+
+    /** SM4-GCM IV 长度（字节） */
+    private static final int GCM_IV_LENGTH = 12;
+
+    /** 录音密文头部长度 = magic(4) + version(1) + iv(12) */
+    private static final int RECORDING_HEADER_LENGTH = RECORDING_MAGIC.length + 1 + GCM_IV_LENGTH;
+
     /** 开发兜底密钥（与 SecretCryptoUtils 一致；生产必须注入 APP_SECRET_KEY） */
     private static final String DEV_DEFAULT_KEY = "ai-lawyers-dev-secret-change-me-in-production-2026";
+
+    /** 当前根密钥版本号（密钥轮换时递增；密文头部携带此版本以选密钥） */
+    private static final byte KEY_VERSION = 1;
+
+    /** V2.55 存量密文前缀：Base64(IV + cipher)，无版本号（轮换后 current 失败回退 previous） */
+    private static final String CIPHER_PREFIX = "encp:";
+
+    /** V2.56+ 版本化密文前缀：Base64(version(1) + IV(12) + cipher) */
+    private static final String CIPHER_V2_PREFIX = "encp2:";
 
     private PiiCryptoUtils()
     {
@@ -68,8 +89,9 @@ public final class PiiCryptoUtils
     // ------------------------------------------------------------ 加解密
 
     /**
-     * 加密字段明文：{@code encp: + Base64(IV(12) + SM4-GCM 密文 + tag)}。
-     * null/空串原样返回；已带 encp: 前缀幂等返回（防二次加密）。
+     * 加密字段明文：{@code encp2: + Base64(version(1) + IV(12) + SM4-GCM 密文+tag)}。
+     * <p>版本化密文（V2.57+），密钥轮换时按头部 version 选对应根密钥解密。</p>
+     * null/空串原样返回；已带 encp:/encp2: 前缀幂等返回（防二次加密）。
      */
     public static String encrypt(String plain)
     {
@@ -77,12 +99,25 @@ public final class PiiCryptoUtils
         {
             return plain;
         }
-        return CIPHER_PREFIX + SmCryptoUtils.sm4GcmEncryptToBase64(plain, piiSm4Key());
+        byte[] iv = new byte[GCM_IV_LENGTH];
+        new java.security.SecureRandom().nextBytes(iv);
+        byte[] cipher = SmCryptoUtils.sm4Gcm(plain.getBytes(StandardCharsets.UTF_8), piiSm4Key(), iv, true);
+        // version(1) + iv(12) + cipher
+        byte[] combined = new byte[1 + iv.length + cipher.length];
+        combined[0] = KEY_VERSION;
+        System.arraycopy(iv, 0, combined, 1, iv.length);
+        System.arraycopy(cipher, 0, combined, 1 + iv.length, cipher.length);
+        return CIPHER_V2_PREFIX + java.util.Base64.getEncoder().encodeToString(combined);
     }
 
     /**
-     * 解密字段值。三态兼容：encp: → SM4-GCM 解密（篡改/密钥不匹配抛异常）；
-     * 无前缀 → 存量明文原样返回（迁移窗口兼容）。
+     * 解密字段值。多态兼容：
+     * <ul>
+     *   <li>{@code encp2:} 版本化密文 → 按头部 version 选根密钥派生域密钥解密；</li>
+     *   <li>{@code encp:} V2.55 存量密文 → 先试 current 根密钥，失败回退 previous 根密钥；</li>
+     *   <li>无前缀 → 存量明文原样返回（迁移窗口兼容）。</li>
+     * </ul>
+     * 篡改/密钥不匹配抛 {@link IllegalStateException}。
      */
     public static String decrypt(String stored)
     {
@@ -90,17 +125,45 @@ public final class PiiCryptoUtils
         {
             return stored;
         }
-        if (isEncrypted(stored))
+        if (stored.startsWith(CIPHER_V2_PREFIX))
         {
-            return SmCryptoUtils.sm4GcmDecryptFromBase64(stored.substring(CIPHER_PREFIX.length()), piiSm4Key());
+            byte[] combined = java.util.Base64.getDecoder().decode(stored.substring(CIPHER_V2_PREFIX.length()));
+            byte version = combined[0];
+            byte[] iv = new byte[GCM_IV_LENGTH];
+            System.arraycopy(combined, 1, iv, 0, GCM_IV_LENGTH);
+            byte[] cipher = new byte[combined.length - 1 - GCM_IV_LENGTH];
+            System.arraycopy(combined, 1 + GCM_IV_LENGTH, cipher, 0, cipher.length);
+            byte[] key = piiSm4Key(version);
+            return new String(SmCryptoUtils.sm4Gcm(cipher, key, iv, false), StandardCharsets.UTF_8);
+        }
+        if (stored.startsWith(CIPHER_PREFIX))
+        {
+            // V2.55 存量：无 version，先 current 后 previous
+            String body = stored.substring(CIPHER_PREFIX.length());
+            try
+            {
+                return SmCryptoUtils.sm4GcmDecryptFromBase64(body, piiSm4Key());
+            }
+            catch (Exception curFail)
+            {
+                byte[] prev = previousRootKey32();
+                if (prev == null)
+                {
+                    throw curFail;
+                }
+                byte[] key = new byte[SM4_KEY_LENGTH];
+                byte[] derived = domainKey(prev, SM4_KEY_DOMAIN);
+                System.arraycopy(derived, 0, key, 0, SM4_KEY_LENGTH);
+                return SmCryptoUtils.sm4GcmDecryptFromBase64(body, key);
+            }
         }
         return stored;
     }
 
-    /** 是否为本工具密文（encp: 前缀）。 */
+    /** 是否为本工具密文（encp: 或 encp2: 前缀）。 */
     public static boolean isEncrypted(String stored)
     {
-        return stored != null && stored.startsWith(CIPHER_PREFIX);
+        return stored != null && (stored.startsWith(CIPHER_PREFIX) || stored.startsWith(CIPHER_V2_PREFIX));
     }
 
     // ------------------------------------------------------------ 盲索引
@@ -187,6 +250,81 @@ public final class PiiCryptoUtils
         return groups;
     }
 
+    // ------------------------------------------------------------ 录音文件加密（G1-b3）
+
+    /**
+     * 加密录音文件字节。封装格式：{@code magic(4 "AIRC") + version(1) + iv(12) + SM4-GCM 密文+tag}。
+     * 随机 IV 同明文每次密文不同；GCM 认证加密防篡改。
+     *
+     * @param plain 明文字节（音频原始数据）；null/空原样返回
+     * @return 加密后字节（含头部）；null 输入返回 null
+     */
+    public static byte[] recordingEncrypt(byte[] plain)
+    {
+        if (plain == null || plain.length == 0)
+        {
+            return plain;
+        }
+        byte[] iv = new byte[GCM_IV_LENGTH];
+        new java.security.SecureRandom().nextBytes(iv);
+        byte[] cipher = SmCryptoUtils.sm4Gcm(plain, recordingSm4Key(), iv, true);
+
+        byte[] out = new byte[RECORDING_HEADER_LENGTH + cipher.length];
+        System.arraycopy(RECORDING_MAGIC, 0, out, 0, RECORDING_MAGIC.length);
+        out[RECORDING_MAGIC.length] = RECORDING_VERSION;
+        System.arraycopy(iv, 0, out, RECORDING_MAGIC.length + 1, GCM_IV_LENGTH);
+        System.arraycopy(cipher, 0, out, RECORDING_HEADER_LENGTH, cipher.length);
+        return out;
+    }
+
+    /**
+     * 解密录音文件字节。校验 magic 头部，按 version 选取对应密钥解密。
+     * <p>非加密数据（无前 4 字节 magic）原样返回——兼容存量明文录音与迁移窗口。</p>
+     *
+     * @param stored 存储字节；null 返回 null
+     * @return 明文字节；非加密原样返回
+     * @throws IllegalStateException 密文损坏或密钥不匹配（GCM 认证失败）
+     */
+    public static byte[] recordingDecrypt(byte[] stored)
+    {
+        if (stored == null || stored.length == 0)
+        {
+            return stored;
+        }
+        // 长度不足以容纳头部，视为明文（或损坏的小文件）原样返回
+        if (stored.length < RECORDING_HEADER_LENGTH || !isEncryptedRecording(stored))
+        {
+            return stored;
+        }
+        byte version = stored[RECORDING_MAGIC.length];
+        byte[] iv = new byte[GCM_IV_LENGTH];
+        System.arraycopy(stored, RECORDING_MAGIC.length + 1, iv, 0, GCM_IV_LENGTH);
+        byte[] cipher = new byte[stored.length - RECORDING_HEADER_LENGTH];
+        System.arraycopy(stored, RECORDING_HEADER_LENGTH, cipher, 0, cipher.length);
+        // 当前仅 version=1；密钥轮换后按 version 选历史密钥（见 recordingSm4Key(version)）
+        return SmCryptoUtils.sm4Gcm(cipher, recordingSm4Key(version), iv, false);
+    }
+
+    /**
+     * 判断字节是否为加密录音（前 4 字节匹配 magic）。
+     * 仅检查头部前 4 字节，不要求完整长度。
+     */
+    public static boolean isEncryptedRecording(byte[] header)
+    {
+        if (header == null || header.length < RECORDING_MAGIC.length)
+        {
+            return false;
+        }
+        for (int i = 0; i < RECORDING_MAGIC.length; i++)
+        {
+            if (header[i] != RECORDING_MAGIC[i])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
     // ------------------------------------------------------------ 密钥派生
 
     /** 根密钥：SHA-256(密钥来源)，与 SecretCryptoUtils 同源（env → 属性 → 开发默认） */
@@ -212,10 +350,15 @@ public final class PiiCryptoUtils
         }
     }
 
-    /** 域分离派生：SHA-256(根密钥 || 域标签)，各用途密钥互不相关 */
+    /** 域分离派生：SHA-256(根密钥 || 域标签)，各用途密钥互不相关（使用当前根密钥） */
     private static byte[] domainKey(String domain)
     {
-        byte[] root = rootKey32();
+        return domainKey(rootKey32(), domain);
+    }
+
+    /** 域分离派生（指定根密钥，供密钥轮换时使用历史根密钥派生） */
+    private static byte[] domainKey(byte[] root, String domain)
+    {
         byte[] domainBytes = domain.getBytes(StandardCharsets.UTF_8);
         byte[] material = new byte[root.length + domainBytes.length];
         System.arraycopy(root, 0, material, 0, root.length);
@@ -230,10 +373,48 @@ public final class PiiCryptoUtils
         }
     }
 
+    /**
+     * 历史根密钥（密钥轮换用）：来源环境变量 {@code APP_PREVIOUS_SECRET_KEY}
+     * 或系统属性 {@code app.previous-secret-key}；未配置返回 null（无历史密钥）。
+     * 轮换时旧密文按 version 选此根密钥派生域密钥解密。
+     */
+    private static byte[] previousRootKey32()
+    {
+        String key = System.getenv("APP_PREVIOUS_SECRET_KEY");
+        if (StringUtils.isEmpty(key))
+        {
+            key = System.getProperty("app.previous-secret-key");
+        }
+        if (StringUtils.isEmpty(key))
+        {
+            return null;
+        }
+        try
+        {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return digest.digest(key.getBytes(StandardCharsets.UTF_8));
+        }
+        catch (Exception e)
+        {
+            throw new IllegalStateException("初始化 PII 历史根密钥失败", e);
+        }
+    }
+
     /** 字段加密密钥：域派生 32 字节取前 16 字节（SM4 固定 128 位密钥） */
     private static byte[] piiSm4Key()
     {
-        byte[] derived = domainKey(SM4_KEY_DOMAIN);
+        return piiSm4Key(KEY_VERSION);
+    }
+
+    /** 字段加密密钥（按密文版本选根密钥；历史版本用 previous 根，未配置回退 current） */
+    private static byte[] piiSm4Key(byte version)
+    {
+        byte[] root = version == KEY_VERSION ? rootKey32() : previousRootKey32();
+        if (root == null)
+        {
+            root = rootKey32();
+        }
+        byte[] derived = domainKey(root, SM4_KEY_DOMAIN);
         byte[] key = new byte[SM4_KEY_LENGTH];
         System.arraycopy(derived, 0, key, 0, SM4_KEY_LENGTH);
         return key;
@@ -243,6 +424,30 @@ public final class PiiCryptoUtils
     private static byte[] piiBlindKey()
     {
         return domainKey(BLIND_KEY_DOMAIN);
+    }
+
+    /** 录音 SM4 密钥（当前版本） */
+    private static byte[] recordingSm4Key()
+    {
+        return recordingSm4Key(RECORDING_VERSION);
+    }
+
+    /**
+     * 录音 SM4 密钥（按密文版本选取）。
+     * version={@link #RECORDING_VERSION} → 当前根密钥；更早版本 → 历史根密钥。
+     * 历史根密钥未配置时回退当前根密钥（便于单密钥环境）。
+     */
+    private static byte[] recordingSm4Key(byte version)
+    {
+        byte[] root = version == RECORDING_VERSION ? rootKey32() : previousRootKey32();
+        if (root == null)
+        {
+            root = rootKey32();
+        }
+        byte[] derived = domainKey(root, RECORDING_KEY_DOMAIN);
+        byte[] key = new byte[SM4_KEY_LENGTH];
+        System.arraycopy(derived, 0, key, 0, SM4_KEY_LENGTH);
+        return key;
     }
 
     /** 字节数组前 length 位转小写 hex */
