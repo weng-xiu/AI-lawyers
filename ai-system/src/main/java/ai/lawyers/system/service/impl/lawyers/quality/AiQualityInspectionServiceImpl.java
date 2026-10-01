@@ -84,6 +84,10 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
     @Autowired
     private IAiCallAgentStatusService agentStatusService;
 
+    /** P1-7：规则引擎（违禁词/服务规范，零成本确定性评分） */
+    @Autowired
+    private QualityRuleEngine qualityRuleEngine;
+
     /** 质检总开关 */
     @Value("${ai.quality.enabled:true}")
     private boolean qualityEnabled;
@@ -104,8 +108,8 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
     @Autowired(required = false)
     private IAiCallSummaryService callSummaryService;
 
-    /** 录音文件基础路径（对应 FreeSWITCH recordings_dir） */
-    @Value("${call.recording.base-path:C:/Program Files/FreeSWITCH/recordings}")
+    /** 录音文件基础路径（对应 FreeSWITCH recordings_dir）；默认相对路径（跨平台），由环境变量覆盖 */
+    @Value("${call.recording.base-path:recordings}")
     private String recordingBasePath;
 
     /** F2：录音存储抽象（本地/对象存储），为空时退化到本地文件 */
@@ -202,8 +206,8 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
                 callRecordMapper.updateRecordingInfo(up);
             }
 
-            // 2. AI 评分
-            AiScore score = scoreByAi(transcript, record);
+            // 2. 评分：P1-7 起 AI+规则双引擎融合（LLM 不可用时规则引擎降级，仍可出结果）
+            AiScore score = scoreByDualEngine(transcript, record);
 
             // 3. 落库评分结果
             AiQualityInspection upd = new AiQualityInspection();
@@ -319,7 +323,114 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
         return dot >= 0 ? name.substring(dot + 1) : "wav";
     }
 
-    /** 调大模型按四维度评分，解析 JSON；失败抛出由上层置失败 */
+    /**
+     * P1-7：AI + 规则双引擎融合评分。
+     *
+     * <p>规则引擎始终执行；LLM 可用时：compliance/serviceNorm 取两引擎更严值（min），
+     * answerAccuracy/emotionAttitude 取 LLM，违规明细合并并标记来源，totalScore 按四维平均。
+     * LLM 不可用时：仅用规则引擎可评两维（另两维在 dimensions 中为 null，不计入均分），
+     * 质检仍可完成，remark 注明降级——不再因模型抖动整单失败。</p>
+     */
+    private AiScore scoreByDualEngine(String transcript, AiCallRecord record)
+    {
+        QualityRuleEngine.RuleResult rule = qualityRuleEngine.evaluate(transcript);
+        AiScore score = new AiScore();
+        try
+        {
+            AiScore ai = scoreByAi(transcript, record);
+            JsonNode aiDims = MAPPER.readTree(ai.dimensionJson);
+
+            double serviceNorm = Math.min(aiDims.path("serviceNorm").asDouble(100d), rule.serviceNormScore());
+            double compliance = Math.min(aiDims.path("compliance").asDouble(100d), rule.getComplianceScore());
+            double answerAccuracy = aiDims.path("answerAccuracy").asDouble(0d);
+            double emotionAttitude = aiDims.path("emotionAttitude").asDouble(0d);
+
+            ObjectNode fusedDims = MAPPER.createObjectNode();
+            fusedDims.put("serviceNorm", round1(serviceNorm));
+            fusedDims.put("answerAccuracy", round1(answerAccuracy));
+            fusedDims.put("emotionAttitude", round1(emotionAttitude));
+            fusedDims.put("compliance", round1(compliance));
+            score.dimensionJson = MAPPER.writeValueAsString(fusedDims);
+
+            // 违规合并：AI 项（source=ai）+ 规则项（source=rule）
+            ArrayNode merged = MAPPER.createArrayNode();
+            if (ai.violationNodes != null && ai.violationNodes.isArray())
+            {
+                for (JsonNode item : ai.violationNodes)
+                {
+                    ObjectNode v = merged.addObject();
+                    v.put("keyword", item.path("keyword").asText(""));
+                    v.put("reason", item.path("reason").asText(""));
+                    v.put("source", "ai");
+                }
+            }
+            for (QualityRuleEngine.RuleViolation rv : rule.getViolations())
+            {
+                ObjectNode v = merged.addObject();
+                v.put("keyword", rv.getKeyword());
+                v.put("reason", rv.getReason());
+                v.put("source", "rule");
+            }
+            score.violationNodes = merged;
+            score.violationJson = MAPPER.writeValueAsString(merged);
+            score.totalScore = BigDecimal.valueOf(round1(
+                    (serviceNorm + compliance + answerAccuracy + emotionAttitude) / 4d));
+            score.remark = "AI+规则双引擎融合评分。" + (ai.remark == null ? "" : ai.remark);
+            return score;
+        }
+        catch (RuntimeException e)
+        {
+            // scoreByAi 的模型调用/解析失败：规则引擎降级（不重投、不置失败）
+            log.warn("AI 评分不可用，质检降级为规则引擎评分 recordId={}: {}",
+                    record.getRecordId(), e.getMessage());
+            return ruleOnlyScore(rule, e.getMessage());
+        }
+        catch (Exception e)
+        {
+            return ruleOnlyScore(rule, e.getMessage());
+        }
+    }
+
+    /** 仅规则引擎评分：可评两维计分，未评两维 dimensions 中置 null */
+    private AiScore ruleOnlyScore(QualityRuleEngine.RuleResult rule, String failReason)
+    {
+        AiScore score = new AiScore();
+        try
+        {
+            ObjectNode dims = MAPPER.createObjectNode();
+            dims.put("serviceNorm", round1(rule.serviceNormScore()));
+            dims.putNull("answerAccuracy");
+            dims.putNull("emotionAttitude");
+            dims.put("compliance", round1(rule.getComplianceScore()));
+            score.dimensionJson = MAPPER.writeValueAsString(dims);
+
+            ArrayNode violations = MAPPER.createArrayNode();
+            for (QualityRuleEngine.RuleViolation rv : rule.getViolations())
+            {
+                ObjectNode v = violations.addObject();
+                v.put("keyword", rv.getKeyword());
+                v.put("reason", rv.getReason());
+                v.put("source", "rule");
+            }
+            score.violationNodes = violations;
+            score.violationJson = MAPPER.writeValueAsString(violations);
+            score.totalScore = BigDecimal.valueOf(round1(
+                    (rule.serviceNormScore() + rule.getComplianceScore()) / 2d));
+            score.remark = "AI 评分不可用，规则引擎降级评分（原因：" + failReason + "）";
+        }
+        catch (Exception ex)
+        {
+            throw new RuntimeException("规则引擎降级评分序列化失败：" + ex.getMessage(), ex);
+        }
+        return score;
+    }
+
+    /** 保留 1 位小数 */
+    private static double round1(double value)
+    {
+        return BigDecimal.valueOf(value).setScale(1, BigDecimal.ROUND_HALF_UP).doubleValue();
+    }
+
     private AiScore scoreByAi(String transcript, AiCallRecord record)
     {
         AiScore score = new AiScore();
@@ -541,6 +652,105 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
             catch (Exception e)
             {
                 log.warn("质检驳回站内信投递失败 inspectionId={}: {}", inspection.getInspectionId(), e.getMessage());
+            }
+        }
+        return rows;
+    }
+
+    @Override
+    public int appeal(Long inspectionId, String appealReason, Long currentUserId)
+    {
+        if (inspectionId == null)
+        {
+            throw new IllegalArgumentException("质检ID不能为空");
+        }
+        if (currentUserId == null)
+        {
+            throw new IllegalArgumentException("无法识别当前坐席身份");
+        }
+        String reason = appealReason == null ? "" : appealReason.trim();
+        if (reason.isEmpty())
+        {
+            throw new IllegalArgumentException("申诉理由不能为空");
+        }
+        AiQualityInspection full = inspectionMapper.selectAiQualityInspectionByInspectionId(inspectionId);
+        if (full == null || !"2".equals(full.getAiStatus()))
+        {
+            throw new IllegalArgumentException("仅 AI 质检已完成的记录可发起申诉");
+        }
+        Long ownerUserId = resolveAgentUserId(full.getAgentId());
+        if (ownerUserId == null || !ownerUserId.equals(currentUserId))
+        {
+            throw new IllegalArgumentException("仅被检坐席本人可发起申诉");
+        }
+        int rows = inspectionMapper.appeal(inspectionId, reason);
+        if (rows == 0)
+        {
+            throw new IllegalArgumentException("申诉提交失败：已有待班组长复核的申诉，请勿重复提交");
+        }
+        log.info("质检申诉已提交 inspectionId={} agentId={}", inspectionId, full.getAgentId());
+        return rows;
+    }
+
+    @Override
+    public int appealReview(AiQualityInspection inspection)
+    {
+        if (inspection == null || inspection.getInspectionId() == null)
+        {
+            throw new IllegalArgumentException("质检ID不能为空");
+        }
+        String result = inspection.getAppealStatus();
+        if (!"2".equals(result) && !"3".equals(result))
+        {
+            throw new IllegalArgumentException("申诉复核结果只能为 2维持 或 3改分");
+        }
+        if ("3".equals(result))
+        {
+            if (inspection.getAdjustedScore() == null)
+            {
+                throw new IllegalArgumentException("申诉成立改分时必须填写调整分数");
+            }
+            double s = inspection.getAdjustedScore().doubleValue();
+            if (s < 0d || s > 100d)
+            {
+                throw new IllegalArgumentException("调整分数须在 0-100 之间");
+            }
+        }
+        else
+        {
+            // 维持原判不写改分值，防止前端夹带
+            inspection.setAdjustedScore(null);
+        }
+        inspection.setUpdateBy(inspection.getReviewerName());
+        int rows = inspectionMapper.appealReview(inspection);
+        if (rows == 0)
+        {
+            throw new IllegalArgumentException("申诉复核失败：该申诉不在待复核状态（可能已被处理）");
+        }
+
+        // 站内信通知坐席复核结果
+        if (messageNotifyDispatcher != null)
+        {
+            try
+            {
+                AiQualityInspection full = inspectionMapper
+                        .selectAiQualityInspectionByInspectionId(inspection.getInspectionId());
+                Long receiver = resolveAgentUserId(full == null ? null : full.getAgentId());
+                if (receiver != null)
+                {
+                    boolean changed = "3".equals(result);
+                    messageNotifyDispatcher.notify(receiver, "4",
+                            changed ? "质检申诉成立，已改分" : "质检申诉复核完成，维持原判",
+                            "您的质检申诉（质检ID " + inspection.getInspectionId() + "）复核结果："
+                                    + (changed ? "申诉成立，调整后分数 " + inspection.getAdjustedScore()
+                                               : "维持原判") + "。",
+                            "quality", inspection.getInspectionId(),
+                            inspection.getReviewerName());
+                }
+            }
+            catch (Exception e)
+            {
+                log.warn("申诉复核站内信投递失败 inspectionId={}: {}", inspection.getInspectionId(), e.getMessage());
             }
         }
         return rows;

@@ -58,4 +58,22 @@ public interface AiQualityInspectionMapper
      */
     public int updateRiskWarningId(@Param("inspectionId") Long inspectionId,
                                    @Param("riskWarningId") Long riskWarningId);
+
+    /**
+     * P1-7：坐席发起申诉（状态推进为待复核）
+     */
+    public int appeal(@Param("inspectionId") Long inspectionId,
+                      @Param("appealReason") String appealReason);
+
+    /**
+     * P1-10：查询近 N 天 AI 已完成且分数达标的质检记录（知识沉淀扫描，按时间倒序限量）。
+     */
+    public List<AiQualityInspection> selectHighScoreInspections(
+            @Param("days") int days, @Param("minScore") java.math.BigDecimal minScore,
+            @Param("limit") int limit);
+
+    /**
+     * P1-7：班组长申诉复核（维持/改分）
+     */
+    public int appealReview(AiQualityInspection inspection);
 }

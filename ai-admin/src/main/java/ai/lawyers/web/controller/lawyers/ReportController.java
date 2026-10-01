@@ -1,15 +1,7 @@
 package ai.lawyers.web.controller.lawyers;
 
 import java.io.IOException;
-import java.net.URLEncoder;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 import javax.servlet.http.HttpServletResponse;
-import org.apache.poi.xssf.usermodel.XSSFCell;
-import org.apache.poi.xssf.usermodel.XSSFRow;
-import org.apache.poi.xssf.usermodel.XSSFSheet;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,7 +18,8 @@ import ai.lawyers.system.task.StatMinuteScheduleTask;
 /**
  * 独立多维统计报表 Controller（P3-D6）
  *
- * <p>四类报表：呼叫 / 坐席服务 / 质检 / 业务工单，支持日/周/月维度与 Excel 导出。</p>
+ * <p>四类报表：呼叫 / 坐席服务 / 质检 / 业务工单，支持日/周/月维度与 Excel 导出。
+ * P0-2 起导出列定义与 POI 输出下沉 {@link IReportService}，本类只做路由。</p>
  *
  * @author ai-lawyers
  */
@@ -106,99 +99,12 @@ public class ReportController extends BaseController
         return success(reportService.businessReport(beginTime, endTime, granularity));
     }
 
-    /** 报表导出（Excel，列定义按报表类型固定） */
+    /** 报表导出（Excel，列定义与 POI 输出由 Service 承担） */
     @PreAuthorize("@ss.hasPermi('lawyers:report:export')")
     @PostMapping("/{type}/export")
     public void export(@PathVariable("type") String type, String beginTime, String endTime,
                        String granularity, HttpServletResponse response) throws IOException
     {
-        List<Map<String, Object>> rows;
-        LinkedHashMap<String, String> columns;
-        String sheetName;
-        switch (type)
-        {
-            case "call":
-                rows = reportService.callReport(beginTime, endTime, granularity);
-                columns = new LinkedHashMap<>();
-                columns.put("period", "周期");
-                columns.put("totalCalls", "呼叫总量");
-                columns.put("answeredCalls", "接通量");
-                columns.put("missedCalls", "未接量");
-                columns.put("transferredCalls", "转接量");
-                columns.put("answerRate", "接通率(%)");
-                columns.put("avgDurationSec", "平均通话时长(秒)");
-                sheetName = "呼叫报表";
-                break;
-            case "service":
-                rows = reportService.serviceReport(beginTime, endTime);
-                columns = new LinkedHashMap<>();
-                columns.put("agentName", "坐席");
-                columns.put("totalCalls", "接线量");
-                columns.put("answeredCalls", "接通量");
-                columns.put("answerRate", "接通率(%)");
-                columns.put("avgDurationSec", "平均通话时长(秒)");
-                columns.put("totalTalkSec", "总通话时长(秒)");
-                sheetName = "坐席服务报表";
-                break;
-            case "quality":
-                rows = reportService.qualityReport(beginTime, endTime, granularity);
-                columns = new LinkedHashMap<>();
-                columns.put("period", "周期");
-                columns.put("inspections", "质检量");
-                columns.put("avgScore", "平均分");
-                columns.put("reviewedCount", "已复核");
-                columns.put("pendingCount", "待复核");
-                columns.put("riskCount", "关联风险数");
-                sheetName = "质检报表";
-                break;
-            case "business":
-                rows = reportService.businessReport(beginTime, endTime, granularity);
-                columns = new LinkedHashMap<>();
-                columns.put("period", "周期");
-                columns.put("totalTickets", "工单量");
-                columns.put("closedTickets", "办结量");
-                columns.put("closeRate", "办结率(%)");
-                columns.put("overdueTickets", "超时量");
-                columns.put("avgCloseMinutes", "平均办结时长(分钟)");
-                sheetName = "业务工单报表";
-                break;
-            default:
-                throw new IllegalArgumentException("未知报表类型: " + type);
-        }
-        writeExcel(sheetName, columns, rows, response);
-    }
-
-    /** 简单 XLSX 输出：首行表头 + 数据行（Map 按键取值，null 输出空串） */
-    private void writeExcel(String sheetName, LinkedHashMap<String, String> columns,
-                            List<Map<String, Object>> rows, HttpServletResponse response) throws IOException
-    {
-        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-        String fileName = URLEncoder.encode(sheetName + "_" + System.currentTimeMillis() + ".xlsx", "UTF-8")
-                .replaceAll("\\+", "%20");
-        response.setHeader("Content-Disposition", "attachment; filename=\"" + fileName + "\"; filename*=UTF-8''" + fileName);
-
-        try (XSSFWorkbook wb = new XSSFWorkbook())
-        {
-            XSSFSheet sheet = wb.createSheet(sheetName);
-            XSSFRow header = sheet.createRow(0);
-            int col = 0;
-            for (String title : columns.values())
-            {
-                header.createCell(col++).setCellValue(title);
-            }
-            int rowIdx = 1;
-            for (Map<String, Object> rowData : rows)
-            {
-                XSSFRow row = sheet.createRow(rowIdx++);
-                col = 0;
-                for (String key : columns.keySet())
-                {
-                    XSSFCell cell = row.createCell(col++);
-                    Object value = rowData.get(key);
-                    cell.setCellValue(value == null ? "" : String.valueOf(value));
-                }
-            }
-            wb.write(response.getOutputStream());
-        }
+        reportService.exportExcel(type, beginTime, endTime, granularity, response);
     }
 }

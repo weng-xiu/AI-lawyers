@@ -82,6 +82,25 @@ public class AiQualityInspection extends BaseEntity
     /** 联动生成的风险预警ID */
     private Long riskWarningId;
 
+    /** P1-7：申诉状态 0未申诉 1待班组长复核 2维持原判 3申诉成立已改分 */
+    @Excel(name = "申诉状态", readConverterExp = "0=未申诉,1=待复核,2=维持,3=已改分")
+    private String appealStatus;
+
+    /** 坐席申诉理由 */
+    private String appealReason;
+
+    /** 申诉时间 */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Excel(name = "申诉时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    private Date appealTime;
+
+    /** 班组长申诉复核说明 */
+    private String appealReviewRemark;
+
+    /** 申诉成立后的调整分数（null=未调整，原始分保留在 totalScore 变更前留痕于复核说明） */
+    @Excel(name = "调整后分数")
+    private BigDecimal adjustedScore;
+
     /** 联表回显：坐席名称 */
     @Excel(name = "坐席名称")
     private String agentName;
@@ -142,4 +161,19 @@ public class AiQualityInspection extends BaseEntity
 
     public String getAgentName() { return agentName; }
     public void setAgentName(String agentName) { this.agentName = agentName; }
+
+    public String getAppealStatus() { return appealStatus; }
+    public void setAppealStatus(String appealStatus) { this.appealStatus = appealStatus; }
+
+    public String getAppealReason() { return appealReason; }
+    public void setAppealReason(String appealReason) { this.appealReason = appealReason; }
+
+    public Date getAppealTime() { return appealTime; }
+    public void setAppealTime(Date appealTime) { this.appealTime = appealTime; }
+
+    public String getAppealReviewRemark() { return appealReviewRemark; }
+    public void setAppealReviewRemark(String appealReviewRemark) { this.appealReviewRemark = appealReviewRemark; }
+
+    public BigDecimal getAdjustedScore() { return adjustedScore; }
+    public void setAdjustedScore(BigDecimal adjustedScore) { this.adjustedScore = adjustedScore; }
 }

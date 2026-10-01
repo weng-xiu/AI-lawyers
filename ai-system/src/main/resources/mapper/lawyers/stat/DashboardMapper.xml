@@ -35,6 +35,55 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by timeLabel
     </select>
 
+    <!--
+      P0-2：呼叫汇总预聚合版。
+      四项计数来自 ai_stat_minute（call_total/answered/missed/transferred，口径与实时版一致），
+      avgDuration/outboundCalls/avgQueueWaitMs/abandonRate 仍来自原有表实时聚合。
+      注意：统计区间须为物化表已覆盖范围（可用 /lawyers/report/stat/backfill 回填历史）。
+    -->
+    <select id="selectCallSummaryPreagg" resultType="map">
+        select
+               (select ifnull(sum(metric_value), 0) from ai_stat_minute
+                 where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                   and dimension = 'ALL' and metric_key = 'call_total') as totalCalls,
+               (select ifnull(sum(metric_value), 0) from ai_stat_minute
+                 where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                   and dimension = 'ALL' and metric_key = 'call_answered') as answeredCalls,
+               (select ifnull(sum(metric_value), 0) from ai_stat_minute
+                 where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                   and dimension = 'ALL' and metric_key = 'call_missed') as missedCalls,
+               (select ifnull(sum(metric_value), 0) from ai_stat_minute
+                 where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                   and dimension = 'ALL' and metric_key = 'call_transferred') as transferredCalls,
+               ifnull(round(avg(case when status = '1' then duration end), 0), 0) as avgDuration,
+               ifnull((select count(*) from ai_call_dial_log
+                        where create_time &gt;= #{beginTime} and create_time &lt; #{endTime}), 0) as outboundCalls,
+               ifnull((select round(avg(queue_wait_ms), 0) from ai_call_dial_log
+                        where create_time &gt;= #{beginTime} and create_time &lt; #{endTime}
+                          and queue_wait_ms is not null), 0) as avgQueueWaitMs,
+               ifnull((select round(
+                           sum(case when queue_status = '3' then 1 else 0 end) / nullif(count(*), 0) * 100, 2)
+                        from ai_call_queue
+                        where enqueue_time &gt;= #{beginTime} and enqueue_time &lt; #{endTime}), 0) as abandonRate
+        from ai_call_record
+        where call_time &gt;= #{beginTime} and call_time &lt; #{endTime}
+    </select>
+
+    <!-- P0-2：呼叫趋势预聚合版——分钟级物化数据按小时上卷，字段契约与实时版完全一致 -->
+    <select id="selectCallTrendPreagg" resultType="map">
+        select date_format(stat_time, '%Y-%m-%d %H:00') as timeLabel,
+               ifnull(sum(case when metric_key = 'call_total' then metric_value else 0 end), 0) as totalCalls,
+               ifnull(sum(case when metric_key = 'call_answered' then metric_value else 0 end), 0) as answeredCalls,
+               ifnull(sum(case when metric_key = 'call_missed' then metric_value else 0 end), 0) as missedCalls,
+               ifnull(sum(case when metric_key = 'call_transferred' then metric_value else 0 end), 0) as transferredCalls
+        from ai_stat_minute
+        where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+          and dimension = 'ALL'
+          and metric_key in ('call_total', 'call_answered', 'call_missed', 'call_transferred')
+        group by date_format(stat_time, '%Y-%m-%d %H:00')
+        order by timeLabel
+    </select>
+
     <select id="selectCategoryPie" resultType="map">
         select ifnull(c.category_name, '未分类') as name, count(*) as value
         from ai_call_record cr

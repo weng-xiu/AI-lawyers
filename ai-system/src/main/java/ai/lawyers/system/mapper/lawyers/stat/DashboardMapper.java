@@ -18,6 +18,16 @@ public interface DashboardMapper
     /** 呼叫趋势（按小时桶）：呼入/接通/未接/转接 */
     List<Map<String, Object>> selectCallTrend(@Param("beginTime") Date beginTime, @Param("endTime") Date endTime);
 
+    /**
+     * P0-2：呼叫汇总（四项计数读 ai_stat_minute 分钟级物化表，其余指标仍实时聚合）。
+     */
+    Map<String, Object> selectCallSummaryPreagg(@Param("beginTime") Date beginTime, @Param("endTime") Date endTime);
+
+    /**
+     * P0-2：呼叫趋势（ai_stat_minute 分钟级数据上卷为小时桶，字段契约与 selectCallTrend 相同）。
+     */
+    List<Map<String, Object>> selectCallTrendPreagg(@Param("beginTime") Date beginTime, @Param("endTime") Date endTime);
+
     /** 咨询分类占比 */
     List<Map<String, Object>> selectCategoryPie(@Param("beginTime") Date beginTime, @Param("endTime") Date endTime);
 

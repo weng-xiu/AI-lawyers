@@ -82,6 +82,11 @@ public interface AiLegalKnowledgeMapper
     public int deleteAiLegalKnowledgeById(Long knowledgeId);
 
     /**
+     * P1-10：按来源去重键计数（source_url 存 source://call/{id} 或 source://ticket/{id}）。
+     */
+    public int countBySourceUrl(String sourceUrl);
+
+    /**
      * 批量删除法律知识库
      * 
      * @param knowledgeIds 需要删除的数据ID

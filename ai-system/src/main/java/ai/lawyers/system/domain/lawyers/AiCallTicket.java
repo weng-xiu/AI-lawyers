@@ -54,6 +54,13 @@ public class AiCallTicket extends BaseEntity
     @Excel(name = "处理内容")
     private String processContent;
 
+    /** 标题+内容语义向量字节（小端 float32，内存索引备份；不序列化到前端） */
+    @JsonIgnore
+    private byte[] contentEmbedding;
+
+    /** 向量维度（0=未向量化） */
+    private Integer embeddingDim;
+
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "处理时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     private Date processTime;
@@ -211,9 +218,29 @@ public class AiCallTicket extends BaseEntity
         this.processContent = processContent;
     }
 
-    public String getProcessContent() 
+    public String getProcessContent()
     {
         return processContent;
+    }
+
+    public byte[] getContentEmbedding()
+    {
+        return contentEmbedding;
+    }
+
+    public void setContentEmbedding(byte[] contentEmbedding)
+    {
+        this.contentEmbedding = contentEmbedding;
+    }
+
+    public Integer getEmbeddingDim()
+    {
+        return embeddingDim;
+    }
+
+    public void setEmbeddingDim(Integer embeddingDim)
+    {
+        this.embeddingDim = embeddingDim;
     }
     public void setProcessTime(Date processTime) 
     {

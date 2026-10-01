@@ -30,7 +30,8 @@ import ai.lawyers.system.service.lawyers.cluster.RedisLeaderLock;
  * <p>幂等：唯一键 uk_stat(stat_time, dimension, metric_key) 冲突覆盖写，
  * 同一分钟重复聚合结果一致；多实例经 {@link RedisLeaderLock} 保证单实例执行。</p>
  *
- * <p>大屏与 D6 报表当前仍读实时聚合，待本表数据积累后仅切 Mapper 数据源（契约已预留）。</p>
+ * <p>P0-2 起大屏呼叫汇总/趋势已切换读取本表（call.dashboard.preagg-enabled 默认开启），
+ * 历史区间由 /lawyers/report/stat/backfill 手工回填。</p>
  *
  * @author ai-lawyers
  */

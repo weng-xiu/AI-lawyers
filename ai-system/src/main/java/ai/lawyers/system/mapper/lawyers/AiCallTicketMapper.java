@@ -77,4 +77,26 @@ public interface AiCallTicketMapper
                                                    @Param("phrase2") String phrase2,
                                                    @Param("excludeRecordId") Long excludeRecordId,
                                                    @Param("limit") int limit);
+
+    /**
+     * P1-8：加载已向量化的办结/归档工单（启动重建内存索引用，不调 embedding）。
+     */
+    public List<AiCallTicket> selectVectorIndexTickets();
+
+    /**
+     * P1-8：工单向量回填（embedding 字节 + 维度）。
+     */
+    public int updateTicketEmbedding(@Param("ticketId") Long ticketId,
+                                     @Param("contentEmbedding") byte[] contentEmbedding,
+                                     @Param("embeddingDim") int embeddingDim);
+
+    /**
+     * P1-8：查询已办结/归档但尚未向量化的工单（异步补齐扫描）。
+     */
+    public List<AiCallTicket> selectClosedTicketsWithoutEmbedding();
+
+    /**
+     * P1-8：按ID批量查工单（向量命中后加载详情）。
+     */
+    public List<AiCallTicket> selectAiCallTicketByIds(@Param("ticketIds") List<Long> ticketIds);
 }

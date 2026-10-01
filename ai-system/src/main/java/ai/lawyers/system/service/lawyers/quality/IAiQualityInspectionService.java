@@ -45,4 +45,22 @@ public interface IAiQualityInspectionService
      * @return 结果
      */
     int review(AiQualityInspection inspection);
+
+    /**
+     * P1-7：被检坐席发起本人申诉（仅 AI 已完成的记录；非本人记录/非法状态/空理由抛 IllegalArgumentException）。
+     *
+     * @param inspectionId  质检ID
+     * @param appealReason  申诉理由
+     * @param currentUserId 当前登录用户ID（须与被检坐席绑定用户一致）
+     * @return 结果
+     */
+    int appeal(Long inspectionId, String appealReason, Long currentUserId);
+
+    /**
+     * P1-7：班组长复核申诉——维持原判（appealStatus=2）或改分（=3，adjustedScore 必填）。
+     *
+     * @param inspection 含 inspectionId/appealStatus/appealReviewRemark/adjustedScore/reviewer 信息
+     * @return 结果
+     */
+    int appealReview(AiQualityInspection inspection);
 }

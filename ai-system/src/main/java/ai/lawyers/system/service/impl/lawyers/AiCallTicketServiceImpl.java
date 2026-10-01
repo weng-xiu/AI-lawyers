@@ -19,6 +19,7 @@ import ai.lawyers.system.mapper.lawyers.AiCallTicketMapper;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
 import ai.lawyers.system.service.lawyers.IAiSlaPolicyService;
 import ai.lawyers.system.service.lawyers.queue.MessageNotifyDispatcher;
+import ai.lawyers.system.service.lawyers.rag.TicketVectorService;
 
 @Service
 public class AiCallTicketServiceImpl implements IAiCallTicketService 
@@ -34,6 +35,10 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
     /** F9：按策略自动计算 SLA 截止时间（无匹配策略时不阻断建单） */
     @Autowired(required = false)
     private IAiSlaPolicyService slaPolicyService;
+
+    /** P1-8：工单办结/归档时入语义向量索引（未装配模型时静默） */
+    @Autowired(required = false)
+    private TicketVectorService ticketVectorService;
 
     @Override
     public AiCallTicket selectAiCallTicketByTicketId(Long ticketId)
@@ -97,19 +102,36 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
     @Override
     public int updateAiCallTicket(AiCallTicket aiCallTicket)
     {
-        return aiCallTicketMapper.updateAiCallTicket(aiCallTicket);
+        int rows = aiCallTicketMapper.updateAiCallTicket(aiCallTicket);
+        // P1-8：编辑路径办结/归档时入语义索引
+        if (rows > 0 && aiCallTicket.getTicketId() != null
+                && ("2".equals(aiCallTicket.getStatus()) || "3".equals(aiCallTicket.getStatus())))
+        {
+            indexIfReady(aiCallTicket.getTicketId());
+        }
+        return rows;
     }
 
     @Override
     public int deleteAiCallTicketByTicketId(Long ticketId)
     {
-        return aiCallTicketMapper.deleteAiCallTicketByTicketId(ticketId);
+        int rows = aiCallTicketMapper.deleteAiCallTicketByTicketId(ticketId);
+        removeIndexIfReady(ticketId);
+        return rows;
     }
 
     @Override
     public int deleteAiCallTicketByTicketIds(Long[] ticketIds)
     {
-        return aiCallTicketMapper.deleteAiCallTicketByTicketIds(ticketIds);
+        int rows = aiCallTicketMapper.deleteAiCallTicketByTicketIds(ticketIds);
+        if (ticketVectorService != null && ticketIds != null)
+        {
+            for (Long id : ticketIds)
+            {
+                ticketVectorService.removeTicket(id);
+            }
+        }
+        return rows;
     }
 
     @Override
@@ -121,7 +143,12 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
     @Override
     public int updateTicketStatus(Long ticketId, String status)
     {
-        return aiCallTicketMapper.updateTicketStatus(ticketId, status);
+        int rows = aiCallTicketMapper.updateTicketStatus(ticketId, status);
+        if (rows > 0 && ("2".equals(status) || "3".equals(status)))
+        {
+            indexIfReady(ticketId);
+        }
+        return rows;
     }
 
     @Override
@@ -215,5 +242,30 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
         node.put("color", color);
         node.put("icon", icon);
         timeline.add(node);
+    }
+
+    /** P1-8：触发向量索引（服务未装配时静默） */
+    private void indexIfReady(Long ticketId)
+    {
+        if (ticketVectorService != null)
+        {
+            try
+            {
+                ticketVectorService.indexTicketAsync(ticketId);
+            }
+            catch (Exception e)
+            {
+                log.warn("工单向量索引触发失败 ticketId={}: {}", ticketId, e.getMessage());
+            }
+        }
+    }
+
+    /** P1-8：从内存索引移除（服务未装配时静默） */
+    private void removeIndexIfReady(Long ticketId)
+    {
+        if (ticketVectorService != null)
+        {
+            ticketVectorService.removeTicket(ticketId);
+        }
     }
 }

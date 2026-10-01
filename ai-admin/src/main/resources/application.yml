@@ -80,6 +80,10 @@ management:
 
 # P3-C6：在途通话排空配置（无损发布 drain 参数）
 app:
+  # P0-3：生产安全自检开关——置 true（环境变量 APP_SECURITY_GUARD=true）或启用 Spring prod profile 后，
+  # 启动时校验 JWT/数据库/Druid 口令，命中空值或内置默认值即拒绝启动（fail-fast）。默认关闭，开发零影响
+  security:
+    guard: ${APP_SECURITY_GUARD:false}
   shutdown:
     drain:
       # 等待在途通话结束的最长时间（秒），须 < spring.lifecycle.timeout-per-shutdown-phase
@@ -276,6 +280,8 @@ ai:
     auto-on-hangup: ${AI_QUALITY_AUTO_ON_HANGUP:true}
     # 采样率：1.0 全量质检；可按坐席规模调为 0.1~0.5 抽检
     sample-rate: ${AI_QUALITY_SAMPLE_RATE:1.0}
+    # P1-7：规则引擎违禁词（逗号分隔；不配置则用代码内置清单：承诺胜诉/包赢/私自收费/风险代理等）
+    banned-words: ${AI_QUALITY_BANNED_WORDS:承诺胜诉,包赢,保证打赢,官司包在我身上,私自收费,私下收费,风险代理,私了费,拿钱办事}
   # P3-E3 话后 AI 通话小结
   call-summary:
     # 小结总开关：关闭后手动接口与质检联动均不生成
@@ -306,6 +312,10 @@ ai:
     law-limit: ${AI_COPILOT_LAW_LIMIT:3}
     # 相似工单条数（已办结/已归档）
     ticket-limit: ${AI_COPILOT_TICKET_LIMIT:3}
+    # P1-8：相似工单语义向量检索开关（向量持久化在 ai_call_ticket；关闭回退 LIKE 短语匹配）
+    ticket-vector-enabled: ${AI_COPILOT_TICKET_VECTOR_ENABLED:true}
+    # P1-8：工单向量命中阈值（余弦相似度，低于不推荐）
+    ticket-similarity-threshold: ${AI_COPILOT_TICKET_SIMILARITY_THRESHOLD:0.5}
 
 # ============================================================
 # 语音引擎配置（TTS / ASR）。ASR 为 OpenAI/Whisper 兼容端点
@@ -382,8 +392,9 @@ content:
 call:
   # ---------- 录音文件（T4-1 质检读取本地录音） ----------
   recording:
-    # 录音文件基础路径（对应 FreeSWITCH recordings_dir）
-    base-path: ${CALL_RECORDING_BASE_PATH:C:/Program Files/FreeSWITCH/recordings}
+    # 录音文件基础路径（对应 FreeSWITCH recordings_dir）：默认相对工作目录的 recordings（跨平台），
+    # 生产/本机 FreeSWITCH 须经 CALL_RECORDING_BASE_PATH 显式指定真实目录（如 /var/lib/freeswitch/recordings）
+    base-path: ${CALL_RECORDING_BASE_PATH:recordings}
     # F2：存储类型（local=本地文件系统，s3=对象存储；默认 local 完全向后兼容）
     type: ${CALL_RECORDING_TYPE:local}
     # F2：对象存储配置（type=s3 时必填）
@@ -406,6 +417,24 @@ call:
       key-prefix: ${CALL_RECORDING_S3_KEY_PREFIX:recordings/}
       # 上传成功后是否删除本地文件
       delete-local-after-upload: ${CALL_RECORDING_S3_DELETE_LOCAL:true}
+
+    # P0-5：上传/加密 worker 池（S3 上传与本地加密共用）——多 worker 并行，失败指数退避重试
+    upload:
+      workers: ${CALL_RECORDING_UPLOAD_WORKERS:2}
+      queue-capacity: ${CALL_RECORDING_UPLOAD_QUEUE_CAPACITY:1000}
+      # 单文件最大尝试次数（含首次），全部失败后保留本地文件待人工/定时扫描
+      max-attempts: ${CALL_RECORDING_UPLOAD_MAX_ATTEMPTS:3}
+      # 退避基数（毫秒）：第 N 次失败后等待 base * 2^(N-1)
+      retry-backoff-base-ms: ${CALL_RECORDING_UPLOAD_BACKOFF_BASE_MS:1000}
+      # RECORD_STOP 后等待文件落盘就绪：文件存在+长度>0+长度连续两次轮询不变
+      ready-timeout-seconds: ${CALL_RECORDING_READY_TIMEOUT_SECONDS:30}
+      ready-poll-interval-ms: ${CALL_RECORDING_READY_POLL_INTERVAL_MS:500}
+
+  # ---------- P0-2：运营大屏预聚合数据源 ----------
+  dashboard:
+    # true（默认）：呼叫汇总/趋势读 ai_stat_minute 分钟级物化表（降低大屏实时聚合压力）；
+    # false：回退业务表实时聚合。查历史区间前须先用 POST /lawyers/report/stat/backfill 回填
+    preagg-enabled: ${DASHBOARD_PREAGG_ENABLED:true}
 
   # ---------- P3-B2：统一 PBX 事件入 Stream 开关 ----------
   # true（默认）：ESL/AMI 两侧桥的事件统一投递 stream:call-event 异步消费（CallEventBus 入队 →

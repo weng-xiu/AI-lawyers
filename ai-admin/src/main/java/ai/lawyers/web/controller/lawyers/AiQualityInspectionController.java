@@ -101,4 +101,41 @@ public class AiQualityInspectionController extends BaseController
             return AjaxResult.error("质检触发失败：" + e.getMessage());
         }
     }
+
+    /**
+     * P1-7：被检坐席对本人质检结果发起申诉（登录坐席即可，服务端校验本人归属）。
+     */
+    @Log(title = "质检申诉", businessType = BusinessType.INSERT)
+    @PostMapping("/appeal/{inspectionId}")
+    public AjaxResult appeal(@PathVariable("inspectionId") Long inspectionId, String appealReason)
+    {
+        try
+        {
+            return toAjax(qualityInspectionService.appeal(inspectionId, appealReason, getUserId()));
+        }
+        catch (IllegalArgumentException e)
+        {
+            return AjaxResult.error(e.getMessage());
+        }
+    }
+
+    /**
+     * P1-7：班组长复核申诉（维持原判/申诉成立改分 + 复核说明），复用质检复核权限。
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:quality:review')")
+    @Log(title = "质检申诉复核", businessType = BusinessType.UPDATE)
+    @PutMapping("/appeal/review")
+    public AjaxResult appealReview(@RequestBody AiQualityInspection inspection)
+    {
+        inspection.setReviewerId(getUserId());
+        inspection.setReviewerName(getUsername());
+        try
+        {
+            return toAjax(qualityInspectionService.appealReview(inspection));
+        }
+        catch (IllegalArgumentException e)
+        {
+            return AjaxResult.error(e.getMessage());
+        }
+    }
 }

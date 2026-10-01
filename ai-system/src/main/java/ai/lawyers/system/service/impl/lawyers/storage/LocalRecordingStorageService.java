@@ -33,8 +33,8 @@ public class LocalRecordingStorageService implements RecordingStorageService
 {
     private static final Logger log = LoggerFactory.getLogger(LocalRecordingStorageService.class);
 
-    /** 录音文件根目录，对应 FreeSWITCH recordings_dir */
-    @Value("${call.recording.base-path:C:/Program Files/FreeSWITCH/recordings}")
+    /** 录音文件根目录，对应 FreeSWITCH recordings_dir；默认相对路径（跨平台），由环境变量覆盖 */
+    @Value("${call.recording.base-path:recordings}")
     private String recordingBasePath;
 
     /** G1-b3：是否启用录音 SM4 加密（默认关闭，灰度） */

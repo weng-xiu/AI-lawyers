@@ -18,6 +18,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="assignUserId"    column="assign_user_id"   />
         <result property="assignUserName"  column="assign_user_name" />
         <result property="processContent"  column="process_content"  />
+        <result property="contentEmbedding" column="content_embedding" />
+        <result property="embeddingDim"   column="embedding_dim"    />
         <result property="processTime"     column="process_time"     />
         <result property="closeTime"       column="close_time"       />
         <result property="callerNumber"    column="caller_number"    />
@@ -296,4 +298,36 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{ticketId}
         </foreach>
     </delete>
+
+    <!-- P1-8：加载已向量化的办结/归档工单（只读必要列含 blob） -->
+    <select id="selectVectorIndexTickets" resultMap="AiCallTicketResult">
+        select t.ticket_id, t.content_embedding, t.embedding_dim
+        from ai_call_ticket t
+        where t.status in ('2', '3') and t.embedding_dim &gt; 0 and t.content_embedding is not null
+    </select>
+
+    <update id="updateTicketEmbedding">
+        update ai_call_ticket
+        set content_embedding = #{contentEmbedding}, embedding_dim = #{embeddingDim}
+        where ticket_id = #{ticketId}
+    </update>
+
+    <!-- 待补齐向量化工单（限制 200 条/批，避免单次 embedding 风暴） -->
+    <select id="selectClosedTicketsWithoutEmbedding" resultMap="AiCallTicketResult">
+        select t.ticket_id, t.ticket_no, t.title, t.content, t.status
+        from ai_call_ticket t
+        where t.status in ('2', '3') and (t.embedding_dim = 0 or t.content_embedding is null)
+        order by t.ticket_id desc
+        limit 200
+    </select>
+
+    <select id="selectAiCallTicketByIds" resultMap="AiCallTicketResult">
+        select t.ticket_id, t.ticket_no, t.record_id, t.title,
+               substring(t.content, 1, 120) as content, t.status
+        from ai_call_ticket t
+        where t.ticket_id in
+        <foreach item="ticketId" collection="ticketIds" open="(" separator="," close=")">
+            #{ticketId}
+        </foreach>
+    </select>
 </mapper>

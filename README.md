@@ -29,11 +29,11 @@ AI律师话务系统是一套面向公共法律服务热线的**专业呼叫中�
 | 层次 | 技术选型 | 说明 |
 |------|----------|------|
 | 后端框架 | Spring Boot + Spring Security | 提供RESTful API与安全认证 |
-| ORM | MyBatis Plus | 简化数据访问 |
+| ORM | MyBatis + PageHelper | 数据访问与分页 |
 | 前端 | Vue 2 + Element UI | 坐席工作台与管理后台UI |
-| 工作流 | Flowable | 工单流转与审批 |
+| 工作流 | 自研状态机 + SLA 策略 | 工单流转（Flowable 未引入，配置化流程编排规划中） |
 | 语音网关 | SIP协议（FreeSWITCH / Asterisk） | 电话接入与呼叫控制 |
-| 语音识别 | ASR（阿里云/科大讯飞） | 实时转写通话内容 |
+| 语音识别 | ASR（阿里 DashScope / Whisper 兼容端点） | 实时转写通话内容（科大讯飞未接入） |
 | 语音合成 | TTS | 自动播报IVR提示 |
 | 数据库 | MySQL + Redis | 业务数据存储与缓存 |
 | 实时通信 | WebSocket | 坐席状态同步、来电弹屏 |

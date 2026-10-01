@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiTicketFlowDefinitionMapper">
+
+    <resultMap type="AiTicketFlowDefinition" id="FlowDefinitionResult">
+        <result property="flowId"       column="flow_id"       />
+        <result property="flowCode"     column="flow_code"     />
+        <result property="statusFrom"   column="status_from"   />
+        <result property="actionCode"   column="action_code"   />
+        <result property="actionName"   column="action_name"   />
+        <result property="targetStatus" column="target_status" />
+        <result property="roleKey"      column="role_key"      />
+        <result property="sortNo"       column="sort_no"       />
+        <result property="status"       column="status"        />
+        <result property="createTime"   column="create_time"   />
+        <result property="updateTime"   column="update_time"   />
+    </resultMap>
+
+    <sql id="columns">
+        flow_id, flow_code, status_from, action_code, action_name, target_status,
+        role_key, sort_no, status, create_time, update_time
+    </sql>
+
+    <select id="selectActions" resultMap="FlowDefinitionResult">
+        select <include refid="columns"/> from ai_ticket_flow_definition
+        where status = '0' and flow_code = #{flowCode} and status_from = #{statusFrom}
+        order by sort_no, flow_id
+    </select>
+
+    <select id="selectByFlowCode" resultMap="FlowDefinitionResult">
+        select <include refid="columns"/> from ai_ticket_flow_definition
+        where flow_code = #{flowCode}
+        order by status_from, sort_no
+    </select>
+
+    <select id="selectRule" resultMap="FlowDefinitionResult">
+        select <include refid="columns"/> from ai_ticket_flow_definition
+        where status = '0' and flow_code = #{flowCode}
+          and status_from = #{statusFrom} and action_code = #{actionCode}
+        limit 1
+    </select>
+
+    <insert id="insertDefinition" parameterType="AiTicketFlowDefinition"
+            useGeneratedKeys="true" keyProperty="flowId">
+        insert into ai_ticket_flow_definition
+            (flow_code, status_from, action_code, action_name, target_status,
+             role_key, sort_no, status, create_time)
+        values
+            (#{flowCode}, #{statusFrom}, #{actionCode}, #{actionName}, #{targetStatus},
+             #{roleKey}, #{sortNo}, #{status}, sysdate())
+    </insert>
+
+    <update id="updateDefinition" parameterType="AiTicketFlowDefinition">
+        update ai_ticket_flow_definition
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="actionName != null">action_name = #{actionName},</if>
+            <if test="targetStatus != null">target_status = #{targetStatus},</if>
+            <if test="roleKey != null">role_key = #{roleKey},</if>
+            <if test="sortNo != null">sort_no = #{sortNo},</if>
+            <if test="status != null">status = #{status},</if>
+            update_time = sysdate()
+        </trim>
+        where flow_id = #{flowId}
+    </update>
+</mapper>

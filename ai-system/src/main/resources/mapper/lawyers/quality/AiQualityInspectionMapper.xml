@@ -23,6 +23,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="reviewRemark"   column="review_remark"   />
         <result property="reviewTime"     column="review_time"     />
         <result property="riskWarningId"  column="risk_warning_id" />
+        <result property="appealStatus"  column="appeal_status"   />
+        <result property="appealReason"  column="appeal_reason"   />
+        <result property="appealTime"    column="appeal_time"     />
+        <result property="appealReviewRemark" column="appeal_review_remark" />
+        <result property="adjustedScore" column="adjusted_score"  />
         <result property="createBy"       column="create_by"       />
         <result property="createTime"     column="create_time"     />
         <result property="updateBy"       column="update_by"       />
@@ -34,7 +39,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select q.inspection_id, q.source_type, q.record_id, q.session_id, q.agent_id, q.caller_number,
                q.transcript, q.total_score, q.dimension_json, q.violation_json, q.ai_status, q.ai_remark,
                q.review_status, q.reviewer_id, q.reviewer_name, q.review_remark, q.review_time,
-               q.risk_warning_id, q.create_by, q.create_time, q.update_by, q.update_time,
+               q.risk_warning_id, q.appeal_status, q.appeal_reason, q.appeal_time,
+               q.appeal_review_remark, q.adjusted_score,
+               q.create_by, q.create_time, q.update_by, q.update_time,
                a.agent_name
         from ai_quality_inspection q
         left join ai_call_agent_status a on a.agent_id = q.agent_id
@@ -62,6 +69,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="aiStatus != null and aiStatus != ''"> and q.ai_status = #{aiStatus}</if>
             <if test="reviewStatus != null and reviewStatus != ''"> and q.review_status = #{reviewStatus}</if>
             <if test="riskWarningId != null"> and q.risk_warning_id = #{riskWarningId}</if>
+            <if test="appealStatus != null and appealStatus != ''"> and q.appeal_status = #{appealStatus}</if>
             <if test="params.beginTime != null and params.beginTime != ''">
                 and date_format(q.create_time,'%Y%m%d') &gt;= date_format(#{params.beginTime},'%Y%m%d')
             </if>
@@ -140,4 +148,37 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         set risk_warning_id = #{riskWarningId}, update_time = sysdate()
         where inspection_id = #{inspectionId} and risk_warning_id is null
     </update>
+
+    <!-- P1-7：坐席发起申诉（仅当未申诉/申诉已办结，防止重复提交） -->
+    <update id="appeal">
+        update ai_quality_inspection
+        set appeal_status = '1',
+            appeal_reason = #{appealReason},
+            appeal_time = sysdate(),
+            update_time = sysdate()
+        where inspection_id = #{inspectionId}
+          and (appeal_status is null or appeal_status = '0' or appeal_status = '2' or appeal_status = '3')
+    </update>
+
+    <!-- P1-7：班组长申诉复核——维持('2')或改分('3'，写 adjusted_score，原始 total_score 不动) -->
+    <update id="appealReview" parameterType="AiQualityInspection">
+        update ai_quality_inspection
+        set appeal_status = #{appealStatus},
+            appeal_review_remark = #{appealReviewRemark},
+            <if test="adjustedScore != null">adjusted_score = #{adjustedScore},</if>
+            reviewer_id = #{reviewerId},
+            reviewer_name = #{reviewerName},
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where inspection_id = #{inspectionId} and appeal_status = '1'
+    </update>
+
+    <!-- P1-10：高分已完成质检扫描（知识自动沉淀候选） -->
+    <select id="selectHighScoreInspections" resultMap="AiQualityInspectionResult">
+        <include refid="selectInspectionVo"/>
+        where q.ai_status = '2' and q.total_score &gt;= #{minScore}
+          and q.create_time &gt;= date_sub(sysdate(), interval #{days} day)
+        order by q.total_score desc, q.create_time desc
+        limit #{limit}
+    </select>
 </mapper>

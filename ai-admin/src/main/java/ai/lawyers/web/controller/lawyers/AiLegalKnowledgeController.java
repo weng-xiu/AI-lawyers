@@ -47,6 +47,10 @@ public class AiLegalKnowledgeController extends BaseController
     @Autowired
     private ai.lawyers.system.service.lawyers.rag.RagSearchService ragSearchService;
 
+    /** P1-10：知识自动沉淀 */
+    @Autowired
+    private ai.lawyers.system.service.lawyers.KnowledgeDraftService knowledgeDraftService;
+
     /**
      * 查询法律知识库列表
      */
@@ -214,5 +218,53 @@ public class AiLegalKnowledgeController extends BaseController
     public AjaxResult ragRerankTest()
     {
         return success(ragSearchService.testRerank());
+    }
+
+    /**
+     * P1-10：从指定通话生成知识草稿（待审核；已沉淀/无转写返回错误）。
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:knowledge:add')")
+    @Log(title = "知识沉淀-通话", businessType = BusinessType.INSERT)
+    @PostMapping("/draft/call/{recordId}")
+    public AjaxResult draftFromCall(@PathVariable("recordId") Long recordId)
+    {
+        try
+        {
+            return AjaxResult.success(knowledgeDraftService.draftFromCall(recordId));
+        }
+        catch (IllegalArgumentException e)
+        {
+            return AjaxResult.error(e.getMessage());
+        }
+    }
+
+    /**
+     * P1-10：从指定工单生成知识草稿（待审核）。
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:knowledge:add')")
+    @Log(title = "知识沉淀-工单", businessType = BusinessType.INSERT)
+    @PostMapping("/draft/ticket/{ticketId}")
+    public AjaxResult draftFromTicket(@PathVariable("ticketId") Long ticketId)
+    {
+        try
+        {
+            return AjaxResult.success(knowledgeDraftService.draftFromTicket(ticketId));
+        }
+        catch (IllegalArgumentException e)
+        {
+            return AjaxResult.error(e.getMessage());
+        }
+    }
+
+    /**
+     * P1-10：扫描高分优质通话批量生成待审草稿（可定时每日调用）。
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:knowledge:add')")
+    @Log(title = "知识沉淀-扫描", businessType = BusinessType.INSERT)
+    @PostMapping("/draft/scan")
+    public AjaxResult draftScan(Integer days, java.math.BigDecimal minScore, Integer limit)
+    {
+        int created = knowledgeDraftService.scanQualityCalls(days, minScore, limit);
+        return success("扫描完成，新生成待审知识草稿 " + created + " 条");
     }
 }

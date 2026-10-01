@@ -33,12 +33,27 @@ public class DashboardServiceImpl implements IDashboardService
     @Autowired
     private IAiCopilotFeedbackService copilotFeedbackService;
 
+    /**
+     * P0-2：呼叫汇总/趋势是否读 ai_stat_minute 预聚合（默认开启）；
+     * 历史区间需先用 /lawyers/report/stat/backfill 回填，false 回退实时聚合。
+     */
+    @org.springframework.beans.factory.annotation.Value("${call.dashboard.preagg-enabled:true}")
+    private boolean preaggEnabled;
+
     @Override
     public Map<String, Object> getDashboardData(Date beginTime, Date endTime)
     {
         Map<String, Object> data = new LinkedHashMap<>();
-        data.put("callSummary", nullToEmpty(dashboardMapper.selectCallSummary(beginTime, endTime)));
-        data.put("callTrend", nullToEmptyList(dashboardMapper.selectCallTrend(beginTime, endTime)));
+        if (preaggEnabled)
+        {
+            data.put("callSummary", nullToEmpty(dashboardMapper.selectCallSummaryPreagg(beginTime, endTime)));
+            data.put("callTrend", nullToEmptyList(dashboardMapper.selectCallTrendPreagg(beginTime, endTime)));
+        }
+        else
+        {
+            data.put("callSummary", nullToEmpty(dashboardMapper.selectCallSummary(beginTime, endTime)));
+            data.put("callTrend", nullToEmptyList(dashboardMapper.selectCallTrend(beginTime, endTime)));
+        }
         data.put("categoryPie", nullToEmptyList(dashboardMapper.selectCategoryPie(beginTime, endTime)));
         data.put("aiRatio", nullToEmpty(dashboardMapper.selectAiRatio(beginTime, endTime)));
         data.put("agentLoad", nullToEmptyList(dashboardMapper.selectAgentLoad()));
@@ -55,7 +70,7 @@ public class DashboardServiceImpl implements IDashboardService
     /**
      * F10 公共法律服务业务类指标：语种分布 / 关怀模式使用率 / 条线转办统计 /
      * 渠道活跃与绑定 / 公众端满意度。全部实时聚合现有业务表；
-     * P3-F3 ai_stat_minute 物化表落地后仅需切换 Mapper 数据源，接口与前端契约不变。
+     * P0-2 起呼叫汇总/趋势已切换 ai_stat_minute 预聚合，本模块指标无对应物化口径暂不切换。
      * Copilot 建议采纳率（F4）已接通 ai_copilot_feedback 埋点实时统计。
      */
     private Map<String, Object> buildBizMetrics(Date beginTime, Date endTime)

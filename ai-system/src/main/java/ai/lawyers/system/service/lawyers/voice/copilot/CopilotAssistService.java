@@ -16,6 +16,7 @@ import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
 import ai.lawyers.system.service.lawyers.rag.RagChunk;
 import ai.lawyers.system.service.lawyers.rag.RagSearchService;
+import ai.lawyers.system.service.lawyers.rag.TicketVectorService;
 import ai.lawyers.system.service.lawyers.stat.AiModelCallLogRecorder;
 
 /**
@@ -59,6 +60,10 @@ public class CopilotAssistService
     @Autowired
     private AiCallTicketMapper ticketMapper;
 
+    /** P1-8：相似工单语义向量路（未装配/未就绪时回退 LIKE 短语） */
+    @Autowired(required = false)
+    private TicketVectorService ticketVectorService;
+
     @Autowired(required = false)
     private HotlineMetrics metrics;
 
@@ -84,7 +89,8 @@ public class CopilotAssistService
         String q = text.trim();
         extractElements(q, result);
         recommendLaws(q, result);
-        recommendTickets(result, sessionId);
+        recommendTickets(q, result, sessionId);
+        buildSuggestedActions(result, sessionId);
         if (metrics != null)
         {
             metrics.incrementCopilotAssist();
@@ -148,9 +154,35 @@ public class CopilotAssistService
         result.setLaws(laws);
     }
 
-    /** ③ 相似工单：纠纷类型 + 首个诉求为 LIKE 短语；无短语则跳过 */
-    private void recommendTickets(CopilotAssistResult result, String sessionId)
+    /**
+     * ③ 相似工单：P1-8 起优先语义向量路（完整通话文本 embedding 近邻），
+     * 向量路未装配/未就绪/无命中时回退旧的纠纷类型+诉求 LIKE 短语路。
+     */
+    private void recommendTickets(String queryText, CopilotAssistResult result, String sessionId)
     {
+        Long excludeRecordId = parseRecordId(sessionId);
+        int n = ticketLimit > 0 ? ticketLimit : 3;
+
+        // 向量路
+        if (ticketVectorService != null && ticketVectorService.isReady())
+        {
+            try
+            {
+                List<AiCallTicket> tickets =
+                        ticketVectorService.findSimilar(queryText, excludeRecordId, n);
+                if (tickets != null && !tickets.isEmpty())
+                {
+                    result.setTickets(toCopilotTickets(tickets));
+                    return;
+                }
+            }
+            catch (Exception e)
+            {
+                log.warn("Copilot 相似工单向量路异常，回退 LIKE: {}", e.getMessage());
+            }
+        }
+
+        // 回退：LIKE 短语路
         String phrase1 = clip(result.getDisputeType());
         String phrase2 = null;
         if (!result.getClaims().isEmpty())
@@ -164,25 +196,84 @@ public class CopilotAssistService
         }
         try
         {
-            Long excludeRecordId = parseRecordId(sessionId);
-            int n = ticketLimit > 0 ? ticketLimit : 3;
             List<AiCallTicket> tickets = ticketMapper.selectSimilarTickets(
                     phrase1, phrase2, excludeRecordId, n);
-            List<CopilotTicket> out = new ArrayList<>();
-            if (tickets != null)
-            {
-                for (AiCallTicket t : tickets)
-                {
-                    out.add(new CopilotTicket(t.getTicketId(), t.getTicketNo(),
-                            t.getTitle(), t.getStatus(), t.getContent()));
-                }
-            }
-            result.setTickets(out);
+            result.setTickets(toCopilotTickets(tickets));
         }
         catch (Exception e)
         {
             log.warn("Copilot 相似工单查询异常: {}", e.getMessage());
         }
+    }
+
+    /** 工单实体转 Copilot 输出结构 */
+    private List<CopilotTicket> toCopilotTickets(List<AiCallTicket> tickets)
+    {
+        List<CopilotTicket> out = new ArrayList<>();
+        if (tickets != null)
+        {
+            for (AiCallTicket t : tickets)
+            {
+                out.add(new CopilotTicket(t.getTicketId(), t.getTicketNo(),
+                        t.getTitle(), t.getStatus(), t.getContent()));
+            }
+        }
+        return out;
+    }
+
+    /**
+     * P1-8：构造代执行白名单动作（仅草稿，不自动执行）。
+     * 要素抽取成功且有纠纷类型/诉求 → createTicket 草稿（标题/内容/优先级预填，人工确认修改）。
+     */
+    private void buildSuggestedActions(CopilotAssistResult result, String sessionId)
+    {
+        if (result.isElementDegraded())
+        {
+            return;
+        }
+        boolean hasType = StringUtils.isNotEmpty(result.getDisputeType());
+        if (!hasType && result.getClaims().isEmpty())
+        {
+            return;
+        }
+        // 标题：纠纷类型 + 咨询工单；无类型时用首个诉求
+        String title;
+        if (hasType)
+        {
+            title = result.getDisputeType() + "咨询工单";
+        }
+        else
+        {
+            String claim = result.getClaims().get(0);
+            title = claim.length() > 20 ? claim.substring(0, 20) : claim;
+        }
+        // 内容：诉求 + 关键事实
+        StringBuilder content = new StringBuilder();
+        if (!result.getClaims().isEmpty())
+        {
+            content.append("诉求：").append(String.join("；", result.getClaims()));
+        }
+        if (!result.getKeyFacts().isEmpty())
+        {
+            if (content.length() > 0)
+            {
+                content.append('\n');
+            }
+            content.append("关键事实：").append(String.join("；", result.getKeyFacts()));
+        }
+        java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("title", title);
+        payload.put("content", content.toString());
+        payload.put("priority", "urgent".equals(result.getUrgency()) ? "1" : "2");
+        Long recordId = parseRecordId(sessionId);
+        if (recordId != null)
+        {
+            payload.put("recordId", recordId);
+        }
+        List<CopilotAssistResult.SuggestedAction> actions = new ArrayList<>();
+        actions.add(new CopilotAssistResult.SuggestedAction(
+                "createTicket", "确认建单（草稿可修改）", payload));
+        result.setActions(actions);
     }
 
     private List<String> toStringList(JsonNode array)

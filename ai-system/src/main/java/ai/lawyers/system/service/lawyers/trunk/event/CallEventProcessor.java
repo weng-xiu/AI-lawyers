@@ -282,20 +282,17 @@ public class CallEventProcessor
             log.info("[CallEvent] 已回写录音信息: recordId={} file={} duration={}s",
                     recordId, recordPath, recordSeconds);
 
-            // F2：对象存储模式，排队异步上传；上传成功后再更新 recordFile 为 object key
+            // F2/P0-5：排队异步处理（S3 上传/本地加密）。不再预判 exists——
+            // RECORD_STOP 与落盘存在竞态，worker 内部会等待文件就绪确认
             if (recordingUploadService != null && StringUtils.isNotEmpty(recordPath))
             {
                 try
                 {
-                    File localFile = new File(recordPath);
-                    if (localFile.exists())
-                    {
-                        recordingUploadService.enqueue(recordId, localFile);
-                    }
+                    recordingUploadService.enqueue(recordId, new File(recordPath));
                 }
                 catch (Exception ex)
                 {
-                    log.warn("[CallEvent] 录音上传排队失败 recordId={}: {}", recordId, ex.getMessage());
+                    log.warn("[CallEvent] 录音任务排队失败 recordId={}: {}", recordId, ex.getMessage());
                 }
             }
 

@@ -177,9 +177,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </delete>
 
     <delete id="deleteAiLegalKnowledgeByIds" parameterType="String">
-        delete from ai_legal_knowledge where knowledge_id in 
+        delete from ai_legal_knowledge where knowledge_id in
         <foreach item="knowledgeId" collection="array" open="(" separator="," close=")">
             #{knowledgeId}
         </foreach>
     </delete>
+
+    <select id="countBySourceUrl" parameterType="String" resultType="int">
+        select count(*) from ai_legal_knowledge where source_url = #{sourceUrl}
+    </select>
 </mapper>
