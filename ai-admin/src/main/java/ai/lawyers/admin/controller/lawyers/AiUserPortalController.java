@@ -27,6 +27,7 @@ import ai.lawyers.system.mapper.lawyers.AiCallerProfileMapper;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
 import ai.lawyers.system.service.lawyers.IAiChannelIdentityService;
 import ai.lawyers.system.service.lawyers.IAiExternalOrgService;
+import ai.lawyers.system.service.lawyers.IPiiSearchTokenService;
 
 /**
  * 公众端门户 Controller（F8 + F2 + F6 二期绑定入口）
@@ -52,6 +53,9 @@ public class AiUserPortalController extends BaseController
 
     @Autowired
     private IAiChannelIdentityService channelIdentityService;
+
+    @Autowired(required = false)
+    private IPiiSearchTokenService piiSearchTokenService;
 
     /**
      * 我的工单：强制按登录用户手机号过滤，忽略请求中任何外部条件。
@@ -112,6 +116,19 @@ public class AiUserPortalController extends BaseController
             profile.setCareMode(careMode == null ? 0 : careMode);
             profile.setCreateBy(username);
             callerProfileMapper.insertAiCallerProfile(profile);
+            // G1-b2：新档案回填号码模糊检索 token
+            if (piiSearchTokenService != null)
+            {
+                try
+                {
+                    piiSearchTokenService.rebuild(IPiiSearchTokenService.OWNER_CALLER_PROFILE,
+                            profile.getProfileId(), phone);
+                }
+                catch (Exception e)
+                {
+                    // token 失败不阻断偏好保存，迁移接口可补建
+                }
+            }
         }
         else
         {

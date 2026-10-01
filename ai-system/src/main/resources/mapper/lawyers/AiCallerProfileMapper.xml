@@ -7,10 +7,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <resultMap type="AiCallerProfile" id="AiCallerProfileResult">
         <result property="profileId"          column="profile_id"          />
         <result property="callerNumber"       column="caller_number"       />
+        <result property="callerNumberIndex"  column="caller_number_index" />
         <result property="callerName"         column="caller_name"         />
         <result property="callerGender"       column="caller_gender"       />
         <result property="callerAge"          column="caller_age"          />
         <result property="callerIdCard"       column="caller_id_card"      />
+        <result property="callerIdCardIndex"  column="caller_id_card_index" />
         <result property="callerAddress"      column="caller_address"      />
         <result property="customerLevel"      column="customer_level"      />
         <result property="tags"               column="tags"                />
@@ -33,7 +35,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectAiCallerProfileVo">
-        select profile_id, caller_number, caller_name, caller_gender, caller_age, caller_id_card, caller_address,
+        select profile_id, caller_number, caller_number_index, caller_name, caller_gender, caller_age, caller_id_card, caller_id_card_index, caller_address,
                customer_level, tags, intent_prediction, intent_confidence, consult_preference, high_freq_problem,
                freq_mention_count, risk_level, emotion_status, emotion_warning, last_call_time,
                language_preference, care_mode,
@@ -44,7 +46,28 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectAiCallerProfileList" parameterType="AiCallerProfile" resultMap="AiCallerProfileResult">
         <include refid="selectAiCallerProfileVo"/>
         <where>
-            <if test="callerNumber != null and callerNumber != ''"> and caller_number like concat('%', #{callerNumber}, '%')</if>
+            <if test="callerNumber != null and callerNumber != ''">
+                <!-- G1-b2：LIKE '%kw%' 改走 CALLER_PROFILE 位置分片盲 token（9.57.4 随本任务落地） -->
+                <choose>
+                    <when test="tokenGroups != null and tokenGroups.size() > 0">
+                        and (
+                        <foreach collection="tokenGroups" item="grp" separator=" or ">
+                            profile_id in (
+                                select owner_id from ai_pii_search_token
+                                where owner_type = 'CALLER_PROFILE'
+                                  and token_value in
+                                <foreach collection="grp" item="tok" open="(" separator="," close=")">
+                                    #{tok}
+                                </foreach>
+                                group by owner_id
+                                having count(distinct token_value) = #{grp.size()}
+                            )
+                        </foreach>
+                        )
+                    </when>
+                    <otherwise>and 1 = 0</otherwise>
+                </choose>
+            </if>
             <if test="callerName != null and callerName != ''"> and caller_name like concat('%', #{callerName}, '%')</if>
             <if test="customerLevel != null and customerLevel != ''"> and customer_level = #{customerLevel}</if>
             <if test="riskLevel != null and riskLevel != ''"> and risk_level = #{riskLevel}</if>

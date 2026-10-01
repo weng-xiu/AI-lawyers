@@ -1,7 +1,9 @@
 package ai.lawyers.system.domain.lawyers;
 
 import java.util.Date;
+import java.util.List;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import ai.lawyers.common.annotation.Excel;
@@ -16,6 +18,9 @@ public class AiCallRecord extends BaseEntity
 
     @Excel(name = "来电号码")
     private String callerNumber;
+
+    /** 来电号码盲索引（HMAC-SM3 截断 128 位 hex，等值查询；非导出项） */
+    private String callerNumberIndex;
 
     @Excel(name = "来电人姓名")
     private String callerName;
@@ -90,6 +95,10 @@ public class AiCallRecord extends BaseEntity
 
     private String categoryName;
 
+    /** 模糊检索 token 分组（仅查询入参，不持久化/不序列化） */
+    @JsonIgnore
+    private List<List<String>> tokenGroups;
+
     public void setRecordId(Long recordId) 
     {
         this.recordId = recordId;
@@ -107,6 +116,16 @@ public class AiCallRecord extends BaseEntity
     public String getCallerNumber() 
     {
         return callerNumber;
+    }
+
+    public void setCallerNumberIndex(String callerNumberIndex)
+    {
+        this.callerNumberIndex = callerNumberIndex;
+    }
+
+    public String getCallerNumberIndex()
+    {
+        return callerNumberIndex;
     }
     public void setCallerName(String callerName) 
     {
@@ -335,6 +354,17 @@ public class AiCallRecord extends BaseEntity
     public void setCategoryName(String categoryName) 
     {
         this.categoryName = categoryName;
+    }
+
+    @JsonIgnore
+    public List<List<String>> getTokenGroups()
+    {
+        return tokenGroups;
+    }
+
+    public void setTokenGroups(List<List<String>> tokenGroups)
+    {
+        this.tokenGroups = tokenGroups;
     }
 
     @Override

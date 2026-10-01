@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiPiiSearchTokenMapper">
+
+    <!-- P3-G1-b2（V2.56）：批量写入位置分片盲 token（调用方保证 list 非空） -->
+    <insert id="batchInsertToken">
+        insert into ai_pii_search_token (owner_type, owner_id, token_value) values
+        <foreach item="item" collection="list" separator=",">
+            (#{item.ownerType}, #{item.ownerId}, #{item.tokenValue})
+        </foreach>
+    </insert>
+
+    <delete id="deleteByOwner">
+        delete from ai_pii_search_token
+        where owner_type = #{ownerType} and owner_id = #{ownerId}
+    </delete>
+</mapper>

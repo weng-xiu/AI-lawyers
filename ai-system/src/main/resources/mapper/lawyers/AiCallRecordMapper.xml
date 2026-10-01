@@ -7,6 +7,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <resultMap type="AiCallRecord" id="AiCallRecordResult">
         <result property="recordId"        column="record_id"        />
         <result property="callerNumber"    column="caller_number"    />
+        <result property="callerNumberIndex" column="caller_number_index" />
         <result property="callerName"      column="caller_name"      />
         <result property="callerAddress"   column="caller_address"   />
         <result property="callTime"        column="call_time"        />
@@ -39,7 +40,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectAiCallRecordVo">
-        select cr.record_id, cr.caller_number, cr.caller_name, cr.caller_address, cr.call_time, 
+        select cr.record_id, cr.caller_number, cr.caller_number_index, cr.caller_name, cr.caller_address, cr.call_time, 
                cr.end_time, cr.duration, cr.agent_id, cr.category_id, cr.content, cr.answer, 
                cr.status, cr.transfer_id, cr.ticket_id, cr.call_uuid,
                cr.record_file, cr.recording_url, cr.record_duration, cr.asr_status, cr.transcript,
@@ -55,7 +56,29 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectAiCallRecordList" parameterType="AiCallRecord" resultMap="AiCallRecordResult">
         <include refid="selectAiCallRecordVo"/>
         <where>
-            <if test="callerNumber != null and callerNumber != ''"> and cr.caller_number like concat('%', #{callerNumber}, '%')</if>
+            <if test="callerNumber != null and callerNumber != ''">
+                <!-- G1-b2：LIKE '%kw%' 改走位置分片盲 token（组间 OR / 组内 AND，零误判）；
+                     关键词长于 11 位时号码不可能包含，直接置否 -->
+                <choose>
+                    <when test="tokenGroups != null and tokenGroups.size() > 0">
+                        and (
+                        <foreach collection="tokenGroups" item="grp" separator=" or ">
+                            cr.record_id in (
+                                select owner_id from ai_pii_search_token
+                                where owner_type = 'CALL_RECORD'
+                                  and token_value in
+                                <foreach collection="grp" item="tok" open="(" separator="," close=")">
+                                    #{tok}
+                                </foreach>
+                                group by owner_id
+                                having count(distinct token_value) = #{grp.size()}
+                            )
+                        </foreach>
+                        )
+                    </when>
+                    <otherwise>and 1 = 0</otherwise>
+                </choose>
+            </if>
             <if test="callerName != null and callerName != ''"> and cr.caller_name like concat('%', #{callerName}, '%')</if>
             <if test="agentId != null"> and cr.agent_id = #{agentId}</if>
             <if test="categoryId != null"> and cr.category_id = #{categoryId}</if>
@@ -129,22 +152,23 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                sum(case when date_format(call_time,'%Y%m') = date_format(now(),'%Y%m') then 1 else 0 end) as monthCallCount,
                max(call_time) as lastCallTime
         from ai_call_record
-        where caller_number = #{callerNumber}
+        where caller_number_index = #{callerNumberIndex}
     </select>
 
     <select id="selectAiCallRecordByCallerNumber" resultMap="AiCallRecordResult">
         <include refid="selectAiCallRecordVo"/>
-        where cr.caller_number = #{callerNumber}
+        where cr.caller_number_index = #{callerNumberIndex}
         order by cr.call_time desc
         <if test="limit != null">
             limit #{limit}
         </if>
     </select>
         
-    <insert id="insertAiCallRecord" parameterType="AiCallRecord">
+    <insert id="insertAiCallRecord" parameterType="AiCallRecord" useGeneratedKeys="true" keyProperty="recordId">
         insert into ai_call_record
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="callerNumber != null and callerNumber != ''">caller_number,</if>
+            <if test="callerNumberIndex != null and callerNumberIndex != ''">caller_number_index,</if>
             <if test="callerName != null and callerName != ''">caller_name,</if>
             <if test="callerAddress != null and callerAddress != ''">caller_address,</if>
             <if test="callTime != null">call_time,</if>
@@ -169,6 +193,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
          </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="callerNumber != null and callerNumber != ''">#{callerNumber},</if>
+            <if test="callerNumberIndex != null and callerNumberIndex != ''">#{callerNumberIndex},</if>
             <if test="callerName != null and callerName != ''">#{callerName},</if>
             <if test="callerAddress != null and callerAddress != ''">#{callerAddress},</if>
             <if test="callTime != null">#{callTime},</if>
@@ -197,6 +222,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         update ai_call_record
         <trim prefix="SET" suffixOverrides=",">
             <if test="callerNumber != null and callerNumber != ''">caller_number = #{callerNumber},</if>
+            <if test="callerNumberIndex != null and callerNumberIndex != ''">caller_number_index = #{callerNumberIndex},</if>
             <if test="callerName != null and callerName != ''">caller_name = #{callerName},</if>
             <if test="callerAddress != null and callerAddress != ''">caller_address = #{callerAddress},</if>
             <if test="callTime != null">call_time = #{callTime},</if>

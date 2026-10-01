@@ -17,6 +17,7 @@ import ai.lawyers.system.mapper.lawyers.AiCallRecordMapper;
 import ai.lawyers.system.mapper.lawyers.AiCallTicketMapper;
 import ai.lawyers.system.mapper.lawyers.AiCallerProfileMapper;
 import ai.lawyers.system.service.lawyers.ICallPopupService;
+import ai.lawyers.system.service.lawyers.IPiiSearchTokenService;
 
 @Service
 public class CallPopupServiceImpl implements ICallPopupService
@@ -30,12 +31,16 @@ public class CallPopupServiceImpl implements ICallPopupService
     @Autowired
     private AiCallTicketMapper aiCallTicketMapper;
 
+    @Autowired(required = false)
+    private IPiiSearchTokenService piiSearchTokenService;
+
     @Override
     public Map<String, Object> getPopupProfile(String callerNumber)
     {
         Map<String, Object> result = new HashMap<>();
-        // 实时通话统计
-        Map<String, Object> callStats = aiCallRecordMapper.selectCallerCallStats(callerNumber);
+        // 实时通话统计（G1-b2：等值统计走号码盲索引）
+        Map<String, Object> callStats = aiCallRecordMapper.selectCallerCallStats(
+                PiiCryptoUtils.blindIndex(callerNumber));
         long callCount = 0L;
         long monthCallCount = 0L;
         Object lastCallTime = null;
@@ -81,7 +86,8 @@ public class CallPopupServiceImpl implements ICallPopupService
     @Override
     public List<?> getPopupHistory(String callerNumber, Integer limit)
     {
-        return aiCallRecordMapper.selectAiCallRecordByCallerNumber(callerNumber, limit);
+        return aiCallRecordMapper.selectAiCallRecordByCallerNumber(
+                PiiCryptoUtils.blindIndex(callerNumber), limit);
     }
 
     @Override
@@ -97,7 +103,8 @@ public class CallPopupServiceImpl implements ICallPopupService
     {
         List<Map<String, Object>> track = new ArrayList<>();
         // 通话轨迹
-        List<?> records = aiCallRecordMapper.selectAiCallRecordByCallerNumber(callerNumber, 50);
+        List<?> records = aiCallRecordMapper.selectAiCallRecordByCallerNumber(
+                PiiCryptoUtils.blindIndex(callerNumber), 50);
         for (Object obj : records) {
             if (obj instanceof AiCallRecord) {
                 AiCallRecord r = (AiCallRecord) obj;
@@ -152,8 +159,27 @@ public class CallPopupServiceImpl implements ICallPopupService
     @Override
     public int updateAiCallerProfile(AiCallerProfile aiCallerProfile)
     {
+        // G1-b2：先取明文（写后对象已密文化），更新成功后回填模糊检索 token
+        String plainNumber = null;
+        if (StringUtils.isNotEmpty(aiCallerProfile.getCallerNumber()))
+        {
+            plainNumber = PiiCryptoUtils.decrypt(aiCallerProfile.getCallerNumber());
+        }
         encryptPiiForWrite(aiCallerProfile);
-        return aiCallerProfileMapper.updateAiCallerProfile(aiCallerProfile);
+        int rows = aiCallerProfileMapper.updateAiCallerProfile(aiCallerProfile);
+        if (rows > 0 && piiSearchTokenService != null && plainNumber != null)
+        {
+            try
+            {
+                piiSearchTokenService.rebuild(IPiiSearchTokenService.OWNER_CALLER_PROFILE,
+                        aiCallerProfile.getProfileId(), plainNumber);
+            }
+            catch (Exception e)
+            {
+                // 与其他写路径一致：token 失败不阻断主流程，迁移接口可补建
+            }
+        }
+        return rows;
     }
 
     /** G1-b：盲索引等值查询 + 读后解密（域对象保持明文语义，展示层脱敏逻辑不变） */

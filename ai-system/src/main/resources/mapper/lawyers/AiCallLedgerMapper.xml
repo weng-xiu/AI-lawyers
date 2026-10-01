@@ -56,7 +56,28 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <where>
             del_flag = '0'
             <if test="callerName != null and callerName != ''"> and caller_name like concat('%', #{callerName}, '%')</if>
-            <if test="callerPhone != null and callerPhone != ''"> and caller_phone like concat('%', #{callerPhone}, '%')</if>
+            <if test="callerPhone != null and callerPhone != ''">
+                <!-- G1-b2：LIKE '%kw%' 改走 CALL_LEDGER 位置分片盲 token -->
+                <choose>
+                    <when test="tokenGroups != null and tokenGroups.size() > 0">
+                        and (
+                        <foreach collection="tokenGroups" item="grp" separator=" or ">
+                            ledger_id in (
+                                select owner_id from ai_pii_search_token
+                                where owner_type = 'CALL_LEDGER'
+                                  and token_value in
+                                <foreach collection="grp" item="tok" open="(" separator="," close=")">
+                                    #{tok}
+                                </foreach>
+                                group by owner_id
+                                having count(distinct token_value) = #{grp.size()}
+                            )
+                        </foreach>
+                        )
+                    </when>
+                    <otherwise>and 1 = 0</otherwise>
+                </choose>
+            </if>
             <if test="lawyerId != null"> and lawyer_id = #{lawyerId}</if>
             <if test="lawyerName != null and lawyerName != ''"> and lawyer_name like concat('%', #{lawyerName}, '%')</if>
             <if test="categoryId != null"> and category_id = #{categoryId}</if>

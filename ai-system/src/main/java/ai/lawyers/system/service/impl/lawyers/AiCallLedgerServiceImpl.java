@@ -4,9 +4,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import ai.lawyers.common.utils.DateUtils;
+import ai.lawyers.common.utils.StringUtils;
+import ai.lawyers.common.utils.sign.PiiCryptoUtils;
 import ai.lawyers.common.utils.uuid.IdUtils;
 import ai.lawyers.system.domain.lawyers.AiCallLedger;
 import ai.lawyers.system.domain.lawyers.AiCallRecord;
@@ -17,12 +21,18 @@ import ai.lawyers.system.service.lawyers.IAiCallLedgerService;
 import ai.lawyers.system.service.lawyers.IAiCallRecordService;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
 import ai.lawyers.system.service.lawyers.IAiCallAgentStatusService;
+import ai.lawyers.system.service.lawyers.IPiiSearchTokenService;
 
 @Service
 public class AiCallLedgerServiceImpl implements IAiCallLedgerService
 {
+    private static final Logger log = LoggerFactory.getLogger(AiCallLedgerServiceImpl.class);
+
     @Autowired
     private AiCallLedgerMapper aiCallLedgerMapper;
+
+    @Autowired(required = false)
+    private IPiiSearchTokenService piiSearchTokenService;
 
     @Autowired
     private IAiCallRecordService aiCallRecordService;
@@ -48,6 +58,12 @@ public class AiCallLedgerServiceImpl implements IAiCallLedgerService
     @Override
     public List<AiCallLedger> selectAiCallLedgerList(AiCallLedger aiCallLedger)
     {
+        // G1-b2：号码条件统一在此派生位置分片 token
+        if (StringUtils.isNotEmpty(aiCallLedger.getCallerPhone())
+                && aiCallLedger.getTokenGroups() == null)
+        {
+            aiCallLedger.setTokenGroups(PiiCryptoUtils.tokenGroups(aiCallLedger.getCallerPhone()));
+        }
         return aiCallLedgerMapper.selectAiCallLedgerList(aiCallLedger);
     }
 
@@ -57,13 +73,57 @@ public class AiCallLedgerServiceImpl implements IAiCallLedgerService
         if (aiCallLedger.getLedgerNo() == null || aiCallLedger.getLedgerNo().isEmpty()) {
             aiCallLedger.setLedgerNo(generateLedgerNo());
         }
-        return aiCallLedgerMapper.insertAiCallLedger(aiCallLedger);
+        String plainPhone = normalizePii(aiCallLedger);
+        int rows = aiCallLedgerMapper.insertAiCallLedger(aiCallLedger);
+        rebuildTokens(aiCallLedger.getLedgerId(), plainPhone);
+        return rows;
     }
 
     @Override
     public int updateAiCallLedger(AiCallLedger aiCallLedger)
     {
-        return aiCallLedgerMapper.updateAiCallLedger(aiCallLedger);
+        String plainPhone = normalizePii(aiCallLedger);
+        int rows = aiCallLedgerMapper.updateAiCallLedger(aiCallLedger);
+        rebuildTokens(aiCallLedger.getLedgerId(), plainPhone);
+        return rows;
+    }
+
+    /**
+     * G1-b2：写前 PII 规整——联系电话/身份证号明文密文统一归一为密文。
+     * @return 明文联系电话（供 token 回填）；为空时返回 null
+     */
+    private String normalizePii(AiCallLedger ledger)
+    {
+        String plainPhone = null;
+        if (StringUtils.isNotEmpty(ledger.getCallerPhone()))
+        {
+            plainPhone = PiiCryptoUtils.decrypt(ledger.getCallerPhone());
+            ledger.setCallerPhone(PiiCryptoUtils.encrypt(plainPhone));
+        }
+        if (StringUtils.isNotEmpty(ledger.getCallerIdCard()))
+        {
+            String plainIdCard = PiiCryptoUtils.decrypt(ledger.getCallerIdCard());
+            ledger.setCallerIdCard(PiiCryptoUtils.encrypt(plainIdCard));
+        }
+        return plainPhone;
+    }
+
+    /** G1-b2：重建台账号码模糊检索 token（失败仅告警，可由迁移接口补建） */
+    private void rebuildTokens(Long ledgerId, String plainPhone)
+    {
+        if (piiSearchTokenService != null && ledgerId != null
+                && StringUtils.isNotEmpty(plainPhone))
+        {
+            try
+            {
+                piiSearchTokenService.rebuild(IPiiSearchTokenService.OWNER_CALL_LEDGER,
+                        ledgerId, plainPhone);
+            }
+            catch (Exception e)
+            {
+                log.warn("台账模糊检索 token 重建失败 ledgerId={}: {}", ledgerId, e.getMessage());
+            }
+        }
     }
 
     @Override

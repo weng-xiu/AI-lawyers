@@ -18,11 +18,11 @@ import ai.lawyers.system.domain.lawyers.skill.AiSkillGroupMember;
 import ai.lawyers.system.domain.lawyers.skill.DispatchContext;
 import ai.lawyers.system.domain.lawyers.skill.DispatchResult;
 import ai.lawyers.system.domain.lawyers.trunk.AiCallTrunk;
-import ai.lawyers.system.mapper.lawyers.AiCallRecordMapper;
 import ai.lawyers.system.mapper.lawyers.trunk.AiCallTrunkMapper;
 import ai.lawyers.system.service.lawyers.CallEventPublisher;
 import ai.lawyers.system.service.lawyers.IAiCallAgentStatusService;
 import ai.lawyers.system.service.lawyers.IAiCallBlacklistService;
+import ai.lawyers.system.service.lawyers.IAiCallRecordService;
 import ai.lawyers.system.service.lawyers.IAiHotspotSuppressService;
 import ai.lawyers.system.service.lawyers.skill.IAgentDispatchService;
 import ai.lawyers.system.service.lawyers.skill.IAiSkillGroupService;
@@ -61,7 +61,7 @@ public class DefaultInboundCallHandler implements InboundCallHandler
     private boolean inboundEnabled;
 
     @Autowired
-    private AiCallRecordMapper callRecordMapper;
+    private IAiCallRecordService callRecordService;
 
     @Autowired
     private IAgentDispatchService agentDispatchService;
@@ -176,7 +176,8 @@ public class DefaultInboundCallHandler implements InboundCallHandler
             record.setRemark("ESL入站 uuid=" + uuid + " dnis=" + dnis);
             record.setCreateBy("esl-inbound");
             record.setCreateTime(new Date());
-            callRecordMapper.insertAiCallRecord(record);
+            // G1-b2：经服务层写密文 + 盲索引 + 模糊检索 token
+            callRecordService.insertAiCallRecord(record);
             Long recordId = record.getRecordId();
 
             // 2. 选择技能组（按 DNIS 匹配，未命中走默认组）

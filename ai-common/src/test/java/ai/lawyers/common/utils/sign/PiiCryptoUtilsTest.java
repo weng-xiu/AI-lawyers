@@ -1,6 +1,8 @@
 package ai.lawyers.common.utils.sign;
 
+import java.util.Arrays;
 import java.util.Base64;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
@@ -90,5 +92,65 @@ class PiiCryptoUtilsTest
         String plain = "13812345678";
         // 密钥必须参与运算：盲索引 != 裸 SM3(明文)，手机号小明文空间防枚举/彩虹表反推
         assertNotEquals(SmCryptoUtils.sm3Hex(plain), PiiCryptoUtils.blindIndex(plain));
+    }
+
+    // --------------------------------------------- G1-b2 位置分片盲 token（V2.56）
+
+    @Test
+    void searchToken_positionSensitiveAndDeterministic()
+    {
+        String t0 = PiiCryptoUtils.searchToken(0, "8");
+        String t1 = PiiCryptoUtils.searchToken(1, "8");
+        assertNotEquals(t0, t1, "位置必须参与运算：同字符不同位置 token 应不同");
+        assertEquals(t0, PiiCryptoUtils.searchToken(0, "8"), "位置 token 应确定性输出");
+        assertEquals(32, t0.length());
+        assertTrue(t0.matches("[0-9a-f]{32}"));
+    }
+
+    @Test
+    void phoneTokens_onePerPosition()
+    {
+        List<String> tokens = PiiCryptoUtils.phoneTokens("13812345678");
+        assertEquals(11, tokens.size(), "11 位号码应生成 11 个位置 token");
+        assertEquals(tokens.size(), tokens.stream().distinct().count(), "各位置 token 应互不相同");
+        assertTrue(PiiCryptoUtils.phoneTokens("").isEmpty());
+        assertTrue(PiiCryptoUtils.phoneTokens(null).isEmpty());
+    }
+
+    @Test
+    void tokenGroups_structureByKeywordLength()
+    {
+        List<List<String>> one = PiiCryptoUtils.tokenGroups("8");
+        assertEquals(11, one.size(), "1 位关键词在 11 位号码上有 11 个起始位置");
+        assertTrue(one.stream().allMatch(g -> g.size() == 1), "每组 1 个 token");
+
+        List<List<String>> three = PiiCryptoUtils.tokenGroups("123");
+        assertEquals(9, three.size(), "3 位关键词应有 9 个分组");
+        assertTrue(three.stream().allMatch(g -> g.size() == 3), "每组 3 个 token");
+
+        List<List<String>> full = PiiCryptoUtils.tokenGroups("13812345678");
+        assertEquals(1, full.size(), "11 位关键词仅有 1 个起始位置");
+        assertEquals(11, full.get(0).size());
+
+        assertTrue(PiiCryptoUtils.tokenGroups("123456789012").isEmpty(), "超长关键词无分组（无匹配）");
+        assertTrue(PiiCryptoUtils.tokenGroups("").isEmpty());
+        assertTrue(PiiCryptoUtils.tokenGroups(null).isEmpty());
+    }
+
+    @Test
+    void tokenGroups_matchSemanticsLike()
+    {
+        String phone = "13812345678";
+        List<String> stored = PiiCryptoUtils.phoneTokens(phone);
+        // 真实子串（含前/中/后缀）：至少一个分组的全部 token 都在号码 token 中（SQL 组内 AND 命中）
+        for (String kw : Arrays.asList("138", "3456", "5678", "13812345678"))
+        {
+            boolean hit = PiiCryptoUtils.tokenGroups(kw).stream()
+                    .anyMatch(stored::containsAll);
+            assertTrue(hit, "号码包含关键词 " + kw + "，应存在命中分组");
+        }
+        // 不相关号码：无任何分组完全命中
+        boolean hit = PiiCryptoUtils.tokenGroups("999").stream().anyMatch(stored::containsAll);
+        assertFalse(hit, "号码不含 999，不应命中");
     }
 }

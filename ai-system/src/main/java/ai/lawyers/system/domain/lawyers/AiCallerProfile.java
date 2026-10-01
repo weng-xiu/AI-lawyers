@@ -1,7 +1,9 @@
 package ai.lawyers.system.domain.lawyers;
 
 import java.util.Date;
+import java.util.List;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import ai.lawyers.common.annotation.Excel;
@@ -82,10 +84,17 @@ public class AiCallerProfile extends BaseEntity
     /** 身份证号盲索引：HMAC-SM3 截断 128 位（G1-b，落库与等值查询用，非导出项） */
     private String callerIdCardIndex;
 
+    /** 模糊检索 token 分组（仅查询入参，不持久化/不序列化，G1-b2） */
+    @JsonIgnore
+    private List<List<String>> tokenGroups;
+
     public void setProfileId(Long profileId) { this.profileId = profileId; }
     public Long getProfileId() { return profileId; }
     public void setCallerNumber(String callerNumber) { this.callerNumber = callerNumber; }
     public String getCallerNumber() { return callerNumber; }
+    @JsonIgnore
+    public List<List<String>> getTokenGroups() { return tokenGroups; }
+    public void setTokenGroups(List<List<String>> tokenGroups) { this.tokenGroups = tokenGroups; }
     public void setCallerName(String callerName) { this.callerName = callerName; }
     public String getCallerName() { return callerName; }
     public void setCallerGender(String callerGender) { this.callerGender = callerGender; }

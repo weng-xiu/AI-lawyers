@@ -2,7 +2,9 @@ package ai.lawyers.common.utils.sign;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 
 import org.bouncycastle.crypto.digests.SM3Digest;
 import org.bouncycastle.crypto.macs.HMac;
@@ -23,7 +25,11 @@ import ai.lawyers.common.utils.StringUtils;
  *   <li><b>盲索引</b>：HMAC-SM3（GB/T 32905-2016 为内核）截断 128 位、小写 hex 32 字符，
  *       对同明文恒定输出（支持 {@code where xxx_index = ?} 等值查询与唯一索引防重），
  *       密钥参与运算，明文空间小的字段（手机号）无法被彩虹表/枚举反推；
- *       <b>仅支持等值匹配，不支持模糊查询</b>（模糊检索类表列入 G1-b2 专项）。</li>
+ *       <b>盲索引仅支持等值匹配</b>；</li>
+ *   <li><b>模糊检索（G1-b2 V2.56）</b>：位置分片盲 token——号码按字符位置逐位生成
+ *       {@code searchToken(position, char)}，查询关键词按可能的起始位置构造 token 分组
+ *       （组间 OR / 组内 AND），在 {@code ai_pii_search_token} token 表上保持
+ *       {@code LIKE '%keyword%'} 完全等价语义、零误判。</li>
  * </ul>
  *
  * <p>三态兼容：无 {@code encp:} 前缀的存量明文在解密侧原样返回，配合迁移接口
@@ -48,6 +54,9 @@ public final class PiiCryptoUtils
 
     /** 盲索引截断长度：HMAC-SM3 256 位取前 128 位（hex 32 字符） */
     private static final int BLIND_INDEX_BYTES = 16;
+
+    /** 标准号码长度（手机号 11 位；模糊检索 token 分组的位置空间依据） */
+    private static final int PHONE_LENGTH = 11;
 
     /** 开发兜底密钥（与 SecretCryptoUtils 一致；生产必须注入 APP_SECRET_KEY） */
     private static final String DEV_DEFAULT_KEY = "ai-lawyers-dev-secret-change-me-in-production-2026";
@@ -113,6 +122,69 @@ public final class PiiCryptoUtils
         byte[] mac = new byte[hMac.getMacSize()];
         hMac.doFinal(mac, 0);
         return toHex(mac, BLIND_INDEX_BYTES);
+    }
+
+    // ------------------------------------------------------------ 模糊检索 token（G1-b2）
+
+    /**
+     * 位置分片盲 token：HMAC-SM3 密钥化 {@code position + ":" + fragment}，
+     * 复用盲索引截断 128 位输出。<b>位置参与运算</b>——同一字符在不同位置 token 不同，
+     * 这是"组内 AND 即保证位置连续"、模糊检索零误判的根基。
+     */
+    public static String searchToken(int position, String fragment)
+    {
+        return blindIndex(position + ":" + fragment);
+    }
+
+    /**
+     * 为落库号码生成全部位置 token：位置 0..len-1 逐位 unigram token（号码长度个）。
+     * null/空串返回空集合（无 token 可检索）。
+     */
+    public static List<String> phoneTokens(String phone)
+    {
+        List<String> tokens = new ArrayList<>();
+        if (StringUtils.isNotEmpty(phone))
+        {
+            for (int i = 0; i < phone.length(); i++)
+            {
+                tokens.add(searchToken(i, String.valueOf(phone.charAt(i))));
+            }
+        }
+        return tokens;
+    }
+
+    /**
+     * 构造模糊检索 token 分组（与 SQL {@code LIKE '%keyword%'} 完全等价）：
+     * 关键词长度 L，在标准 11 位号码上的起始位置为 0..11-L（共 12-L 个分组），
+     * 每个分组 = 关键词落在该位置所需的 L 个位置 token；SQL 上<b>分组间 OR、组内 AND</b>
+     * （HAVING 计数），只有连续位置全部命中才返回——零误判。
+     *
+     * <p>null/空串或 L &gt; 11 返回空集合：空关键词不参与条件（调用方判空）；
+     * L &gt; 11 对应无匹配（标准号码不可能包含超长关键词）。含非数字字符时照常分组，
+     * token 表中只存数字位置 token，自然零命中（与 LIKE 查数字列行为一致）。</p>
+     */
+    public static List<List<String>> tokenGroups(String keyword)
+    {
+        List<List<String>> groups = new ArrayList<>();
+        if (StringUtils.isEmpty(keyword))
+        {
+            return groups;
+        }
+        int len = keyword.length();
+        if (len > PHONE_LENGTH)
+        {
+            return groups;
+        }
+        for (int start = 0; start <= PHONE_LENGTH - len; start++)
+        {
+            List<String> group = new ArrayList<>(len);
+            for (int i = 0; i < len; i++)
+            {
+                group.add(searchToken(start + i, String.valueOf(keyword.charAt(i))));
+            }
+            groups.add(group);
+        }
+        return groups;
     }
 
     // ------------------------------------------------------------ 密钥派生

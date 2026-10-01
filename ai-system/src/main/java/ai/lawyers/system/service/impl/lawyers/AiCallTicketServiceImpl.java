@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import ai.lawyers.common.utils.DateUtils;
 import ai.lawyers.common.utils.StringUtils;
+import ai.lawyers.common.utils.sign.PiiCryptoUtils;
 import ai.lawyers.common.utils.uuid.IdUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,6 +50,12 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
     @Override
     public List<AiCallTicket> selectAiCallTicketList(AiCallTicket aiCallTicket)
     {
+        // G1-b2：号码条件（含弹屏内部调用）统一在此派生位置分片 token
+        if (StringUtils.isNotEmpty(aiCallTicket.getCallerNumber())
+                && aiCallTicket.getTokenGroups() == null)
+        {
+            aiCallTicket.setTokenGroups(PiiCryptoUtils.tokenGroups(aiCallTicket.getCallerNumber()));
+        }
         return aiCallTicketMapper.selectAiCallTicketList(aiCallTicket);
     }
 

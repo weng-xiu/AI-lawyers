@@ -1,7 +1,9 @@
 package ai.lawyers.system.domain.lawyers;
 
 import java.util.Date;
+import java.util.List;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import ai.lawyers.common.annotation.Excel;
@@ -61,6 +63,13 @@ public class AiCallTicket extends BaseEntity
     private Date closeTime;
 
     private String callerNumber;
+
+    /** 号码盲索引查询入参（等值；join ai_call_record，工单表本身无此列） */
+    private String callerNumberIndex;
+
+    /** 模糊检索 token 分组（仅查询入参，不持久化/不序列化） */
+    @JsonIgnore
+    private List<List<String>> tokenGroups;
 
     private String callerName;
 
@@ -233,6 +242,27 @@ public class AiCallTicket extends BaseEntity
     public void setCallerNumber(String callerNumber) 
     {
         this.callerNumber = callerNumber;
+    }
+
+    public String getCallerNumberIndex()
+    {
+        return callerNumberIndex;
+    }
+
+    public void setCallerNumberIndex(String callerNumberIndex)
+    {
+        this.callerNumberIndex = callerNumberIndex;
+    }
+
+    @JsonIgnore
+    public List<List<String>> getTokenGroups()
+    {
+        return tokenGroups;
+    }
+
+    public void setTokenGroups(List<List<String>> tokenGroups)
+    {
+        this.tokenGroups = tokenGroups;
     }
 
     public String getCallerName() 

@@ -9,6 +9,7 @@ import ai.lawyers.system.domain.lawyers.AiCallRecord;
 import ai.lawyers.system.domain.lawyers.AiCallTransfer;
 import ai.lawyers.system.mapper.lawyers.AiCallRecordMapper;
 import ai.lawyers.system.mapper.lawyers.AiCallTransferMapper;
+import ai.lawyers.system.service.lawyers.IAiCallRecordService;
 import ai.lawyers.system.service.lawyers.IAiCallTransferService;
 
 @Service
@@ -19,6 +20,10 @@ public class AiCallTransferServiceImpl implements IAiCallTransferService
 
     @Autowired
     private AiCallRecordMapper aiCallRecordMapper;
+
+    /** G1-b2：话单更新经服务层加密/token 回填 */
+    @Autowired
+    private IAiCallRecordService aiCallRecordService;
 
     @Override
     public AiCallTransfer selectAiCallTransferByTransferId(Long transferId)
@@ -75,7 +80,7 @@ public class AiCallTransferServiceImpl implements IAiCallTransferService
             record.setStatus("2");
             record.setTransferId(transfer.getTransferId());
             record.setAgentId(toAgentId);
-            aiCallRecordMapper.updateAiCallRecord(record);
+            aiCallRecordService.updateAiCallRecord(record);
         }
 
         return 1;

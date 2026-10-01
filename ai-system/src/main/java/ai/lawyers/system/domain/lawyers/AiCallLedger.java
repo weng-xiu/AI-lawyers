@@ -2,7 +2,9 @@ package ai.lawyers.system.domain.lawyers;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import ai.lawyers.common.annotation.Excel;
@@ -99,6 +101,10 @@ public class AiCallLedger extends BaseEntity
 
     private String delFlag;
 
+    /** 模糊检索 token 分组（仅查询入参，不持久化/不序列化） */
+    @JsonIgnore
+    private List<List<String>> tokenGroups;
+
     public void setLedgerId(Long ledgerId)
     {
         this.ledgerId = ledgerId;
@@ -157,6 +163,17 @@ public class AiCallLedger extends BaseEntity
     public String getCallerPhone()
     {
         return callerPhone;
+    }
+
+    @JsonIgnore
+    public List<List<String>> getTokenGroups()
+    {
+        return tokenGroups;
+    }
+
+    public void setTokenGroups(List<List<String>> tokenGroups)
+    {
+        this.tokenGroups = tokenGroups;
     }
 
     public void setCallerIdCard(String callerIdCard)

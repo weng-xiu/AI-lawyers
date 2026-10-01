@@ -8,8 +8,8 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ai.lawyers.system.domain.lawyers.AiCallRecord;
 import ai.lawyers.system.domain.lawyers.trunk.AiCallDialLog;
-import ai.lawyers.system.mapper.lawyers.AiCallRecordMapper;
 import ai.lawyers.system.mapper.lawyers.trunk.AiCallDialLogMapper;
+import ai.lawyers.system.service.lawyers.IAiCallRecordService;
 
 /**
  * W1: call-event 队列生产者 + 消费者。
@@ -47,8 +47,9 @@ public class CallEventDispatcher
     @Autowired
     private StreamQueueService streamQueueService;
 
+    /** G1-b2：话单更新经服务层加密/token 回填，不再直写 mapper */
     @Autowired
-    private AiCallRecordMapper callRecordMapper;
+    private IAiCallRecordService callRecordService;
 
     @Autowired
     private AiCallDialLogMapper dialLogMapper;
@@ -93,7 +94,7 @@ public class CallEventDispatcher
             log.warn("话单更新投递队列失败，降级同步 recordId={}: {}",
                     record.getRecordId(), e.getMessage());
         }
-        callRecordMapper.updateAiCallRecord(record);
+        callRecordService.updateAiCallRecord(record);
     }
 
     /**
@@ -136,7 +137,7 @@ public class CallEventDispatcher
             case UPDATE_CALL_RECORD:
                 if (event.getCallRecord() != null)
                 {
-                    callRecordMapper.updateAiCallRecord(event.getCallRecord());
+                    callRecordService.updateAiCallRecord(event.getCallRecord());
                 }
                 break;
             case UPDATE_DIAL_LOG:

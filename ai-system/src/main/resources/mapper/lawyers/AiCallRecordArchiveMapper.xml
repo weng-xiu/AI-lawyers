@@ -7,6 +7,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <resultMap type="AiCallRecord" id="AiCallRecordArchiveResult">
         <result property="recordId"        column="record_id"        />
         <result property="callerNumber"    column="caller_number"    />
+        <result property="callerNumberIndex" column="caller_number_index" />
         <result property="callerName"      column="caller_name"      />
         <result property="callerAddress"   column="caller_address"   />
         <result property="callTime"        column="call_time"        />
@@ -41,7 +42,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <!-- 归档表为冷数据：查询固定携带 call_time 条件可触发分区裁剪；
          名称字段与热表列表一致走维度表联查，保证前端展示契约不变 -->
     <sql id="selectArchiveVo">
-        select ar.record_id, ar.caller_number, ar.caller_name, ar.caller_address, ar.call_time,
+        select ar.record_id, ar.caller_number, ar.caller_number_index, ar.caller_name, ar.caller_address, ar.call_time,
                ar.end_time, ar.duration, ar.agent_id, ar.category_id, ar.content, ar.answer,
                ar.status, ar.transfer_id, ar.ticket_id, ar.call_uuid,
                ar.record_file, ar.recording_url, ar.record_duration, ar.asr_status, ar.transcript,
@@ -56,7 +57,28 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectArchiveList" parameterType="AiCallRecord" resultMap="AiCallRecordArchiveResult">
         <include refid="selectArchiveVo"/>
         <where>
-            <if test="callerNumber != null and callerNumber != ''">and ar.caller_number like concat('%', #{callerNumber}, '%')</if>
+            <if test="callerNumber != null and callerNumber != ''">
+                <!-- G1-b2：归档号码 token 复用 CALL_RECORD（record_id 稳定，归档不另建属主） -->
+                <choose>
+                    <when test="tokenGroups != null and tokenGroups.size() > 0">
+                        and (
+                        <foreach collection="tokenGroups" item="grp" separator=" or ">
+                            ar.record_id in (
+                                select owner_id from ai_pii_search_token
+                                where owner_type = 'CALL_RECORD'
+                                  and token_value in
+                                <foreach collection="grp" item="tok" open="(" separator="," close=")">
+                                    #{tok}
+                                </foreach>
+                                group by owner_id
+                                having count(distinct token_value) = #{grp.size()}
+                            )
+                        </foreach>
+                        )
+                    </when>
+                    <otherwise>and 1 = 0</otherwise>
+                </choose>
+            </if>
             <if test="callerName != null and callerName != ''">and ar.caller_name like concat('%', #{callerName}, '%')</if>
             <if test="agentId != null">and ar.agent_id = #{agentId}</if>
             <if test="categoryId != null">and ar.category_id = #{categoryId}</if>
@@ -75,5 +97,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="countArchive" resultType="long">
         select count(1) from ai_call_record_archive
     </select>
+
+    <!-- G1-b2：归档话单存量 PII 加密迁移专用（动态 SET，仅更新非空参数列） -->
+    <update id="updateArchiveEncryption">
+        update ai_call_record_archive
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="callerNumber != null">caller_number = #{callerNumber},</if>
+            <if test="callerNumberIndex != null">caller_number_index = #{callerNumberIndex},</if>
+        </trim>
+        where record_id = #{recordId}
+    </update>
 
 </mapper>

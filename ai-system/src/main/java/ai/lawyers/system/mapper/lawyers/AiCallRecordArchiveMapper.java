@@ -5,11 +5,12 @@ import org.apache.ibatis.annotations.Param;
 import ai.lawyers.system.domain.lawyers.AiCallRecord;
 
 /**
- * 话单归档表（ai_call_record_archive，P3-F1 冷热分离）只读 Mapper。
+ * 话单归档表（ai_call_record_archive，P3-F1 冷热分离）查询 Mapper。
  *
  * <p>归档表结构由 CREATE TABLE ... LIKE ai_call_record 生成并按月 RANGE 分区，
- * 仅提供查询能力；写入由 {@code DataArchiveTask} 批量迁移，删除仅限 DBA
- * DROP PARTITION 操作，应用侧不提供任何写接口。</p>
+ * 常规业务仅查询；行迁移由 {@code DataArchiveTask} 批量执行，删除仅限 DBA
+ * DROP PARTITION 操作。{@link #updateArchiveEncryption} 为 G1-b2 存量 PII
+ * 加密迁移专用方法，不用于日常业务。</p>
  *
  * @author ai-lawyers
  */
@@ -23,4 +24,11 @@ public interface AiCallRecordArchiveMapper
 
     /** 归档总量（冷数据规模观测） */
     public long countArchive();
+
+    /**
+     * G1-b2：归档话单存量 PII 加密迁移专用更新（动态 SET，仅更新非空参数列）。
+     */
+    public int updateArchiveEncryption(@Param("recordId") Long recordId,
+                                       @Param("callerNumber") String callerNumber,
+                                       @Param("callerNumberIndex") String callerNumberIndex);
 }

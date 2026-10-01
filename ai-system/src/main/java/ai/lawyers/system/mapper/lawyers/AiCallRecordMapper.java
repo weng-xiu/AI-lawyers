@@ -33,11 +33,11 @@ public interface AiCallRecordMapper
     /** 工作台：最近通话记录 */
     public List<AiCallRecord> selectRecentCalls(Integer limit);
 
-    /** 来电弹屏：来电人通话统计（callCount、monthCallCount、lastCallTime） */
-    public java.util.Map<String, Object> selectCallerCallStats(String callerNumber);
+    /** 来电弹屏：来电人通话统计（callCount、monthCallCount、lastCallTime）；入参为号码盲索引 */
+    public java.util.Map<String, Object> selectCallerCallStats(String callerNumberIndex);
 
-    /** 来电弹屏：按号码查询历史通话 */
-    public List<AiCallRecord> selectAiCallRecordByCallerNumber(@org.apache.ibatis.annotations.Param("callerNumber") String callerNumber, @org.apache.ibatis.annotations.Param("limit") Integer limit);
+    /** 来电弹屏：按号码盲索引查询历史通话 */
+    public List<AiCallRecord> selectAiCallRecordByCallerNumber(@org.apache.ibatis.annotations.Param("callerNumberIndex") String callerNumberIndex, @org.apache.ibatis.annotations.Param("limit") Integer limit);
 
     /** 按 FreeSWITCH 通道 UUID 查询话单（ESL 事件回写时使用） */
     public AiCallRecord selectAiCallRecordByCallUuid(String callUuid);
