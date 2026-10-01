@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.quality.AiQualityTemplateMapper">
+
+    <resultMap type="AiQualityTemplate" id="QualityTemplateResult">
+        <result property="templateId"   column="template_id"   />
+        <result property="templateName" column="template_name" />
+        <result property="dimensions"   column="dimensions"    />
+        <result property="scorePrompt"  column="score_prompt"  />
+        <result property="isDefault"    column="is_default"    />
+        <result property="status"       column="status"        />
+        <result property="createBy"     column="create_by"     />
+        <result property="createTime"   column="create_time"   />
+        <result property="updateBy"     column="update_by"     />
+        <result property="updateTime"   column="update_time"   />
+    </resultMap>
+
+    <sql id="columns">
+        template_id, template_name, dimensions, score_prompt, is_default, status,
+        create_by, create_time, update_by, update_time
+    </sql>
+
+    <select id="selectTemplateList" parameterType="AiQualityTemplate" resultMap="QualityTemplateResult">
+        select <include refid="columns"/> from ai_quality_template
+        <where>
+            <if test="templateName != null and templateName != ''">
+                and template_name like concat('%', #{templateName}, '%')
+            </if>
+            <if test="status != null and status != ''">and status = #{status}</if>
+        </where>
+        order by is_default desc, template_id
+    </select>
+
+    <select id="selectActiveTemplate" resultMap="QualityTemplateResult">
+        select <include refid="columns"/> from ai_quality_template
+        where is_default = '1' and status = '0'
+        order by template_id limit 1
+    </select>
+
+    <select id="selectTemplateById" parameterType="Long" resultMap="QualityTemplateResult">
+        select <include refid="columns"/> from ai_quality_template where template_id = #{templateId}
+    </select>
+
+    <insert id="insertTemplate" parameterType="AiQualityTemplate"
+            useGeneratedKeys="true" keyProperty="templateId">
+        insert into ai_quality_template
+            (template_name, dimensions, score_prompt, is_default, status,
+             create_by, create_time)
+        values
+            (#{templateName}, #{dimensions}, #{scorePrompt},
+             <choose><when test="isDefault != null and isDefault != ''">#{isDefault}</when><otherwise>'0'</otherwise></choose>,
+             <choose><when test="status != null and status != ''">#{status}</when><otherwise>'0'</otherwise></choose>,
+             #{createBy}, sysdate())
+    </insert>
+
+    <update id="updateTemplate" parameterType="AiQualityTemplate">
+        update ai_quality_template
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="templateName != null">template_name = #{templateName},</if>
+            <if test="dimensions != null">dimensions = #{dimensions},</if>
+            <if test="scorePrompt != null">score_prompt = #{scorePrompt},</if>
+            <if test="isDefault != null and isDefault != ''">is_default = #{isDefault},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = sysdate()
+        </trim>
+        where template_id = #{templateId}
+    </update>
+
+    <update id="clearDefault">
+        update ai_quality_template set is_default = '0' where is_default = '1'
+    </update>
+</mapper>

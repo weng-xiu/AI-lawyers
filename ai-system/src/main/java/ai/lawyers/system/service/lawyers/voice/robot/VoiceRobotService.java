@@ -91,6 +91,25 @@ public class VoiceRobotService
         {
             return VoiceRobotResult.degraded(FALLBACK_ANSWER, "robot_disabled");
         }
+        return runPipeline(question.trim(), sessionId);
+    }
+
+    /**
+     * P1-8：上线前仿真入口——绕过总开关执行同一 RAG+LLM 管线（开关未开也可做回归评测）。
+     * 空问题仍返回降级结果；其余行为与 {@link #answer} 完全一致。
+     */
+    public VoiceRobotResult simulateAnswer(String question, String sessionId)
+    {
+        if (StringUtils.isEmpty(question) || question.trim().isEmpty())
+        {
+            return VoiceRobotResult.degraded(FALLBACK_ANSWER, "empty_question");
+        }
+        return runPipeline(question.trim(), sessionId);
+    }
+
+    /** RAG 检索 + 提示词装配 + LLM 应答（answer 与仿真共用） */
+    private VoiceRobotResult runPipeline(String question, String sessionId)
+    {
         // ① RAG 检索（耗时埋点；服务未装配时按无命中处理）
         long ragBegin = System.nanoTime();
         List<RagChunk> hits = new ArrayList<>();

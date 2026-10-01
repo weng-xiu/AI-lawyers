@@ -35,6 +35,13 @@ public class AiQualityInspectionController extends BaseController
     @Autowired
     private IAiQualityInspectionService qualityInspectionService;
 
+    /** P1-7：质检模板数据层与校验支撑 */
+    @Autowired
+    private ai.lawyers.system.mapper.lawyers.quality.AiQualityTemplateMapper qualityTemplateMapper;
+
+    @Autowired
+    private ai.lawyers.system.service.impl.lawyers.quality.QualityTemplateSupport qualityTemplateSupport;
+
     /**
      * 质检记录列表
      */
@@ -137,5 +144,90 @@ public class AiQualityInspectionController extends BaseController
         {
             return AjaxResult.error(e.getMessage());
         }
+    }
+
+    /**
+     * P1-7：质检模板列表（维度/权重/prompt 管理）。
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:quality:review')")
+    @GetMapping("/template/list")
+    public AjaxResult templateList(ai.lawyers.system.domain.lawyers.quality.AiQualityTemplate query)
+    {
+        return success(qualityTemplateMapper.selectTemplateList(query));
+    }
+
+    /**
+     * P1-7：新增质检模板。
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:quality:review')")
+    @Log(title = "质检模板", businessType = BusinessType.INSERT)
+    @PostMapping("/template")
+    public AjaxResult addTemplate(
+            @RequestBody ai.lawyers.system.domain.lawyers.quality.AiQualityTemplate template)
+    {
+        try
+        {
+            qualityTemplateSupport.validate(template);
+            template.setCreateBy(getUsername());
+            qualityTemplateMapper.insertTemplate(template);
+            return success(template.getTemplateId());
+        }
+        catch (IllegalArgumentException e)
+        {
+            return AjaxResult.error(e.getMessage());
+        }
+    }
+
+    /**
+     * P1-7：修改质检模板。
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:quality:review')")
+    @Log(title = "质检模板", businessType = BusinessType.UPDATE)
+    @PutMapping("/template")
+    public AjaxResult editTemplate(
+            @RequestBody ai.lawyers.system.domain.lawyers.quality.AiQualityTemplate template)
+    {
+        try
+        {
+            if (template.getTemplateId() == null
+                    || qualityTemplateMapper.selectTemplateById(template.getTemplateId()) == null)
+            {
+                return AjaxResult.error("质检模板不存在");
+            }
+            qualityTemplateSupport.validate(template);
+            template.setUpdateBy(getUsername());
+            return toAjax(qualityTemplateMapper.updateTemplate(template));
+        }
+        catch (IllegalArgumentException e)
+        {
+            return AjaxResult.error(e.getMessage());
+        }
+    }
+
+    /**
+     * P1-7：将指定模板设为唯一生效默认模板（停用模板不可设默认）。
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:quality:review')")
+    @Log(title = "质检模板-设默认", businessType = BusinessType.UPDATE)
+    @PutMapping("/template/default/{templateId}")
+    public AjaxResult setDefaultTemplate(@PathVariable("templateId") Long templateId)
+    {
+        ai.lawyers.system.domain.lawyers.quality.AiQualityTemplate template =
+                qualityTemplateMapper.selectTemplateById(templateId);
+        if (template == null)
+        {
+            return AjaxResult.error("质检模板不存在");
+        }
+        if ("1".equals(template.getStatus()))
+        {
+            return AjaxResult.error("停用状态的模板不能设为生效模板");
+        }
+        qualityTemplateMapper.clearDefault();
+        ai.lawyers.system.domain.lawyers.quality.AiQualityTemplate up =
+                new ai.lawyers.system.domain.lawyers.quality.AiQualityTemplate();
+        up.setTemplateId(templateId);
+        up.setIsDefault("1");
+        up.setUpdateBy(getUsername());
+        return toAjax(qualityTemplateMapper.updateTemplate(up));
     }
 }
