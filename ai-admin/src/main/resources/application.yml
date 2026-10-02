@@ -448,6 +448,31 @@ call:
     # false：回退业务表实时聚合。查历史区间前须先用 POST /lawyers/report/stat/backfill 回填
     preagg-enabled: ${DASHBOARD_PREAGG_ENABLED:true}
 
+  # ---------- P2-15：呼叫行为风控（自动评估 → 置底规则留痕复核） ----------
+  risk:
+    # 总开关（定时任务与手动扫描共用；已有留痕记录仍可查询/复核）
+    enabled: ${CALL_RISK_ENABLED:true}
+    # 扫描 cron（默认每 30 分钟，分钟位 17 错开统计任务）
+    cron: ${CALL_RISK_CRON:0 17/30 * * * ?}
+    # 评估窗口（小时）与窗口内最小来电次数（样本不足不评估）
+    window-hours: ${CALL_RISK_WINDOW_HOURS:72}
+    min-calls: ${CALL_RISK_MIN_CALLS:10}
+    # 风险评分处置阈值与中/高风险分界（评分构成见 CallBehaviorRiskScorer）
+    score-threshold: ${CALL_RISK_SCORE_THRESHOLD:60}
+    medium-threshold: ${CALL_RISK_MEDIUM_THRESHOLD:60}
+    high-threshold: ${CALL_RISK_HIGH_THRESHOLD:80}
+    # 超短通话阈值（秒，≤该时长且接通视为超短）
+    short-seconds: ${CALL_RISK_SHORT_SECONDS:15}
+    # 夜间来电时段 [start, 次日end)，默认 22:00~次日 7:00
+    night-start-hour: ${CALL_RISK_NIGHT_START:22}
+    night-end-hour: ${CALL_RISK_NIGHT_END:7}
+    # 自动处置策略：PRIORITY 评分达标自动生成置底规则 / OFF 仅留痕待班组长复核
+    # （REJECT 直接拦截不做自动处置，避免误杀；确认后可在高频置底规则页人工调整）
+    auto-suppress: ${CALL_RISK_AUTO_SUPPRESS:PRIORITY}
+    # 自动生成置底规则的频次窗口（窗口内命中 N 次才置底，防单次误伤）
+    suppress-trigger-count: ${CALL_RISK_SUPPRESS_TRIGGER_COUNT:3}
+    suppress-window-seconds: ${CALL_RISK_SUPPRESS_WINDOW_SECONDS:86400}
+
   # ---------- P3-B2：统一 PBX 事件入 Stream 开关 ----------
   # true（默认）：ESL/AMI 两侧桥的事件统一投递 stream:call-event 异步消费（CallEventBus 入队 →
   #   CallEventDispatcher 消费组路由 → CallEventProcessor 状态机/坐席推送/自动化工单）；
@@ -623,3 +648,48 @@ call:
       token: ${SMS_UPSTREAM_TOKEN:}
       # 同号码每分钟退订频控（<=0 表示不限制）
       rate-limit-per-min: ${SMS_UPSTREAM_RATE_LIMIT:10}
+
+# ============================================================
+# P1-9：话务预测与智能排班（轻量版）
+# 基线剖面读 ai_stat_minute call_total（近 N 周 weekday+hour 平均），
+# 未来 N 天逐时预测 = 剖面 × 日型系数（假日/事件/调休，日历维护见
+# /lawyers/forecast/calendar）；排班建议按 Erlang 简化式推算坐席数
+# ============================================================
+forecast:
+  # 基线剖面历史周数
+  history-weeks: ${FORECAST_HISTORY_WEEKS:8}
+  # 单次预测最大天数
+  max-days: ${FORECAST_MAX_DAYS:14}
+  # 平均处理时长（秒，含通话+话后）
+  aht-seconds: ${FORECAST_AHT_SECONDS:300}
+  # 坐席利用率（0~1）
+  utilization: ${FORECAST_UTILIZATION:0.85}
+  # 假日话务系数（HOLIDAY 日型统一值）
+  holiday-factor: ${FORECAST_HOLIDAY_FACTOR:0.4}
+  # 调休补班话务系数（WORKDAY 日型）
+  workday-factor: ${FORECAST_WORKDAY_FACTOR:1.2}
+
+# ============================================================
+# P1-11：预测性满意度（轻量加权模型，非训练模型）
+# 量表 1非常满意/2满意/3一般/4不满意；基线 1.0 起步按特征罚分
+# （情绪词/质检情绪/质检总分/超短通话/未接/转接），四舍五入映射 1~4。
+# 预测与真实回访（ai_call_ledger.satisfaction）保留对照口径持续校准权重
+# ============================================================
+satisfaction:
+  forecast:
+    # 紧急情绪（EmotionIntentDetector URGENT）罚分
+    weight-urgent: ${SATISFACTION_W_URGENT:1.5}
+    # 负面情绪（NEGATIVE）罚分
+    weight-negative: ${SATISFACTION_W_NEGATIVE:0.8}
+    # 质检情绪态度分低罚分（<60 全额，<80 减半）
+    weight-qc-low-emotion: ${SATISFACTION_W_QC_EMOTION:0.8}
+    # 质检总分低罚分（<60 全额，<80 减半；申诉成立取调整分）
+    weight-qc-low-total: ${SATISFACTION_W_QC_TOTAL:0.6}
+    # 超短通话罚分（疑似未解决）
+    weight-short-call: ${SATISFACTION_W_SHORT:0.4}
+    # 未接来电罚分
+    weight-missed: ${SATISFACTION_W_MISSED:1.0}
+    # 转接罚分
+    weight-transferred: ${SATISFACTION_W_TRANSFERRED:0.3}
+    # 超短通话阈值（秒）
+    short-seconds: ${SATISFACTION_SHORT_SECONDS:30}

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.forecast.AiForecastPlanMapper">
+
+    <resultMap type="AiForecastPlan" id="AiForecastPlanResult">
+        <result property="planId"        column="plan_id"        />
+        <result property="beginDate"     column="begin_date"     />
+        <result property="endDate"       column="end_date"       />
+        <result property="totalVolume"   column="total_volume"   />
+        <result property="peakHour"      column="peak_hour"      />
+        <result property="peakAgents"    column="peak_agents"    />
+        <result property="payloadJson"   column="payload_json"   />
+        <result property="confirmedBy"   column="confirmed_by"   />
+        <result property="confirmedTime" column="confirmed_time" />
+        <result property="remark"        column="remark"         />
+        <result property="createTime"    column="create_time"    />
+    </resultMap>
+
+    <select id="selectPlanList" parameterType="AiForecastPlan" resultMap="AiForecastPlanResult">
+        select plan_id, begin_date, end_date, total_volume, peak_hour, peak_agents,
+               confirmed_by, confirmed_time, remark, create_time
+        from ai_forecast_plan
+        <where>
+            <if test="confirmedBy != null and confirmedBy != ''"> and confirmed_by like concat('%', #{confirmedBy}, '%')</if>
+        </where>
+        order by plan_id desc
+    </select>
+
+    <select id="selectPlanById" parameterType="Long" resultMap="AiForecastPlanResult">
+        select plan_id, begin_date, end_date, total_volume, peak_hour, peak_agents,
+               payload_json, confirmed_by, confirmed_time, remark, create_time
+        from ai_forecast_plan
+        where plan_id = #{planId}
+    </select>
+
+    <insert id="insertPlan" parameterType="AiForecastPlan" useGeneratedKeys="true" keyProperty="planId">
+        insert into ai_forecast_plan
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            begin_date,
+            end_date,
+            <if test="totalVolume != null">total_volume,</if>
+            <if test="peakHour != null">peak_hour,</if>
+            <if test="peakAgents != null">peak_agents,</if>
+            <if test="payloadJson != null">payload_json,</if>
+            <if test="confirmedBy != null">confirmed_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            #{beginDate},
+            #{endDate},
+            <if test="totalVolume != null">#{totalVolume},</if>
+            <if test="peakHour != null">#{peakHour},</if>
+            <if test="peakAgents != null">#{peakAgents},</if>
+            <if test="payloadJson != null">#{payloadJson},</if>
+            <if test="confirmedBy != null">#{confirmedBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate()
+        </trim>
+    </insert>
+</mapper>

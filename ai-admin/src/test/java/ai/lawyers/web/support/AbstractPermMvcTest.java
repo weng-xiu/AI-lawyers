@@ -151,12 +151,36 @@ public abstract class AbstractPermMvcTest
     @EnableWebSecurity
     @EnableWebMvc
     @EnableMethodSecurity(prePostEnabled = true)
-    static class PermMvcConfig
+    static class PermMvcConfig implements org.springframework.web.servlet.config.annotation.WebMvcConfigurer
     {
         @Bean("ss")
         PermissionService permissionService()
         {
             return new PermissionService();
+        }
+
+        /**
+         * 测试聚焦权限语义（401/403/200），不验证请求体 Bean Validation。
+         * 经 WebMvcConfigurer#getValidator 提供恒通过 Validator（SB 标准扩展点），
+         * 避免空 {} body 触发 @NotBlank 等校验导致 400 掩盖 200/403 断言。
+         */
+        @Override
+        public org.springframework.validation.Validator getValidator()
+        {
+            return new org.springframework.validation.Validator()
+            {
+                @Override
+                public boolean supports(Class<?> clazz)
+                {
+                    return true;
+                }
+
+                @Override
+                public void validate(Object target, org.springframework.validation.Errors errors)
+                {
+                    // 恒通过：不做任何字段级校验
+                }
+            };
         }
 
         @Bean

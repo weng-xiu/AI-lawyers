@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.risk.AiCallRiskRecordMapper">
+
+    <resultMap type="AiCallRiskRecord" id="AiCallRiskRecordResult">
+        <result property="riskId"             column="risk_id"             />
+        <result property="callerNumberIndex"  column="caller_number_index" />
+        <result property="maskedNumber"       column="masked_number"       />
+        <result property="windowHours"        column="window_hours"        />
+        <result property="callCount"          column="call_count"          />
+        <result property="shortCount"         column="short_count"         />
+        <result property="nightCount"         column="night_count"         />
+        <result property="missedCount"        column="missed_count"        />
+        <result property="riskScore"          column="risk_score"          />
+        <result property="scoreDetail"        column="score_detail"        />
+        <result property="riskLevel"          column="risk_level"          />
+        <result property="reviewStatus"       column="review_status"       />
+        <result property="suppressId"         column="suppress_id"         />
+        <result property="reviewBy"           column="review_by"           />
+        <result property="reviewTime"         column="review_time"         />
+        <result property="reviewRemark"       column="review_remark"       />
+        <result property="createTime"         column="create_time"         />
+    </resultMap>
+
+    <sql id="riskColumns">
+        select risk_id, caller_number_index, masked_number, window_hours,
+               call_count, short_count, night_count, missed_count,
+               risk_score, score_detail, risk_level, review_status, suppress_id,
+               review_by, review_time, review_remark, create_time
+        from ai_call_risk_record
+    </sql>
+
+    <select id="selectRiskList" parameterType="AiCallRiskRecord" resultMap="AiCallRiskRecordResult">
+        <include refid="riskColumns"/>
+        <where>
+            <if test="reviewStatus != null and reviewStatus != ''"> and review_status = #{reviewStatus}</if>
+            <if test="riskLevel != null and riskLevel != ''"> and risk_level = #{riskLevel}</if>
+            <if test="maskedNumberLike != null and maskedNumberLike != ''"> and masked_number like concat('%', #{maskedNumberLike}, '%')</if>
+            <if test="params.beginTime != null and params.beginTime != ''"> and create_time &gt;= #{params.beginTime}</if>
+            <if test="params.endTime != null and params.endTime != ''"> and create_time &lt;= #{params.endTime}</if>
+        </where>
+        order by risk_id desc
+    </select>
+
+    <select id="selectRiskById" parameterType="Long" resultMap="AiCallRiskRecordResult">
+        <include refid="riskColumns"/>
+        where risk_id = #{riskId}
+    </select>
+
+    <select id="selectLatestByIndex" resultMap="AiCallRiskRecordResult">
+        <include refid="riskColumns"/>
+        where caller_number_index = #{callerNumberIndex} and review_status = #{reviewStatus}
+        order by risk_id desc limit 1
+    </select>
+
+    <insert id="insertRisk" parameterType="AiCallRiskRecord" useGeneratedKeys="true" keyProperty="riskId">
+        insert into ai_call_risk_record
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            caller_number_index,
+            <if test="maskedNumber != null">masked_number,</if>
+            <if test="windowHours != null">window_hours,</if>
+            <if test="callCount != null">call_count,</if>
+            <if test="shortCount != null">short_count,</if>
+            <if test="nightCount != null">night_count,</if>
+            <if test="missedCount != null">missed_count,</if>
+            <if test="riskScore != null">risk_score,</if>
+            <if test="scoreDetail != null">score_detail,</if>
+            <if test="riskLevel != null">risk_level,</if>
+            <if test="reviewStatus != null">review_status,</if>
+            <if test="suppressId != null">suppress_id,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            #{callerNumberIndex},
+            <if test="maskedNumber != null">#{maskedNumber},</if>
+            <if test="windowHours != null">#{windowHours},</if>
+            <if test="callCount != null">#{callCount},</if>
+            <if test="shortCount != null">#{shortCount},</if>
+            <if test="nightCount != null">#{nightCount},</if>
+            <if test="missedCount != null">#{missedCount},</if>
+            <if test="riskScore != null">#{riskScore},</if>
+            <if test="scoreDetail != null">#{scoreDetail},</if>
+            <if test="riskLevel != null">#{riskLevel},</if>
+            <if test="reviewStatus != null">#{reviewStatus},</if>
+            <if test="suppressId != null">#{suppressId},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateReview" parameterType="AiCallRiskRecord">
+        update ai_call_risk_record
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="reviewStatus != null and reviewStatus != ''">review_status = #{reviewStatus},</if>
+            <if test="suppressId != null">suppress_id = #{suppressId},</if>
+            <if test="reviewBy != null">review_by = #{reviewBy},</if>
+            <if test="reviewTime != null">review_time = #{reviewTime},</if>
+            <if test="reviewRemark != null">review_remark = #{reviewRemark},</if>
+        </trim>
+        where risk_id = #{riskId}
+    </update>
+</mapper>
