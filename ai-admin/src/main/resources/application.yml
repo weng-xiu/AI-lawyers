@@ -342,6 +342,13 @@ voice:
   asr-language: ${VOICE_ASR_LANGUAGE:zh}
   # A4：/ws/voice 服务端 VAD（能量+过零率，语音起始≤80ms/尾静默400ms），关闭后不做自动 barge-in
   vad-enabled: ${VOICE_VAD_ENABLED:true}
+  # P2-12 方案A：Silero VAD 影子验证开关。开启后旧 VAD 仍为主决策（不影响线上打断链路），
+  # Silero 判定仅记录对比日志/落表（ai_vad_shadow_*），用于离线评估误打断率/漏打断率/响应延迟
+  vad-shadow-enabled: ${VOICE_VAD_SHADOW_ENABLED:false}
+  # Silero VAD ONNX 模型路径（classpath: 前缀或文件路径），无 ONNX Runtime 时自动降级 Mock
+  vad-shadow-model-path: ${VOICE_VAD_SHADOW_MODEL_PATH:models/silero_vad_int8.onnx}
+  # Silero VAD 语音概率阈值（0~1）
+  vad-shadow-threshold: ${VOICE_VAD_SHADOW_THRESHOLD:0.5}
 
 # MyBatis配置
 mybatis:

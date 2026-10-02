@@ -70,12 +70,12 @@
             <artifactId>ai-system</artifactId>
         </dependency>
 
-        <!-- P3-A2/A3：DashScope 全双工 WebSocket 客户端（okhttp 3.14.9 与 ai-system 大模型客户端同版本，
-             避免引入 dashscope-sdk 导致的 okhttp4/slf4j2 依赖污染，见综合文档 4.1 节"沿用 HTTP，避免 SDK 依赖"决策） -->
+        <!-- P3-A2/A3：DashScope 全双工 WebSocket 客户端（okhttp 4.12.x，Java 17 兼容，
+             修复 3.14.x 已知 CVE；大模型 HTTP 客户端同版本，避免依赖污染） -->
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>okhttp</artifactId>
-            <version>3.14.9</version>
+            <version>4.12.0</version>
         </dependency>
 
         <!-- P3-A5：VoiceSession 注入 HotlineMetrics（ai-system 的 micrometer-core 为 optional 不传递），

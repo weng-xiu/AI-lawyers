@@ -1,0 +1,213 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "AI 调用总量（区间）",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(increase(hotline_ai_call_total[$__range]))",
+          "instant": true
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed" } } },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "title": "AI 调用成功率",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(increase(hotline_ai_call_total{result=\"success\"}[$__range])) / clamp_min(sum(increase(hotline_ai_call_total[$__range])), 1) * 100",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 95 },
+              { "color": "green", "value": 99 }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "title": "AI 降级率（fallback）",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(increase(hotline_ai_call_total{result=\"fallback\"}[$__range])) / clamp_min(sum(increase(hotline_ai_call_total[$__range])), 1) * 100",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 15 }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "title": "AI 拒绝率（reject）",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(increase(hotline_ai_call_total{result=\"reject\"}[$__range])) / clamp_min(sum(increase(hotline_ai_call_total[$__range])), 1) * 100",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 2 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "title": "AI 调用 QPS（按类型/结果）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "targets": [
+        {
+          "expr": "sum by (kind, result) (rate(hotline_ai_call_total[$__rate_interval]))",
+          "legendFormat": "{{kind}} / {{result}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" } }
+    },
+    {
+      "title": "AI 在途并发（许可占用）",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 4 },
+      "targets": [
+        {
+          "expr": "hotline_ai_inflight",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 50,
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 35 },
+              { "color": "red", "value": 45 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "AI 首响耗时 p95 (ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 4 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(hotline_ai_first_response_seconds_bucket[$__rate_interval]))) * 1000"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 2000 },
+              { "color": "red", "value": 4000 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "AI 调用结果分布",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 12 },
+      "targets": [
+        {
+          "expr": "sum by (result) (increase(hotline_ai_call_total[$__range]))",
+          "legendFormat": "{{result}}"
+        }
+      ]
+    },
+    {
+      "title": "各类型调用量占比（chat/embed/rerank/asr）",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 12 },
+      "targets": [
+        {
+          "expr": "sum by (kind) (increase(hotline_ai_call_total[$__range]))",
+          "legendFormat": "{{kind}}"
+        }
+      ]
+    },
+    {
+      "title": "RAG 检索路由分布",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 12 },
+      "targets": [
+        {
+          "expr": "sum by (route) (increase(hotline_rag_hit_total[$__range]))",
+          "legendFormat": "{{route}}"
+        }
+      ]
+    },
+    {
+      "title": "说明：成本/Token 口径",
+      "type": "text",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 20 },
+      "options": {
+        "mode": "markdown",
+        "content": "### 成本与 Token 数据说明\n\n- 应用已埋点的 Prometheus 指标仅覆盖**调用量/结果/在途/首响/RAG 路由**（`hotline_ai_*`），本看板全部基于这些真实指标。\n- **Token 消耗与成本金额**落库在 MySQL `ai_model_call_log` 表（由 AiModelCallLogRecorder 异步写入），当前**未导出为 Prometheus 指标**。\n- 成本分析请使用后台「模型成本分析」页面（ModelCostService 按模型/场景聚合）。\n- 如需在 Grafana 查看成本/Token 趋势，需另行部署 **sql_exporter**（或 mysqld-exporter + 自定义查询）把该表聚合导出，再补充面板。"
+      }
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["ai-lawyers", "ai", "cost", "p2-observability"],
+  "templating": { "list": [] },
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "Asia/Shanghai",
+  "title": "AI律师话务系统 - AI 调用与降级监控",
+  "uid": "ai-cost-dashboard",
+  "version": 2,
+  "weekStart": ""
+}

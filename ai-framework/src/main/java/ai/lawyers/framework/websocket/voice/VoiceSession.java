@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
+import ai.lawyers.system.service.lawyers.voice.vad.SileroVadShadowService;
 import ai.lawyers.system.service.lawyers.voice.vad.VoiceActivityDetector;
 
 /**
@@ -86,6 +87,12 @@ public class VoiceSession
 
     /** A4：能量+过零率 VAD，start 帧后按 sampleRate 创建，stop/shutdown 释放 */
     private volatile VoiceActivityDetector vad;
+
+    /** P2-12：Silero VAD 影子服务（null 时影子模式关闭） */
+    private final SileroVadShadowService vadShadowService;
+
+    /** P2-12：影子 VAD 对（start 帧后创建，stop/shutdown 释放） */
+    private volatile SileroVadShadowService.VadPair vadShadowPair;
 
     /** A5：指标门面（null 时埋点静默跳过，不抛异常） */
     private final HotlineMetrics metrics;
@@ -191,6 +198,17 @@ public class VoiceSession
             ai.lawyers.system.service.lawyers.voice.emotion.VoiceRiskActionService emotionAction,
             ai.lawyers.system.service.lawyers.voice.copilot.CopilotAssistService copilotService)
     {
+        this(wsSession, sessionId, role, queueCapacity, engineRegistry, vadEnabled, metrics,
+                robotService, emotionAction, copilotService, null);
+    }
+
+    VoiceSession(Session wsSession, String sessionId, String role, int queueCapacity,
+            VoiceEngineRegistry engineRegistry, boolean vadEnabled, HotlineMetrics metrics,
+            ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotService robotService,
+            ai.lawyers.system.service.lawyers.voice.emotion.VoiceRiskActionService emotionAction,
+            ai.lawyers.system.service.lawyers.voice.copilot.CopilotAssistService copilotService,
+            SileroVadShadowService vadShadowService)
+    {
         this.wsSession = wsSession;
         this.connId = wsSession.getId();
         this.sessionId = sessionId;
@@ -201,6 +219,7 @@ public class VoiceSession
         this.robotService = robotService;
         this.emotionAction = emotionAction;
         this.copilotService = copilotService;
+        this.vadShadowService = vadShadowService;
         int cap = queueCapacity > 0 ? queueCapacity : 1000;
         this.sendQueue = new LinkedBlockingQueue<>(cap);
         this.sender = new Thread(this::runSender, "voice-sender-" + connId);
@@ -318,6 +337,20 @@ public class VoiceSession
         }
         asrActive = false;
         vad = null;
+        // P2-12：释放影子 VAD 对
+        SileroVadShadowService.VadPair pair = vadShadowPair;
+        if (pair != null)
+        {
+            try
+            {
+                pair.close();
+            }
+            catch (Exception e)
+            {
+                log.warn("VoiceWS Silero VAD 影子关闭异常 conn={}: {}", connId, e.getMessage());
+            }
+            vadShadowPair = null;
+        }
         // E3：作废旧回合并停回合执行器（阻塞中的 LLM 调用结果产出时被 turnId 校验丢弃）
         activeRobotTurn.incrementAndGet();
         robotExecutor.shutdownNow();
@@ -387,6 +420,27 @@ public class VoiceSession
                 onVadSpeechEnd();
             }
         }) : null;
+        // P2-12：Silero VAD 影子模式（主决策仍走旧 VAD，Silero 仅记录日志打标）
+        if (vadShadowService != null && vadEnabled)
+        {
+            this.vadShadowPair = vadShadowService.createShadowPair(sessionId, rate,
+                    new VoiceActivityDetector.Listener()
+                    {
+                        @Override
+                        public void onSpeechStart()
+                        {
+                            onVadSpeechStart();
+                        }
+
+                        @Override
+                        public void onSpeechEnd()
+                        {
+                            onVadSpeechEnd();
+                        }
+                    });
+            // 影子模式下主 VAD 由 VadPair 内部持有，外部统一走影子链路
+            this.vad = this.vadShadowPair.getLegacy();
+        }
         // A5：记录 start 受理时刻（ASR 首包/E2E 首响起点）
         this.startNanos = System.nanoTime();
         this.asrFirstMarked.set(false);
@@ -833,6 +887,20 @@ public class VoiceSession
     /** A4：音频帧喂 VAD（独立于 ASR 引擎，Mock/真实引擎下均生效） */
     private void feedVad(byte[] pcm)
     {
+        // P2-12：影子模式开启时，VadPair 内部已包含主 VAD，直接走影子链路避免重复 feed
+        SileroVadShadowService.VadPair pair = vadShadowPair;
+        if (pair != null)
+        {
+            try
+            {
+                pair.feed(pcm);
+            }
+            catch (Exception e)
+            {
+                log.warn("VoiceWS Silero VAD 影子处理异常 conn={}: {}", connId, e.getMessage());
+            }
+            return;
+        }
         VoiceActivityDetector detector = vad;
         if (detector != null)
         {
@@ -918,6 +986,20 @@ public class VoiceSession
         asrActive = false;
         asrEngine = null;
         vad = null;
+        // P2-12：停止识别时释放影子 VAD 对
+        SileroVadShadowService.VadPair stopPair = vadShadowPair;
+        if (stopPair != null)
+        {
+            try
+            {
+                stopPair.close();
+            }
+            catch (Exception e)
+            {
+                log.warn("VoiceWS Silero VAD 影子 stop 释放异常 conn={}: {}", connId, e.getMessage());
+            }
+            vadShadowPair = null;
+        }
         robotMode = false;
         // E3：停止识别即作废机器人回合（在途 LLM 结果产出时丢弃）
         activeRobotTurn.incrementAndGet();

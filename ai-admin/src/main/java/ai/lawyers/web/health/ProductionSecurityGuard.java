@@ -31,6 +31,7 @@ public class ProductionSecurityGuard implements ApplicationRunner
             "Z2xwLWExMmwtbGF3eWVycy1qd3Qtc2VjcmV0LWtleS0yMDI2LWNoYW5nZS1tZS1pbi1wcm9kLTA5ODc2NTQz";
     public static final String DEFAULT_DB_PASSWORD = "root";
     public static final String DEFAULT_DRUID_CONSOLE_PASSWORD = "Druid@2026!ChangeMe";
+    public static final String DEFAULT_CALLBACK_SIGN_SECRET = "ai-lawyers-callback-dev-secret-change-me-2026";
 
     private final Environment environment;
 
@@ -123,6 +124,11 @@ public class ProductionSecurityGuard implements ApplicationRunner
         {
             warnings.add("PBX 媒体 fork 共享密钥为空（不校验来源），仅限完全隔离内网 + IP 白名单场景；"
                     + "否则须经 CALL_PBX_MEDIA_AUTH_KEY 注入强随机密钥");
+        }
+        String callbackSecret = props.apply("call.callback.sign-secret");
+        if (isBlank(callbackSecret) || DEFAULT_CALLBACK_SIGN_SECRET.equals(callbackSecret))
+        {
+            warnings.add("网关回调签名密钥为空或仍为内置默认值，须经 CALLBACK_SIGN_SECRET 注入 >=32 字节随机串");
         }
         return warnings;
     }

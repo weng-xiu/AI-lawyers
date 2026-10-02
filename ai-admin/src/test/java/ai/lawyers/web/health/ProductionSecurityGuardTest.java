@@ -59,8 +59,22 @@ public class ProductionSecurityGuardTest
 
         assertTrue(ProductionSecurityGuard.findViolations(props::get).isEmpty());
         List<String> warnings = ProductionSecurityGuard.findWarnings(props::get);
-        assertEquals(1, warnings.size());
+        assertEquals(2, warnings.size());
         assertTrue(warnings.get(0).contains("PBX"));
+        assertTrue(warnings.get(1).contains("CALLBACK_SIGN_SECRET"));
+    }
+
+    @Test
+    public void strongCallbackSecretSuppressesWarning()
+    {
+        Map<String, String> props = defaultProps();
+        props.put("token.secret", "a-very-strong-random-jwt-secret-key-0123456789");
+        props.put("spring.datasource.druid.master.password", "Str0ng!Db#Pass");
+        props.put("spring.datasource.druid.statViewServlet.enabled", "false");
+        props.put("call.pbx.media.auth-key", "strong-pbx-auth-key-32bytes");
+        props.put("call.callback.sign-secret", "strong-callback-sign-secret-32bytes");
+
+        assertTrue(ProductionSecurityGuard.findWarnings(props::get).isEmpty());
     }
 
     @Test

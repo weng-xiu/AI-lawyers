@@ -64,6 +64,15 @@ public class VoiceProperties
     /** A4：/ws/voice 服务端 VAD（能量+过零率）开关，关闭后不做自动 barge-in 打断 */
     private boolean vadEnabled = true;
 
+    /** P2-12：Silero VAD 影子模式开关（默认关闭）。开启后旧 VAD 仍为主决策，Silero 判定仅记录日志打标 */
+    private boolean vadShadowEnabled = false;
+
+    /** P2-12：Silero VAD 模型路径（classpath: 前缀或文件路径），默认 models/silero_vad_int8.onnx */
+    private String vadShadowModelPath = "models/silero_vad_int8.onnx";
+
+    /** P2-12：Silero VAD 语音概率阈值（0~1），默认 0.5 */
+    private float vadShadowThreshold = 0.5f;
+
     public boolean isVadEnabled()
     {
         return vadEnabled;
@@ -72,6 +81,36 @@ public class VoiceProperties
     public void setVadEnabled(boolean vadEnabled)
     {
         this.vadEnabled = vadEnabled;
+    }
+
+    public boolean isVadShadowEnabled()
+    {
+        return vadShadowEnabled;
+    }
+
+    public void setVadShadowEnabled(boolean vadShadowEnabled)
+    {
+        this.vadShadowEnabled = vadShadowEnabled;
+    }
+
+    public String getVadShadowModelPath()
+    {
+        return vadShadowModelPath;
+    }
+
+    public void setVadShadowModelPath(String vadShadowModelPath)
+    {
+        this.vadShadowModelPath = vadShadowModelPath;
+    }
+
+    public float getVadShadowThreshold()
+    {
+        return vadShadowThreshold;
+    }
+
+    public void setVadShadowThreshold(float vadShadowThreshold)
+    {
+        this.vadShadowThreshold = vadShadowThreshold;
     }
 
     public String getEngine()

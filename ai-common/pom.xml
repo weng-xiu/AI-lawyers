@@ -99,11 +99,12 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- P3-G1 国密算法库（SM2/SM3/SM4，单一 jar 无传递依赖；等保/信创测评认可的标准实现） -->
+        <!-- P3-G1 国密算法库（SM2/SM3/SM4，单一 jar 无传递依赖；等保/信创测评认可的标准实现）。
+             P2-13：1.70 存在 CVE-2024-29857 等漏洞，升级为 jdk18on 1.78.1（API 完全兼容） -->
         <dependency>
             <groupId>org.bouncycastle</groupId>
-            <artifactId>bcprov-jdk15on</artifactId>
-            <version>1.70</version>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>1.78.1</version>
         </dependency>
 
         <!-- Jaxb（JDK 17 + SB3 迁移：javax → jakarta） -->

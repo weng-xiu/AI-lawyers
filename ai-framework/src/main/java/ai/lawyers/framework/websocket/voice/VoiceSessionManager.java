@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import ai.lawyers.framework.websocket.WsClusterRelay;
 import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
+import ai.lawyers.system.service.lawyers.voice.vad.SileroVadShadowService;
 
 /**
  * /ws/voice 本机连接注册表（P3-A1）。
@@ -68,6 +69,10 @@ public class VoiceSessionManager
     @Autowired(required = false)
     private ai.lawyers.system.service.lawyers.voice.copilot.CopilotAssistService copilotAssistService;
 
+    /** P2-12：Silero VAD 影子服务（未装配时影子模式关闭） */
+    @Autowired(required = false)
+    private SileroVadShadowService vadShadowService;
+
     @PostConstruct
     public void init()
     {
@@ -97,10 +102,17 @@ public class VoiceSessionManager
             log.warn("VoiceWS 连接数达上限 {}，拒绝 connId={}", maxSessions, wsSession.getId());
             return null;
         }
+        // P2-12：影子模式开关（voice.vad-shadow-enabled）
+        SileroVadShadowService shadowService = null;
+        if (voiceProperties != null && voiceProperties.isVadShadowEnabled() && vadShadowService != null)
+        {
+            shadowService = vadShadowService;
+        }
         VoiceSession session = new VoiceSession(wsSession, sessionId, role, sendQueueCapacity,
                 engineRegistry != null ? engineRegistry : new VoiceEngineRegistry(),
                 voiceProperties == null || voiceProperties.isVadEnabled(),
-                hotlineMetrics, voiceRobotService, voiceRiskActionService, copilotAssistService);
+                hotlineMetrics, voiceRobotService, voiceRiskActionService, copilotAssistService,
+                shadowService);
         VoiceSession old = sessions.putIfAbsent(wsSession.getId(), session);
         if (old != null)
         {
