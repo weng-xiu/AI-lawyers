@@ -349,6 +349,10 @@ voice:
   vad-shadow-model-path: ${VOICE_VAD_SHADOW_MODEL_PATH:models/silero_vad_int8.onnx}
   # Silero VAD 语音概率阈值（0~1）
   vad-shadow-threshold: ${VOICE_VAD_SHADOW_THRESHOLD:0.5}
+  # 影子日统计输出 cron（默认每日 00:05，UPSERT ai_vad_shadow_daily；影子开关关闭时空转）
+  vad-shadow-report-cron: ${VOICE_VAD_SHADOW_REPORT_CRON:0 5 0 * * ?}
+  # 会话明细抽样率（0~1，0=仅日统计不落会话明细，1=全量抽样写 ai_vad_shadow_session）
+  vad-shadow-session-sample-rate: ${VOICE_VAD_SHADOW_SESSION_SAMPLE_RATE:0}
 
 # MyBatis配置
 mybatis:

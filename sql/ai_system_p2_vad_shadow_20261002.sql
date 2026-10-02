@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS ai_vad_shadow_daily (
     false_alarm_rate      DECIMAL(8,6) DEFAULT NULL COMMENT '误打断率（仅Silero判语音/总帧数）',
     miss_rate             DECIMAL(8,6) DEFAULT NULL COMMENT '漏打断率（仅旧VAD判语音/总帧数）',
     avg_latency_diff_ms   DECIMAL(10,2) DEFAULT NULL COMMENT '平均打断响应延迟差（ms，Silero-旧VAD）',
-    active_sessions       INT          NOT NULL DEFAULT 0 COMMENT '当日活跃会话数',
+    latency_diff_count    BIGINT       NOT NULL DEFAULT 0 COMMENT '延迟差样本数（多实例加权合并均值用）',
+    active_sessions       INT          NOT NULL DEFAULT 0 COMMENT '当日活跃会话数（已结束且有音频帧）',
     create_time           DATETIME     DEFAULT NULL COMMENT '记录创建时间',
     update_time           DATETIME     DEFAULT NULL COMMENT '记录更新时间',
     PRIMARY KEY (id),
@@ -51,9 +52,19 @@ CREATE TABLE IF NOT EXISTS ai_vad_shadow_session (
     avg_latency_diff_ms   DECIMAL(10,2) DEFAULT NULL COMMENT '会话级平均延迟差(ms)',
     legacy_start_count    INT          NOT NULL DEFAULT 0 COMMENT '旧VAD起始次数',
     silero_start_count    INT          NOT NULL DEFAULT 0 COMMENT 'Silero起始次数',
-    create_time           DATETIME     DEFAULT NULL COMMENT '会话开始时间',
-    end_time              DATETIME     DEFAULT NULL COMMENT '会话结束时间',
+    create_time      DATETIME     DEFAULT NULL COMMENT '会话开始时间',
+    end_time         DATETIME     DEFAULT NULL COMMENT '会话结束时间',
     PRIMARY KEY (id),
     KEY idx_session_id (session_id),
     KEY idx_create_time (create_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='VAD影子会话明细（P2-12方案A，抽样审计用）';
+
+-- -------------------------------------------------------------
+-- 3) 已部署库补列：latency_diff_count（延迟差样本数，加权均值合并用）
+-- -------------------------------------------------------------
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'ai_vad_shadow_daily' AND column_name = 'latency_diff_count');
+SET @ddl = IF(@col_exists = 0,
+    'ALTER TABLE ai_vad_shadow_daily ADD COLUMN latency_diff_count BIGINT NOT NULL DEFAULT 0 COMMENT ''延迟差样本数（多实例加权合并均值用）'' AFTER avg_latency_diff_ms',
+    'SELECT ''ai_vad_shadow_daily.latency_diff_count already exists, skipped'' AS info');
+PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;

@@ -73,6 +73,9 @@ public class VoiceProperties
     /** P2-12：Silero VAD 语音概率阈值（0~1），默认 0.5 */
     private float vadShadowThreshold = 0.5f;
 
+    /** P2-12：会话明细抽样率（0~1，0=仅日统计不落会话明细，1=全量抽样） */
+    private double vadShadowSessionSampleRate = 0d;
+
     public boolean isVadEnabled()
     {
         return vadEnabled;
@@ -111,6 +114,16 @@ public class VoiceProperties
     public void setVadShadowThreshold(float vadShadowThreshold)
     {
         this.vadShadowThreshold = vadShadowThreshold;
+    }
+
+    public double getVadShadowSessionSampleRate()
+    {
+        return vadShadowSessionSampleRate;
+    }
+
+    public void setVadShadowSessionSampleRate(double vadShadowSessionSampleRate)
+    {
+        this.vadShadowSessionSampleRate = Math.max(0d, Math.min(1d, vadShadowSessionSampleRate));
     }
 
     public String getEngine()
