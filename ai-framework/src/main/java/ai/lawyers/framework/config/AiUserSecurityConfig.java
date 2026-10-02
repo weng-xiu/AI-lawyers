@@ -107,8 +107,8 @@ public class AiUserSecurityConfig
     public SecurityFilterChain userSecurityFilterChain(HttpSecurity httpSecurity) throws Exception
     {
         return httpSecurity
-            // 只处理/aiuser开头的请求
-            .requestMatchers((matchers) -> matchers.antMatchers("/aiuser/**"))
+            // 只处理/aiuser开头的请求（SB3 用 securityMatcher 替代 requestMatchers）
+            .securityMatcher("/aiuser/**")
             // CSRF禁用，因为不使用session
             .csrf(csrf -> csrf.disable())
             // 禁用HTTP响应标头
@@ -121,11 +121,11 @@ public class AiUserSecurityConfig
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             // 注解标记允许匿名访问的url
             .authorizeHttpRequests((requests) -> {
-                permitAllUrl.getUrls().forEach(url -> requests.antMatchers(url).permitAll());
+                permitAllUrl.getUrls().forEach(url -> requests.requestMatchers(url).permitAll());
                 // 对于用户端登录login 注册register 验证码captchaImage 允许匿名访问
-                requests.antMatchers("/aiuser/login", "/aiuser/register", "/aiuser/captchaImage").permitAll()
+                requests.requestMatchers("/aiuser/login", "/aiuser/register", "/aiuser/captchaImage").permitAll()
                     // 静态资源，可匿名访问
-                    .antMatchers(HttpMethod.GET, "/aiuser/**/*.html", "/aiuser/**/*.css", "/aiuser/**/*.js").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/aiuser/**/*.html", "/aiuser/**/*.css", "/aiuser/**/*.js").permitAll()
                     // 除上面外的所有请求全部需要鉴权认证
                     .anyRequest().authenticated();
             })

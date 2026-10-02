@@ -1,6 +1,6 @@
 package ai.lawyers.framework.config;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Component;
 import ai.lawyers.common.utils.ServletUtils;
 

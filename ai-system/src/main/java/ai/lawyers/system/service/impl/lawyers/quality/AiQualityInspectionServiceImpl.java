@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -82,6 +83,7 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
     private MessageNotifyDispatcher messageNotifyDispatcher;
 
     @Autowired
+    @Lazy
     private IAiCallAgentStatusService agentStatusService;
 
     /** P1-7：规则引擎（违禁词/服务规范，零成本确定性评分） */

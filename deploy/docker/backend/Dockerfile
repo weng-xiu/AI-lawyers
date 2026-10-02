@@ -1,6 +1,6 @@
 # ===== 后端 Spring Boot 多阶段构建 =====
-# 阶段1：Maven 编译打包
-FROM maven:3.8.6-openjdk-8 AS builder
+# 阶段1：Maven 编译打包（JDK 17）
+FROM maven:3.9-eclipse-temurin-17 AS builder
 WORKDIR /build
 # 先拷贝 pom 利用缓存加速依赖下载
 COPY pom.xml .
@@ -15,8 +15,8 @@ RUN mvn -q dependency:go-offline -B || true
 COPY . .
 RUN mvn -q clean package -DskipTests -B
 
-# 阶段2：运行镜像
-FROM openjdk:8-jre
+# 阶段2：运行镜像（JDK 17）
+FROM eclipse-temurin:17-jre
 LABEL maintainer="12348-hotline"
 WORKDIR /app
 # 时区
@@ -28,4 +28,4 @@ COPY --from=builder /build/ai-admin/target/ai-admin.jar /app/ai-admin.jar
 
 EXPOSE 8080
 # 容器内通过环境变量覆盖数据库/Redis/ESL 连接（见 docker-compose.yml）
-ENTRYPOINT ["java", "-Xms256m", "-Xmx1024m", "-Djava.security.egd=file:/dev/./urandom", "-jar", "/app/ai-admin.jar"]
+ENTRYPOINT ["java", "-Xms256m", "-Xmx1024m", "-XX:+UseG1GC", "-Djava.security.egd=file:/dev/./urandom", "-jar", "/app/ai-admin.jar"]

@@ -5,10 +5,10 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import javax.servlet.FilterChain;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.springframework.context.annotation.Bean;
 import org.springframework.mock.web.MockServletContext;
@@ -70,8 +70,8 @@ public abstract class AbstractPermMvcTest
         // 无 spring-security-test 依赖，手工把真实 FilterChainProxy 接入 MockMvc——
         // 401 由 URL 层 anyRequest authenticated 触发，403 由方法层 @PreAuthorize 触发，
         // ExceptionTranslationFilter 统一翻译为配置中指定的入口/拒绝处理器
-        javax.servlet.Filter securityFilterChain =
-                (javax.servlet.Filter) context.getBean("springSecurityFilterChain");
+        jakarta.servlet.Filter securityFilterChain =
+                (jakarta.servlet.Filter) context.getBean("springSecurityFilterChain");
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
                 .addFilters(securityFilterChain)
                 .build();

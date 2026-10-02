@@ -1,6 +1,6 @@
 package ai.lawyers.system.service.lawyers.queue;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;

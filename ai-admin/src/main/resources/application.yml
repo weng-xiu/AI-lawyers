@@ -58,6 +58,8 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+      # SB3：分组校验关闭（readinessState/livenessState 未注册时避免启动失败）
+      validate-group-membership: false
       # P3-C6：探针分组——nginx/负载均衡经 /actuator/health/readiness 决定是否路由：
       # 停机时 readinessState 自动 REFUSING_TRAFFIC，drain 指示器同步翻 OUT_OF_SERVICE；
       # /actuator/health/liveness 仅反映进程存活（异常才重启，停机不翻）
@@ -103,6 +105,9 @@ user:
 
 # Spring配置
 spring:
+  # SB3 兼容性：允许循环依赖（历史遗留，后续专项重构消除）
+  main:
+    allow-circular-references: true
   # 资源信息
   messages:
     # 国际化资源文件路径

@@ -38,7 +38,7 @@
         <!-- 阿里数据库连接池 -->
         <dependency>
             <groupId>com.alibaba</groupId>
-            <artifactId>druid-spring-boot-starter</artifactId>
+            <artifactId>druid-spring-boot-3-starter</artifactId>
         </dependency>
 
         <!-- 验证码 -->
@@ -48,6 +48,11 @@
             <exclusions>
                 <exclusion>
                     <artifactId>servlet-api</artifactId>
+                    <groupId>javax.servlet</groupId>
+                </exclusion>
+                <!-- SB3 迁移：kaptcha 传递的 javax.servlet-api 需排除，由 jakarta.servlet-api 替代 -->
+                <exclusion>
+                    <artifactId>javax.servlet-api</artifactId>
                     <groupId>javax.servlet</groupId>
                 </exclusion>
             </exclusions>

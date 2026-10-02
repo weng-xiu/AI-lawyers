@@ -30,13 +30,13 @@
         <!-- swagger3（springdoc-openapi，替代已停维护的 springfox） -->
         <dependency>
             <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-ui</artifactId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
         </dependency>
 
-        <!-- Mysql驱动包 -->
+        <!-- Mysql驱动包（SB 2.7.18 BOM 起改用新坐标 com.mysql:mysql-connector-j，驱动类名不变 com.mysql.cj.jdbc.Driver） -->
         <dependency>
-            <groupId>mysql</groupId>
-            <artifactId>mysql-connector-java</artifactId>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
         </dependency>
 
         <!-- 核心模块-->

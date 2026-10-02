@@ -13,9 +13,6 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.script.Bindings;
-import javax.script.ScriptEngine;
-
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -34,9 +31,6 @@ import org.springframework.expression.Expression;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.SimpleEvaluationContext;
 import org.springframework.stereotype.Service;
-
-import jdk.nashorn.api.scripting.ClassFilter;
-import jdk.nashorn.api.scripting.NashornScriptEngineFactory;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -1151,25 +1145,24 @@ public class IvrEngineServiceImpl implements IIvrEngineService
         }
         if ("groovy".equalsIgnoreCase(language))
         {
-            variables.put("scriptError", "Java8环境暂不支持Groovy，请使用js脚本");
-            step.setDetail("脚本执行失败：Java8环境暂不支持Groovy，请使用js脚本");
+            variables.put("scriptError", "当前环境不支持Groovy，请使用SpEL表达式");
+            step.setDetail("脚本执行失败：当前环境不支持Groovy，请使用SpEL表达式");
             result.getSteps().add(step);
             return nextNode(current, nodeMap, edges, variables, null);
         }
         try
         {
-            // 安全收口(S4)：Nashorn 加 ClassFilter 沙箱，禁止脚本访问任意 Java 类（防 Java.type 逃逸 RCE）
-            ScriptEngine engine = createSandboxScriptEngine();
-            if (engine == null)
+            // JDK 17 迁移：Nashorn 已删除，改用 SpEL 表达式（与条件节点一致，复用现有安全沙箱）
+            Expression expression = SPEL_PARSER.parseExpression(script);
+            SimpleEvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding()
+                    .withRootObject(variables == null ? new HashMap<>() : variables)
+                    .build();
+            context.getPropertyAccessors().add(0, new MapAccessor());
+            if (variables != null)
             {
-                throw new IllegalStateException("当前JDK未提供JavaScript脚本引擎");
+                variables.forEach(context::setVariable);
             }
-            Bindings bindings = engine.createBindings();
-            for (Map.Entry<String, Object> entry : variables.entrySet())
-            {
-                bindings.put(entry.getKey(), entry.getValue());
-            }
-            Object value = engine.eval(script, bindings);
+            Object value = expression.getValue(context);
             variables.put(resultVar, value == null ? "" : String.valueOf(value));
             step.setDetail("脚本执行成功，结果已写入变量" + resultVar);
         }
@@ -1273,37 +1266,6 @@ public class IvrEngineServiceImpl implements IIvrEngineService
         }
         result.getSteps().add(step);
         return nextNode(current, nodeMap, edges, variables, null);
-    }
-
-    /**
-     * 安全收口(S4)：创建带 ClassFilter 沙箱的 Nashorn 引擎。
-     * ClassFilter.exposeToScripts 恒返回 false，脚本无法通过 Java.type/反射访问任何 Java 类，
-     * 仅能使用 JS 内置对象与注入的流程变量（变量值均为字符串/数字）。
-     */
-    private ScriptEngine createSandboxScriptEngine()
-    {
-        try
-        {
-            NashornScriptEngineFactory factory = new NashornScriptEngineFactory();
-            // --no-java 禁止 Java 包访问；ClassFilter 双重兜底拒绝所有类暴露
-            return factory.getScriptEngine(new String[] { "--no-java" },
-                    Thread.currentThread().getContextClassLoader(),
-                    new ClassFilter()
-                    {
-                        @Override
-                        public boolean exposeToScripts(String className)
-                        {
-                            log.warn("IVR脚本尝试访问Java类已被沙箱拦截：{}", className);
-                            return false;
-                        }
-                    });
-        }
-        catch (Throwable t)
-        {
-            // 极端情况下 Nashorn 不可用（如裁剪版 JRE），返回 null 由上层降级
-            log.warn("创建Nashorn沙箱脚本引擎失败：{}", t.getMessage());
-            return null;
-        }
     }
 
     /**

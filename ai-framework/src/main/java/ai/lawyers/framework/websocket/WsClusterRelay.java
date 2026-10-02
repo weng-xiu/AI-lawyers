@@ -108,7 +108,7 @@ public class WsClusterRelay implements MessageListener
     /**
      * 启动心跳并注册为当前实例中转组件。
      */
-    @javax.annotation.PostConstruct
+    @jakarta.annotation.PostConstruct
     public void start()
     {
         instance = this;
@@ -126,7 +126,7 @@ public class WsClusterRelay implements MessageListener
     /**
      * 停机时注销本实例全部在线标记，避免残留 TTL 窗口。
      */
-    @javax.annotation.PreDestroy
+    @jakarta.annotation.PreDestroy
     public void stop()
     {
         if (heartbeat != null)

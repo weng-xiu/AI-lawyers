@@ -2,7 +2,7 @@ package ai.lawyers.common.utils.ip;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import ai.lawyers.common.utils.ServletUtils;
 import ai.lawyers.common.utils.StringUtils;
 

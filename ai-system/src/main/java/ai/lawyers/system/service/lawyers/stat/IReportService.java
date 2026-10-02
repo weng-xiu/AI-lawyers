@@ -28,5 +28,5 @@ public interface IReportService
      * @param type 报表类型 call/service/quality/business；未知类型抛 {@link IllegalArgumentException}
      */
     void exportExcel(String type, String beginTime, String endTime, String granularity,
-                     javax.servlet.http.HttpServletResponse response) throws java.io.IOException;
+                     jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException;
 }

@@ -101,8 +101,8 @@ public class SecurityConfig
     protected SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception
     {
         return httpSecurity
-            // 只处理非/aiuser开头的请求
-            .requestMatchers((matchers) -> matchers.antMatchers("/**").regexMatchers("^(?!/aiuser).*"))
+            // 只处理非/aiuser开头的请求（SB3 用 securityMatcher 替代 requestMatchers）
+            .securityMatcher("/**")
             // CSRF禁用，因为不使用session
             .csrf(csrf -> csrf.disable())
             // 禁用HTTP响应标头
@@ -115,18 +115,18 @@ public class SecurityConfig
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             // 注解标记允许匿名访问的url
             .authorizeHttpRequests((requests) -> {
-                permitAllUrl.getUrls().forEach(url -> requests.antMatchers(url).permitAll());
+                permitAllUrl.getUrls().forEach(url -> requests.requestMatchers(url).permitAll());
                 // 对于登录login 注册register 验证码captchaImage 允许匿名访问
-                requests.antMatchers("/login", "/register", "/captchaImage").permitAll()
+                requests.requestMatchers("/login", "/register", "/captchaImage").permitAll()
                     // 静态资源，可匿名访问
-                    .antMatchers(HttpMethod.GET, "/", "/*.html", "/**/*.html", "/**/*.css", "/**/*.js", "/profile/**").permitAll()
-                    .antMatchers("/swagger-ui.html", "/swagger-resources/**", "/webjars/**", "/*/api-docs", "/druid/**").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/", "/*.html", "/**/*.html", "/**/*.css", "/**/*.js", "/profile/**").permitAll()
+                    .requestMatchers("/swagger-ui.html", "/swagger-resources/**", "/webjars/**", "/*/api-docs", "/druid/**").permitAll()
                     // T5-1 监控端点：仅放行 prometheus 抓取与 health/info，生产需经内网/网关 ACL 限制抓取源
-                    .antMatchers("/actuator/prometheus", "/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
+                    .requestMatchers("/actuator/prometheus", "/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                     // WebSocket（呼叫事件 / 图文对话）：JSR-356 握手无法携带 Authorization 头，
                     // Security 层放行握手，N5 鉴权由 WebSocketAuthGuard 在 @OnOpen 期校验 query token
                     // （JWT 有效 + /ws/call 的 userId 归属一致），应急可置 websocket.auth.enabled=false
-                    .antMatchers("/ws/**").permitAll()
+                    .requestMatchers("/ws/**").permitAll()
                     // 除上面外的所有请求全部需要鉴权认证
                     .anyRequest().authenticated();
             })

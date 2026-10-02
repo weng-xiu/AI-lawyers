@@ -9,6 +9,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import ai.lawyers.common.utils.StringUtils;
@@ -53,13 +54,20 @@ public class CallEventProcessor
 {
     private static final Logger log = LoggerFactory.getLogger(CallEventProcessor.class);
 
+    /** SB3 默认禁止循环依赖：CallDispatchServiceImpl→CallEventDispatcher→CallEventBus→本类→ICallDispatchService
+     *  构成环，用 @Lazy 在事件实际分发时才解析实现，打破构造期环 */
     @Autowired
+    @Lazy
     private ICallDispatchService callDispatchService;
 
+    /** 同环：本类→IAiCallAgentStatusService→CallDispatchServiceImpl→…→本类，@Lazy 打破构造期环 */
     @Autowired
+    @Lazy
     private IAiCallAgentStatusService agentStatusService;
 
+    /** 同环：本类→InboundCallHandler→AiCallAgentStatusServiceImpl→…→本类，@Lazy 打破构造期环 */
     @Autowired(required = false)
+    @Lazy
     private InboundCallHandler inboundCallHandler;
 
     @Autowired(required = false)

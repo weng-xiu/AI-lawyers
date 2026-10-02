@@ -106,10 +106,10 @@
             <version>1.70</version>
         </dependency>
 
-        <!-- Jaxb -->
+        <!-- Jaxb（JDK 17 + SB3 迁移：javax → jakarta） -->
         <dependency>
-            <groupId>javax.xml.bind</groupId>
-            <artifactId>jaxb-api</artifactId>
+            <groupId>jakarta.xml.bind</groupId>
+            <artifactId>jakarta.xml.bind-api</artifactId>
         </dependency>
 
         <!-- redis 缓存操作 -->
@@ -130,10 +130,10 @@
             <artifactId>UserAgentUtils</artifactId>
         </dependency>
 
-        <!-- servlet包 -->
+        <!-- servlet包（JDK 17 + SB3 迁移：javax → jakarta） -->
         <dependency>
-            <groupId>javax.servlet</groupId>
-            <artifactId>javax.servlet-api</artifactId>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
         </dependency>
 
         <!-- P3-G1：单元测试（版本由 spring-boot-dependencies 管理；surefire 2.22.2 支持 JUnit5 平台） -->

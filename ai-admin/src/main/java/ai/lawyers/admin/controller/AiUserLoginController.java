@@ -34,7 +34,7 @@ import ai.lawyers.framework.web.service.TokenService;
 import ai.lawyers.system.service.ISysConfigService;
 import ai.lawyers.system.service.ISysMenuService;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;

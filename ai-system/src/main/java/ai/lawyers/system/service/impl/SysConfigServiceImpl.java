@@ -2,7 +2,7 @@ package ai.lawyers.system.service.impl;
 
 import java.util.Collection;
 import java.util.List;
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import ai.lawyers.common.annotation.DataSource;

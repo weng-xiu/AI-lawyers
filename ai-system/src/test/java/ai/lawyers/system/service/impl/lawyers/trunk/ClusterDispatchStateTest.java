@@ -2,8 +2,10 @@ package ai.lawyers.system.service.impl.lawyers.trunk;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -49,6 +51,8 @@ class ClusterDispatchStateTest
         zSetOps = mock(ZSetOperations.class);
         when(redis.opsForValue()).thenReturn(valueOps);
         when(redis.opsForZSet()).thenReturn(zSetOps);
+        // SB3 Mockito 严格 stubbing：lenient 避免 varargs 匹配歧义导致的 UnnecessaryStubbingException
+        lenient().when(redis.execute(any(), anyList(), any())).thenReturn(null);
 
         state = new ClusterDispatchState();
         ReflectionTestUtils.setField(state, "stringRedisTemplate", redis);
@@ -60,7 +64,7 @@ class ClusterDispatchStateTest
     @Test
     void acquireGlobalConcurrent_underLimit_returnsIncremented()
     {
-        when(redis.execute(any(), any(), any())).thenReturn(5L);
+        when(redis.execute(any(), anyList(), any())).thenReturn(5L);
 
         assertThat(state.acquireGlobalConcurrent(200)).isEqualTo(5L);
     }
@@ -68,7 +72,7 @@ class ClusterDispatchStateTest
     @Test
     void acquireGlobalConcurrent_atLimit_returnsMinusOne()
     {
-        when(redis.execute(any(), any(), any())).thenReturn(-1L);
+        when(redis.execute(any(), anyList(), any())).thenReturn(-1L);
 
         assertThat(state.acquireGlobalConcurrent(200)).isEqualTo(-1L);
     }
@@ -76,7 +80,7 @@ class ClusterDispatchStateTest
     @Test
     void acquireGlobalConcurrent_redisFailure_failClosed()
     {
-        when(redis.execute(any(), any(), any())).thenThrow(new RuntimeException("connection lost"));
+        when(redis.execute(any(), anyList(), any())).thenThrow(new RuntimeException("connection lost"));
 
         // fail-closed：Redis 异常按已满处理，避免突破运营商并发限额
         assertThat(state.acquireGlobalConcurrent(200)).isEqualTo(-1L);
@@ -175,7 +179,7 @@ class ClusterDispatchStateTest
     void acquireCps_firstCount_returnsTrueViaAtomicScript()
     {
         // Lua 原子 INCR + 首次 PEXPIRE，返回 1
-        when(redis.execute(any(), any(), any())).thenReturn(1L);
+        when(redis.execute(any(), anyList(), any())).thenReturn(1L);
 
         assertThat(state.acquireCps(7L, 5)).isTrue();
         verify(redis, times(1)).execute(any(),
@@ -189,7 +193,7 @@ class ClusterDispatchStateTest
     @Test
     void acquireCps_underLimit_returnsTrue()
     {
-        when(redis.execute(any(), any(), any())).thenReturn(3L);
+        when(redis.execute(any(), anyList(), any())).thenReturn(3L);
 
         assertThat(state.acquireCps(7L, 5)).isTrue();
     }
@@ -197,7 +201,7 @@ class ClusterDispatchStateTest
     @Test
     void acquireCps_overLimit_returnsFalse()
     {
-        when(redis.execute(any(), any(), any())).thenReturn(6L);
+        when(redis.execute(any(), anyList(), any())).thenReturn(6L);
 
         assertThat(state.acquireCps(7L, 5)).isFalse();
     }
@@ -213,7 +217,7 @@ class ClusterDispatchStateTest
     @Test
     void acquireCps_redisFailure_failOpen()
     {
-        when(redis.execute(any(), any(), any())).thenThrow(new RuntimeException("down"));
+        when(redis.execute(any(), anyList(), any())).thenThrow(new RuntimeException("down"));
 
         // fail-open：CPS 为软限速，Redis 故障不阻断呼叫
         assertThat(state.acquireCps(7L, 5)).isTrue();
@@ -267,20 +271,21 @@ class ClusterDispatchStateTest
     @Test
     void enqueue_withinCapacity_returnsTrue()
     {
-        when(redis.execute(any(), any(), any())).thenReturn(1L);
+        // enqueue 调用：execute(script, keys, capacity, score, member) → 3 个 varargs
+        when(redis.execute(any(), anyList(), anyString(), anyString(), anyString())).thenReturn(1L);
 
         DialRequest req = new DialRequest("13800138000", 1L);
         boolean ok = state.enqueue(req, 2000);
 
         assertThat(ok).isTrue();
         // 校验调用了入队 Lua 脚本（ZADD 原子容量校验）
-        verify(redis, times(1)).execute(any(), any(), any());
+        verify(redis, times(1)).execute(any(), anyList(), anyString(), anyString(), anyString());
     }
 
     @Test
     void enqueue_full_returnsFalse()
     {
-        when(redis.execute(any(), any(), any())).thenReturn(0L);
+        when(redis.execute(any(), anyList(), anyString(), anyString(), anyString())).thenReturn(0L);
 
         DialRequest req = new DialRequest("13800138000", 1L);
         assertThat(state.enqueue(req, 2000)).isFalse();
@@ -289,7 +294,7 @@ class ClusterDispatchStateTest
     @Test
     void enqueue_redisFailure_returnsFalse()
     {
-        when(redis.execute(any(), any(), any())).thenThrow(new RuntimeException("down"));
+        when(redis.execute(any(), anyList(), anyString(), anyString(), anyString())).thenThrow(new RuntimeException("down"));
 
         DialRequest req = new DialRequest("13800138000", 1L);
         assertThat(state.enqueue(req, 2000)).isFalse();
@@ -308,8 +313,8 @@ class ClusterDispatchStateTest
         item.request = req;
         String member = om.writeValueAsString(item);
 
-        // Lua 返回 [member, score]
-        when(redis.execute(any(), any(), any())).thenReturn(Arrays.asList(member, "501700000000000"));
+        // pollQueue 调用：execute(script, keys) → 0 个 varargs
+        when(redis.execute(any(), anyList())).thenReturn(Arrays.asList(member, "501700000000000"));
 
         ClusterDispatchState.QueueItem got = state.pollQueue();
 
@@ -324,14 +329,14 @@ class ClusterDispatchStateTest
     @Test
     void pollQueue_empty_returnsNull()
     {
-        when(redis.execute(any(), any(), any())).thenReturn(Collections.emptyList());
+        when(redis.execute(any(), anyList())).thenReturn(Collections.emptyList());
         assertThat(state.pollQueue()).isNull();
     }
 
     @Test
     void pollQueue_redisFailure_returnsNull()
     {
-        when(redis.execute(any(), any(), any())).thenThrow(new RuntimeException("down"));
+        when(redis.execute(any(), anyList())).thenThrow(new RuntimeException("down"));
         assertThat(state.pollQueue()).isNull();
     }
 

@@ -123,13 +123,13 @@ class CopilotAssistServiceTest
     {
         // 模型在 JSON 外附加说明，cleanJson 应截取最外层 {}
         stubModel("好的，结果如下：" + JSON + " 以上。");
-        when(ragSearchService.search(anyString(), isNull(List.class)))
+        when(ragSearchService.search(anyString(), isNull()))
                 .thenReturn(Arrays.asList(chunk(11L, "劳动合同法", "第三十条"),
                         chunk(12L, "劳动法", "第五十条"),
                         chunk(13L, "工资支付暂行规定", "第七条"),
                         chunk(14L, "应被截断", "第X条")));
         when(ticketMapper.selectSimilarTickets(eq("劳动争议"), eq("支付拖欠工资"),
-                isNull(Long.class), eq(3)))
+                isNull(), eq(3)))
                 .thenReturn(Arrays.asList(ticket(7L, "GD2026001")));
 
         CopilotAssistResult r = service.assist(TEXT, null);
@@ -155,7 +155,7 @@ class CopilotAssistServiceTest
     {
         stubModel("{\"disputeType\":\"家暴\",\"claims\":[\"申请人身保护\"],\"urgency\":\"URGENT\","
                 + "\"keyFacts\":[]}");
-        when(ragSearchService.search(anyString(), isNull(List.class)))
+        when(ragSearchService.search(anyString(), isNull()))
                 .thenReturn(new ArrayList<RagChunk>());
         when(ticketMapper.selectSimilarTickets(anyString(), anyString(),
                 org.mockito.ArgumentMatchers.<Long>isNull(), org.mockito.ArgumentMatchers.anyInt()))
@@ -172,7 +172,7 @@ class CopilotAssistServiceTest
     {
         when(modelConfigService.chatJson(anyString(), anyString(), anyString()))
                 .thenThrow(new RuntimeException("模型超时"));
-        when(ragSearchService.search(anyString(), isNull(List.class)))
+        when(ragSearchService.search(anyString(), isNull()))
                 .thenReturn(Arrays.asList(chunk(21L, "劳动合同法", "第三十条")));
 
         CopilotAssistResult r = service.assist(TEXT, null);
@@ -207,7 +207,7 @@ class CopilotAssistServiceTest
     void assist_ragThrows_lawsEmptyAndNoPropagation()
     {
         stubModel(JSON);
-        when(ragSearchService.search(anyString(), isNull(List.class)))
+        when(ragSearchService.search(anyString(), isNull()))
                 .thenThrow(new RuntimeException("检索失败"));
         when(ticketMapper.selectSimilarTickets(anyString(), anyString(),
                 org.mockito.ArgumentMatchers.<Long>isNull(), org.mockito.ArgumentMatchers.anyInt()))
@@ -232,7 +232,7 @@ class CopilotAssistServiceTest
     void assist_ticketMapperThrows_noPropagation()
     {
         stubModel(JSON);
-        when(ragSearchService.search(anyString(), isNull(List.class)))
+        when(ragSearchService.search(anyString(), isNull()))
                 .thenReturn(new ArrayList<RagChunk>());
         when(ticketMapper.selectSimilarTickets(anyString(), anyString(),
                 org.mockito.ArgumentMatchers.<Long>isNull(), org.mockito.ArgumentMatchers.anyInt()))
@@ -251,20 +251,20 @@ class CopilotAssistServiceTest
         String longClaim = "要求公司立即支付拖欠的两个月工资并且支付经济补偿金";
         stubModel("{\"disputeType\":\"劳动争议\",\"claims\":[\"" + longClaim + "\"],"
                 + "\"urgency\":\"normal\",\"keyFacts\":[]}");
-        when(ragSearchService.search(anyString(), isNull(List.class)))
+        when(ragSearchService.search(anyString(), isNull()))
                 .thenReturn(new ArrayList<RagChunk>());
 
         service.assist(TEXT, null);
 
         verify(ticketMapper).selectSimilarTickets(eq("劳动争议"),
-                eq(longClaim.substring(0, 20)), isNull(Long.class), eq(3));
+                eq(longClaim.substring(0, 20)), isNull(), eq(3));
     }
 
     @Test
     void assist_numericSessionId_parsedAsExcludeRecordId()
     {
         stubModel(JSON);
-        when(ragSearchService.search(anyString(), isNull(List.class)))
+        when(ragSearchService.search(anyString(), isNull()))
                 .thenReturn(new ArrayList<RagChunk>());
         when(ticketMapper.selectSimilarTickets(anyString(), anyString(),
                 eq(2000L), org.mockito.ArgumentMatchers.anyInt()))
@@ -278,14 +278,14 @@ class CopilotAssistServiceTest
     void assist_nonNumericSessionId_excludeNull()
     {
         stubModel(JSON);
-        when(ragSearchService.search(anyString(), isNull(List.class)))
+        when(ragSearchService.search(anyString(), isNull()))
                 .thenReturn(new ArrayList<RagChunk>());
         when(ticketMapper.selectSimilarTickets(anyString(), anyString(),
-                isNull(Long.class), org.mockito.ArgumentMatchers.anyInt()))
+                isNull(), org.mockito.ArgumentMatchers.anyInt()))
                 .thenReturn(new ArrayList<AiCallTicket>());
 
         service.assist(TEXT, "sess-uuid-1");
         verify(ticketMapper).selectSimilarTickets(anyString(), anyString(),
-                isNull(Long.class), org.mockito.ArgumentMatchers.anyInt());
+                isNull(), org.mockito.ArgumentMatchers.anyInt());
     }
 }

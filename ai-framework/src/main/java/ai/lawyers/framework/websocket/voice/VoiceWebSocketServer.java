@@ -6,14 +6,14 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
-import javax.websocket.CloseReason;
-import javax.websocket.OnClose;
-import javax.websocket.OnError;
-import javax.websocket.OnMessage;
-import javax.websocket.OnOpen;
-import javax.websocket.Session;
-import javax.websocket.server.PathParam;
-import javax.websocket.server.ServerEndpoint;
+import jakarta.websocket.CloseReason;
+import jakarta.websocket.OnClose;
+import jakarta.websocket.OnError;
+import jakarta.websocket.OnMessage;
+import jakarta.websocket.OnOpen;
+import jakarta.websocket.Session;
+import jakarta.websocket.server.PathParam;
+import jakarta.websocket.server.ServerEndpoint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -30,7 +30,7 @@ import ai.lawyers.framework.websocket.WebSocketAuthGuard;
  * 服务端→客户端：connected / started / asr_partial / asr_final / tts_audio / tts_end / error
  * </pre>
  *
- * <p>工程约束：Java 8 + javax.websocket（不引入 WebFlux）；握手期 JWT 鉴权复用
+ * <p>工程约束：JDK 17 + jakarta.websocket（不引入 WebFlux）；握手期 JWT 鉴权复用
  * {@link WebSocketAuthGuard}（query {@code ?token=}，非法/缺失令牌以 1008 关闭）；
  * 保序发送与引擎句柄释放委托 {@link VoiceSession}，{@code @OnClose} 不遗留线程。
  * 当前引擎仅 mock（A2/A3 接 DashScope 等真实 Provider；请求未接入引擎时显式回 error）。</p>

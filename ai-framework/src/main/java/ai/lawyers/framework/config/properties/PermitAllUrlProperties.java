@@ -37,7 +37,7 @@ public class PermitAllUrlProperties implements InitializingBean, ApplicationCont
     @Override
     public void afterPropertiesSet()
     {
-        RequestMappingHandlerMapping mapping = applicationContext.getBean(RequestMappingHandlerMapping.class);
+        RequestMappingHandlerMapping mapping = applicationContext.getBean("requestMappingHandlerMapping", RequestMappingHandlerMapping.class);
         Map<RequestMappingInfo, HandlerMethod> map = mapping.getHandlerMethods();
 
         map.keySet().forEach(info -> {
@@ -45,14 +45,30 @@ public class PermitAllUrlProperties implements InitializingBean, ApplicationCont
 
             // 获取方法上边的注解 替代path variable 为 *
             Anonymous method = AnnotationUtils.findAnnotation(handlerMethod.getMethod(), Anonymous.class);
-            Optional.ofNullable(method).ifPresent(anonymous -> Objects.requireNonNull(info.getPatternsCondition().getPatterns())
+            Optional.ofNullable(method).ifPresent(anonymous -> getPatterns(info)
                     .forEach(url -> urls.add(RegExUtils.replaceAll(url, PATTERN, ASTERISK))));
 
             // 获取类上边的注解, 替代path variable 为 *
             Anonymous controller = AnnotationUtils.findAnnotation(handlerMethod.getBeanType(), Anonymous.class);
-            Optional.ofNullable(controller).ifPresent(anonymous -> Objects.requireNonNull(info.getPatternsCondition().getPatterns())
+            Optional.ofNullable(controller).ifPresent(anonymous -> getPatterns(info)
                     .forEach(url -> urls.add(RegExUtils.replaceAll(url, PATTERN, ASTERISK))));
         });
+    }
+
+    /**
+     * SB3 PathPattern 兼容：getPatternsCondition 为 null 时回退到 getPathPatternsCondition
+     */
+    private java.util.Set<String> getPatterns(RequestMappingInfo info)
+    {
+        if (info.getPatternsCondition() != null)
+        {
+            return info.getPatternsCondition().getPatterns();
+        }
+        if (info.getPathPatternsCondition() != null)
+        {
+            return info.getPathPatternsCondition().getPatternValues();
+        }
+        return java.util.Collections.emptySet();
     }
 
     @Override

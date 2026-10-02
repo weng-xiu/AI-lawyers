@@ -16,50 +16,32 @@
         <ai.version>3.9.0</ai.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <java.version>1.8</java.version>
+        <java.version>17</java.version>
         <maven-jar-plugin.version>3.1.1</maven-jar-plugin.version>
-        <spring-boot.version>2.5.15</spring-boot.version>
-        <druid.version>1.2.23</druid.version>
+        <spring-boot.version>3.2.12</spring-boot.version>
+        <druid.version>1.2.24</druid.version>
+        <!-- SB3 兼容线：druid-spring-boot-3-starter（spring.factories 在 SB3 已失效，需 AutoConfiguration.imports 注册） -->
+        <druid.boot3.version>1.2.23</druid.boot3.version>
         <bitwalker.version>1.21</bitwalker.version>
-        <swagger.version>1.6.15</swagger.version>
+        <swagger.version>2.2.0</swagger.version>
         <kaptcha.version>2.3.3</kaptcha.version>
-        <pagehelper.boot.version>1.4.7</pagehelper.boot.version>
+        <pagehelper.boot.version>2.1.0</pagehelper.boot.version>
         <fastjson.version>2.0.57</fastjson.version>
         <oshi.version>6.8.2</oshi.version>
         <commons.io.version>2.19.0</commons.io.version>
-        <poi.version>4.1.2</poi.version>
+        <poi.version>5.2.5</poi.version>
         <velocity.version>2.3</velocity.version>
         <jwt.version>0.12.6</jwt.version>
         <!-- override dependency version -->
-        <tomcat.version>9.0.106</tomcat.version>
-        <logback.version>1.2.13</logback.version>
-        <spring-security.version>5.7.12</spring-security.version>
-        <spring-framework.version>5.3.39</spring-framework.version>
+        <tomcat.version>10.1.33</tomcat.version>
+        <logback.version>1.5.12</logback.version>
     </properties>
 
     <!-- 依赖声明 -->
     <dependencyManagement>
         <dependencies>
 
-            <!-- 覆盖SpringFramework的依赖配置-->
-            <dependency>
-                <groupId>org.springframework</groupId>
-                <artifactId>spring-framework-bom</artifactId>
-                <version>${spring-framework.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-
-            <!-- 覆盖SpringSecurity的依赖配置-->
-            <dependency>
-                <groupId>org.springframework.security</groupId>
-                <artifactId>spring-security-bom</artifactId>
-                <version>${spring-security.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-
-            <!-- SpringBoot的依赖配置-->
+            <!-- SpringBoot 3.x BOM 统一管理 Spring Framework/Security 等版本 -->
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
@@ -88,6 +70,15 @@
                 <version>${tomcat.version}</version>
             </dependency>
 
+            <!-- SB3 修复：pagehelper-spring-boot-starter 2.1.0 传递的 mybatis-spring 2.1.2 与
+                 Spring Framework 6.1 不兼容（MapperScannerConfigurer 对 factoryBeanObjectType
+                 赋值 String 触发 BeanDefinitionStoreException），强制升级为 Spring 6 兼容线 3.0.3 -->
+            <dependency>
+                <groupId>org.mybatis</groupId>
+                <artifactId>mybatis-spring</artifactId>
+                <version>3.0.3</version>
+            </dependency>
+
             <dependency>
                 <groupId>org.apache.tomcat.embed</groupId>
                 <artifactId>tomcat-embed-el</artifactId>
@@ -100,10 +91,15 @@
                 <version>${tomcat.version}</version>
             </dependency>
 
-            <!-- 阿里数据库连接池 -->
+            <!-- 阿里数据库连接池（SB3 兼容线 starter；核心包单独锁定 1.2.24） -->
             <dependency>
                 <groupId>com.alibaba</groupId>
-                <artifactId>druid-spring-boot-starter</artifactId>
+                <artifactId>druid-spring-boot-3-starter</artifactId>
+                <version>${druid.boot3.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.alibaba</groupId>
+                <artifactId>druid</artifactId>
                 <version>${druid.version}</version>
             </dependency>
 
@@ -128,10 +124,10 @@
                 <version>${oshi.version}</version>
             </dependency>
 
-            <!-- Swagger3依赖（springdoc-openapi，替代已停维护的 springfox） -->
+            <!-- Swagger3依赖（springdoc-openapi，SB3 版本为 starter-webmvc-ui） -->
             <dependency>
                 <groupId>org.springdoc</groupId>
-                <artifactId>springdoc-openapi-ui</artifactId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
                 <version>${swagger.version}</version>
             </dependency>
 
@@ -242,11 +238,13 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.1</version>
+                <version>3.11.0</version>
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
+                    <release>${java.version}</release>
                     <encoding>${project.build.sourceEncoding}</encoding>
+                    <!-- SB3：Spring 6.1 移除了 ASM 参数名推断，@PathVariable/@RequestParam 未显式命名时
+                         依赖编译器 -parameters 输出真实参数名，否则运行期绑定报 IllegalArgumentException -->
+                    <parameters>true</parameters>
                 </configuration>
             </plugin>
             <!-- T5-2：升级 surefire 至 2.22.2 以支持 JUnit5 平台；无测试的模块不报错 -->

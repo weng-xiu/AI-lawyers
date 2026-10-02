@@ -1,6 +1,6 @@
 package ai.lawyers.generator.domain;
 
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotBlank;
 import ai.lawyers.common.core.domain.BaseEntity;
 import ai.lawyers.common.utils.StringUtils;
 
