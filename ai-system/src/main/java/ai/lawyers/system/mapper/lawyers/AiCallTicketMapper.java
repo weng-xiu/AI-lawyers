@@ -29,6 +29,12 @@ public interface AiCallTicketMapper
     public int archiveTicket(Long ticketId);
 
     /**
+     * 更新工单 SLA 截止时间（P1-6 状态机时限维度：动作触发后按 sla_hours 重算）。
+     * @param dueTime 新截止时间，传 null 表示清空（归档终态）
+     */
+    public int updateTicketDueTime(@Param("ticketId") Long ticketId, @Param("dueTime") java.util.Date dueTime);
+
+    /**
      * 查询已超过 SLA 截止时间但尚未标记超时的待处理工单。
      * 供 TicketSlaScheduleTask 定时扫描使用。
      */

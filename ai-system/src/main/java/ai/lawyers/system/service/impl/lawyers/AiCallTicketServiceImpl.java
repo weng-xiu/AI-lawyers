@@ -2,6 +2,7 @@ package ai.lawyers.system.service.impl.lawyers;
 
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ai.lawyers.system.domain.lawyers.AiCallTicket;
 import ai.lawyers.system.domain.lawyers.AiSlaPolicy;
+import ai.lawyers.system.domain.lawyers.AiTicketFlowDefinition;
 import ai.lawyers.system.mapper.lawyers.AiCallTicketMapper;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
 import ai.lawyers.system.service.lawyers.IAiSlaPolicyService;
@@ -172,15 +174,20 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
         String st = exist.getStatus();
         if ("0".equals(st))
         {
-            ticketFlowService.validateAction(TicketFlowService.DEFAULT_FLOW, "0", "start", roles);
+            AiTicketFlowDefinition startRule = ticketFlowService.validateAction(
+                    TicketFlowService.DEFAULT_FLOW, "0", "start", roles);
+            // 未受理直接办结：start 的表单(处理内容)可选，不强制；SLA 24h 在此补算
+            ticketFlowService.applySlaDeadline(ticketId, startRule);
             aiCallTicketMapper.updateTicketStatus(ticketId, "1");
             st = "1";
         }
-        ticketFlowService.validateAction(TicketFlowService.DEFAULT_FLOW, st, "complete", roles);
+        AiTicketFlowDefinition completeRule = ticketFlowService.validateAction(
+                TicketFlowService.DEFAULT_FLOW, st, "complete", roles);
         int rows = aiCallTicketMapper.updateTicketStatus(ticketId, "2");
         if (rows > 0)
         {
             indexIfReady(ticketId);
+            ticketFlowService.applySlaDeadline(ticketId, completeRule);
         }
         return rows;
     }
@@ -200,13 +207,23 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
     public int updateTicketProcess(Long ticketId, String processContent, Long assignUserId, String assignUserName)
     {
         AiCallTicket exist = requireTicket(ticketId);
+        AiTicketFlowDefinition startRule = null;
         if ("0".equals(exist.getStatus()))
         {
-            // 首次受理：经状态机校验 start(0→1)及角色；处理中(1)的再分派状态不变，放行
-            ticketFlowService.validateAction(TicketFlowService.DEFAULT_FLOW, "0", "start",
+            // 首次受理：经状态机校验 start(0→1)及角色+表单(processContent 必填)
+            startRule = ticketFlowService.validateAction(TicketFlowService.DEFAULT_FLOW, "0", "start",
                     ticketFlowService.currentRoleKeys());
+            Map<String, Object> form = new HashMap<>();
+            form.put("processContent", processContent);
+            form.put("assignUserId", assignUserId);
+            ticketFlowService.validateForm(startRule, form);
         }
         int rows = aiCallTicketMapper.updateTicketProcess(ticketId, processContent, assignUserId, assignUserName);
+        if (rows > 0 && startRule != null)
+        {
+            // 受理后按 start 规则的 sla_hours（seed=24h）重算 SLA 截止时间
+            ticketFlowService.applySlaDeadline(ticketId, startRule);
+        }
         // 分配给坐席成功后投递站内信（T5-3 消息中心）
         if (rows > 0 && assignUserId != null && messageNotifyDispatcher != null)
         {
@@ -234,9 +251,16 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
     {
         AiCallTicket exist = requireTicket(ticketId);
         // 归档必须为已办结(2)且角色允许（状态机唯一依据），防止未办结直接归档
-        ticketFlowService.validateAction(TicketFlowService.DEFAULT_FLOW, exist.getStatus(),
-                "archive", ticketFlowService.currentRoleKeys());
-        return aiCallTicketMapper.archiveTicket(ticketId);
+        AiTicketFlowDefinition archiveRule = ticketFlowService.validateAction(
+                TicketFlowService.DEFAULT_FLOW, exist.getStatus(), "archive",
+                ticketFlowService.currentRoleKeys());
+        int rows = aiCallTicketMapper.archiveTicket(ticketId);
+        if (rows > 0)
+        {
+            // 归档按规则 sla_hours=0 清空 due_time
+            ticketFlowService.applySlaDeadline(ticketId, archiveRule);
+        }
+        return rows;
     }
 
     @Override

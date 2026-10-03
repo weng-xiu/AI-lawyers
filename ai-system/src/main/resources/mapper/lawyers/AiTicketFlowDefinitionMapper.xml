@@ -14,13 +14,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="roleKey"      column="role_key"      />
         <result property="sortNo"       column="sort_no"       />
         <result property="status"       column="status"        />
+        <result property="slaHours"     column="sla_hours"     />
+        <result property="formSchema"   column="form_schema"   />
         <result property="createTime"   column="create_time"   />
         <result property="updateTime"   column="update_time"   />
     </resultMap>
 
     <sql id="columns">
         flow_id, flow_code, status_from, action_code, action_name, target_status,
-        role_key, sort_no, status, create_time, update_time
+        role_key, sort_no, status, sla_hours, form_schema, create_time, update_time
     </sql>
 
     <select id="selectActions" resultMap="FlowDefinitionResult">
@@ -46,10 +48,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             useGeneratedKeys="true" keyProperty="flowId">
         insert into ai_ticket_flow_definition
             (flow_code, status_from, action_code, action_name, target_status,
-             role_key, sort_no, status, create_time)
+             role_key, sort_no, status, sla_hours, form_schema, create_time)
         values
             (#{flowCode}, #{statusFrom}, #{actionCode}, #{actionName}, #{targetStatus},
-             #{roleKey}, #{sortNo}, #{status}, sysdate())
+             #{roleKey}, #{sortNo}, #{status}, #{slaHours}, #{formSchema}, sysdate())
     </insert>
 
     <update id="updateDefinition" parameterType="AiTicketFlowDefinition">
@@ -60,6 +62,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="roleKey != null">role_key = #{roleKey},</if>
             <if test="sortNo != null">sort_no = #{sortNo},</if>
             <if test="status != null">status = #{status},</if>
+            <if test="slaHours != null">sla_hours = #{slaHours},</if>
+            <if test="formSchema != null">form_schema = #{formSchema},</if>
             update_time = sysdate()
         </trim>
         where flow_id = #{flowId}

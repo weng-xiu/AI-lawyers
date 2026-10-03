@@ -1,5 +1,6 @@
 package ai.lawyers.system.domain.lawyers;
 
+import java.math.BigDecimal;
 import ai.lawyers.common.core.domain.BaseEntity;
 
 /**
@@ -23,6 +24,10 @@ public class AiTicketFlowDefinition extends BaseEntity
     private String roleKey;
     private Integer sortNo;
     private String status;
+    /** 动作触发后 SLA 时限（小时）：null=不重算，0=清空截止时间 */
+    private BigDecimal slaHours;
+    /** 该动作必填表单 JSON，如 {"required":["orgId","remark"]} */
+    private String formSchema;
 
     public Long getFlowId() { return flowId; }
     public void setFlowId(Long flowId) { this.flowId = flowId; }
@@ -50,4 +55,10 @@ public class AiTicketFlowDefinition extends BaseEntity
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+
+    public BigDecimal getSlaHours() { return slaHours; }
+    public void setSlaHours(BigDecimal slaHours) { this.slaHours = slaHours; }
+
+    public String getFormSchema() { return formSchema; }
+    public void setFormSchema(String formSchema) { this.formSchema = formSchema; }
 }

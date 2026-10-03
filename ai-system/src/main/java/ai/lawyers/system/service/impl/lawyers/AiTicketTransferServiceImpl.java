@@ -25,6 +25,7 @@ import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.common.utils.sign.CallbackSignUtils;
 import ai.lawyers.system.domain.lawyers.AiCallTicket;
 import ai.lawyers.system.domain.lawyers.AiExternalOrg;
+import ai.lawyers.system.domain.lawyers.AiTicketFlowDefinition;
 import ai.lawyers.system.domain.lawyers.AiTicketTransfer;
 import ai.lawyers.system.domain.lawyers.AiUnifiedSession;
 import ai.lawyers.system.mapper.lawyers.AiCallTicketMapper;
@@ -33,6 +34,7 @@ import ai.lawyers.system.mapper.lawyers.AiTicketTransferMapper;
 import ai.lawyers.system.mapper.lawyers.AiUnifiedSessionMapper;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
 import ai.lawyers.system.service.lawyers.IAiTicketTransferService;
+import ai.lawyers.system.service.lawyers.TicketFlowService;
 
 /**
  * 工单跨域转办 Service 实现（F3）
@@ -84,6 +86,10 @@ public class AiTicketTransferServiceImpl implements IAiTicketTransferService
     @Autowired
     private IAiCallTicketService ticketService;
 
+    /** P1-6：外派转办前经工单状态机校验（动作 transfer 合法性+角色+必填表单） */
+    @Autowired
+    private TicketFlowService ticketFlowService;
+
     /** 对外回调地址根（推送报文里回传给外部系统，可为空表示不回传） */
     @Value("${call.collab.callback-base-url:}")
     private String callbackBaseUrl;
@@ -101,6 +107,15 @@ public class AiTicketTransferServiceImpl implements IAiTicketTransferService
         {
             throw new ServiceException("工单不存在");
         }
+        // P1-6：外派转办前经状态机校验——动作 transfer 必须在当前工单状态下对当前角色开放，
+        // 且 form_schema 要求 orgId 必填（transfer target_status 与源相同，状态不变）。
+        java.util.Map<String, Object> form = new java.util.HashMap<>();
+        form.put("orgId", orgId);
+        form.put("remark", remark);
+        AiTicketFlowDefinition rule = ticketFlowService.validateAction(
+                TicketFlowService.DEFAULT_FLOW, ticket.getStatus(), "transfer",
+                ticketFlowService.currentRoleKeys());
+        ticketFlowService.validateForm(rule, form);
         AiExternalOrg org = orgMapper.selectAiExternalOrgByOrgId(orgId);
         if (org == null)
         {

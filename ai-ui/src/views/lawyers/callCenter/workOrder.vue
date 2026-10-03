@@ -332,11 +332,31 @@
         <el-button @click="transferOpen = false">取消</el-button>
       </div>
     </el-dialog>
+
+    <!-- P1-6：外派转办——选择协同机构并提交，orgId 为状态机表单必填 -->
+    <el-dialog title="外派转办" :visible.sync="transferOrgVisible" width="460px" append-to-body>
+      <el-form label-width="90px">
+        <el-form-item label="协同机构" required>
+          <el-select v-model="transferOrgForm.orgId" placeholder="请选择外派协同机构" filterable style="width:100%">
+            <el-option v-for="org in externalOrgs" :key="org.orgId"
+              :label="org.orgName" :value="org.orgId" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="转办说明">
+          <el-input v-model="transferOrgForm.remark" type="textarea" :rows="3" placeholder="可选，说明转办原因" />
+        </el-form-item>
+      </el-form>
+      <div slot="footer">
+        <el-button type="primary" @click="confirmExternalTransfer">确认外派</el-button>
+        <el-button @click="transferOrgVisible = false">取消</el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import { listTicket, getTicket, addTicket, updateTicket, delTicket, processTicket, completeTicket, archiveTicket, generateTicketNo, listTicketActions } from "@/api/lawyers/callCenter"
+import { listTicket, getTicket, addTicket, updateTicket, delTicket, processTicket, completeTicket, archiveTicket, generateTicketNo, listTicketActions, transferOutTicket } from "@/api/lawyers/callCenter"
+import { listExternalOrg } from "@/api/lawyers/externalOrg"
 import request from '@/utils/request'
 
 // 查询工单流转记录（若后端接口存在）
@@ -385,6 +405,11 @@ export default {
       transferUserId: null,
       transferUserName: '',
       transferRow: null,
+      // P1-6：外派转办（跨域协同机构）
+      externalOrgs: [],
+      transferOrgVisible: false,
+      transferOrgRow: null,
+      transferOrgForm: { orgId: null, remark: '' },
       rules: {
         title: [{ required: true, message: '工单标题不能为空', trigger: 'blur' }],
         content: [{ required: true, message: '工单内容不能为空', trigger: 'blur' }]
@@ -419,7 +444,7 @@ export default {
     handleFlowAction(row, action) {
       const code = action.actionCode
       if (code === 'transfer') {
-        this.handleRowTransfer(row)
+        this.openExternalTransfer(row)
         return
       }
       const tips = { start: '确认受理该工单？', complete: '确认办结该工单？', archive: '确认归档该工单？' }
@@ -446,6 +471,35 @@ export default {
       this.transferUserId = null
       this.transferUserName = ''
       this.transferOpen = true
+    },
+    // P1-6：外派转办——加载协同机构并打开外派弹窗
+    openExternalTransfer(row) {
+      this.transferOrgRow = row
+      this.transferOrgForm = { orgId: null, remark: '' }
+      this.externalOrgs = []
+      listExternalOrg({ pageNum: 1, pageSize: 100, status: '0' }).then(res => {
+        this.externalOrgs = res.rows || []
+        this.transferOrgVisible = true
+      }).catch(() => {
+        this.$message.error('加载协同机构失败')
+      })
+    },
+    // 确认外派：orgId 为 form_schema 必填，后端状态机二次校验
+    confirmExternalTransfer() {
+      if (!this.transferOrgForm.orgId) {
+        this.$message.warning('请选择外派协同机构')
+        return
+      }
+      transferOutTicket({
+        ticketId: this.transferOrgRow.ticketId,
+        orgId: this.transferOrgForm.orgId,
+        remark: this.transferOrgForm.remark
+      }).then(() => {
+        this.$message.success('外派成功')
+        this.transferOrgVisible = false
+        this.getList()
+        this.calcStatData()
+      }).catch(() => {})
     },
     getList() {
       this.loading = true

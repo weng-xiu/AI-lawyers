@@ -343,6 +343,15 @@ export function archiveTicket(data) {
   })
 }
 
+// P1-6：工单外派转办（跨域协同机构），请求体 { ticketId, orgId, remark }
+export function transferOutTicket(data) {
+  return request({
+    url: '/lawyers/ticket/transfer',
+    method: 'post',
+    data: data
+  })
+}
+
 export function generateTicketNo() {
   return request({
     url: '/lawyers/call/ticket/generateNo',

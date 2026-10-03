@@ -1,11 +1,16 @@
 package ai.lawyers.system.service.lawyers;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import ai.lawyers.common.utils.SecurityUtils;
 import ai.lawyers.system.domain.lawyers.AiTicketFlowDefinition;
 import ai.lawyers.system.mapper.lawyers.AiCallTicketMapper;
@@ -35,6 +40,8 @@ public class TicketFlowService
     @Autowired
     private AiCallTicketMapper ticketMapper;
 
+    private static final ObjectMapper JSON = new ObjectMapper();
+
     /**
      * 查询当前状态下当前角色可执行的动作（前端按钮动态渲染）。
      *
@@ -60,14 +67,17 @@ public class TicketFlowService
     }
 
     /**
-     * 校验并执行动作：查规则 → 角色校验 → 目标状态不同则推进工单状态。
+     * 校验并执行动作：查规则 → 角色校验 → 表单必填校验 → 推进状态 → 按 sla_hours 重算 SLA。
      *
+     * @param formParams 动作提交的表单字段（如 orgId/processContent），用于 form_schema 必填校验，
+     *                   可为 null（表示无表单）。
      * @return 目标状态（与当前相同时状态不变，调用方可另行记录转办等业务）
      */
     public String applyAction(String flowCode, Long ticketId, String currentStatus,
-                              String actionCode, List<String> roles)
+                              String actionCode, List<String> roles, Map<String, Object> formParams)
     {
         AiTicketFlowDefinition rule = validateAction(flowCode, currentStatus, actionCode, roles);
+        validateForm(rule, formParams);
         if (!rule.getTargetStatus().equals(currentStatus))
         {
             int rows = ticketMapper.updateTicketStatus(ticketId, rule.getTargetStatus());
@@ -78,7 +88,83 @@ public class TicketFlowService
             log.info("工单状态机流转 ticketId={} {}: {} -> {}",
                     ticketId, actionCode, currentStatus, rule.getTargetStatus());
         }
+        applySla(ticketId, rule);
         return rule.getTargetStatus();
+    }
+
+    /** 便捷重载：无表单参数 */
+    public String applyAction(String flowCode, Long ticketId, String currentStatus,
+                              String actionCode, List<String> roles)
+    {
+        return applyAction(flowCode, ticketId, currentStatus, actionCode, roles, null);
+    }
+
+    /**
+     * 按规则 form_schema 校验表单必填字段。schema 形如 {"required":["orgId","remark"]}。
+     * 缺失/为空字段一律抛 IllegalArgumentException；schema 为 null/空时放行。
+     */
+    public void validateForm(AiTicketFlowDefinition rule, Map<String, Object> formParams)
+    {
+        String schema = rule.getFormSchema();
+        if (schema == null || schema.trim().isEmpty())
+        {
+            return;
+        }
+        try
+        {
+            JsonNode root = JSON.readTree(schema);
+            JsonNode required = root.get("required");
+            if (required == null || !required.isArray())
+            {
+                return;
+            }
+            for (JsonNode field : required)
+            {
+                String key = field.asText();
+                Object val = formParams == null ? null : formParams.get(key);
+                if (val == null || (val instanceof String && ((String) val).trim().isEmpty()))
+                {
+                    throw new IllegalArgumentException("动作「" + rule.getActionName()
+                            + "」缺少必填字段：" + key);
+                }
+            }
+        }
+        catch (IllegalArgumentException e)
+        {
+            throw e;
+        }
+        catch (Exception e)
+        {
+            log.warn("状态机表单 schema 解析失败，跳过校验 action={} schema={}",
+                    rule.getActionCode(), schema, e);
+        }
+    }
+
+    /**
+     * 按规则 sla_hours 重算工单 SLA 截止时间（供调用方在自管状态推进后触发）。
+     *   null  -> 不重算；0  -> 清空 due_time（归档终态）；>0 -> now + sla_hours 小时。
+     */
+    public void applySlaDeadline(Long ticketId, AiTicketFlowDefinition rule)
+    {
+        applySla(ticketId, rule);
+    }
+
+    private void applySla(Long ticketId, AiTicketFlowDefinition rule)
+    {
+        BigDecimal hours = rule.getSlaHours();
+        if (hours == null)
+        {
+            return;
+        }
+        Date due = null;
+        if (hours.compareTo(BigDecimal.ZERO) > 0)
+        {
+            due = new Date(System.currentTimeMillis()
+                    + hours.multiply(BigDecimal.valueOf(3600_000L)).longValue());
+        }
+        ticketMapper.updateTicketDueTime(ticketId, due);
+        log.info("工单 SLA 时限更新 ticketId={} action={} slaHours={} dueTime={}",
+                ticketId, rule.getActionCode(), hours, due);
     }
 
     /** 校验动作存在且角色允许，返回规则定义 */

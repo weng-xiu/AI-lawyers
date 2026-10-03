@@ -236,6 +236,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where ticket_id = #{ticketId}
     </update>
 
+    <update id="updateTicketDueTime" parameterType="map">
+        update ai_call_ticket
+        set due_time = #{dueTime},
+            update_time = sysdate()
+        where ticket_id = #{ticketId}
+    </update>
+
     <select id="selectOvertimePendingTickets" resultMap="AiCallTicketResult">
         <include refid="selectAiCallTicketVo"/>
         where t.status = '0'
