@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import ai.lawyers.common.utils.SecurityUtils;
 import ai.lawyers.system.domain.lawyers.AiTicketFlowDefinition;
 import ai.lawyers.system.mapper.lawyers.AiCallTicketMapper;
 import ai.lawyers.system.mapper.lawyers.AiTicketFlowDefinitionMapper;
@@ -136,5 +137,30 @@ public class TicketFlowService
     private String normalizeFlow(String flowCode)
     {
         return flowCode == null || flowCode.trim().isEmpty() ? DEFAULT_FLOW : flowCode.trim();
+    }
+
+    /**
+     * 取当前登录用户的角色 key 集合；无登录上下文（系统线程/未登录）时返回空表，
+     * 调用方据此走"无角色，仅 admin 规则放行"或拒绝分支。
+     */
+    public List<String> currentRoleKeys()
+    {
+        List<String> keys = new ArrayList<>();
+        try
+        {
+            if (SecurityUtils.getLoginUser() != null
+                    && SecurityUtils.getLoginUser().getUser() != null
+                    && SecurityUtils.getLoginUser().getUser().getRoles() != null)
+            {
+                SecurityUtils.getLoginUser().getUser().getRoles()
+                        .forEach(role -> keys.add(role.getRoleKey()));
+            }
+        }
+        catch (Exception e)
+        {
+            // 非 web 请求线程取登录态会抛异常，按无角色处理
+            log.debug("当前上下文无登录用户：{}", e.getMessage());
+        }
+        return keys;
     }
 }

@@ -350,6 +350,14 @@ export function generateTicketNo() {
   })
 }
 
+// P1-6：查询当前用户在指定工单状态下可执行的流转动作（状态机 DSL，含角色过滤）
+export function listTicketActions(flowCode, status) {
+  return request({
+    url: '/lawyers/ticket-flow/actions/' + flowCode + '/' + status,
+    method: 'get'
+  })
+}
+
 // ==================== 转接管理 ====================
 export function listTransfer(query) {
   return request({

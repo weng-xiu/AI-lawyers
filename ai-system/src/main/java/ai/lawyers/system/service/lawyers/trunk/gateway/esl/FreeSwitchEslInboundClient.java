@@ -226,9 +226,11 @@ public class FreeSwitchEslInboundClient
      */
     public String sendCommand(String command)
     {
-        if (out == null || socket == null || socket.isClosed())
+        // ready 必须先于 socket 检查：重连握手窗口期 socket/out 已赋值但尚未鉴权，
+        // 此时写入命令会与 auth 报文交错破坏握手、且调用方空等 30s 超时——未就绪一律快速失败。
+        if (!ready.get() || out == null || socket == null || socket.isClosed())
         {
-            log.warn("[ESL-{}] 未连接，跳过命令: {}", host, command);
+            log.warn("[ESL-{}] 未连接/未就绪，跳过命令: {}", host, command);
             return null;
         }
         CompletableFuture<String> reply = new CompletableFuture<>();

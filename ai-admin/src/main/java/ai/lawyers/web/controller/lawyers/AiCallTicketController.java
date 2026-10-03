@@ -93,15 +93,22 @@ public class AiCallTicketController extends BaseController
     @PostMapping("/process")
     public AjaxResult processTicket(@RequestBody java.util.Map<String, Object> params)
     {
-        Long ticketId = Long.valueOf(params.get("ticketId").toString());
-        String processContent = params.get("processContent").toString();
-        Long assignUserId = params.get("assignUserId") != null ? Long.valueOf(params.get("assignUserId").toString()) : null;
-        String assignUserName = params.get("assignUserName") != null ? params.get("assignUserName").toString() : null;
-        int result = aiCallTicketService.updateTicketProcess(ticketId, processContent, assignUserId, assignUserName);
-        if (result > 0) {
-            return success("工单处理成功");
+        try
+        {
+            Long ticketId = Long.valueOf(params.get("ticketId").toString());
+            String processContent = params.get("processContent").toString();
+            Long assignUserId = params.get("assignUserId") != null ? Long.valueOf(params.get("assignUserId").toString()) : null;
+            String assignUserName = params.get("assignUserName") != null ? params.get("assignUserName").toString() : null;
+            int result = aiCallTicketService.updateTicketProcess(ticketId, processContent, assignUserId, assignUserName);
+            if (result > 0) {
+                return success("工单处理成功");
+            }
+            return error("工单处理失败");
         }
-        return error("工单处理失败");
+        catch (IllegalArgumentException e)
+        {
+            return AjaxResult.error(e.getMessage());
+        }
     }
 
     @PreAuthorize("@ss.hasPermi('lawyers:call:ticket:complete')")
@@ -109,12 +116,19 @@ public class AiCallTicketController extends BaseController
     @PostMapping("/complete")
     public AjaxResult completeTicket(@RequestBody java.util.Map<String, Object> params)
     {
-        Long ticketId = Long.valueOf(params.get("ticketId").toString());
-        int result = aiCallTicketService.updateTicketStatus(ticketId, "2");
-        if (result > 0) {
-            return success("工单已完成");
+        try
+        {
+            Long ticketId = Long.valueOf(params.get("ticketId").toString());
+            int result = aiCallTicketService.updateTicketStatus(ticketId, "2");
+            if (result > 0) {
+                return success("工单已完成");
+            }
+            return error("工单完成失败");
         }
-        return error("工单完成失败");
+        catch (IllegalArgumentException e)
+        {
+            return AjaxResult.error(e.getMessage());
+        }
     }
 
     @PreAuthorize("@ss.hasPermi('lawyers:call:ticket:archive')")
@@ -122,12 +136,19 @@ public class AiCallTicketController extends BaseController
     @PostMapping("/archive")
     public AjaxResult archiveTicket(@RequestBody java.util.Map<String, Object> params)
     {
-        Long ticketId = Long.valueOf(params.get("ticketId").toString());
-        int result = aiCallTicketService.archiveTicket(ticketId);
-        if (result > 0) {
-            return success("工单已归档");
+        try
+        {
+            Long ticketId = Long.valueOf(params.get("ticketId").toString());
+            int result = aiCallTicketService.archiveTicket(ticketId);
+            if (result > 0) {
+                return success("工单已归档");
+            }
+            return error("工单归档失败");
         }
-        return error("工单归档失败");
+        catch (IllegalArgumentException e)
+        {
+            return AjaxResult.error(e.getMessage());
+        }
     }
 
     @PreAuthorize("@ss.hasPermi('lawyers:call:ticket:add')")

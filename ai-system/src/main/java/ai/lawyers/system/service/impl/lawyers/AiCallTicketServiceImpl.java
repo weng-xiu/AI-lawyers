@@ -18,6 +18,7 @@ import ai.lawyers.system.domain.lawyers.AiSlaPolicy;
 import ai.lawyers.system.mapper.lawyers.AiCallTicketMapper;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
 import ai.lawyers.system.service.lawyers.IAiSlaPolicyService;
+import ai.lawyers.system.service.lawyers.TicketFlowService;
 import ai.lawyers.system.service.lawyers.queue.MessageNotifyDispatcher;
 import ai.lawyers.system.service.lawyers.rag.TicketVectorService;
 
@@ -39,6 +40,10 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
     /** P1-8：工单办结/归档时入语义向量索引（未装配模型时静默） */
     @Autowired(required = false)
     private TicketVectorService ticketVectorService;
+
+    /** P1-6：工单流转合法性 + 角色校验（状态机为唯一依据） */
+    @Autowired
+    private TicketFlowService ticketFlowService;
 
     @Override
     public AiCallTicket selectAiCallTicketByTicketId(Long ticketId)
@@ -143,17 +148,64 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
     @Override
     public int updateTicketStatus(Long ticketId, String status)
     {
+        if ("2".equals(status))
+        {
+            // 办结必须经状态机校验（含角色），不能直接跳状态
+            return completeWithFlow(ticketId);
+        }
         int rows = aiCallTicketMapper.updateTicketStatus(ticketId, status);
-        if (rows > 0 && ("2".equals(status) || "3".equals(status)))
+        if (rows > 0 && "3".equals(status))
         {
             indexIfReady(ticketId);
         }
         return rows;
     }
 
+    /**
+     * P1-6：办结经状态机校验——当前为处理中(1)直接 complete；兼容未受理(0)工单，
+     * 在有 start 权限前提下自动补推进到处理中再 complete（保持现网"未受理也可办结"体验）。
+     */
+    private int completeWithFlow(Long ticketId)
+    {
+        AiCallTicket exist = requireTicket(ticketId);
+        List<String> roles = ticketFlowService.currentRoleKeys();
+        String st = exist.getStatus();
+        if ("0".equals(st))
+        {
+            ticketFlowService.validateAction(TicketFlowService.DEFAULT_FLOW, "0", "start", roles);
+            aiCallTicketMapper.updateTicketStatus(ticketId, "1");
+            st = "1";
+        }
+        ticketFlowService.validateAction(TicketFlowService.DEFAULT_FLOW, st, "complete", roles);
+        int rows = aiCallTicketMapper.updateTicketStatus(ticketId, "2");
+        if (rows > 0)
+        {
+            indexIfReady(ticketId);
+        }
+        return rows;
+    }
+
+    /** 读取工单，不存在抛非法参数异常 */
+    private AiCallTicket requireTicket(Long ticketId)
+    {
+        AiCallTicket t = aiCallTicketMapper.selectAiCallTicketByTicketId(ticketId);
+        if (t == null)
+        {
+            throw new IllegalArgumentException("工单不存在：" + ticketId);
+        }
+        return t;
+    }
+
     @Override
     public int updateTicketProcess(Long ticketId, String processContent, Long assignUserId, String assignUserName)
     {
+        AiCallTicket exist = requireTicket(ticketId);
+        if ("0".equals(exist.getStatus()))
+        {
+            // 首次受理：经状态机校验 start(0→1)及角色；处理中(1)的再分派状态不变，放行
+            ticketFlowService.validateAction(TicketFlowService.DEFAULT_FLOW, "0", "start",
+                    ticketFlowService.currentRoleKeys());
+        }
         int rows = aiCallTicketMapper.updateTicketProcess(ticketId, processContent, assignUserId, assignUserName);
         // 分配给坐席成功后投递站内信（T5-3 消息中心）
         if (rows > 0 && assignUserId != null && messageNotifyDispatcher != null)
@@ -180,6 +232,10 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
     @Override
     public int archiveTicket(Long ticketId)
     {
+        AiCallTicket exist = requireTicket(ticketId);
+        // 归档必须为已办结(2)且角色允许（状态机唯一依据），防止未办结直接归档
+        ticketFlowService.validateAction(TicketFlowService.DEFAULT_FLOW, exist.getStatus(),
+                "archive", ticketFlowService.currentRoleKeys());
         return aiCallTicketMapper.archiveTicket(ticketId);
     }
 

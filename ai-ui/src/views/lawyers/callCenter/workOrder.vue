@@ -150,11 +150,28 @@
           </template>
         </el-table-column>
         <el-table-column label="创建时间" align="center" prop="createTime" width="160" />
-        <el-table-column label="操作" align="center" width="180" fixed="right">
+        <el-table-column label="操作" align="center" width="230" fixed="right">
           <template slot-scope="scope">
             <el-button type="text" size="mini" icon="el-icon-view" @click="handleView(scope.row)">查看</el-button>
             <el-button type="text" size="mini" icon="el-icon-edit" @click="handleEdit(scope.row)">编辑</el-button>
             <el-button type="text" size="mini" icon="el-icon-delete" style="color: #C63D4A" @click="handleDelete(scope.row)">删除</el-button>
+            <el-dropdown
+              v-if="actionsOf(scope.row.status).length"
+              trigger="click"
+              style="margin-left: 8px"
+              @command="handleFlowAction(scope.row, $event)"
+            >
+              <span class="flow-trigger">流转<i class="el-icon-arrow-down el-icon--right"></i></span>
+              <el-dropdown-menu slot="dropdown">
+                <el-dropdown-item
+                  v-for="action in actionsOf(scope.row.status)"
+                  :key="action.actionCode"
+                  :command="action"
+                >
+                  {{ flowActionName(action) }}
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </el-dropdown>
           </template>
         </el-table-column>
       </el-table>
@@ -319,7 +336,7 @@
 </template>
 
 <script>
-import { listTicket, getTicket, addTicket, updateTicket, delTicket, processTicket, completeTicket, archiveTicket, generateTicketNo } from "@/api/lawyers/callCenter"
+import { listTicket, getTicket, addTicket, updateTicket, delTicket, processTicket, completeTicket, archiveTicket, generateTicketNo, listTicketActions } from "@/api/lawyers/callCenter"
 import request from '@/utils/request'
 
 // 查询工单流转记录（若后端接口存在）
@@ -358,6 +375,8 @@ export default {
         status: undefined
       },
       orderList: [],
+      // P1-6：按工单状态缓存当前用户可执行动作（同状态动作一致）
+      actionMap: {},
       timelineList: [],
       formOpen: false,
       isEdit: false,
@@ -375,10 +394,58 @@ export default {
   created() {
     this.getList()
     this.calcStatData()
+    this.loadFlowActions()
   },
   methods: {
     onAssignUserChange(val, user) {
       this.$set(this.form, 'assignUserName', user ? (user.nickName || user.userName) : '')
+    },
+    // P1-6：加载各状态下当前用户可执行的流转动作（仅一次，动作只随角色变化）
+    loadFlowActions() {
+      ['0', '1', '2', '3'].forEach(st => {
+        listTicketActions('HOTLINE', st).then(res => {
+          this.$set(this.actionMap, st, res.data || [])
+        }).catch(() => { this.$set(this.actionMap, st, []) })
+      })
+    },
+    actionsOf(status) {
+      return this.actionMap[String(status)] || []
+    },
+    flowActionName(action) {
+      const fallback = { start: '受理', complete: '办结', archive: '归档', transfer: '转派' }
+      return action.actionName || fallback[action.actionCode] || action.actionCode
+    },
+    // 执行状态机动作：transfer 打开转派弹窗，其余确认后调用对应接口（后端二次校验）
+    handleFlowAction(row, action) {
+      const code = action.actionCode
+      if (code === 'transfer') {
+        this.handleRowTransfer(row)
+        return
+      }
+      const tips = { start: '确认受理该工单？', complete: '确认办结该工单？', archive: '确认归档该工单？' }
+      const runners = {
+        start: () => processTicket({ ticketId: row.ticketId, processContent: '工单已受理' }),
+        complete: () => completeTicket({ ticketId: row.ticketId }),
+        archive: () => archiveTicket({ ticketId: row.ticketId })
+      }
+      if (!runners[code]) return
+      this.$confirm(tips[code], '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        runners[code]().then(() => {
+          this.$message.success(this.flowActionName(action) + '成功')
+          this.getList()
+          this.calcStatData()
+        }).catch(() => {})
+      }).catch(() => {})
+    },
+    handleRowTransfer(row) {
+      this.transferRow = row
+      this.transferUserId = null
+      this.transferUserName = ''
+      this.transferOpen = true
     },
     getList() {
       this.loading = true
@@ -824,6 +891,17 @@ export default {
       &:hover {
         color: #1A3C6E;
         text-decoration: underline;
+      }
+    }
+
+    .flow-trigger {
+      color: #255A99;
+      font-size: 13px;
+      cursor: pointer;
+      outline: none;
+
+      &:hover {
+        color: #1A3C6E;
       }
     }
   }

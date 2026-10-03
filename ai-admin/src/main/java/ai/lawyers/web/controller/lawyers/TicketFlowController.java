@@ -1,6 +1,5 @@
 package ai.lawyers.web.controller.lawyers;
 
-import java.util.ArrayList;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -10,7 +9,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import ai.lawyers.common.core.controller.BaseController;
 import ai.lawyers.common.core.domain.AjaxResult;
-import ai.lawyers.common.utils.SecurityUtils;
 import ai.lawyers.system.domain.lawyers.AiTicketFlowDefinition;
 import ai.lawyers.system.service.lawyers.TicketFlowService;
 
@@ -35,21 +33,8 @@ public class TicketFlowController extends BaseController
                               @PathVariable("status") String status)
     {
         List<AiTicketFlowDefinition> actions =
-                ticketFlowService.listAllowedActions(flowCode, status, currentRoleKeys());
+                ticketFlowService.listAllowedActions(flowCode, status,
+                        ticketFlowService.currentRoleKeys());
         return AjaxResult.success(actions);
-    }
-
-    /** 取当前登录用户角色 key 集合 */
-    private List<String> currentRoleKeys()
-    {
-        List<String> keys = new ArrayList<>();
-        if (SecurityUtils.getLoginUser() != null
-                && SecurityUtils.getLoginUser().getUser() != null
-                && SecurityUtils.getLoginUser().getUser().getRoles() != null)
-        {
-            SecurityUtils.getLoginUser().getUser().getRoles()
-                    .forEach(role -> keys.add(role.getRoleKey()));
-        }
-        return keys;
     }
 }
