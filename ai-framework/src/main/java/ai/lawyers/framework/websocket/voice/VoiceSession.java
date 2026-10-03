@@ -823,6 +823,17 @@ public class VoiceSession
             tickets.add(m);
         }
         enqueue(Entry.Kind.OTHER, VoiceFrames.copilotTickets(seq, tickets));
+
+        List<java.util.Map<String, Object>> actions = new ArrayList<>();
+        for (ai.lawyers.system.service.lawyers.voice.copilot.CopilotAssistResult.SuggestedAction act : result.getActions())
+        {
+            java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("action", act.getAction());
+            m.put("label", act.getLabel());
+            m.put("payload", act.getPayload());
+            actions.add(m);
+        }
+        enqueue(Entry.Kind.OTHER, VoiceFrames.copilotActions(seq, actions));
     }
 
     /* ================= E4：情绪/意图识别联动 ================= */

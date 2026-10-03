@@ -32,4 +32,25 @@ public interface ReportMapper
     List<Map<String, Object>> selectBusinessReport(@Param("beginTime") String beginTime,
                                                    @Param("endTime") String endTime,
                                                    @Param("granularity") String granularity);
+
+    // ----------------------------- P0-2 预聚合版（读 ai_stat_minute，字段契约与实时版一致） -----------------------------
+
+    /** 呼叫报表预聚合：ALL call_* 指标按周期上卷 */
+    List<Map<String, Object>> selectCallReportPreagg(@Param("beginTime") String beginTime,
+                                                     @Param("endTime") String endTime,
+                                                     @Param("granularity") String granularity);
+
+    /** 坐席服务报表预聚合：agent:* 维度指标，关联坐席表取名 */
+    List<Map<String, Object>> selectServiceReportPreagg(@Param("beginTime") String beginTime,
+                                                        @Param("endTime") String endTime);
+
+    /** 质检报表预聚合：ALL quality_* 指标按周期上卷 */
+    List<Map<String, Object>> selectQualityReportPreagg(@Param("beginTime") String beginTime,
+                                                        @Param("endTime") String endTime,
+                                                        @Param("granularity") String granularity);
+
+    /** 业务工单报表预聚合：ALL ticket_* 指标按周期上卷 */
+    List<Map<String, Object>> selectBusinessReportPreagg(@Param("beginTime") String beginTime,
+                                                         @Param("endTime") String endTime,
+                                                         @Param("granularity") String granularity);
 }

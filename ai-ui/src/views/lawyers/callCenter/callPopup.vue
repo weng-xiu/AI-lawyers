@@ -99,7 +99,8 @@
         <voice-caption v-if="connected" :session-id="currentRecordId" @final="onCaptionFinal"
                        @copilot-element="onCopilotElement"
                        @copilot-laws="onCopilotLaws"
-                       @copilot-tickets="onCopilotTickets" />
+                       @copilot-tickets="onCopilotTickets"
+                       @copilot-actions="onCopilotActions" />
 
         <!-- 独立 AI 律师辅助面板（与人工接听链路分离，仅以 currentRecordId 关联） -->
         <ai-assist-panel v-if="connected" :record-id="currentRecordId"
@@ -298,8 +299,8 @@ export default {
       currentRecordId: null,
       // P3-A6：实时字幕累计文本（供 AI 辅助面板联动分析）
       liveCaptionText: '',
-      // F4：实时 Copilot 数据（要素/法条/相似工单，按 seq 回合刷新）
-      copilotData: { seq: 0, element: null, laws: [], tickets: [] }
+      // F4：实时 Copilot 数据（要素/法条/相似工单/建议动作，按 seq 回合刷新）
+      copilotData: { seq: 0, element: null, laws: [], tickets: [], actions: [] }
     }
   },
   computed: {
@@ -456,7 +457,7 @@ export default {
     onCopilotElement(msg) {
       if (!msg || msg.seq < this.copilotData.seq) return
       if (msg.seq !== this.copilotData.seq) {
-        this.copilotData = { seq: msg.seq, element: msg, laws: [], tickets: [] }
+        this.copilotData = { seq: msg.seq, element: msg, laws: [], tickets: [], actions: [] }
       } else {
         this.copilotData.element = msg
       }
@@ -464,7 +465,7 @@ export default {
     onCopilotLaws(msg) {
       if (!msg || msg.seq < this.copilotData.seq) return
       if (msg.seq > this.copilotData.seq) {
-        this.copilotData = { seq: msg.seq, element: null, laws: msg.laws || [], tickets: [] }
+        this.copilotData = { seq: msg.seq, element: null, laws: msg.laws || [], tickets: [], actions: [] }
       } else {
         this.copilotData.laws = msg.laws || []
       }
@@ -472,9 +473,17 @@ export default {
     onCopilotTickets(msg) {
       if (!msg || msg.seq < this.copilotData.seq) return
       if (msg.seq > this.copilotData.seq) {
-        this.copilotData = { seq: msg.seq, element: null, laws: [], tickets: msg.tickets || [] }
+        this.copilotData = { seq: msg.seq, element: null, laws: [], tickets: msg.tickets || [], actions: [] }
       } else {
         this.copilotData.tickets = msg.tickets || []
+      }
+    },
+    onCopilotActions(msg) {
+      if (!msg || msg.seq < this.copilotData.seq) return
+      if (msg.seq > this.copilotData.seq) {
+        this.copilotData = { seq: msg.seq, element: null, laws: [], tickets: [], actions: msg.actions || [] }
+      } else {
+        this.copilotData.actions = msg.actions || []
       }
     },
     onWsDtmf(data) {

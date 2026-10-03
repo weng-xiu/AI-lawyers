@@ -50,8 +50,8 @@ public class AiCallRecordController extends BaseController
     @Autowired
     private IAiCallSummaryService aiCallSummaryService;
 
-    /** 录音文件基础路径，对应 FreeSWITCH recordings_dir */
-    @Value("${call.recording.base-path:C:/Program Files/FreeSWITCH/recordings}")
+    /** 录音文件基础路径，对应 FreeSWITCH recordings_dir（默认相对工作目录，生产由 CALL_RECORDING_BASE_PATH 指定） */
+    @Value("${call.recording.base-path:recordings}")
     private String recordingBasePath;
 
     /** F2：录音存储抽象（本地/对象存储） */

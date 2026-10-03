@@ -31,6 +31,27 @@ public interface DashboardMapper
     /** 咨询分类占比 */
     List<Map<String, Object>> selectCategoryPie(@Param("beginTime") Date beginTime, @Param("endTime") Date endTime);
 
+    /** P0-2：咨询分类占比预聚合版（category:* 维度 call_total，字段契约与实时版一致） */
+    List<Map<String, Object>> selectCategoryPiePreagg(@Param("beginTime") Date beginTime, @Param("endTime") Date endTime);
+
+    /** P0-2：话单满意度预聚合版（ALL satisfaction_score_sum/satisfaction_count） */
+    Map<String, Object> selectSatisfactionSummaryPreagg(@Param("beginTime") Date beginTime, @Param("endTime") Date endTime);
+
+    /** P0-2：SLA 汇总预聚合版（ALL queue_*，阈值固定 20 秒，字段契约与实时版一致） */
+    Map<String, Object> selectSlaSummaryPreagg(@Param("beginTime") Date beginTime, @Param("endTime") Date endTime);
+
+    /** P0-2：语种分布预聚合版（lang:* 维度 call_total） */
+    List<Map<String, Object>> selectLanguageDistPreagg(@Param("beginTime") Date beginTime, @Param("endTime") Date endTime);
+
+    /** P0-2：条线转办统计预聚合版（line:* 维度 transfer_total/closed_count/close_sec_sum） */
+    List<Map<String, Object>> selectTransferLineStatsPreagg(@Param("beginTime") Date beginTime, @Param("endTime") Date endTime);
+
+    /** P0-2：渠道活跃预聚合版（channel:* 维度 session_total） */
+    List<Map<String, Object>> selectChannelSessionsPreagg(@Param("beginTime") Date beginTime, @Param("endTime") Date endTime);
+
+    /** P0-2：公众端满意度预聚合版（ALL eval_*） */
+    Map<String, Object> selectPortalSatisfactionPreagg(@Param("beginTime") Date beginTime, @Param("endTime") Date endTime);
+
     /** AI 独立解决 vs 转人工会话数 */
     Map<String, Object> selectAiRatio(@Param("beginTime") Date beginTime, @Param("endTime") Date endTime);
 

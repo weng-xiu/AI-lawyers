@@ -1,7 +1,10 @@
 package ai.lawyers.web.controller.lawyers;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -10,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.MediaType;
+import ai.lawyers.system.domain.lawyers.AiCallTicket;
 import ai.lawyers.system.mapper.lawyers.AiLegalKnowledgeChunkMapper;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
 import ai.lawyers.system.service.lawyers.voice.copilot.IAiCopilotFeedbackService;
@@ -74,5 +78,37 @@ public class CopilotControllerPermTest extends AbstractPermMvcTest
                 .andExpect(status().isOk());
 
         verify(ticketService).insertAiCallTicket(any());
+    }
+
+    @Test
+    void queryTicket_unauthenticated_401() throws Exception
+    {
+        mockMvc.perform(get("/lawyers/copilot/actions/queryTicket/9"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void queryTicket_wrongPermission_403() throws Exception
+    {
+        mockMvc.perform(get("/lawyers/copilot/actions/queryTicket/9")
+                        .with(loginAs("lawyers:nope")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void queryTicket_withPermission_delegatesService() throws Exception
+    {
+        AiCallTicket ticket = new AiCallTicket();
+        ticket.setTicketId(9L);
+        ticket.setTicketNo("GD20261003001");
+        ticket.setTitle("历史咨询");
+        ticket.setStatus("1");
+        when(ticketService.selectAiCallTicketByTicketId(9L)).thenReturn(ticket);
+
+        mockMvc.perform(get("/lawyers/copilot/actions/queryTicket/9")
+                        .with(loginAs("lawyers:call:ticket:query")))
+                .andExpect(status().isOk());
+
+        verify(ticketService).selectAiCallTicketByTicketId(eq(9L));
     }
 }

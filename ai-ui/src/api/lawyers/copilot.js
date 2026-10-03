@@ -27,3 +27,22 @@ export function getCopilotAdoption(query) {
     params: query
   })
 }
+
+// ==================== P1-8 代执行白名单 ====================
+
+// 确认建单（Copilot 草稿经坐席修改后提交，白名单字段 title/content/priority/recordId）
+export function createCopilotTicket(data) {
+  return request({
+    url: '/lawyers/copilot/actions/createTicket',
+    method: 'post',
+    data: data
+  })
+}
+
+// 查询工单办理进度（返回脱敏进度信息 + 口语化播报话术）
+export function queryCopilotTicket(ticketId) {
+  return request({
+    url: '/lawyers/copilot/actions/queryTicket/' + ticketId,
+    method: 'get'
+  })
+}

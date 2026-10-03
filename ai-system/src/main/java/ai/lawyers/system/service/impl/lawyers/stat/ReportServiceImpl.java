@@ -11,6 +11,7 @@ import org.apache.poi.xssf.usermodel.XSSFRow;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import ai.lawyers.system.mapper.lawyers.stat.ReportMapper;
 import ai.lawyers.system.service.lawyers.stat.IReportService;
@@ -18,7 +19,8 @@ import ai.lawyers.system.service.lawyers.stat.IReportService;
 /**
  * 独立多维统计报表 Service 实现（P3-D6）
  *
- * <p>全部实时聚合现有业务表；P0-2 起 Excel 列定义与 POI 输出从 Controller 下沉至本类。</p>
+ * <p>P0-2 起四张报表优先读取 ai_stat_minute 分钟预聚合（call.dashboard.preagg-enabled，默认 true），
+ * 关闭时回退业务表实时聚合；Excel 列定义与 POI 输出同样在本类。</p>
  *
  * @author ai-lawyers
  */
@@ -28,28 +30,43 @@ public class ReportServiceImpl implements IReportService
     @Autowired
     private ReportMapper reportMapper;
 
+    /** 是否读取分钟预聚合表（与大屏共用开关），关闭回退实时聚合 */
+    @Value("${call.dashboard.preagg-enabled:true}")
+    private boolean preaggEnabled;
+
     @Override
     public List<Map<String, Object>> callReport(String beginTime, String endTime, String granularity)
     {
-        return reportMapper.selectCallReport(beginTime, endTime, normalizeGranularity(granularity));
+        String g = normalizeGranularity(granularity);
+        return preaggEnabled
+                ? reportMapper.selectCallReportPreagg(beginTime, endTime, g)
+                : reportMapper.selectCallReport(beginTime, endTime, g);
     }
 
     @Override
     public List<Map<String, Object>> serviceReport(String beginTime, String endTime)
     {
-        return reportMapper.selectServiceReport(beginTime, endTime);
+        return preaggEnabled
+                ? reportMapper.selectServiceReportPreagg(beginTime, endTime)
+                : reportMapper.selectServiceReport(beginTime, endTime);
     }
 
     @Override
     public List<Map<String, Object>> qualityReport(String beginTime, String endTime, String granularity)
     {
-        return reportMapper.selectQualityReport(beginTime, endTime, normalizeGranularity(granularity));
+        String g = normalizeGranularity(granularity);
+        return preaggEnabled
+                ? reportMapper.selectQualityReportPreagg(beginTime, endTime, g)
+                : reportMapper.selectQualityReport(beginTime, endTime, g);
     }
 
     @Override
     public List<Map<String, Object>> businessReport(String beginTime, String endTime, String granularity)
     {
-        return reportMapper.selectBusinessReport(beginTime, endTime, normalizeGranularity(granularity));
+        String g = normalizeGranularity(granularity);
+        return preaggEnabled
+                ? reportMapper.selectBusinessReportPreagg(beginTime, endTime, g)
+                : reportMapper.selectBusinessReport(beginTime, endTime, g);
     }
 
     /** 粒度白名单：仅允许 day/week/month，非法值回退 day（防 SQL 片段注入） */

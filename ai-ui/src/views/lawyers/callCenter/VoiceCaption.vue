@@ -277,6 +277,9 @@ export default {
         case 'copilot_tickets':
           this.$emit('copilot-tickets', msg)
           break
+        case 'copilot_actions':
+          this.$emit('copilot-actions', msg)
+          break
         default:
           break
       }

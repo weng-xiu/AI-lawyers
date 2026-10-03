@@ -44,3 +44,60 @@ export function exportQuality(query) {
     params: query
   })
 }
+
+// ========== P1-7：质检申诉 ==========
+
+// 被检坐席本人发起申诉
+export function appealQuality(inspectionId, appealReason) {
+  return request({
+    url: '/lawyers/quality/appeal/' + inspectionId,
+    method: 'post',
+    params: { appealReason: appealReason }
+  })
+}
+
+// 班组长复核申诉（2维持 / 3改分）
+export function reviewAppeal(data) {
+  return request({
+    url: '/lawyers/quality/appeal/review',
+    method: 'put',
+    data: data
+  })
+}
+
+// ========== P1-7：质检模板 ==========
+
+// 查询质检模板列表
+export function listQualityTemplate(query) {
+  return request({
+    url: '/lawyers/quality/template/list',
+    method: 'get',
+    params: query
+  })
+}
+
+// 新增质检模板
+export function addQualityTemplate(data) {
+  return request({
+    url: '/lawyers/quality/template',
+    method: 'post',
+    data: data
+  })
+}
+
+// 修改质检模板
+export function updateQualityTemplate(data) {
+  return request({
+    url: '/lawyers/quality/template',
+    method: 'put',
+    data: data
+  })
+}
+
+// 设为唯一生效默认模板
+export function setDefaultQualityTemplate(templateId) {
+  return request({
+    url: '/lawyers/quality/template/default/' + templateId,
+    method: 'put'
+  })
+}

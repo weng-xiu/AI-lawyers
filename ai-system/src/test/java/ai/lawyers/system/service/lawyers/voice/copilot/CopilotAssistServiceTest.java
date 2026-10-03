@@ -147,6 +147,11 @@ class CopilotAssistServiceTest
         assertThat(r.getTickets()).hasSize(1);
         assertThat(r.getTickets().get(0).getTicketId()).isEqualTo(7L);
         assertThat(r.getTickets().get(0).getStatus()).isEqualTo("2");
+        // P1-8 建议动作：createTicket 草稿 + 基于相似工单 Top1 的 queryTicket
+        assertThat(r.getActions()).hasSize(2);
+        assertThat(r.getActions().get(0).getAction()).isEqualTo("createTicket");
+        assertThat(r.getActions().get(1).getAction()).isEqualTo("queryTicket");
+        assertThat(r.getActions().get(1).getPayload()).containsEntry("ticketId", 7L);
         verify(metrics).incrementCopilotAssist();
     }
 

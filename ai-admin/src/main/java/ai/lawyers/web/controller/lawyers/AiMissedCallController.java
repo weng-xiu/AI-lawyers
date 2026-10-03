@@ -51,8 +51,8 @@ public class AiMissedCallController extends BaseController
     @Autowired
     private IAiCallTicketService aiCallTicketService;
 
-    /** 语音留言录音文件基础路径，默认复用 FreeSWITCH 录音目录 */
-    @Value("${call.recording.base-path:C:/Program Files/FreeSWITCH/recordings}")
+    /** 语音留言录音文件基础路径，默认复用录音目录（相对工作目录，生产由 CALL_RECORDING_BASE_PATH 指定） */
+    @Value("${call.recording.base-path:recordings}")
     private String recordingBasePath;
 
     @PreAuthorize("@ss.hasPermi('lawyers:call:missed:list')")

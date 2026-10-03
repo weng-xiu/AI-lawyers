@@ -218,7 +218,7 @@ public class AiQualityInspectionController extends BaseController
         {
             return AjaxResult.error("质检模板不存在");
         }
-        if ("1".equals(template.getStatus()))
+        if (!"1".equals(template.getStatus()))
         {
             return AjaxResult.error("停用状态的模板不能设为生效模板");
         }

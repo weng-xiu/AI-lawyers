@@ -36,10 +36,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </select>
 
     <!--
-      P0-2：呼叫汇总预聚合版。
-      四项计数来自 ai_stat_minute（call_total/answered/missed/transferred，口径与实时版一致），
-      avgDuration/outboundCalls/avgQueueWaitMs/abandonRate 仍来自原有表实时聚合。
-      注意：统计区间须为物化表已覆盖范围（可用 /lawyers/report/stat/backfill 回填历史）。
+      P0-2：呼叫汇总预聚合版（已完全脱离业务表扫描，全部取自 ai_stat_minute）。
+      计数：call_total/answered/missed/transferred；
+      平均通话时长 = answered_duration_sum / call_answered（口径=仅接通 status='1'，与实时版一致）；
+      外呼 = outbound_total；
+      平均排队等待 = queue_wait_ms_sum / queue_wait_count；
+      放弃率 = queue_abandon / queue_total * 100。
+      注意：统计区间须为物化表已覆盖范围（可用 /lawyers/report/stat/backfill 回填历史；
+      回填前的历史分钟缺少新指标，对应派生值按 0 计）。
     -->
     <select id="selectCallSummaryPreagg" resultType="map">
         select
@@ -55,18 +59,30 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                (select ifnull(sum(metric_value), 0) from ai_stat_minute
                  where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
                    and dimension = 'ALL' and metric_key = 'call_transferred') as transferredCalls,
-               ifnull(round(avg(case when status = '1' then duration end), 0), 0) as avgDuration,
-               ifnull((select count(*) from ai_call_dial_log
-                        where create_time &gt;= #{beginTime} and create_time &lt; #{endTime}), 0) as outboundCalls,
-               ifnull((select round(avg(queue_wait_ms), 0) from ai_call_dial_log
-                        where create_time &gt;= #{beginTime} and create_time &lt; #{endTime}
-                          and queue_wait_ms is not null), 0) as avgQueueWaitMs,
-               ifnull((select round(
-                           sum(case when queue_status = '3' then 1 else 0 end) / nullif(count(*), 0) * 100, 2)
-                        from ai_call_queue
-                        where enqueue_time &gt;= #{beginTime} and enqueue_time &lt; #{endTime}), 0) as abandonRate
-        from ai_call_record
-        where call_time &gt;= #{beginTime} and call_time &lt; #{endTime}
+               (select ifnull(round(sum(metric_value) / nullif(
+                           (select sum(metric_value) from ai_stat_minute
+                             where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                               and dimension = 'ALL' and metric_key = 'call_answered'), 0), 0), 0)
+                 from ai_stat_minute
+                 where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                   and dimension = 'ALL' and metric_key = 'answered_duration_sum') as avgDuration,
+               (select ifnull(sum(metric_value), 0) from ai_stat_minute
+                 where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                   and dimension = 'ALL' and metric_key = 'outbound_total') as outboundCalls,
+               (select ifnull(round(sum(metric_value) / nullif(
+                           (select sum(metric_value) from ai_stat_minute
+                             where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                               and dimension = 'ALL' and metric_key = 'queue_wait_count'), 0), 0), 0)
+                 from ai_stat_minute
+                 where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                   and dimension = 'ALL' and metric_key = 'queue_wait_ms_sum') as avgQueueWaitMs,
+               (select ifnull(round(sum(metric_value) / nullif(
+                           (select sum(metric_value) from ai_stat_minute
+                             where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                               and dimension = 'ALL' and metric_key = 'queue_total'), 0) * 100, 2), 0)
+                 from ai_stat_minute
+                 where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                   and dimension = 'ALL' and metric_key = 'queue_abandon') as abandonRate
     </select>
 
     <!-- P0-2：呼叫趋势预聚合版——分钟级物化数据按小时上卷，字段契约与实时版完全一致 -->
@@ -82,6 +98,134 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           and metric_key in ('call_total', 'call_answered', 'call_missed', 'call_transferred')
         group by date_format(stat_time, '%Y-%m-%d %H:00')
         order by timeLabel
+    </select>
+
+    <!--
+      ============================ P0-2 其余大屏模块预聚合版 ============================
+      维度行命名：category:xx(未分类=NONE) / lang:xx / line:xx / channel:xx / agent:xx。
+      仅输出有活动的维度行；历史区间需先 backfill。
+    -->
+
+    <!-- 咨询分类占比：category:* 维度 call_total，关联分类表取名（NONE/缺名→未分类） -->
+    <select id="selectCategoryPiePreagg" resultType="map">
+        select case when dimension = 'category:NONE' then '未分类'
+                    else ifnull(c.category_name, '未分类') end as name,
+               sum(metric_value) as value
+        from ai_stat_minute
+        left join ai_consultation_category c on concat('category:', c.category_id) = dimension
+        where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+          and metric_key = 'call_total' and dimension like 'category:%'
+        group by dimension, c.category_name
+        order by value desc
+    </select>
+
+    <!-- 话单满意度：映射分合计 / 评价条数 -->
+    <select id="selectSatisfactionSummaryPreagg" resultType="map">
+        select ifnull(round(
+                 (select ifnull(sum(metric_value), 0) from ai_stat_minute
+                   where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                     and dimension = 'ALL' and metric_key = 'satisfaction_score_sum')
+                 / nullif(
+                   (select sum(metric_value) from ai_stat_minute
+                     where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                       and dimension = 'ALL' and metric_key = 'satisfaction_count'), 0), 0), 0)
+               as avgSatisfaction
+    </select>
+
+    <!-- SLA 汇总：阈值固定 20 秒，字段契约与实时版一致 -->
+    <select id="selectSlaSummaryPreagg" resultType="map">
+        select
+               (select ifnull(sum(metric_value), 0) from ai_stat_minute
+                 where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                   and dimension = 'ALL' and metric_key = 'queue_total') as totalQueued,
+               (select ifnull(sum(metric_value), 0) from ai_stat_minute
+                 where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                   and dimension = 'ALL' and metric_key = 'queue_answered') as answeredCount,
+               (select ifnull(sum(metric_value), 0) from ai_stat_minute
+                 where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                   and dimension = 'ALL' and metric_key = 'queue_within20') as withinThreshold,
+               (select ifnull(sum(metric_value), 0) from ai_stat_minute
+                 where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                   and dimension = 'ALL' and metric_key = 'queue_abandon') as abandonedCount,
+               (select ifnull(round(sum(metric_value) / nullif(
+                           (select sum(metric_value) from ai_stat_minute
+                             where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                               and dimension = 'ALL' and metric_key = 'queue_answered'), 0), 1), 0)
+                 from ai_stat_minute
+                 where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                   and dimension = 'ALL' and metric_key = 'queue_answered_wait_sum') as avgWaitSec,
+               20 as thresholdSeconds
+    </select>
+
+    <!-- 语种分布：lang:* 维度 call_total（substring 去掉 'lang:' 前缀，冒号在第 5 位） -->
+    <select id="selectLanguageDistPreagg" resultType="map">
+        select substring(dimension, 6) as lang, sum(metric_value) as value
+        from ai_stat_minute
+        where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+          and metric_key = 'call_total' and dimension like 'lang:%'
+        group by dimension
+        order by value desc
+    </select>
+
+    <!-- 条线转办：line:* 维度三指标，平均办结分钟 = close_sec_sum/closed_count/60 -->
+    <select id="selectTransferLineStatsPreagg" resultType="map">
+        select substring(dimension, 6) as line,
+               sum(case when metric_key = 'transfer_total' then metric_value else 0 end) as transferCount,
+               sum(case when metric_key = 'closed_count' then metric_value else 0 end) as closedCount,
+               ifnull(round(sum(case when metric_key = 'close_sec_sum' then metric_value else 0 end)
+                   / nullif(sum(case when metric_key = 'closed_count' then metric_value else 0 end), 0) / 60, 1), 0)
+                   as avgCloseMinutes
+        from ai_stat_minute
+        where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+          and dimension like 'line:%'
+        group by dimension
+        order by transferCount desc
+    </select>
+
+    <!-- 渠道活跃：channel:* 维度 session_total（冒号在第 8 位） -->
+    <select id="selectChannelSessionsPreagg" resultType="map">
+        select substring(dimension, 9) as channel, sum(metric_value) as value
+        from ai_stat_minute
+        where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+          and metric_key = 'session_total' and dimension like 'channel:%'
+        group by dimension
+        order by value desc
+    </select>
+
+    <!-- 公众端满意度：eval_* 计数与四维均分（评价为必填项，sum 按 eval_total 求均） -->
+    <select id="selectPortalSatisfactionPreagg" resultType="map">
+        select
+               (select ifnull(sum(metric_value), 0) from ai_stat_minute
+                 where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                   and dimension = 'ALL' and metric_key = 'eval_total') as evalCount,
+               (select ifnull(round(sum(metric_value) / nullif(
+                           (select sum(metric_value) from ai_stat_minute
+                             where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                               and dimension = 'ALL' and metric_key = 'eval_total'), 0), 1), 0)
+                 from ai_stat_minute
+                 where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                   and dimension = 'ALL' and metric_key = 'eval_overall_sum') as avgOverall,
+               (select ifnull(round(sum(metric_value) / nullif(
+                           (select sum(metric_value) from ai_stat_minute
+                             where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                               and dimension = 'ALL' and metric_key = 'eval_total'), 0), 1), 0)
+                 from ai_stat_minute
+                 where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                   and dimension = 'ALL' and metric_key = 'eval_professionalism_sum') as avgProfessionalism,
+               (select ifnull(round(sum(metric_value) / nullif(
+                           (select sum(metric_value) from ai_stat_minute
+                             where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                               and dimension = 'ALL' and metric_key = 'eval_total'), 0), 1), 0)
+                 from ai_stat_minute
+                 where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                   and dimension = 'ALL' and metric_key = 'eval_responsiveness_sum') as avgResponsiveness,
+               (select ifnull(round(sum(metric_value) / nullif(
+                           (select sum(metric_value) from ai_stat_minute
+                             where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                               and dimension = 'ALL' and metric_key = 'eval_total'), 0), 1), 0)
+                 from ai_stat_minute
+                 where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+                   and dimension = 'ALL' and metric_key = 'eval_quality_sum') as avgQuality
     </select>
 
     <select id="selectCategoryPie" resultType="map">

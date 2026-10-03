@@ -58,6 +58,9 @@ final class VoiceFrames
     /** F4：Copilot 相似工单 */
     static final String T_COPILOT_TICKETS = "copilot_tickets";
 
+    /** P1-8：Copilot 建议动作（createTicket/queryTicket 白名单草稿） */
+    static final String T_COPILOT_ACTIONS = "copilot_actions";
+
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private VoiceFrames()
@@ -200,6 +203,15 @@ final class VoiceFrames
         Map<String, Object> m = base(T_COPILOT_TICKETS);
         m.put("seq", seq);
         m.put("tickets", tickets == null ? java.util.Collections.emptyList() : tickets);
+        return write(m);
+    }
+
+    /** P1-8：建议动作帧（actions 元素含 action/label/payload） */
+    static String copilotActions(long seq, java.util.List<Map<String, Object>> actions)
+    {
+        Map<String, Object> m = base(T_COPILOT_ACTIONS);
+        m.put("seq", seq);
+        m.put("actions", actions == null ? java.util.Collections.emptyList() : actions);
         return write(m);
     }
 

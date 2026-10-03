@@ -274,6 +274,21 @@ public class CopilotAssistService
         actions.add(new CopilotAssistResult.SuggestedAction(
                 "createTicket", "确认建单（草稿可修改）", payload));
         result.setActions(actions);
+
+        // queryTicket：存在相似工单时，取 Top1 作为"查询该工单办理进度"候选（坐席确认后调进度接口）
+        if (!result.getTickets().isEmpty())
+        {
+            CopilotTicket top = result.getTickets().get(0);
+            if (top != null && top.getTicketId() != null)
+            {
+                java.util.Map<String, Object> queryPayload = new java.util.LinkedHashMap<>();
+                queryPayload.put("ticketId", top.getTicketId());
+                queryPayload.put("ticketNo", top.getTicketNo());
+                queryPayload.put("title", top.getTitle());
+                actions.add(new CopilotAssistResult.SuggestedAction(
+                        "queryTicket", "查询工单进度", queryPayload));
+            }
+        }
     }
 
     private List<String> toStringList(JsonNode array)

@@ -81,6 +81,19 @@
                 </span>
               </div>
             </div>
+
+            <!-- P1-8：代执行白名单动作（人工确认，模型不直接落库） -->
+            <div v-if="copilot.actions && copilot.actions.length" class="cp-block">
+              <div class="cp-sub-title"><i class="el-icon-magic-stick"></i> 建议操作（需您确认）</div>
+              <div class="cp-action-btns">
+                <el-button v-for="act in copilot.actions" :key="act.action + (act.payload && act.payload.ticketId)"
+                           size="mini" :type="act.action === 'createTicket' ? 'success' : 'primary'" plain
+                           icon="el-icon-document-add"
+                           @click="handleSuggestedAction(act)">
+                  {{ act.label }}
+                </el-button>
+              </div>
+            </div>
           </div>
 
           <!-- 意图识别 -->
@@ -149,12 +162,58 @@
                    @click="adoptOpenedLaw">采用并关闭</el-button>
       </span>
     </el-dialog>
+
+    <!-- P1-8：确认建单弹窗（草稿可改，提交白名单字段） -->
+    <el-dialog title="确认建单（草稿可修改）" :visible.sync="ticketDialogVisible" width="560px" append-to-body>
+      <el-form ref="ticketForm" :model="ticketForm" :rules="ticketRules" label-width="80px">
+        <el-form-item label="工单标题" prop="title">
+          <el-input v-model="ticketForm.title" placeholder="请输入工单标题" />
+        </el-form-item>
+        <el-form-item label="优先级" prop="priority">
+          <el-radio-group v-model="ticketForm.priority">
+            <el-radio label="1">紧急</el-radio>
+            <el-radio label="2">普通</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="工单内容" prop="content">
+          <el-input v-model="ticketForm.content" type="textarea" :rows="5"
+                    placeholder="AI 已预填诉求与关键事实，请核对修改" />
+        </el-form-item>
+      </el-form>
+      <span slot="footer">
+        <el-button @click="ticketDialogVisible = false">取 消</el-button>
+        <el-button type="primary" :loading="ticketSubmitting" @click="submitCreateTicket">确认提交</el-button>
+      </span>
+    </el-dialog>
+
+    <!-- P1-8：工单进度播报弹窗 -->
+    <el-dialog title="工单办理进度" :visible.sync="progressDialogVisible" width="560px" append-to-body>
+      <div v-loading="progressLoading">
+        <template v-if="progressData">
+          <el-descriptions :column="1" border size="small">
+            <el-descriptions-item label="工单号">{{ progressData.ticketNo || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="工单标题">{{ progressData.title || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="当前状态">
+              <el-tag size="mini" :type="ticketStatusTag(progressData.status)">{{ progressData.statusName }}</el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item v-if="progressData.assignUserName" label="办理人">{{ progressData.assignUserName }}</el-descriptions-item>
+            <el-descriptions-item v-if="progressData.processContent" label="最近办理">{{ progressData.processContent }}</el-descriptions-item>
+          </el-descriptions>
+          <div class="cp-speech-label"><i class="el-icon-microphone"></i> 可播报话术</div>
+          <div class="cp-speech">{{ progressData.speech }}</div>
+        </template>
+      </div>
+      <span slot="footer">
+        <el-button @click="progressDialogVisible = false">关 闭</el-button>
+        <el-button type="primary" @click="copySpeech">复制话术</el-button>
+      </span>
+    </el-dialog>
   </div>
 </template>
 
 <script>
 import { getAiAssistByRecord, analyzeAiAssist, summarizeAiAssist } from '@/api/lawyers/aiAssist'
-import { copilotFeedback, getCopilotChunk } from '@/api/lawyers/copilot'
+import { copilotFeedback, getCopilotChunk, createCopilotTicket, queryCopilotTicket } from '@/api/lawyers/copilot'
 
 export default {
   name: 'AiAssistPanel',
@@ -184,7 +243,20 @@ export default {
       lawDialogVisible: false,
       lawLoading: false,
       lawDetail: null,
-      openedChunkId: null
+      openedChunkId: null,
+      // P1-8：确认建单
+      ticketDialogVisible: false,
+      ticketSubmitting: false,
+      ticketForm: {},
+      ticketRules: {
+        title: [{ required: true, message: '请输入工单标题', trigger: 'blur' }],
+        priority: [{ required: true, message: '请选择优先级', trigger: 'change' }],
+        content: [{ required: true, message: '请输入工单内容', trigger: 'blur' }]
+      },
+      // P1-8：工单进度
+      progressDialogVisible: false,
+      progressLoading: false,
+      progressData: null
     }
   },
   computed: {
@@ -300,6 +372,73 @@ export default {
     },
     ticketStatusTag(s) {
       return { '0': 'info', '1': 'warning', '2': 'success', '3': '' }[s] || 'info'
+    },
+
+    /* ================= P1-8：代执行（确认建单 / 查工单进度） ================= */
+
+    handleSuggestedAction(act) {
+      if (!act || !act.action) return
+      if (act.action === 'createTicket') {
+        const p = act.payload || {}
+        this.ticketForm = {
+          title: p.title || '',
+          content: p.content || '',
+          priority: p.priority || '2',
+          recordId: p.recordId != null ? p.recordId : (this.recordId ? Number(this.recordId) : null)
+        }
+        this.ticketDialogVisible = true
+        this.$nextTick(() => this.$refs.ticketForm && this.$refs.ticketForm.clearValidate())
+      } else if (act.action === 'queryTicket') {
+        const ticketId = act.payload && act.payload.ticketId
+        if (!ticketId) {
+          this.$message.warning('缺少工单ID')
+          return
+        }
+        this.loadProgress(ticketId)
+      }
+    },
+    submitCreateTicket() {
+      this.$refs.ticketForm.validate(valid => {
+        if (!valid) return
+        this.ticketSubmitting = true
+        createCopilotTicket({
+          title: this.ticketForm.title.trim(),
+          content: this.ticketForm.content.trim(),
+          priority: this.ticketForm.priority,
+          recordId: this.ticketForm.recordId
+        }).then(res => {
+          this.$message.success('工单已创建：' + ((res.data && res.data.ticketNo) || ''))
+          this.ticketDialogVisible = false
+        }).catch(() => {}).finally(() => { this.ticketSubmitting = false })
+      })
+    },
+    loadProgress(ticketId) {
+      this.progressData = null
+      this.progressDialogVisible = true
+      this.progressLoading = true
+      queryCopilotTicket(ticketId).then(res => {
+        this.progressData = res.data || null
+      }).catch(() => {
+        this.progressData = null
+      }).finally(() => { this.progressLoading = false })
+    },
+    copySpeech() {
+      if (!this.progressData || !this.progressData.speech) return
+      const text = this.progressData.speech
+      const done = () => this.$message.success('话术已复制')
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(() => this.fallbackCopy(text, done))
+      } else {
+        this.fallbackCopy(text, done)
+      }
+    },
+    fallbackCopy(text, done) {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      document.body.appendChild(ta)
+      ta.select()
+      try { document.execCommand('copy'); done() } catch (e) { /* 忽略 */ }
+      document.body.removeChild(ta)
     }
   }
 }
@@ -343,4 +482,8 @@ export default {
 .cp-ticket-snippet { color: #5A6A7E; font-size: 12px; line-height: 1.6; margin-bottom: 2px; }
 .cp-law-content { margin-top: 12px; max-height: 320px; overflow-y: auto;
   background: #f7f9fc; border-radius: 4px; padding: 10px; font-size: 13px; line-height: 1.8; color: #33415c; white-space: pre-wrap; }
+.cp-action-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.cp-speech-label { font-size: 12px; font-weight: 600; color: #1F2A3A; margin: 12px 0 6px; }
+.cp-speech { background: #f3f8f4; border: 1px solid #d6e9dc; border-radius: 4px;
+  padding: 10px; font-size: 13px; line-height: 1.8; color: #2b6e4f; white-space: pre-wrap; }
 </style>

@@ -70,4 +70,85 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by period
     </select>
 
+    <!--
+      ============================ P0-2 报表预聚合版（读 ai_stat_minute） ============================
+      半开区间 stat_time ∈ [beginTime, endTime+1天)，周期标签按 stat_time 分组；
+      仅统计有活动的维度；历史区间需先 backfill。
+    -->
+
+    <!-- 呼叫报表预聚合 -->
+    <select id="selectCallReportPreagg" resultType="map">
+        select <include refid="periodLabel"><property name="col" value="stat_time"/></include> as period,
+               sum(case when metric_key = 'call_total' then metric_value else 0 end) as totalCalls,
+               sum(case when metric_key = 'call_answered' then metric_value else 0 end) as answeredCalls,
+               sum(case when metric_key = 'call_missed' then metric_value else 0 end) as missedCalls,
+               sum(case when metric_key = 'call_transferred' then metric_value else 0 end) as transferredCalls,
+               round(sum(case when metric_key = 'call_answered' then metric_value else 0 end)
+                   / nullif(sum(case when metric_key = 'call_total' then metric_value else 0 end), 0) * 100, 2) as answerRate,
+               ifnull(round(sum(case when metric_key = 'answered_duration_sum' then metric_value else 0 end)
+                   / nullif(sum(case when metric_key = 'call_answered' then metric_value else 0 end), 0), 0), 0) as avgDurationSec
+        from ai_stat_minute
+        where stat_time &gt;= #{beginTime} and stat_time &lt; date_add(#{endTime}, interval 1 day)
+          and dimension = 'ALL'
+          and metric_key in ('call_total', 'call_answered', 'call_missed', 'call_transferred', 'answered_duration_sum')
+        group by period
+        order by period
+    </select>
+
+    <!-- 坐席服务报表预聚合：agent:* 维度，关联坐席表取名 -->
+    <select id="selectServiceReportPreagg" resultType="map">
+        select cast(substring(sm.dimension, 7) as unsigned) as agentId,
+               ifnull(a.agent_name, concat('坐席', substring(sm.dimension, 7))) as agentName,
+               sum(case when sm.metric_key = 'call_total' then sm.metric_value else 0 end) as totalCalls,
+               sum(case when sm.metric_key = 'call_answered' then sm.metric_value else 0 end) as answeredCalls,
+               round(sum(case when sm.metric_key = 'call_answered' then sm.metric_value else 0 end)
+                   / nullif(sum(case when sm.metric_key = 'call_total' then sm.metric_value else 0 end), 0) * 100, 2) as answerRate,
+               ifnull(round(sum(case when sm.metric_key = 'answered_duration_sum' then sm.metric_value else 0 end)
+                   / nullif(sum(case when sm.metric_key = 'call_answered' then sm.metric_value else 0 end), 0), 0), 0) as avgDurationSec,
+               ifnull(sum(case when sm.metric_key = 'answered_duration_sum' then sm.metric_value else 0 end), 0) as totalTalkSec
+        from ai_stat_minute sm
+        left join ai_call_agent_status a on concat('agent:', a.agent_id) = sm.dimension
+        where sm.stat_time &gt;= #{beginTime} and sm.stat_time &lt; date_add(#{endTime}, interval 1 day)
+          and sm.dimension like 'agent:%'
+          and sm.metric_key in ('call_total', 'call_answered', 'answered_duration_sum')
+        group by sm.dimension, a.agent_name
+        order by totalCalls desc
+    </select>
+
+    <!-- 质检报表预聚合 -->
+    <select id="selectQualityReportPreagg" resultType="map">
+        select <include refid="periodLabel"><property name="col" value="stat_time"/></include> as period,
+               sum(case when metric_key = 'quality_total' then metric_value else 0 end) as inspections,
+               ifnull(round(sum(case when metric_key = 'quality_score_sum' then metric_value else 0 end)
+                   / nullif(sum(case when metric_key = 'quality_score_count' then metric_value else 0 end), 0), 2), 0) as avgScore,
+               sum(case when metric_key = 'quality_reviewed' then metric_value else 0 end) as reviewedCount,
+               sum(case when metric_key = 'quality_pending' then metric_value else 0 end) as pendingCount,
+               sum(case when metric_key = 'quality_risk' then metric_value else 0 end) as riskCount
+        from ai_stat_minute
+        where stat_time &gt;= #{beginTime} and stat_time &lt; date_add(#{endTime}, interval 1 day)
+          and dimension = 'ALL'
+          and metric_key in ('quality_total', 'quality_score_sum', 'quality_score_count',
+                             'quality_reviewed', 'quality_pending', 'quality_risk')
+        group by period
+        order by period
+    </select>
+
+    <!-- 业务工单报表预聚合 -->
+    <select id="selectBusinessReportPreagg" resultType="map">
+        select <include refid="periodLabel"><property name="col" value="stat_time"/></include> as period,
+               sum(case when metric_key = 'ticket_total' then metric_value else 0 end) as totalTickets,
+               sum(case when metric_key = 'ticket_closed' then metric_value else 0 end) as closedTickets,
+               round(sum(case when metric_key = 'ticket_closed' then metric_value else 0 end)
+                   / nullif(sum(case when metric_key = 'ticket_total' then metric_value else 0 end), 0) * 100, 2) as closeRate,
+               sum(case when metric_key = 'ticket_overdue' then metric_value else 0 end) as overdueTickets,
+               ifnull(round(sum(case when metric_key = 'ticket_close_sec_sum' then metric_value else 0 end)
+                   / nullif(sum(case when metric_key = 'ticket_closed' then metric_value else 0 end), 0) / 60, 1), 0) as avgCloseMinutes
+        from ai_stat_minute
+        where stat_time &gt;= #{beginTime} and stat_time &lt; date_add(#{endTime}, interval 1 day)
+          and dimension = 'ALL'
+          and metric_key in ('ticket_total', 'ticket_closed', 'ticket_overdue', 'ticket_close_sec_sum')
+        group by period
+        order by period
+    </select>
+
 </mapper>

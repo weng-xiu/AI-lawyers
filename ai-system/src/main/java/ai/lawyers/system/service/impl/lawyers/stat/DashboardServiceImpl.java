@@ -54,14 +54,23 @@ public class DashboardServiceImpl implements IDashboardService
             data.put("callSummary", nullToEmpty(dashboardMapper.selectCallSummary(beginTime, endTime)));
             data.put("callTrend", nullToEmptyList(dashboardMapper.selectCallTrend(beginTime, endTime)));
         }
-        data.put("categoryPie", nullToEmptyList(dashboardMapper.selectCategoryPie(beginTime, endTime)));
+        if (preaggEnabled)
+        {
+            data.put("categoryPie", nullToEmptyList(dashboardMapper.selectCategoryPiePreagg(beginTime, endTime)));
+            data.put("satisfactionSummary", nullToEmpty(dashboardMapper.selectSatisfactionSummaryPreagg(beginTime, endTime)));
+            data.put("slaSummary", buildSlaSummaryPreagg(beginTime, endTime));
+        }
+        else
+        {
+            data.put("categoryPie", nullToEmptyList(dashboardMapper.selectCategoryPie(beginTime, endTime)));
+            data.put("satisfactionSummary", nullToEmpty(dashboardMapper.selectSatisfactionSummary(beginTime, endTime)));
+            data.put("slaSummary", buildSlaSummary(beginTime, endTime));
+        }
         data.put("aiRatio", nullToEmpty(dashboardMapper.selectAiRatio(beginTime, endTime)));
         data.put("agentLoad", nullToEmptyList(dashboardMapper.selectAgentLoad()));
         data.put("queueNow", nullToEmptyList(dashboardMapper.selectQueueNow()));
         data.put("outboundProgress", nullToEmptyList(dashboardMapper.selectOutboundProgress()));
         data.put("agentStatusSummary", nullToEmpty(dashboardMapper.selectAgentStatusSummary()));
-        data.put("satisfactionSummary", nullToEmpty(dashboardMapper.selectSatisfactionSummary(beginTime, endTime)));
-        data.put("slaSummary", buildSlaSummary(beginTime, endTime));
         data.put("agentStatusDuration", buildAgentStatusDuration(beginTime, endTime));
         data.put("bizMetrics", buildBizMetrics(beginTime, endTime));
         return data;
@@ -82,7 +91,10 @@ public class DashboardServiceImpl implements IDashboardService
         langNames.put("zh-CN", "普通话");
         langNames.put("yue-CN", "粤语");
         List<Map<String, Object>> langDist = new java.util.ArrayList<>();
-        for (Map<String, Object> row : nullToEmptyList(dashboardMapper.selectLanguageDist(beginTime, endTime)))
+        List<Map<String, Object>> langRows = preaggEnabled
+                ? dashboardMapper.selectLanguageDistPreagg(beginTime, endTime)
+                : dashboardMapper.selectLanguageDist(beginTime, endTime);
+        for (Map<String, Object> row : nullToEmptyList(langRows))
         {
             Map<String, Object> item = new LinkedHashMap<>();
             String lang = str(row.get("lang"));
@@ -112,7 +124,10 @@ public class DashboardServiceImpl implements IDashboardService
         lineNames.put("ARBITRATION", "仲裁");
         lineNames.put("HOTLINE_12345", "12345协同");
         List<Map<String, Object>> lines = new java.util.ArrayList<>();
-        for (Map<String, Object> row : nullToEmptyList(dashboardMapper.selectTransferLineStats(beginTime, endTime)))
+        List<Map<String, Object>> lineRows = preaggEnabled
+                ? dashboardMapper.selectTransferLineStatsPreagg(beginTime, endTime)
+                : dashboardMapper.selectTransferLineStats(beginTime, endTime);
+        for (Map<String, Object> row : nullToEmptyList(lineRows))
         {
             Map<String, Object> item = new LinkedHashMap<>(row);
             String line = str(row.get("line"));
@@ -131,11 +146,15 @@ public class DashboardServiceImpl implements IDashboardService
         channelNames.put("WECHAT_MINI", "微信小程序");
         channelNames.put("H5", "H5页面");
         channelNames.put("WEB", "网站");
-        biz.put("channelSessions", withChannelName(dashboardMapper.selectChannelSessions(beginTime, endTime), channelNames));
+        biz.put("channelSessions", withChannelName(
+                preaggEnabled ? dashboardMapper.selectChannelSessionsPreagg(beginTime, endTime)
+                              : dashboardMapper.selectChannelSessions(beginTime, endTime), channelNames));
         biz.put("channelBinds", withChannelName(dashboardMapper.selectChannelBinds(), channelNames));
 
         // 公众端满意度（图文四维评价）
-        biz.put("portalSatisfaction", nullToEmpty(dashboardMapper.selectPortalSatisfaction(beginTime, endTime)));
+        biz.put("portalSatisfaction", preaggEnabled
+                ? nullToEmpty(dashboardMapper.selectPortalSatisfactionPreagg(beginTime, endTime))
+                : nullToEmpty(dashboardMapper.selectPortalSatisfaction(beginTime, endTime)));
 
         // Copilot 建议采纳率（F4：埋点已接通，total/adoptCount/modifyCount/ignoreCount/adoptRate）
         biz.put("copilotAdoption", copilotFeedbackService.adoptionTotal(beginTime, endTime));
@@ -164,6 +183,24 @@ public class DashboardServiceImpl implements IDashboardService
     {
         Map<String, Object> sla = nullToEmpty(
                 dashboardMapper.selectSlaSummary(beginTime, endTime, DEFAULT_SLA_THRESHOLD_SECONDS));
+        long answered = toLong(sla.get("answeredCount"));
+        long within = toLong(sla.get("withinThreshold"));
+        long abandoned = toLong(sla.get("abandonedCount"));
+        long totalQueued = toLong(sla.get("totalQueued"));
+        sla.put("serviceLevel", answered > 0
+                ? Math.round(within * 10000d / answered) / 100d : 0d);
+        sla.put("abandonRate", totalQueued > 0
+                ? Math.round(abandoned * 10000d / totalQueued) / 100d : 0d);
+        return sla;
+    }
+
+    /**
+     * P0-2 SLA 汇总预聚合版：字段与 {@link #buildSlaSummary} 同构，
+     * 数据源为 ai_stat_minute（阈值固定 20 秒）。
+     */
+    private Map<String, Object> buildSlaSummaryPreagg(Date beginTime, Date endTime)
+    {
+        Map<String, Object> sla = nullToEmpty(dashboardMapper.selectSlaSummaryPreagg(beginTime, endTime));
         long answered = toLong(sla.get("answeredCount"));
         long within = toLong(sla.get("withinThreshold"));
         long abandoned = toLong(sla.get("abandonedCount"));
