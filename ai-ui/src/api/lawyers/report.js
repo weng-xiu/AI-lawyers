@@ -35,3 +35,21 @@ export function getBusinessReport(query) {
     params: query
   })
 }
+
+// 提交分钟级物化回填任务（异步），返回任务ID
+export function statBackfill(query) {
+  return request({
+    url: '/lawyers/report/stat/backfill',
+    method: 'post',
+    params: query
+  })
+}
+
+// 查询分钟物化回填任务进度
+export function statBackfillProgress(taskId) {
+  return request({
+    url: '/lawyers/report/stat/backfill/progress',
+    method: 'get',
+    params: { taskId }
+  })
+}

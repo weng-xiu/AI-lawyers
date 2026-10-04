@@ -13,7 +13,7 @@ import ai.lawyers.common.core.controller.BaseController;
 import ai.lawyers.common.core.domain.AjaxResult;
 import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.system.service.lawyers.stat.IReportService;
-import ai.lawyers.system.task.StatMinuteScheduleTask;
+import ai.lawyers.system.service.lawyers.stat.StatBackfillManager;
 
 /**
  * 独立多维统计报表 Controller（P3-D6）
@@ -31,11 +31,11 @@ public class ReportController extends BaseController
     private IReportService reportService;
 
     @Autowired
-    private StatMinuteScheduleTask statMinuteScheduleTask;
+    private StatBackfillManager statBackfillManager;
 
     /**
-     * 分钟级物化表手工回填（P3-F3）：按分钟循环聚合 [beginTime, endTime) 区间。
-     * 区间上限 7 天防误操作长时间占用；幂等覆盖写可重复执行。
+     * 分钟级物化表手工回填：异步任务化——校验后提交后台任务，立即返回 taskId，前端轮询进度。
+     * 半开区间 [beginTime, endTime)，单区间不超过 7 天；分钟聚合幂等覆盖写，中断可重跑。
      */
     @PreAuthorize("@ss.hasPermi('lawyers:report:export')")
     @PostMapping("/stat/backfill")
@@ -49,22 +49,16 @@ public class ReportController extends BaseController
                 java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
         java.time.LocalDateTime end = java.time.LocalDateTime.parse(endTime,
                 java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
-        if (!begin.isBefore(end))
-        {
-            return error("beginTime 必须早于 endTime");
-        }
-        if (begin.isBefore(end.minusDays(7)))
-        {
-            return error("回填区间不能超过 7 天");
-        }
-        int minutes = 0;
-        int rows = 0;
-        for (java.time.LocalDateTime t = begin; t.isBefore(end); t = t.plusMinutes(1))
-        {
-            rows += statMinuteScheduleTask.aggregateMinute(t);
-            minutes++;
-        }
-        return success("回填完成，共聚合 " + minutes + " 分钟、写入/更新 " + rows + " 条指标");
+        String taskId = statBackfillManager.submit(begin, end);
+        return AjaxResult.success("回填任务已提交").put("taskId", taskId);
+    }
+
+    /** 查询分钟物化回填任务进度（RUNNING/SUCCESS/FAILED + 百分比与计数） */
+    @PreAuthorize("@ss.hasPermi('lawyers:report:view')")
+    @GetMapping("/stat/backfill/progress")
+    public AjaxResult statBackfillProgress(String taskId)
+    {
+        return success(statBackfillManager.getProgress(taskId));
     }
 
     /** 呼叫报表 */

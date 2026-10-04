@@ -15,7 +15,7 @@ import org.mockito.MockitoAnnotations;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import ai.lawyers.system.service.lawyers.stat.IReportService;
-import ai.lawyers.system.task.StatMinuteScheduleTask;
+import ai.lawyers.system.service.lawyers.stat.StatBackfillManager;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -31,7 +31,7 @@ public class ReportControllerTest
     private IReportService reportService;
 
     @Mock
-    private StatMinuteScheduleTask statMinuteScheduleTask;
+    private StatBackfillManager statBackfillManager;
 
     private MockMvc mockMvc;
 
@@ -42,7 +42,7 @@ public class ReportControllerTest
         ReportController controller = new ReportController();
         org.springframework.test.util.ReflectionTestUtils.setField(controller, "reportService", reportService);
         org.springframework.test.util.ReflectionTestUtils.setField(controller,
-                "statMinuteScheduleTask", statMinuteScheduleTask);
+                "statBackfillManager", statBackfillManager);
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 
@@ -75,5 +75,28 @@ public class ReportControllerTest
 
         verify(reportService).exportExcel(eq("call"), eq("2026-10-01 00:00:00"),
                 eq("2026-10-01 23:59:59"), eq("day"), any(HttpServletResponse.class));
+    }
+
+    @Test
+    void backfill_delegatesToManager() throws Exception
+    {
+        when(statBackfillManager.submit(any(), any())).thenReturn("task-1");
+
+        mockMvc.perform(post("/lawyers/report/stat/backfill")
+                        .param("beginTime", "2026-10-01 00:00")
+                        .param("endTime", "2026-10-02 00:00"))
+                .andExpect(status().isOk());
+
+        verify(statBackfillManager).submit(any(), any());
+    }
+
+    @Test
+    void backfillProgress_delegatesToManager() throws Exception
+    {
+        mockMvc.perform(get("/lawyers/report/stat/backfill/progress")
+                        .param("taskId", "task-1"))
+                .andExpect(status().isOk());
+
+        verify(statBackfillManager).getProgress("task-1");
     }
 }

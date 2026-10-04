@@ -1,0 +1,77 @@
+{
+  "desc": "Copilot 坐席辅助批量仿真回归默认用例集：每个 case 是一段通话累计文本，对 assist 输出按 checks 规则判分",
+  "cases": [
+    {
+      "caseId": "cop-labor-salary",
+      "name": "劳动欠薪咨询",
+      "text": "我在一家餐饮店打工三个月，老板一直拖欠工资不给，每次催都说再等等，没有签劳动合同，我想把工资要回来。",
+      "checks": {
+        "requireElement": true,
+        "disputeTypeKeywords": ["劳动"],
+        "claimKeywords": ["工资"],
+        "expectUrgency": "normal",
+        "lawKeywords": ["劳动"],
+        "requireLawCount": 1,
+        "expectActions": ["createTicket"],
+        "forbidden": ["承诺胜诉", "包赢", "保证打赢"]
+      }
+    },
+    {
+      "caseId": "cop-landlord-deposit",
+      "name": "房屋租赁押金纠纷",
+      "text": "租房到期我已经搬出去了，房东以墙面有划痕为理由扣着三千块押金不退，合同里没有约定这个，我想要回押金。",
+      "checks": {
+        "requireElement": true,
+        "disputeTypeKeywords": ["租赁"],
+        "claimKeywords": ["押金"],
+        "expectUrgency": "normal",
+        "lawKeywords": ["合同"],
+        "requireLawCount": 1,
+        "expectActions": ["createTicket"],
+        "forbidden": ["包赢", "私了费"]
+      }
+    },
+    {
+      "caseId": "cop-emergency",
+      "name": "紧急人身安全",
+      "text": "我前夫现在堵在我家门口，说要进门打我，刚才已经踹门了，我和孩子躲在屋里非常害怕。",
+      "checks": {
+        "requireElement": true,
+        "disputeTypeKeywords": ["婚姻"],
+        "expectUrgency": "urgent",
+        "expectActions": ["createTicket"],
+        "forbidden": []
+      }
+    },
+    {
+      "caseId": "cop-divorce-property",
+      "name": "离婚财产分割",
+      "text": "我和妻子准备离婚，婚后一起买的房子和一辆车，还有存款，她要求房子归她，我觉得分割不公平，想咨询财产怎么分。",
+      "checks": {
+        "requireElement": true,
+        "disputeTypeKeywords": ["婚姻"],
+        "claimKeywords": ["财产"],
+        "expectUrgency": "normal",
+        "lawKeywords": ["婚姻"],
+        "requireLawCount": 1,
+        "expectActions": ["createTicket"],
+        "forbidden": ["承诺胜诉", "包赢"]
+      }
+    },
+    {
+      "caseId": "cop-private-loan",
+      "name": "民间借贷纠纷",
+      "text": "朋友两年前向我借了五万块钱，写了借条约定利息，现在到期不还，电话也不接，我想起诉把钱要回来。",
+      "checks": {
+        "requireElement": true,
+        "disputeTypeKeywords": ["借贷"],
+        "claimKeywords": ["借"],
+        "expectUrgency": "normal",
+        "lawKeywords": ["借贷"],
+        "requireLawCount": 1,
+        "expectActions": ["createTicket"],
+        "forbidden": ["保证打赢", "包赢"]
+      }
+    }
+  ]
+}
