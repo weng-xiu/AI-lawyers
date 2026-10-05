@@ -106,6 +106,61 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         from ai_legal_consultation
     </select>
 
+    <select id="countTotalConsultations" resultType="java.lang.Long">
+        select count(*) from ai_legal_consultation
+    </select>
+
+    <select id="countTodayConsultations" resultType="java.lang.Long">
+        select count(*) from ai_legal_consultation
+        where date(create_time) = curdate()
+    </select>
+
+    <select id="countWeekConsultations" resultType="java.lang.Long">
+        select count(*) from ai_legal_consultation
+        where yearweek(date_format(create_time, '%Y-%m-%d'), 1) = yearweek(curdate(), 1)
+    </select>
+
+    <select id="countMonthConsultations" resultType="java.lang.Long">
+        select count(*) from ai_legal_consultation
+        where date_format(create_time, '%Y%m') = date_format(curdate(), '%Y%m')
+    </select>
+
+    <select id="countConsultationsByStatus" parameterType="java.lang.String" resultType="java.lang.Long">
+        select count(*) from ai_legal_consultation where status = #{status}
+    </select>
+
+    <select id="getAverageRating" resultType="java.lang.Double">
+        select avg(rating) from ai_legal_consultation where rating is not null
+    </select>
+
+    <select id="countConsultationsByCategory" resultType="java.util.Map">
+        select c.category_id   as categoryId,
+               c.category_name as categoryName,
+               count(q.consultation_id) as count
+        from ai_consultation_category c
+        left join ai_legal_consultation q on q.category_id = c.category_id
+        where c.del_flag = '0'
+        group by c.category_id, c.category_name
+        order by count desc, c.category_id asc
+    </select>
+
+    <select id="countConsultationsByDate" parameterType="java.lang.Integer" resultType="java.util.Map">
+        with recursive nums(n) as (
+            select 0
+            union all
+            select n + 1 from nums where n &lt; #{days} - 1
+        )
+        select date_format(d.dt, '%Y-%m-%d') as date,
+               count(q.consultation_id) as count
+        from (
+            select date_sub(curdate(), interval n day) as dt
+            from nums
+        ) d
+        left join ai_legal_consultation q on date(q.create_time) = d.dt
+        group by d.dt
+        order by d.dt
+    </select>
+
     <delete id="deleteAiLegalConsultationById" parameterType="Long">
         delete from ai_legal_consultation where consultation_id = #{consultationId}
     </delete>

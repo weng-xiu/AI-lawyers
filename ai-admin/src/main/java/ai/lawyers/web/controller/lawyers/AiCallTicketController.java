@@ -57,7 +57,7 @@ public class AiCallTicketController extends BaseController
     @PreAuthorize("@ss.hasPermi('lawyers:call:ticket:add')")
     @Log(title = "工单", businessType = BusinessType.INSERT)
     @PostMapping
-    public AjaxResult add(@RequestBody AiCallTicket aiCallTicket)
+    public AjaxResult add(@RequestBody @jakarta.validation.Valid AiCallTicket aiCallTicket)
     {
         aiCallTicket.setCreateBy(getUsername());
         return toAjax(aiCallTicketService.insertAiCallTicket(aiCallTicket));
@@ -66,7 +66,7 @@ public class AiCallTicketController extends BaseController
     @PreAuthorize("@ss.hasPermi('lawyers:call:ticket:edit')")
     @Log(title = "工单", businessType = BusinessType.UPDATE)
     @PutMapping
-    public AjaxResult edit(@RequestBody AiCallTicket aiCallTicket)
+    public AjaxResult edit(@RequestBody @jakarta.validation.Valid AiCallTicket aiCallTicket)
     {
         aiCallTicket.setUpdateBy(getUsername());
         return toAjax(aiCallTicketService.updateAiCallTicket(aiCallTicket));

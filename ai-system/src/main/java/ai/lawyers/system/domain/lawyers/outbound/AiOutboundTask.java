@@ -1,6 +1,7 @@
 package ai.lawyers.system.domain.lawyers.outbound;
 
 import java.util.Date;
+import jakarta.validation.constraints.NotBlank;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import ai.lawyers.common.annotation.Excel;
 import ai.lawyers.common.core.domain.BaseEntity;
@@ -80,6 +81,7 @@ public class AiOutboundTask extends BaseEntity
     public Long getTaskId() { return taskId; }
 
     public void setTaskName(String taskName) { this.taskName = taskName; }
+    @NotBlank(message = "任务名称不能为空")
     public String getTaskName() { return taskName; }
 
     public void setTaskNo(String taskNo) { this.taskNo = taskNo; }

@@ -64,7 +64,7 @@ public class AiIvrNodeController extends BaseController
     @PreAuthorize("@ss.hasPermi('lawyers:ivr:node:add')")
     @Log(title = "IVR节点", businessType = BusinessType.INSERT)
     @PostMapping
-    public AjaxResult add(@RequestBody AiIvrNode aiIvrNode)
+    public AjaxResult add(@RequestBody @jakarta.validation.Valid AiIvrNode aiIvrNode)
     {
         aiIvrNode.setCreateBy(getUsername());
         return toAjax(aiIvrNodeService.insertAiIvrNode(aiIvrNode));
@@ -73,7 +73,7 @@ public class AiIvrNodeController extends BaseController
     @PreAuthorize("@ss.hasPermi('lawyers:ivr:node:edit')")
     @Log(title = "IVR节点", businessType = BusinessType.UPDATE)
     @PutMapping
-    public AjaxResult edit(@RequestBody AiIvrNode aiIvrNode)
+    public AjaxResult edit(@RequestBody @jakarta.validation.Valid AiIvrNode aiIvrNode)
     {
         aiIvrNode.setUpdateBy(getUsername());
         return toAjax(aiIvrNodeService.updateAiIvrNode(aiIvrNode));

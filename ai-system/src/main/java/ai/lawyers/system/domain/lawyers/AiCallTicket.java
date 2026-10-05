@@ -2,6 +2,7 @@ package ai.lawyers.system.domain.lawyers;
 
 import java.util.Date;
 import java.util.List;
+import jakarta.validation.constraints.NotBlank;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -135,6 +136,7 @@ public class AiCallTicket extends BaseEntity
         this.title = title;
     }
 
+    @NotBlank(message = "工单标题不能为空")
     public String getTitle() 
     {
         return title;

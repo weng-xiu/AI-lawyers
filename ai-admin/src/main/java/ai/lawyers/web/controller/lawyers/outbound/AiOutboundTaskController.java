@@ -77,7 +77,7 @@ public class AiOutboundTaskController extends BaseController
     @PreAuthorize("@ss.hasPermi('lawyers:outbound:task:add')")
     @Log(title = "外呼任务", businessType = BusinessType.INSERT)
     @PostMapping
-    public AjaxResult add(@RequestBody AiOutboundTask aiOutboundTask)
+    public AjaxResult add(@RequestBody @jakarta.validation.Valid AiOutboundTask aiOutboundTask)
     {
         aiOutboundTask.setCreateBy(getUsername());
         return toAjax(aiOutboundTaskService.insertAiOutboundTask(aiOutboundTask));
@@ -86,7 +86,7 @@ public class AiOutboundTaskController extends BaseController
     @PreAuthorize("@ss.hasPermi('lawyers:outbound:task:edit')")
     @Log(title = "外呼任务", businessType = BusinessType.UPDATE)
     @PutMapping
-    public AjaxResult edit(@RequestBody AiOutboundTask aiOutboundTask)
+    public AjaxResult edit(@RequestBody @jakarta.validation.Valid AiOutboundTask aiOutboundTask)
     {
         aiOutboundTask.setUpdateBy(getUsername());
         return toAjax(aiOutboundTaskService.updateAiOutboundTask(aiOutboundTask));

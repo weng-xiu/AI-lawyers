@@ -114,7 +114,7 @@ public class AiLegalKnowledgeController extends BaseController
     @PreAuthorize("@ss.hasPermi('lawyers:knowledge:add')")
     @Log(title = "法律知识库", businessType = BusinessType.INSERT)
     @PostMapping
-    public AjaxResult add(@RequestBody AiLegalKnowledge aiLegalKnowledge)
+    public AjaxResult add(@RequestBody @jakarta.validation.Valid AiLegalKnowledge aiLegalKnowledge)
     {
         aiLegalKnowledge.setCreateBy(getUsername());
         return toAjax(aiLegalKnowledgeService.insertAiLegalKnowledge(aiLegalKnowledge));
@@ -126,7 +126,7 @@ public class AiLegalKnowledgeController extends BaseController
     @PreAuthorize("@ss.hasPermi('lawyers:knowledge:edit')")
     @Log(title = "法律知识库", businessType = BusinessType.UPDATE)
     @PutMapping
-    public AjaxResult edit(@RequestBody AiLegalKnowledge aiLegalKnowledge)
+    public AjaxResult edit(@RequestBody @jakarta.validation.Valid AiLegalKnowledge aiLegalKnowledge)
     {
         aiLegalKnowledge.setUpdateBy(getUsername());
         return toAjax(aiLegalKnowledgeService.updateAiLegalKnowledge(aiLegalKnowledge));

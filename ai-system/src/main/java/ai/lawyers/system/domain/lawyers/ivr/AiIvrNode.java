@@ -1,5 +1,6 @@
 package ai.lawyers.system.domain.lawyers.ivr;
 
+import jakarta.validation.constraints.NotNull;
 import ai.lawyers.common.core.domain.BaseEntity;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
@@ -28,6 +29,7 @@ public class AiIvrNode extends BaseEntity
     public Long getNodeId() { return nodeId; }
 
     public void setFlowId(Long flowId) { this.flowId = flowId; }
+    @NotNull(message = "所属流程不能为空")
     public Long getFlowId() { return flowId; }
 
     public void setNodeType(String nodeType) { this.nodeType = nodeType; }
