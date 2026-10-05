@@ -20,4 +20,9 @@ public interface AiPiiSearchTokenMapper
      * 删除某属主全部 token（号码变更重建/迁移回填前清理）。
      */
     public int deleteByOwner(@Param("ownerType") String ownerType, @Param("ownerId") Long ownerId);
+
+    /**
+     * 统计某属主已有 token 数（迁移幂等：判定 token 是否已回填）。
+     */
+    public int countByOwner(@Param("ownerType") String ownerType, @Param("ownerId") Long ownerId);
 }

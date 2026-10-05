@@ -125,7 +125,7 @@ public class AiUserSecurityConfig
                 // 对于用户端登录login 注册register 验证码captchaImage 允许匿名访问
                 requests.requestMatchers("/aiuser/login", "/aiuser/register", "/aiuser/captchaImage").permitAll()
                     // 静态资源，可匿名访问
-                    .requestMatchers(HttpMethod.GET, "/aiuser/**/*.html", "/aiuser/**/*.css", "/aiuser/**/*.js").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/aiuser/*.html", "/aiuser/*.css", "/aiuser/*.js").permitAll()
                     // 除上面外的所有请求全部需要鉴权认证
                     .anyRequest().authenticated();
             })

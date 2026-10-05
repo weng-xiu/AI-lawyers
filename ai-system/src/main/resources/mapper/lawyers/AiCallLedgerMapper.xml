@@ -70,7 +70,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                                     #{tok}
                                 </foreach>
                                 group by owner_id
-                                having count(distinct token_value) = #{grp.size()}
+                                having count(distinct token_value) = (
+                                    select count(distinct sq.tok) from
+                                    <foreach collection="grp" item="t" open="(select " separator=" union all select " close=") sq">
+                                        #{t} as tok
+                                    </foreach>
+                                )
                             )
                         </foreach>
                         )
@@ -101,7 +106,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <include refid="selectAiCallLedgerVo"/>
         where ledger_no = #{ledgerNo} and del_flag = '0'
     </select>
-        
+
+    <!-- G1-b2 迁移专用：原始密文（resultType=map 绕过解密拦截器，驼峰别名；台账无盲索引列） -->
+    <select id="selectRawForMigrate" resultType="map">
+        select ledger_id as ledgerId,
+               caller_phone as callerPhone,
+               caller_id_card as callerIdCard
+        from ai_call_ledger
+        where del_flag = '0'
+    </select>
+
     <insert id="insertAiCallLedger" parameterType="AiCallLedger" useGeneratedKeys="true" keyProperty="ledgerId">
         insert into ai_call_ledger
         <trim prefix="(" suffix=")" suffixOverrides=",">

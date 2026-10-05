@@ -25,4 +25,9 @@ public interface IPiiSearchTokenService
      * @param plain     号码明文
      */
     public void rebuild(String ownerType, Long ownerId, String plain);
+
+    /**
+     * 统计某属主已有 token 数（迁移幂等：>0 表示 token 已回填）。
+     */
+    public int countByOwner(String ownerType, Long ownerId);
 }

@@ -43,4 +43,10 @@ public class PiiSearchTokenServiceImpl implements IPiiSearchTokenService
             tokenMapper.batchInsertToken(list);
         }
     }
+
+    @Override
+    public int countByOwner(String ownerType, Long ownerId)
+    {
+        return tokenMapper.countByOwner(ownerType, ownerId);
+    }
 }

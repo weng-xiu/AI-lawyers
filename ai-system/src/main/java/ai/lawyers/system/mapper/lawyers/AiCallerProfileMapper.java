@@ -25,4 +25,10 @@ public interface AiCallerProfileMapper
     public int deleteAiCallerProfileByProfileId(Long profileId);
 
     public int deleteAiCallerProfileByProfileIds(Long[] profileIds);
+
+    /**
+     * G1-b2 迁移专用：读取原始（不经解密拦截器）号码/身份证密文与盲索引。
+     * resultType=map，拦截器仅处理域对象，故返回值保留库中原始形态。
+     */
+    public List<java.util.Map<String, Object>> selectRawForMigrate();
 }

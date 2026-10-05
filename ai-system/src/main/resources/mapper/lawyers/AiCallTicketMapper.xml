@@ -74,7 +74,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                                     #{tok}
                                 </foreach>
                                 group by owner_id
-                                having count(distinct token_value) = #{grp.size()}
+                                having count(distinct token_value) = (
+                                    select count(distinct sq.tok) from
+                                    <foreach collection="grp" item="t" open="(select " separator=" union all select " close=") sq">
+                                        #{t} as tok
+                                    </foreach>
+                                )
                             )
                         </foreach>
                         )

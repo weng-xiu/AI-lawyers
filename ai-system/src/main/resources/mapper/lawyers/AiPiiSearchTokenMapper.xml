@@ -16,4 +16,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         delete from ai_pii_search_token
         where owner_type = #{ownerType} and owner_id = #{ownerId}
     </delete>
+
+    <select id="countByOwner" resultType="int">
+        select count(*) from ai_pii_search_token
+        where owner_type = #{ownerType} and owner_id = #{ownerId}
+    </select>
 </mapper>

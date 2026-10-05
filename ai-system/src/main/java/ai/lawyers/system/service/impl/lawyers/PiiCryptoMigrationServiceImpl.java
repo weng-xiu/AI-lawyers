@@ -64,13 +64,42 @@ public class PiiCryptoMigrationServiceImpl implements IPiiCryptoMigrationService
         int migrated = 0;
         int conflictSkipped = 0;
         int tokenRebuilt = 0;
-        List<AiCallerProfile> rows = callerProfileMapper.selectAiCallerProfileList(new AiCallerProfile());
-        for (AiCallerProfile row : rows)
+        List<Map<String, Object>> rows = callerProfileMapper.selectRawForMigrate();
+        for (Map<String, Object> row : rows)
         {
+            Long profileId = asLong(row.get("profileId"));
+            String rawNumber = asString(row.get("callerNumber"));
+            String rawNumberIndex = asString(row.get("callerNumberIndex"));
+            String rawIdCard = asString(row.get("callerIdCard"));
+            String rawIdCardIndex = asString(row.get("callerIdCardIndex"));
+
+            String numberPlain = decryptOrNull(rawNumber);
+            String idCardPlain = decryptOrNull(rawIdCard);
+
             AiCallerProfile update = new AiCallerProfile();
-            update.setProfileId(row.getProfileId());
-            fillEncryption(row.getCallerNumber(), row.getCallerNumberIndex(), update, true);
-            fillEncryption(row.getCallerIdCard(), row.getCallerIdCardIndex(), update, false);
+            update.setProfileId(profileId);
+            if (numberPlain != null)
+            {
+                if (!PiiCryptoUtils.isEncrypted(rawNumber))
+                {
+                    update.setCallerNumber(PiiCryptoUtils.encrypt(numberPlain));
+                }
+                if (StringUtils.isEmpty(rawNumberIndex))
+                {
+                    update.setCallerNumberIndex(PiiCryptoUtils.blindIndex(numberPlain));
+                }
+            }
+            if (idCardPlain != null)
+            {
+                if (!PiiCryptoUtils.isEncrypted(rawIdCard))
+                {
+                    update.setCallerIdCard(PiiCryptoUtils.encrypt(idCardPlain));
+                }
+                if (StringUtils.isEmpty(rawIdCardIndex))
+                {
+                    update.setCallerIdCardIndex(PiiCryptoUtils.blindIndex(idCardPlain));
+                }
+            }
             boolean hasColumnChange = update.getCallerNumber() != null
                     || update.getCallerNumberIndex() != null
                     || update.getCallerIdCard() != null
@@ -87,9 +116,10 @@ public class PiiCryptoMigrationServiceImpl implements IPiiCryptoMigrationService
                     conflictSkipped++;
                 }
             }
-            // G1-b2：号码 token 回填（含未落库变更的行，首轮迁移统一补齐）
-            if (rebuildToken(IPiiSearchTokenService.OWNER_CALLER_PROFILE,
-                    row.getProfileId(), row.getCallerNumber()))
+            // G1-b2：号码 token 仅在缺失或号码本轮重加密时重建（幂等零写库）
+            boolean numberChanged = update.getCallerNumber() != null;
+            if (ensureToken(IPiiSearchTokenService.OWNER_CALLER_PROFILE,
+                    profileId, numberPlain, numberChanged))
             {
                 tokenRebuilt++;
             }
@@ -110,19 +140,21 @@ public class PiiCryptoMigrationServiceImpl implements IPiiCryptoMigrationService
         int failed = 0;
 
         // 热表
-        List<AiCallRecord> hotRows = callRecordMapper.selectAiCallRecordList(new AiCallRecord());
-        for (AiCallRecord row : hotRows)
+        List<Map<String, Object>> hotRows = callRecordMapper.selectRawForMigrate();
+        for (Map<String, Object> row : hotRows)
         {
             try
             {
-                String raw = row.getCallerNumber();
-                String plain = StringUtils.isNotEmpty(raw) ? PiiCryptoUtils.decrypt(raw) : null;
+                Long recordId = asLong(row.get("recordId"));
+                String raw = asString(row.get("callerNumber"));
+                String existingIndex = asString(row.get("callerNumberIndex"));
+                String plain = decryptOrNull(raw);
                 boolean needCipher = plain != null && !PiiCryptoUtils.isEncrypted(raw);
-                boolean needIndex = plain != null && StringUtils.isEmpty(row.getCallerNumberIndex());
+                boolean needIndex = plain != null && StringUtils.isEmpty(existingIndex);
                 if (needCipher || needIndex)
                 {
                     AiCallRecord update = new AiCallRecord();
-                    update.setRecordId(row.getRecordId());
+                    update.setRecordId(recordId);
                     if (needCipher)
                     {
                         update.setCallerNumber(PiiCryptoUtils.encrypt(plain));
@@ -131,8 +163,8 @@ public class PiiCryptoMigrationServiceImpl implements IPiiCryptoMigrationService
                     callRecordMapper.updateAiCallRecord(update);
                     migrated++;
                 }
-                if (rebuildToken(IPiiSearchTokenService.OWNER_CALL_RECORD,
-                        row.getRecordId(), plain))
+                if (ensureToken(IPiiSearchTokenService.OWNER_CALL_RECORD,
+                        recordId, plain, needCipher))
                 {
                     tokenRebuilt++;
                 }
@@ -140,31 +172,33 @@ public class PiiCryptoMigrationServiceImpl implements IPiiCryptoMigrationService
             catch (Exception e)
             {
                 failed++;
-                log.warn("话单 PII 迁移单行失败 recordId={}: {}", row.getRecordId(), e.getMessage());
+                log.warn("话单 PII 迁移单行失败 recordId={}: {}", asLong(row.get("recordId")), e.getMessage());
             }
         }
 
         // 归档表（token 属主仍为 CALL_RECORD：record_id 稳定，归档不另建属主）
         int archiveTotal = 0;
-        List<AiCallRecord> archiveRows = archiveMapper.selectArchiveList(new AiCallRecord());
-        for (AiCallRecord row : archiveRows)
+        List<Map<String, Object>> archiveRows = archiveMapper.selectRawForMigrate();
+        for (Map<String, Object> row : archiveRows)
         {
             archiveTotal++;
             try
             {
-                String raw = row.getCallerNumber();
-                String plain = StringUtils.isNotEmpty(raw) ? PiiCryptoUtils.decrypt(raw) : null;
+                Long recordId = asLong(row.get("recordId"));
+                String raw = asString(row.get("callerNumber"));
+                String existingIndex = asString(row.get("callerNumberIndex"));
+                String plain = decryptOrNull(raw);
                 boolean needCipher = plain != null && !PiiCryptoUtils.isEncrypted(raw);
-                boolean needIndex = plain != null && StringUtils.isEmpty(row.getCallerNumberIndex());
+                boolean needIndex = plain != null && StringUtils.isEmpty(existingIndex);
                 if (needCipher || needIndex)
                 {
-                    archiveMapper.updateArchiveEncryption(row.getRecordId(),
+                    archiveMapper.updateArchiveEncryption(recordId,
                             needCipher ? PiiCryptoUtils.encrypt(plain) : null,
                             needIndex ? PiiCryptoUtils.blindIndex(plain) : null);
                     migrated++;
                 }
-                if (rebuildToken(IPiiSearchTokenService.OWNER_CALL_RECORD,
-                        row.getRecordId(), plain))
+                if (ensureToken(IPiiSearchTokenService.OWNER_CALL_RECORD,
+                        recordId, plain, needCipher))
                 {
                     tokenRebuilt++;
                 }
@@ -172,7 +206,7 @@ public class PiiCryptoMigrationServiceImpl implements IPiiCryptoMigrationService
             catch (Exception e)
             {
                 failed++;
-                log.warn("归档话单 PII 迁移单行失败 recordId={}: {}", row.getRecordId(), e.getMessage());
+                log.warn("归档话单 PII 迁移单行失败 recordId={}: {}", asLong(row.get("recordId")), e.getMessage());
             }
         }
 
@@ -191,23 +225,24 @@ public class PiiCryptoMigrationServiceImpl implements IPiiCryptoMigrationService
         int migrated = 0;
         int tokenRebuilt = 0;
         int failed = 0;
-        List<AiCallLedger> rows = callLedgerMapper.selectAiCallLedgerList(new AiCallLedger());
-        for (AiCallLedger row : rows)
+        List<Map<String, Object>> rows = callLedgerMapper.selectRawForMigrate();
+        for (Map<String, Object> row : rows)
         {
             try
             {
-                String plainPhone = StringUtils.isNotEmpty(row.getCallerPhone())
-                        ? PiiCryptoUtils.decrypt(row.getCallerPhone()) : null;
-                String plainIdCard = StringUtils.isNotEmpty(row.getCallerIdCard())
-                        ? PiiCryptoUtils.decrypt(row.getCallerIdCard()) : null;
+                Long ledgerId = asLong(row.get("ledgerId"));
+                String rawPhone = asString(row.get("callerPhone"));
+                String rawIdCard = asString(row.get("callerIdCard"));
+                String plainPhone = decryptOrNull(rawPhone);
+                String plainIdCard = decryptOrNull(rawIdCard);
                 boolean needPhoneCipher = plainPhone != null
-                        && !PiiCryptoUtils.isEncrypted(row.getCallerPhone());
+                        && !PiiCryptoUtils.isEncrypted(rawPhone);
                 boolean needIdCardCipher = plainIdCard != null
-                        && !PiiCryptoUtils.isEncrypted(row.getCallerIdCard());
+                        && !PiiCryptoUtils.isEncrypted(rawIdCard);
                 if (needPhoneCipher || needIdCardCipher)
                 {
                     AiCallLedger update = new AiCallLedger();
-                    update.setLedgerId(row.getLedgerId());
+                    update.setLedgerId(ledgerId);
                     if (needPhoneCipher)
                     {
                         update.setCallerPhone(PiiCryptoUtils.encrypt(plainPhone));
@@ -219,8 +254,8 @@ public class PiiCryptoMigrationServiceImpl implements IPiiCryptoMigrationService
                     callLedgerMapper.updateAiCallLedger(update);
                     migrated++;
                 }
-                if (rebuildToken(IPiiSearchTokenService.OWNER_CALL_LEDGER,
-                        row.getLedgerId(), plainPhone))
+                if (ensureToken(IPiiSearchTokenService.OWNER_CALL_LEDGER,
+                        ledgerId, plainPhone, needPhoneCipher))
                 {
                     tokenRebuilt++;
                 }
@@ -228,7 +263,7 @@ public class PiiCryptoMigrationServiceImpl implements IPiiCryptoMigrationService
             catch (Exception e)
             {
                 failed++;
-                log.warn("台账 PII 迁移单行失败 ledgerId={}: {}", row.getLedgerId(), e.getMessage());
+                log.warn("台账 PII 迁移单行失败 ledgerId={}: {}", asLong(row.get("ledgerId")), e.getMessage());
             }
         }
         Map<String, Object> result = new HashMap<>();
@@ -239,10 +274,18 @@ public class PiiCryptoMigrationServiceImpl implements IPiiCryptoMigrationService
         return result;
     }
 
-    /** 重建单个属主的号码 token；服务不可用/明文为空时返回 false */
-    private boolean rebuildToken(String ownerType, Long ownerId, String plain)
+    /**
+     * 幂等地保证属主号码 token 存在：仅当号码本轮重加密（changed=true）或属主 token
+     * 缺失时才触发重建；已存在且号码未变则零写库跳过。
+     * @return 是否实际执行了重建
+     */
+    private boolean ensureToken(String ownerType, Long ownerId, String plain, boolean changed)
     {
         if (piiSearchTokenService == null || ownerId == null || StringUtils.isEmpty(plain))
+        {
+            return false;
+        }
+        if (!changed && piiSearchTokenService.countByOwner(ownerType, ownerId) > 0)
         {
             return false;
         }
@@ -250,41 +293,38 @@ public class PiiCryptoMigrationServiceImpl implements IPiiCryptoMigrationService
         return true;
     }
 
-    /** 字段迁移：明文 → 密文 + 盲索引；密文缺索引 → 解密回填索引；其余不动 */
-    private void fillEncryption(String value, String existingIndex, AiCallerProfile update, boolean isNumber)
+    /**
+     * 解密库中原始值为明文：null/空 → null；密文 → 解密；存量明文 → 原样。
+     */
+    private String decryptOrNull(String stored)
     {
-        if (StringUtils.isEmpty(value))
+        if (StringUtils.isEmpty(stored))
         {
-            return;
+            return null;
         }
-        if (PiiCryptoUtils.isEncrypted(value))
+        return PiiCryptoUtils.isEncrypted(stored) ? PiiCryptoUtils.decrypt(stored) : stored;
+    }
+
+    private String asString(Object value)
+    {
+        return value == null ? null : value.toString();
+    }
+
+    private Long asLong(Object value)
+    {
+        if (value == null)
         {
-            if (StringUtils.isEmpty(existingIndex))
-            {
-                String index = PiiCryptoUtils.blindIndex(PiiCryptoUtils.decrypt(value));
-                if (isNumber)
-                {
-                    update.setCallerNumberIndex(index);
-                }
-                else
-                {
-                    update.setCallerIdCardIndex(index);
-                }
-            }
-            return;
+            return null;
         }
-        String encrypted = PiiCryptoUtils.encrypt(value);
-        String index = PiiCryptoUtils.blindIndex(value);
-        if (isNumber)
+        if (value instanceof Long)
         {
-            update.setCallerNumber(encrypted);
-            update.setCallerNumberIndex(index);
+            return (Long) value;
         }
-        else
+        if (value instanceof Number)
         {
-            update.setCallerIdCard(encrypted);
-            update.setCallerIdCardIndex(index);
+            return ((Number) value).longValue();
         }
+        return Long.valueOf(value.toString());
     }
 
     // ------------------------------------------------------------ G1-b3 密钥轮换
@@ -320,8 +360,11 @@ public class PiiCryptoMigrationServiceImpl implements IPiiCryptoMigrationService
                 {
                     callerProfileMapper.updateAiCallerProfile(update);
                 }
-                rebuildToken(IPiiSearchTokenService.OWNER_CALLER_PROFILE, row.getProfileId(),
-                        decryptPlain(row.getCallerNumber()));
+                if (piiSearchTokenService != null)
+                {
+                    piiSearchTokenService.rebuild(IPiiSearchTokenService.OWNER_CALLER_PROFILE,
+                            row.getProfileId(), decryptPlain(row.getCallerNumber()));
+                }
                 profiles++;
             }
             catch (Exception e)
@@ -345,7 +388,11 @@ public class PiiCryptoMigrationServiceImpl implements IPiiCryptoMigrationService
                     update.setCallerNumber(PiiCryptoUtils.encrypt(plain));
                     update.setCallerNumberIndex(PiiCryptoUtils.blindIndex(plain));
                     callRecordMapper.updateAiCallRecord(update);
-                    rebuildToken(IPiiSearchTokenService.OWNER_CALL_RECORD, row.getRecordId(), plain);
+                    if (piiSearchTokenService != null)
+                    {
+                        piiSearchTokenService.rebuild(IPiiSearchTokenService.OWNER_CALL_RECORD,
+                                row.getRecordId(), plain);
+                    }
                 }
                 reEncryptRecording(row.getRecordFile());
                 recordingEncrypted++;
@@ -369,7 +416,11 @@ public class PiiCryptoMigrationServiceImpl implements IPiiCryptoMigrationService
                 {
                     archiveMapper.updateArchiveEncryption(row.getRecordId(),
                             PiiCryptoUtils.encrypt(plain), PiiCryptoUtils.blindIndex(plain));
-                    rebuildToken(IPiiSearchTokenService.OWNER_CALL_RECORD, row.getRecordId(), plain);
+                    if (piiSearchTokenService != null)
+                    {
+                        piiSearchTokenService.rebuild(IPiiSearchTokenService.OWNER_CALL_RECORD,
+                                row.getRecordId(), plain);
+                    }
                 }
                 archives++;
             }
@@ -393,7 +444,11 @@ public class PiiCryptoMigrationServiceImpl implements IPiiCryptoMigrationService
                 if (phone != null)
                 {
                     update.setCallerPhone(PiiCryptoUtils.encrypt(phone));
-                    rebuildToken(IPiiSearchTokenService.OWNER_CALL_LEDGER, row.getLedgerId(), phone);
+                    if (piiSearchTokenService != null)
+                    {
+                        piiSearchTokenService.rebuild(IPiiSearchTokenService.OWNER_CALL_LEDGER,
+                                row.getLedgerId(), phone);
+                    }
                 }
                 if (idCard != null)
                 {
