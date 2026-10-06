@@ -99,6 +99,9 @@ public class DefaultInboundCallHandler implements InboundCallHandler
     @Autowired(required = false)
     private HotlineMetrics metrics;
 
+    @Autowired(required = false)
+    private ai.lawyers.system.service.lawyers.voice.robot.RobotFrontDoorDecider frontDoorDecider;
+
     @Override
     public void handleIncomingCall(Map<String, Object> ctx)
     {
@@ -179,6 +182,22 @@ public class DefaultInboundCallHandler implements InboundCallHandler
             // G1-b2：经服务层写密文 + 盲索引 + 模糊检索 token
             callRecordService.insertAiCallRecord(record);
             Long recordId = record.getRecordId();
+
+            // P0-1 机器人前置分流：命中决策则交由机器人先接，跳过人工 ACD 分配。
+            // 说明：当前仅完成决策层接线（默认关闭），真正的双向媒体接管（机器人接听/播报/
+            // 转人工媒体交回）需 FreeSWITCH 入站桥接就绪后在此补接，故现在命中时只做
+            // 话单标记 + 可观测事件，不下发人工分配，避免通道被误桥接。
+            if (frontDoorDecider != null && frontDoorDecider.shouldRobotTakeOver(caller))
+            {
+                log.info("[Inbound] 机器人前置分流接管 uuid={} caller={} recordId={}", uuid, caller, recordId);
+                if (metrics != null)
+                {
+                    metrics.incrementCall("robot_front_door");
+                }
+                broadcastEvent("ROBOT_TAKEOVER",
+                        buildData(uuid, recordId, null, caller, dnis, null, null, "机器人前置接管"));
+                return;
+            }
 
             // 2. 选择技能组（按 DNIS 匹配，未命中走默认组）
             Long groupId = resolveGroupId(dnis);

@@ -315,6 +315,12 @@ ai:
     answer-max-chars: ${AI_VOICE_ROBOT_ANSWER_MAX_CHARS:150}
     # RAG 上下文装配长度上限（字，防超 token）
     context-max-chars: ${AI_VOICE_ROBOT_CONTEXT_MAX_CHARS:1200}
+    # P0-1：入站电话"机器人前置分流"总开关（独立于 enabled），默认关闭
+    front-door-enabled: ${AI_VOICE_ROBOT_FRONT_DOOR_ENABLED:false}
+    # 前置分流每日生效时段，格式 HH:mm-HH:mm，多段逗号分隔（如夜间/溢出时段）；留空=全天
+    active-hours: ${AI_VOICE_ROBOT_ACTIVE_HOURS:}
+    # 时段判定时区
+    timezone: ${AI_VOICE_ROBOT_TIMEZONE:Asia/Shanghai}
   # P3-E4 实时情绪/意图识别与路由/SLA 联动（纯词库，零额外成本）
   emotion-detector:
     # 总开关：仅 caller 角色/robot 模式通道挂钩（坐席自身语音不识别）
