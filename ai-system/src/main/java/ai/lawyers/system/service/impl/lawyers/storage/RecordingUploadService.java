@@ -1,6 +1,7 @@
 package ai.lawyers.system.service.impl.lawyers.storage;
 
 import java.io.File;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -48,6 +49,10 @@ public class RecordingUploadService
     /** G1-b3：本地模式录音 SM4 加密开关（默认关闭） */
     @Value("${call.recording.encrypt-enabled:false}")
     private boolean encryptEnabled;
+
+    /** 录音文件本地根目录（仅用于补扫时解析相对路径） */
+    @Value("${call.recording.base-path:recordings}")
+    private String recordingBasePath;
 
     @Value("${call.recording.upload.workers:2}")
     private int workers;
@@ -144,6 +149,72 @@ public class RecordingUploadService
             log.error("[RecordingUpload] 任务入队失败（队列已满？）recordId={} file={}: {}",
                     recordId, localFile.getAbsolutePath(), e.getMessage());
         }
+    }
+
+    /**
+     * P0-5：补扫上传前态话单（队列溢出/入队失败/上传重试耗尽漏处理），重新入队。
+     *
+     * <p>由定时任务经集群单主锁后调用。仅当存在待处理工作（对象存储模式，或本地模式
+     * 且加密开启）且 worker 池就绪时扫描；本地文件当前不存在也重新入队——worker 会
+     * 继续等待落盘（兜底文件晚到场景）。</p>
+     *
+     * @param minAgeMinutes 只取结束时间早于当前时间 N 分钟的话单（避开在途任务）
+     * @param maxAgeHours   只取近 N 小时内结束的话单
+     * @param limit         单轮补扫上限
+     * @return 本轮重新入队条数
+     */
+    public int reconcilePendingUploads(int minAgeMinutes, int maxAgeHours, int limit)
+    {
+        if (executor == null)
+        {
+            return 0;
+        }
+        List<AiCallRecord> pending = callRecordMapper.selectPendingUploadRecords(
+                Math.max(1, minAgeMinutes), Math.max(1, maxAgeHours), Math.max(1, limit));
+        int requeued = 0;
+        for (AiCallRecord record : pending)
+        {
+            File file = resolveLocalFile(record);
+            if (file == null)
+            {
+                continue;
+            }
+            enqueue(record.getRecordId(), file);
+            requeued++;
+        }
+        if (requeued > 0)
+        {
+            log.info("[RecordingUpload] 补扫重新入队 {} 条（候选 {} 条）", requeued, pending.size());
+        }
+        return requeued;
+    }
+
+    /**
+     * 按 DB record_file 形态解析本地文件：绝对路径直接用；相对路径拼 base path；
+     * 兼容 $${recordings_dir}/${recordings_dir} 前缀。
+     */
+    private File resolveLocalFile(AiCallRecord record)
+    {
+        String path = record.getRecordFile();
+        if (path == null || path.trim().isEmpty())
+        {
+            return null;
+        }
+        path = path.trim();
+        File file = new File(path);
+        if (file.isAbsolute())
+        {
+            return file;
+        }
+        if (path.startsWith("$${recordings_dir}") || path.startsWith("${recordings_dir}"))
+        {
+            path = path.substring(path.indexOf('}') + 1);
+            if (path.startsWith("/") || path.startsWith("\\"))
+            {
+                path = path.substring(1);
+            }
+        }
+        return new File(new File(recordingBasePath), path);
     }
 
     /**
@@ -267,7 +338,7 @@ public class RecordingUploadService
      *
      * @return true=就绪；false=超时
      */
-    static boolean waitUntilReady(File file, long timeoutMs, long pollIntervalMs)
+    public static boolean waitUntilReady(File file, long timeoutMs, long pollIntervalMs)
     {
         long deadline = System.currentTimeMillis() + Math.max(0L, timeoutMs);
         long lastLength = -1L;

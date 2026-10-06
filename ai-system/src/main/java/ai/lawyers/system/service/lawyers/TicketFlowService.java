@@ -225,6 +225,85 @@ public class TicketFlowService
         return flowCode == null || flowCode.trim().isEmpty() ? DEFAULT_FLOW : flowCode.trim();
     }
 
+    // ================= P1-6：DSL 管理端 CRUD =================
+
+    /** 管理端条件过滤列表 */
+    public List<AiTicketFlowDefinition> listDefinitions(AiTicketFlowDefinition query)
+    {
+        return flowMapper.selectDefinitionList(query == null ? new AiTicketFlowDefinition() : query);
+    }
+
+    /** 按主键查询（编辑回显） */
+    public AiTicketFlowDefinition getDefinition(Long flowId)
+    {
+        AiTicketFlowDefinition rule = flowMapper.selectByFlowId(flowId);
+        if (rule == null)
+        {
+            throw new IllegalArgumentException("流程规则不存在：" + flowId);
+        }
+        return rule;
+    }
+
+    /** 新增规则：必填 + form_schema JSON 合法性 + (flow,from,action) 唯一校验 */
+    public int addDefinition(AiTicketFlowDefinition rule)
+    {
+        prepareDefinition(rule);
+        if (flowMapper.selectRule(rule.getFlowCode(), rule.getStatusFrom(), rule.getActionCode()) != null)
+        {
+            throw new IllegalArgumentException("该动作规则已存在："
+                    + rule.getFlowCode() + "/" + rule.getStatusFrom() + "/" + rule.getActionCode());
+        }
+        if (rule.getStatus() == null)
+        {
+            rule.setStatus("0");
+        }
+        return flowMapper.insertDefinition(rule);
+    }
+
+    /** 修改规则：必填 + form_schema JSON 合法性（流程/源状态/动作不可改，避免破坏既有引用） */
+    public int updateDefinition(AiTicketFlowDefinition rule)
+    {
+        if (rule.getFlowId() == null)
+        {
+            throw new IllegalArgumentException("流程规则ID不能为空");
+        }
+        prepareDefinition(rule);
+        return flowMapper.updateDefinition(rule);
+    }
+
+    private void prepareDefinition(AiTicketFlowDefinition rule)
+    {
+        if (rule == null)
+        {
+            throw new IllegalArgumentException("规则内容不能为空");
+        }
+        if (isBlank(rule.getFlowCode()) || isBlank(rule.getStatusFrom())
+                || isBlank(rule.getActionCode()) || isBlank(rule.getTargetStatus()))
+        {
+            throw new IllegalArgumentException("流程编码、源状态、动作、目标状态均不能为空");
+        }
+        rule.setFlowCode(rule.getFlowCode().trim());
+        rule.setStatusFrom(rule.getStatusFrom().trim());
+        rule.setActionCode(rule.getActionCode().trim());
+        rule.setTargetStatus(rule.getTargetStatus().trim());
+        if (!isBlank(rule.getFormSchema()))
+        {
+            try
+            {
+                JSON.readTree(rule.getFormSchema());
+            }
+            catch (Exception e)
+            {
+                throw new IllegalArgumentException("表单 schema 不是合法 JSON：" + e.getMessage());
+            }
+        }
+    }
+
+    private boolean isBlank(String s)
+    {
+        return s == null || s.trim().isEmpty();
+    }
+
     /**
      * 取当前登录用户的角色 key 集合；无登录上下文（系统线程/未登录）时返回空表，
      * 调用方据此走"无角色，仅 admin 规则放行"或拒绝分支。

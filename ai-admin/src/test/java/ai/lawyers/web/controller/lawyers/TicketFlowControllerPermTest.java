@@ -1,23 +1,23 @@
 package ai.lawyers.web.controller.lawyers;
 
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.util.Collections;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.http.MediaType;
 import ai.lawyers.system.service.lawyers.TicketFlowService;
 import ai.lawyers.web.support.AbstractPermMvcTest;
 
 /**
- * P2-14：{@link TicketFlowController} 权限校验——未登录 401、权限不足 403、
- * 持有 lawyers:call:ticket:list 放行并按角色查询可执行动作。
+ * P1-6：{@link TicketFlowController} 权限校验——动作查询复用 lawyers:call:ticket:list；
+ * 规则管理端 list/query/add/edit 分别需 lawyers:ticketFlow:*。
  */
 public class TicketFlowControllerPermTest extends AbstractPermMvcTest
 {
@@ -45,23 +45,69 @@ public class TicketFlowControllerPermTest extends AbstractPermMvcTest
     }
 
     @Test
-    void actions_wrongPermission_403() throws Exception
+    void actions_withTicketListPermission_ok() throws Exception
     {
         mockMvc.perform(get("/lawyers/ticket-flow/actions/HOTLINE/0")
-                        .with(loginAs("lawyers:nope")))
+                        .with(loginAs("lawyers:call:ticket:list")))
+                .andExpect(status().isOk());
+        verify(ticketFlowService).listAllowedActions(any(), any(), any());
+    }
+
+    @Test
+    void list_wrongPermission_403() throws Exception
+    {
+        mockMvc.perform(get("/lawyers/ticket-flow/list")
+                        .with(loginAs("lawyers:call:ticket:list")))
                 .andExpect(status().isForbidden());
     }
 
     @Test
-    void actions_withPermission_delegatesService() throws Exception
+    void list_withFlowListPermission_ok() throws Exception
     {
-        when(ticketFlowService.listAllowedActions(eq("HOTLINE"), eq("0"), anyList()))
-                .thenReturn(Collections.emptyList());
-
-        mockMvc.perform(get("/lawyers/ticket-flow/actions/HOTLINE/0")
-                        .with(loginAs("lawyers:call:ticket:list")))
+        mockMvc.perform(get("/lawyers/ticket-flow/list")
+                        .with(loginAs("lawyers:ticketFlow:list")))
                 .andExpect(status().isOk());
+        verify(ticketFlowService).listDefinitions(any());
+    }
 
-        verify(ticketFlowService).listAllowedActions(eq("HOTLINE"), eq("0"), anyList());
+    @Test
+    void getInfo_withQueryPermission_ok() throws Exception
+    {
+        mockMvc.perform(get("/lawyers/ticket-flow/1")
+                        .with(loginAs("lawyers:ticketFlow:query")))
+                .andExpect(status().isOk());
+        verify(ticketFlowService).getDefinition(1L);
+    }
+
+    @Test
+    void add_withoutPermission_403() throws Exception
+    {
+        mockMvc.perform(post("/lawyers/ticket-flow")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}")
+                        .with(loginAs("lawyers:ticketFlow:list")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void add_withAddPermission_ok() throws Exception
+    {
+        mockMvc.perform(post("/lawyers/ticket-flow")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}")
+                        .with(loginAs("lawyers:ticketFlow:add")))
+                .andExpect(status().isOk());
+        verify(ticketFlowService).addDefinition(any());
+    }
+
+    @Test
+    void edit_withEditPermission_ok() throws Exception
+    {
+        mockMvc.perform(put("/lawyers/ticket-flow")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"flowId\":1}")
+                        .with(loginAs("lawyers:ticketFlow:edit")))
+                .andExpect(status().isOk());
+        verify(ticketFlowService).updateDefinition(any());
     }
 }

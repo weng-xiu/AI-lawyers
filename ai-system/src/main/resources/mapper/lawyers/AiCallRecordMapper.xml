@@ -327,4 +327,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             update_time = sysdate()
         where record_id = #{recordId}
     </update>
+
+    <!-- P0-5：扫描上传前态话单（队列溢出/上传失败漏处理）。
+         上传成功后 record_file 为纯文件名（object key），含路径分隔符即仍待上传/加密。
+         LOCATE 定位字面 / 与 \（'\\' 在 MySQL 字符串中表示一个反斜杠）。 -->
+    <select id="selectPendingUploadRecords" resultMap="AiCallRecordResult">
+        <include refid="selectAiCallRecordVo"/>
+        where cr.status = '1'
+          and cr.record_file is not null and cr.record_file != ''
+          and (locate('/', cr.record_file) &gt; 0 or locate('\\', cr.record_file) &gt; 0)
+          and cr.end_time &lt;= date_sub(now(), interval #{minAgeMinutes} minute)
+          and cr.end_time &gt;= date_sub(now(), interval #{maxAgeHours} hour)
+        order by cr.end_time asc
+        limit #{limit}
+    </select>
 </mapper>

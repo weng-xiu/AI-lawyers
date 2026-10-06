@@ -211,9 +211,11 @@ public class RagIndexServiceImpl implements IRagIndexService
         {
             AiLegalKnowledge k = knowledgeMapper.selectAiLegalKnowledgeById(knowledgeId);
             chunkMapper.deleteByKnowledgeId(knowledgeId);
-            if (k == null || !"0".equals(k.getStatus()) || !"1".equals(k.getAuditStatus()))
+            boolean valid = k == null
+                    || (StringUtils.isEmpty(k.getValidStatus()) || "1".equals(k.getValidStatus()));
+            if (k == null || !"0".equals(k.getStatus()) || !"1".equals(k.getAuditStatus()) || !valid)
             {
-                // 知识被删/停用/未过审：仅清理旧分块后刷新索引
+                // 知识被删/停用/未过审/法规已修订或失效：仅清理旧分块后刷新索引
                 vectorIndex.rebuild(chunkMapper.selectAllChunksForIndex());
                 log.info("RAG 单条重建：knowledgeId={} 不可索引，已清理分块", knowledgeId);
                 return;

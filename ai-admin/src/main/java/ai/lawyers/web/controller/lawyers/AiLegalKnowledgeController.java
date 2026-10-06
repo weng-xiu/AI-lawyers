@@ -267,4 +267,16 @@ public class AiLegalKnowledgeController extends BaseController
         int created = knowledgeDraftService.scanQualityCalls(days, minScore, limit);
         return success("扫描完成，新生成待审知识草稿 " + created + " 条");
     }
+
+    /**
+     * P1-10：标记法规效力状态（1现行有效/2已修订/3已失效）。
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:knowledge:edit')")
+    @Log(title = "法规效力标记", businessType = BusinessType.UPDATE)
+    @PutMapping("/valid-status")
+    public AjaxResult markValidStatus(Long knowledgeId, String validStatus, String reason)
+    {
+        return toAjax(aiLegalKnowledgeService.markValidStatus(
+                knowledgeId, validStatus, reason, getUsername()));
+    }
 }

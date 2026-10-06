@@ -12,12 +12,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.system.domain.lawyers.AiCallTicket;
 import ai.lawyers.system.mapper.lawyers.AiCallTicketMapper;
+import ai.lawyers.system.mapper.lawyers.AiCopilotFeedbackMapper;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
 import ai.lawyers.system.service.lawyers.rag.RagChunk;
 import ai.lawyers.system.service.lawyers.rag.RagSearchService;
 import ai.lawyers.system.service.lawyers.rag.TicketVectorService;
 import ai.lawyers.system.service.lawyers.stat.AiModelCallLogRecorder;
+import ai.lawyers.system.service.lawyers.voice.emotion.EmotionIntentDetector;
+import ai.lawyers.system.service.lawyers.voice.emotion.EmotionIntentResult;
 
 /**
  * F4：坐席 Copilot 实时辅助服务（通话中文本 → 案情要素 / 法条 / 相似工单）。
@@ -51,6 +54,14 @@ public class CopilotAssistService
     @Value("${ai.copilot.ticket-limit:3}")
     private int ticketLimit;
 
+    /** P1-8：对客口播话术个性化总开关 */
+    @Value("${ai.copilot.script-enabled:true}")
+    private boolean scriptEnabled;
+
+    /** P1-8：坐席采纳画像回溯天数（供 prompt 注入坐席习惯） */
+    @Value("${ai.copilot.profile-days:30}")
+    private int profileDays;
+
     @Autowired(required = false)
     private IAiModelConfigService modelConfigService;
 
@@ -59,6 +70,13 @@ public class CopilotAssistService
 
     @Autowired
     private AiCallTicketMapper ticketMapper;
+
+    /** P1-8：坐席采纳画像数据层（供话术个性化注入） */
+    @Autowired(required = false)
+    private AiCopilotFeedbackMapper feedbackMapper;
+
+    /** P1-8：情绪实时识别器（纯规则零网络，直接实例化） */
+    private final EmotionIntentDetector emotionDetector = new EmotionIntentDetector();
 
     /** P1-8：相似工单语义向量路（未装配/未就绪时回退 LIKE 短语） */
     @Autowired(required = false)
@@ -81,16 +99,31 @@ public class CopilotAssistService
      */
     public CopilotAssistResult assist(String text, String sessionId)
     {
+        return assist(text, sessionId, null);
+    }
+
+    /**
+     * P1-8：执行一次实时辅助（含个性化对客口播话术）。任何情况下不抛异常。
+     *
+     * @param text      累计/新增通话文本
+     * @param sessionId 语音会话ID（数字型时解析为 recordId 排除当前工单）
+     * @param agentId   当前坐席ID（用于注入坐席采纳画像；null 时话术不带画像）
+     * @return 辅助结果（可能部分降级，不为 null）
+     */
+    public CopilotAssistResult assist(String text, String sessionId, Long agentId)
+    {
         CopilotAssistResult result = CopilotAssistResult.empty();
         if (!enabled || StringUtils.isEmpty(text) || text.trim().isEmpty())
         {
             return result;
         }
         String q = text.trim();
-        extractElements(q, result);
+        EmotionIntentResult emotion = emotionDetector.analyze(q);
+        extractElements(q, result, emotion);
         recommendLaws(q, result);
         recommendTickets(q, result, sessionId);
         buildSuggestedActions(result, sessionId);
+        buildSuggestedScript(q, result, emotion, agentId);
         if (metrics != null)
         {
             metrics.incrementCopilotAssist();
@@ -99,7 +132,7 @@ public class CopilotAssistService
     }
 
     /** ① LLM 结构化要素抽取（模型/解析失败 → elementDegraded=true） */
-    private void extractElements(String text, CopilotAssistResult result)
+    private void extractElements(String text, CopilotAssistResult result, EmotionIntentResult emotion)
     {
         try
         {
@@ -107,7 +140,8 @@ public class CopilotAssistService
             {
                 throw new IllegalStateException("模型配置服务未装配");
             }
-            String raw = modelConfigService.chatJson(SYSTEM_PROMPT, "通话文本：\n" + text,
+            String userMessage = buildExtractUserMessage(text, emotion);
+            String raw = modelConfigService.chatJson(buildExtractSystemPrompt(emotion), userMessage,
                     AiModelCallLogRecorder.SCENE_EXTRACT);
             JsonNode node = MAPPER.readTree(cleanJson(raw));
             result.setDisputeType(node.path("disputeType").asText("").trim());
@@ -121,6 +155,19 @@ public class CopilotAssistService
             log.warn("Copilot 要素抽取降级: {}", e.getMessage());
             result.setElementDegraded(true);
         }
+    }
+
+    /** 要素抽取 user 消息：注入规则情绪作为先验，提示模型优先采信（规则零网络、宁错报） */
+    private String buildExtractUserMessage(String text, EmotionIntentResult emotion)
+    {
+        StringBuilder sb = new StringBuilder("通话文本：\n").append(text);
+        if (emotion.isUrgent())
+        {
+            sb.append("\n\n【系统情绪先验】检测到紧急危机信号（")
+              .append(String.join("、", emotion.getEmotionKeywords()))
+              .append("），若与文本相符请将 urgency 置为 urgent。");
+        }
+        return sb.toString();
     }
 
     /** ② RAG 法条推荐（检索异常 → 空列表，不影响其余部分） */
@@ -308,6 +355,139 @@ public class CopilotAssistService
         return list;
     }
 
+    /**
+     * P1-8：生成个性化对客口播话术。
+     *
+     * <p>以规则情绪（urgent/negative/neutral）+ 纠纷类型/诉求/关键事实 + 坐席近 N 天
+     * 采纳画像为输入，调 {@link IAiModelConfigService#chat}（场景 agent）产出一段坐席可
+     * 直接念读的口语化话术。开关关闭/模型未装配/异常 → 留空，任何路径不外抛。</p>
+     */
+    private void buildSuggestedScript(String text, CopilotAssistResult result,
+                                      EmotionIntentResult emotion, Long agentId)
+    {
+        if (!scriptEnabled || modelConfigService == null)
+        {
+            return;
+        }
+        try
+        {
+            String profile = loadAgentProfile(agentId);
+            String systemPrompt = buildScriptSystemPrompt(emotion, profile);
+            String userMessage = buildScriptUserMessage(result);
+            String script = modelConfigService.chat(systemPrompt, userMessage,
+                    AiModelCallLogRecorder.SCENE_AGENT);
+            if (script != null)
+            {
+                result.setSuggestedScript(script.trim());
+            }
+        }
+        catch (Exception e)
+        {
+            log.warn("Copilot 口播话术生成降级（留空）: {}", e.getMessage());
+        }
+    }
+
+    /** 取坐席采纳画像并格式化为一句画像描述；无坐席/无数据/未装配返回空串 */
+    private String loadAgentProfile(Long agentId)
+    {
+        if (agentId == null || feedbackMapper == null)
+        {
+            return "";
+        }
+        try
+        {
+            int days = profileDays > 0 ? profileDays : 30;
+            java.util.Date now = new java.util.Date();
+            java.util.Date begin = new java.util.Date(now.getTime() - days * 24L * 3600_000L);
+            java.util.Map<String, Object> row =
+                    feedbackMapper.selectAgentProfile(agentId, begin, now);
+            if (row == null)
+            {
+                return "";
+            }
+            long total = toLong(row.get("total"));
+            if (total <= 0)
+            {
+                return "";
+            }
+            long adopt = toLong(row.get("adoptCount"));
+            long modify = toLong(row.get("modifyCount"));
+            long ignore = toLong(row.get("ignoreCount"));
+            long rate = Math.round(adopt * 100d / total);
+            return "该坐席近" + days + "天共收到" + total + "条建议，采纳率约" + rate + "%（采纳"
+                    + adopt + "/修改" + modify + "/忽略" + ignore + "），请贴合其表达习惯调整详略。";
+        }
+        catch (Exception e)
+        {
+            log.warn("Copilot 坐席画像查询异常（话术不带画像）: {}", e.getMessage());
+            return "";
+        }
+    }
+
+    private long toLong(Object v)
+    {
+        if (v instanceof Number)
+        {
+            return ((Number) v).longValue();
+        }
+        return 0L;
+    }
+
+    /** 话术 user 消息：注入已抽案情要素（可能部分为空） */
+    private String buildScriptUserMessage(CopilotAssistResult result)
+    {
+        StringBuilder sb = new StringBuilder();
+        if (StringUtils.isNotEmpty(result.getDisputeType()))
+        {
+            sb.append("纠纷类型：").append(result.getDisputeType()).append('\n');
+        }
+        if (!result.getClaims().isEmpty())
+        {
+            sb.append("群众诉求：").append(String.join("；", result.getClaims())).append('\n');
+        }
+        if (!result.getKeyFacts().isEmpty())
+        {
+            sb.append("关键事实：").append(String.join("；", result.getKeyFacts())).append('\n');
+        }
+        if (sb.length() == 0)
+        {
+            sb.append("（案情要素暂不充分，请先安抚并引导群众说明情况）\n");
+        }
+        sb.append("请生成一句到一段对客口播话术。");
+        return sb.toString();
+    }
+
+    /** 话术 SYSTEM_PROMPT：注入情绪应对口径 + 坐席画像（任一可空） */
+    private String buildScriptSystemPrompt(EmotionIntentResult emotion, String profile)
+    {
+        StringBuilder sb = new StringBuilder(SCRIPT_SYSTEM_PROMPT_HEAD);
+        if (emotion.isUrgent())
+        {
+            sb.append("\n当前群众情绪【紧急危机】：先稳住情绪、明确表达会尽力帮助，"
+                    + "话术简短温和，必要时提示立即报警/寻求紧急帮助，不冷漠不推诿。");
+        }
+        else if (emotion.isNegative())
+        {
+            sb.append("\n当前群众情绪【负面不满】：先共情安抚、耐心倾听，语气诚恳，"
+                    + "避免生硬法条条框和争辩。");
+        }
+        else
+        {
+            sb.append("\n当前群众情绪【平和】：可正常、清晰地说明口径与下一步。");
+        }
+        if (StringUtils.isNotEmpty(profile))
+        {
+            sb.append('\n').append(profile);
+        }
+        return sb.toString();
+    }
+
+    /** 要素抽取 SYSTEM_PROMPT：base 固定 schema（无变量部分，情绪先验走 user 消息） */
+    private String buildExtractSystemPrompt(EmotionIntentResult emotion)
+    {
+        return SYSTEM_PROMPT;
+    }
+
     /** 空或空白返回 null；否则截断至 PHRASE_MAX */
     private String clip(String phrase)
     {
@@ -377,4 +557,11 @@ public class CopilotAssistService
             + "\"claims\":[\"群众核心诉求，每项一条\"],"
             + "\"urgency\":\"紧急度，normal或urgent（人身安全/正在发生的侵害为urgent）\","
             + "\"keyFacts\":[\"关键事实：当事人关系/争议金额/时间/已采取行动等\"]}";
+
+    /** P1-8：对客口播话术系统提示词公共头（情绪口径/坐席画像在运行时变量化追加） */
+    private static final String SCRIPT_SYSTEM_PROMPT_HEAD =
+            "你是12348公共法律服务热线的坐席助手，请为坐席撰写一段对客口播话术。"
+            + "要求：口语化、礼貌、简明，第二人称直接对群众说话；只依据给定案情，"
+            + "不编造事实、不作胜诉承诺、不代替官方结论；可包含安抚与明确的下一步引导，"
+            + "直接输出话术正文，不要加标题、引号或解释。";
 }

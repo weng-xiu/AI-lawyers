@@ -61,6 +61,9 @@ final class VoiceFrames
     /** P1-8：Copilot 建议动作（createTicket/queryTicket 白名单草稿） */
     static final String T_COPILOT_ACTIONS = "copilot_actions";
 
+    /** P1-8：Copilot 对客口播话术（结合情绪/纠纷类型/坐席画像个性化生成） */
+    static final String T_COPILOT_SCRIPT = "copilot_script";
+
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private VoiceFrames()
@@ -212,6 +215,15 @@ final class VoiceFrames
         Map<String, Object> m = base(T_COPILOT_ACTIONS);
         m.put("seq", seq);
         m.put("actions", actions == null ? java.util.Collections.emptyList() : actions);
+        return write(m);
+    }
+
+    /** P1-8：对客口播话术帧（script 为空串表示本次未生成/已降级） */
+    static String copilotScript(long seq, String script)
+    {
+        Map<String, Object> m = base(T_COPILOT_SCRIPT);
+        m.put("seq", seq);
+        m.put("script", script == null ? "" : script);
         return write(m);
     }
 

@@ -37,6 +37,23 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by status_from, sort_no
     </select>
 
+    <select id="selectDefinitionList" parameterType="AiTicketFlowDefinition"
+            resultMap="FlowDefinitionResult">
+        select <include refid="columns"/> from ai_ticket_flow_definition
+        <where>
+            <if test="flowCode != null and flowCode != ''"> and flow_code = #{flowCode}</if>
+            <if test="statusFrom != null and statusFrom != ''"> and status_from = #{statusFrom}</if>
+            <if test="actionCode != null and actionCode != ''"> and action_code = #{actionCode}</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+        </where>
+        order by flow_code, status_from, sort_no
+    </select>
+
+    <select id="selectByFlowId" parameterType="Long" resultMap="FlowDefinitionResult">
+        select <include refid="columns"/> from ai_ticket_flow_definition
+        where flow_id = #{flowId}
+    </select>
+
     <select id="selectRule" resultMap="FlowDefinitionResult">
         select <include refid="columns"/> from ai_ticket_flow_definition
         where status = '0' and flow_code = #{flowCode}

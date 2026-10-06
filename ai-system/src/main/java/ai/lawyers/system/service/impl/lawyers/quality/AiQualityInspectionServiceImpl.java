@@ -32,6 +32,7 @@ import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 import ai.lawyers.system.service.lawyers.quality.IAiQualityInspectionService;
 import ai.lawyers.system.service.lawyers.queue.MessageNotifyDispatcher;
+import ai.lawyers.system.service.impl.lawyers.storage.RecordingUploadService;
 import ai.lawyers.system.service.lawyers.storage.RecordingStorageService;
 import ai.lawyers.system.service.lawyers.summary.IAiCallSummaryService;
 import ai.lawyers.system.service.lawyers.voice.VoiceEngineManager;
@@ -117,6 +118,21 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
     /** 录音文件基础路径（对应 FreeSWITCH recordings_dir）；默认相对路径（跨平台），由环境变量覆盖 */
     @Value("${call.recording.base-path:recordings}")
     private String recordingBasePath;
+
+    /**
+     * P0-1：质检转写独立引擎覆盖（mock/dashscope/ali/dianxin）。
+     * 为空时跟随全局 voice.engine；灰度开量第一阶段可只把质检切到真实 ASR，不影响 IVR/TTS。
+     */
+    @Value("${ai.quality.asr-engine:}")
+    private String qualityAsrEngine;
+
+    /** P0-5：转写前等待录音落盘就绪的最长时间（秒），超时按可恢复异常重试 */
+    @Value("${ai.quality.ready-timeout-seconds:60}")
+    private long readyTimeoutSeconds;
+
+    /** P0-5：录音就绪轮询间隔（毫秒） */
+    @Value("${call.recording.upload.ready-poll-interval-ms:500}")
+    private long readyPollIntervalMs;
 
     /** F2：录音存储抽象（本地/对象存储），为空时退化到本地文件 */
     @Autowired(required = false)
@@ -241,11 +257,18 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
             log.info("AI质检完成 inspectionId={} recordId={} score={}",
                     ins.getInspectionId(), recordId, score.totalScore);
         }
+        catch (RecordingNotReadyException e)
+        {
+            // P0-5：录音尚未落盘属可恢复异常——置回待检(0)，由 quality-transcribe 队列重投
+            // （Stream at-least-once，重试用尽转死信后由定时补扫兜底），不落失败终态
+            log.info("录音未就绪，置回待检等待重投 inspectionId={} recordId={}: {}",
+                    ins.getInspectionId(), recordId, e.getMessage());
+            inspectionMapper.casAiStatus(ins.getInspectionId(), "1", "0");
+        }
         catch (Exception e)
         {
             log.warn("AI质检失败 inspectionId={} recordId={}: {}", ins.getInspectionId(), recordId, e.getMessage());
-            // 录音未落盘等可恢复异常：置回待检(0)并抛出，由队列重投；
-            // 此处统一置失败(3)，依赖死信/手动重检，避免无录音时无限重投
+            // 其余异常统一置失败(3)，依赖死信/手动重检，避免无录音时无限重投
             markFail(ins.getInspectionId(), e.getMessage());
         }
     }
@@ -262,13 +285,13 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
             String key = record.getRecordFile();
             if (StringUtils.isEmpty(key))
             {
-                throw new IllegalStateException("录音文件尚未就绪 recordId=" + record.getRecordId());
+                throw new RecordingNotReadyException("录音文件尚未就绪 recordId=" + record.getRecordId());
             }
             try (java.io.InputStream in = recordingStorageService.load(key))
             {
                 if (in == null)
                 {
-                    throw new IllegalStateException("录音文件尚未就绪 recordId=" + record.getRecordId());
+                    throw new RecordingNotReadyException("录音文件尚未就绪 recordId=" + record.getRecordId());
                 }
                 java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
                 byte[] buf = new byte[8192];
@@ -284,17 +307,25 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
         else
         {
             File file = resolveRecordingFile(record);
-            if (file == null || !file.exists() || !file.isFile())
+            if (file == null)
             {
-                throw new IllegalStateException("录音文件尚未就绪 recordId=" + record.getRecordId());
+                throw new RecordingNotReadyException("录音文件尚未就绪 recordId=" + record.getRecordId());
+            }
+            // P0-5：等待落盘完成（存在 + 长度 > 0 + 连续两次轮询长度不变），避免读到不完整音频
+            long timeoutMs = Math.max(0L, readyTimeoutSeconds) * 1000L;
+            if (!RecordingUploadService.waitUntilReady(file, timeoutMs, Math.max(1L, readyPollIntervalMs)))
+            {
+                throw new RecordingNotReadyException("录音文件尚未就绪 recordId=" + record.getRecordId());
             }
             audio = Files.readAllBytes(file.toPath());
             fileName = file.getName();
         }
 
         String format = guessFormat(fileName);
-        String text = voiceEngineManager.transcribe(
-                voiceEngineManager.defaultEngine(), audio, format, 16000, null);
+        VoiceModelEnum engine = StringUtils.isNotEmpty(qualityAsrEngine)
+                ? VoiceModelEnum.of(qualityAsrEngine)
+                : voiceEngineManager.defaultEngine();
+        String text = voiceEngineManager.transcribe(engine, audio, format, 16000, null);
         return text == null ? "" : text.trim();
     }
 

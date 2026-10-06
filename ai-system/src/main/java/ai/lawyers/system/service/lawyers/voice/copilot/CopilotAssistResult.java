@@ -62,6 +62,9 @@ public class CopilotAssistResult
     /** P1-8：建议动作（默认空，仅要素抽取成功时生成 createTicket 草稿） */
     private List<SuggestedAction> actions = new ArrayList<>();
 
+    /** P1-8：个性化对客口播话术（供坐席参考，可直接念读/修改；生成失败为空） */
+    private String suggestedScript = "";
+
     public static CopilotAssistResult empty()
     {
         return new CopilotAssistResult();
@@ -110,5 +113,11 @@ public class CopilotAssistResult
     public void setActions(List<SuggestedAction> actions)
     {
         this.actions = actions == null ? Collections.<SuggestedAction>emptyList() : actions;
+    }
+
+    public String getSuggestedScript() { return suggestedScript; }
+    public void setSuggestedScript(String suggestedScript)
+    {
+        this.suggestedScript = suggestedScript == null ? "" : suggestedScript;
     }
 }

@@ -277,6 +277,15 @@ ai:
     rerank-url: ${AI_RAG_RERANK_URL:}
     rerank-model: ${AI_RAG_RERANK_MODEL:bge-reranker-base}
     rerank-api-key: ${AI_RAG_RERANK_API_KEY:}
+  # P1-10 知识库自动运营
+  knowledge:
+    # 自动沉淀定时任务总开关
+    auto-draft-enabled: ${AI_KNOWLEDGE_AUTO_DRAFT_ENABLED:true}
+    # 回溯天数 / 最低质检分 / 单轮上限 / cron
+    auto-draft-days: ${AI_KNOWLEDGE_AUTO_DRAFT_DAYS:7}
+    auto-draft-min-score: ${AI_KNOWLEDGE_AUTO_DRAFT_MIN_SCORE:90}
+    auto-draft-limit: ${AI_KNOWLEDGE_AUTO_DRAFT_LIMIT:20}
+    auto-draft-cron: ${AI_KNOWLEDGE_AUTO_DRAFT_CRON:0 17 3 * * ?}
   # T4-1 智能质检
   quality:
     # 质检总开关：关闭则不投递/不消费质检任务
@@ -287,6 +296,11 @@ ai:
     sample-rate: ${AI_QUALITY_SAMPLE_RATE:1.0}
     # P1-7：规则引擎违禁词（逗号分隔；不配置则用代码内置清单：承诺胜诉/包赢/私自收费/风险代理等）
     banned-words: ${AI_QUALITY_BANNED_WORDS:承诺胜诉,包赢,保证打赢,官司包在我身上,私自收费,私下收费,风险代理,私了费,拿钱办事}
+    # P0-5：转写前等待录音落盘就绪的最长时间（秒），超时置回待检由队列/定时补扫重试
+    ready-timeout-seconds: ${AI_QUALITY_READY_TIMEOUT_SECONDS:60}
+    # P0-1：质检转写独立引擎覆盖（mock/dashscope/ali/dianxin）。为空跟随全局 voice.engine；
+    # 灰度第一阶段只开质检 ASR：配 dashscope（或其他真实引擎）并保证 voice.asr-base-url/凭证就绪
+    asr-engine: ${AI_QUALITY_ASR_ENGINE:}
   # P3-E3 话后 AI 通话小结
   call-summary:
     # 小结总开关：关闭后手动接口与质检联动均不生成
@@ -321,6 +335,16 @@ ai:
     ticket-vector-enabled: ${AI_COPILOT_TICKET_VECTOR_ENABLED:true}
     # P1-8：工单向量命中阈值（余弦相似度，低于不推荐）
     ticket-similarity-threshold: ${AI_COPILOT_TICKET_SIMILARITY_THRESHOLD:0.5}
+    # P1-8：个性化对客口播话术开关（关闭后不生成、不下发 copilot_script 帧）
+    script-enabled: ${AI_COPILOT_SCRIPT_ENABLED:true}
+    # P1-8：坐席采纳画像回溯天数（注入话术 SYSTEM_PROMPT，贴合坐席表达习惯）
+    profile-days: ${AI_COPILOT_PROFILE_DAYS:30}
+  # P1-8 仿真评测（Copilot/机器人统一异步任务平台 + 语义打分）
+  simulation:
+    # 检查点 embedding 语义相似度判分开关（关闭回退纯关键词）
+    semantic-enabled: ${AI_SIMULATION_SEMANTIC_ENABLED:true}
+    # 语义判分通过阈值（余弦相似度，低于阈值视为未命中）
+    semantic-threshold: ${AI_SIMULATION_SEMANTIC_THRESHOLD:0.75}
 
 # ============================================================
 # 语音引擎配置（TTS / ASR）。ASR 为 OpenAI/Whisper 兼容端点
@@ -445,6 +469,13 @@ call:
       # RECORD_STOP 后等待文件落盘就绪：文件存在+长度>0+长度连续两次轮询不变
       ready-timeout-seconds: ${CALL_RECORDING_READY_TIMEOUT_SECONDS:30}
       ready-poll-interval-ms: ${CALL_RECORDING_READY_POLL_INTERVAL_MS:500}
+
+    # P0-5：定时补扫上传前态话单（队列溢出/上传失败漏处理兜底），集群经 Redis 单主锁互斥
+    reconcile-enabled: ${CALL_RECORDING_RECONCILE_ENABLED:true}
+    reconcile-cron: ${CALL_RECORDING_RECONCILE_CRON:0 11 */1 * * ?}
+    reconcile-min-age-minutes: ${CALL_RECORDING_RECONCILE_MIN_AGE_MINUTES:5}
+    reconcile-max-age-hours: ${CALL_RECORDING_RECONCILE_MAX_AGE_HOURS:24}
+    reconcile-batch-limit: ${CALL_RECORDING_RECONCILE_BATCH_LIMIT:200}
 
   # ---------- P0-2：运营大屏预聚合数据源 ----------
   dashboard:

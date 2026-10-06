@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import ai.lawyers.common.utils.StringUtils;
+import ai.lawyers.system.service.lawyers.voice.SimulationScorer;
 
 /**
  * G3 深化（V2.79）：Copilot 坐席辅助批量仿真回归。
@@ -54,6 +55,10 @@ public class CopilotSimulationService
 
     @Autowired
     private CopilotAssistService copilotAssistService;
+
+    /** P1-8：语义打分器（关键词降级 + embedding 相似度） */
+    @Autowired
+    private SimulationScorer scorer;
 
     /**
      * 用给定用例集执行仿真。
@@ -138,8 +143,9 @@ public class CopilotSimulationService
         JsonNode typeKws = checks.path("disputeTypeKeywords");
         if (typeKws.isArray() && typeKws.size() > 0)
         {
-            boolean hit = matchAny(r.getDisputeType(), typeKws);
-            record(out, counter, "纠纷类型命中 " + join(typeKws), hit);
+            SimulationScorer.Score s =
+                    scorer.scoreAny(r.getDisputeType(), toStringList(typeKws));
+            recordScore(out, counter, "纠纷类型命中 " + join(typeKws), s);
         }
 
         // 诉求
@@ -147,7 +153,8 @@ public class CopilotSimulationService
         if (claimKws.isArray() && claimKws.size() > 0)
         {
             String claims = String.join("；", r.getClaims());
-            record(out, counter, "诉求命中 " + join(claimKws), matchAny(claims, claimKws));
+            recordScore(out, counter, "诉求命中 " + join(claimKws),
+                    scorer.scoreAny(claims, toStringList(claimKws)));
         }
 
         // 紧急度
@@ -168,8 +175,8 @@ public class CopilotSimulationService
             {
                 lawText.append(law.getTitle()).append(' ').append(law.getLawArticle()).append(' ');
             }
-            record(out, counter, "法条命中 " + join(lawKws),
-                    matchAny(lawText.toString(), lawKws));
+            recordScore(out, counter, "法条命中 " + join(lawKws),
+                    scorer.scoreAny(lawText.toString(), toStringList(lawKws)));
         }
 
         // 法条数量下限
@@ -252,22 +259,35 @@ public class CopilotSimulationService
         return sb.toString();
     }
 
-    /** text 命中关键词数组任一即 true（空文本/空词均不命中） */
-    private boolean matchAny(String text, JsonNode keywords)
+    /** 记录语义评分检查点：按阈值判定，附相似度/模式/命中词 */
+    private ObjectNode recordScore(ArrayNode out, CheckCounter counter, String name,
+            SimulationScorer.Score score)
     {
-        if (StringUtils.isEmpty(text))
+        boolean passed = scorer.passed(score);
+        ObjectNode node = record(out, counter, name, passed);
+        node.put("score", Math.round(score.getSimilarity() * 1000d) / 1000d);
+        node.put("mode", score.getMode());
+        ArrayNode hitNode = node.putArray("matched");
+        score.getMatchedKeywords().forEach(hitNode::add);
+        return node;
+    }
+
+    /** JsonNode 数组转字符串列表 */
+    private List<String> toStringList(JsonNode array)
+    {
+        List<String> list = new ArrayList<>();
+        if (array != null && array.isArray())
         {
-            return false;
-        }
-        for (JsonNode kw : keywords)
-        {
-            String word = kw.asText("");
-            if (!word.isEmpty() && text.contains(word))
+            for (JsonNode n : array)
             {
-                return true;
+                String s = n.asText("");
+                if (!s.isEmpty())
+                {
+                    list.add(s);
+                }
             }
         }
-        return false;
+        return list;
     }
 
     private ObjectNode record(ArrayNode out, CheckCounter counter, String name, boolean passed)

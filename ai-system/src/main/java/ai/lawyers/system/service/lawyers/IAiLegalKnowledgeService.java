@@ -99,4 +99,18 @@ public interface IAiLegalKnowledgeService
      * @return 结果
      */
     public int auditAiLegalKnowledge(AiLegalKnowledge aiLegalKnowledge);
+
+    /**
+     * P1-10：标记法规效力状态（1现行有效/2已修订/3已失效）。
+     *
+     * <p>更新 valid_status 后触发 RAG 单条重建（失效/修订立即移出向量索引），
+     * 并给管理员角色发站内信提醒。</p>
+     *
+     * @param knowledgeId 知识ID
+     * @param validStatus 效力状态（1/2/3）
+     * @param reason 标记原因/备注
+     * @param operator 操作人
+     * @return 结果
+     */
+    public int markValidStatus(Long knowledgeId, String validStatus, String reason, String operator);
 }

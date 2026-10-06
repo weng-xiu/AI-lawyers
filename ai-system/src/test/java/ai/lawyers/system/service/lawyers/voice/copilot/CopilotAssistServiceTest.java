@@ -19,6 +19,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import ai.lawyers.system.domain.lawyers.AiCallTicket;
 import ai.lawyers.system.domain.lawyers.AiLegalKnowledgeChunk;
 import ai.lawyers.system.mapper.lawyers.AiCallTicketMapper;
+import ai.lawyers.system.mapper.lawyers.AiCopilotFeedbackMapper;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
 import ai.lawyers.system.service.lawyers.rag.RagChunk;
@@ -41,6 +42,8 @@ class CopilotAssistServiceTest
 
     private AiCallTicketMapper ticketMapper;
 
+    private AiCopilotFeedbackMapper feedbackMapper;
+
     private HotlineMetrics metrics;
 
     private CopilotAssistService service;
@@ -51,14 +54,18 @@ class CopilotAssistServiceTest
         modelConfigService = Mockito.mock(IAiModelConfigService.class);
         ragSearchService = Mockito.mock(RagSearchService.class);
         ticketMapper = Mockito.mock(AiCallTicketMapper.class);
+        feedbackMapper = Mockito.mock(AiCopilotFeedbackMapper.class);
         metrics = Mockito.mock(HotlineMetrics.class);
         service = new CopilotAssistService();
         service.setEnabled(true);
         ReflectionTestUtils.setField(service, "lawLimit", 3);
         ReflectionTestUtils.setField(service, "ticketLimit", 3);
+        ReflectionTestUtils.setField(service, "scriptEnabled", true);
+        ReflectionTestUtils.setField(service, "profileDays", 30);
         ReflectionTestUtils.setField(service, "modelConfigService", modelConfigService);
         ReflectionTestUtils.setField(service, "ragSearchService", ragSearchService);
         ReflectionTestUtils.setField(service, "ticketMapper", ticketMapper);
+        ReflectionTestUtils.setField(service, "feedbackMapper", feedbackMapper);
         ReflectionTestUtils.setField(service, "metrics", metrics);
     }
 
@@ -292,5 +299,107 @@ class CopilotAssistServiceTest
         service.assist(TEXT, "sess-uuid-1");
         verify(ticketMapper).selectSimilarTickets(anyString(), anyString(),
                 isNull(), org.mockito.ArgumentMatchers.anyInt());
+    }
+
+    // ---------- P1-8：个性化对客口播话术 ----------
+
+    private void stubScript(String script)
+    {
+        when(modelConfigService.chat(anyString(), anyString(),
+                eq(AiModelCallLogRecorder.SCENE_AGENT))).thenReturn(script);
+    }
+
+    @Test
+    void assist_scriptGenerated_andSystemPromptCarriesEmotionAndProfile()
+    {
+        stubModel(JSON);
+        when(ragSearchService.search(anyString(), isNull()))
+                .thenReturn(new ArrayList<RagChunk>());
+        when(ticketMapper.selectSimilarTickets(anyString(), anyString(),
+                org.mockito.ArgumentMatchers.<Long>isNull(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(new ArrayList<AiCallTicket>());
+        stubScript("您好，请您先别着急，我们一起来处理工资的事情。");
+        java.util.Map<String, Object> profileRow = new java.util.HashMap<>();
+        profileRow.put("total", 10);
+        profileRow.put("adoptCount", 8);
+        profileRow.put("modifyCount", 1);
+        profileRow.put("ignoreCount", 1);
+        when(feedbackMapper.selectAgentProfile(org.mockito.ArgumentMatchers.eq(7L),
+                org.mockito.ArgumentMatchers.any(java.util.Date.class),
+                org.mockito.ArgumentMatchers.any(java.util.Date.class))).thenReturn(profileRow);
+
+        CopilotAssistResult r = service.assist(TEXT, null, 7L);
+
+        assertThat(r.getSuggestedScript()).isEqualTo("您好，请您先别着急，我们一起来处理工资的事情。");
+
+        org.mockito.ArgumentCaptor<String> systemPrompt =
+                org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(modelConfigService).chat(systemPrompt.capture(), anyString(),
+                eq(AiModelCallLogRecorder.SCENE_AGENT));
+        // 平和情绪口径 + 坐席画像（采纳率 80%）均注入 SYSTEM_PROMPT
+        assertThat(systemPrompt.getValue()).contains("平和");
+        assertThat(systemPrompt.getValue()).contains("采纳率约80%");
+    }
+
+    @Test
+    void assist_urgentEmotion_systemPromptCarriesCrisisGuidance()
+    {
+        stubModel("{\"disputeType\":\"家暴\",\"claims\":[],\"urgency\":\"urgent\",\"keyFacts\":[]}");
+        when(ragSearchService.search(anyString(), isNull()))
+                .thenReturn(new ArrayList<RagChunk>());
+        stubScript("您先别害怕，注意安全，必要时请立即报警。");
+
+        service.assist("他正在打我，救命", null, 3L);
+
+        org.mockito.ArgumentCaptor<String> systemPrompt =
+                org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(modelConfigService).chat(systemPrompt.capture(), anyString(),
+                eq(AiModelCallLogRecorder.SCENE_AGENT));
+        assertThat(systemPrompt.getValue()).contains("紧急危机");
+    }
+
+    @Test
+    void assist_scriptDisabled_noChatAndEmptyScript()
+    {
+        stubModel(JSON);
+        ReflectionTestUtils.setField(service, "scriptEnabled", false);
+
+        CopilotAssistResult r = service.assist(TEXT, null, 7L);
+
+        assertThat(r.getSuggestedScript()).isEmpty();
+        verify(modelConfigService, never()).chat(anyString(), anyString(),
+                eq(AiModelCallLogRecorder.SCENE_AGENT));
+    }
+
+    @Test
+    void assist_scriptChatThrows_emptyScriptNoPropagation()
+    {
+        stubModel(JSON);
+        when(ragSearchService.search(anyString(), isNull()))
+                .thenReturn(new ArrayList<RagChunk>());
+        when(modelConfigService.chat(anyString(), anyString(),
+                eq(AiModelCallLogRecorder.SCENE_AGENT)))
+                .thenThrow(new RuntimeException("模型不可用"));
+
+        CopilotAssistResult r = service.assist(TEXT, null, 7L);
+
+        assertThat(r.getSuggestedScript()).isEmpty();
+    }
+
+    @Test
+    void assist_nullAgentId_skipsProfileButStillScripts()
+    {
+        stubModel(JSON);
+        when(ragSearchService.search(anyString(), isNull()))
+                .thenReturn(new ArrayList<RagChunk>());
+        stubScript("您好，关于拖欠工资，我为您说明下一步。");
+
+        CopilotAssistResult r = service.assist(TEXT, null, null);
+
+        assertThat(r.getSuggestedScript()).isNotEmpty();
+        verify(feedbackMapper, never()).selectAgentProfile(
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.any(java.util.Date.class),
+                org.mockito.ArgumentMatchers.any(java.util.Date.class));
     }
 }

@@ -5,6 +5,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.Collections;
@@ -99,5 +100,38 @@ public class AiLegalKnowledgeControllerPermTest extends AbstractPermMvcTest
                 .andExpect(status().isOk());
 
         verify(knowledgeDraftService).draftFromCall(1L);
+    }
+
+    @Test
+    void markValidStatus_requiresEditPermission() throws Exception
+    {
+        when(aiLegalKnowledgeService.markValidStatus(any(), any(), any(), any())).thenReturn(1);
+
+        // 未登录 401
+        mockMvc.perform(put("/lawyers/knowledge/valid-status")
+                        .param("knowledgeId", "1")
+                        .param("validStatus", "3"))
+                .andExpect(status().isUnauthorized());
+
+        // 仅 list 权限 403
+        mockMvc.perform(put("/lawyers/knowledge/valid-status")
+                        .param("knowledgeId", "1")
+                        .param("validStatus", "3")
+                        .with(loginAs("lawyers:knowledge:list")))
+                .andExpect(status().isForbidden());
+
+        // 有 edit 权限放行，参数透传 Service
+        mockMvc.perform(put("/lawyers/knowledge/valid-status")
+                        .param("knowledgeId", "1")
+                        .param("validStatus", "3")
+                        .param("reason", "新法已取代")
+                        .with(loginAs("lawyers:knowledge:edit")))
+                .andExpect(status().isOk());
+
+        verify(aiLegalKnowledgeService).markValidStatus(
+                org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.eq("3"),
+                org.mockito.ArgumentMatchers.eq("新法已取代"),
+                any());
     }
 }

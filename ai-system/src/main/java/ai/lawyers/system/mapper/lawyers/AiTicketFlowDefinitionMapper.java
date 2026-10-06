@@ -18,6 +18,12 @@ public interface AiTicketFlowDefinitionMapper
     /** 查询某流程全部规则（管理页） */
     List<AiTicketFlowDefinition> selectByFlowCode(String flowCode);
 
+    /** 管理端条件过滤列表（flowCode/statusFrom/actionCode/status 可空） */
+    List<AiTicketFlowDefinition> selectDefinitionList(AiTicketFlowDefinition query);
+
+    /** 按主键查询单条规则（编辑回显） */
+    AiTicketFlowDefinition selectByFlowId(Long flowId);
+
     /** 查询单条规则（动作执行前校验） */
     AiTicketFlowDefinition selectRule(@Param("flowCode") String flowCode,
                                       @Param("statusFrom") String statusFrom,

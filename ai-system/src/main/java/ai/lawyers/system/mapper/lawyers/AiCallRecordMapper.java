@@ -69,4 +69,19 @@ public interface AiCallRecordMapper
      * resultType=map，拦截器仅处理域对象，故返回值保留库中原始形态。
      */
     public List<java.util.Map<String, Object>> selectRawForMigrate();
+
+    /**
+     * P0-5：扫描上传前态话单（队列溢出/上传失败漏处理）。
+     * <p>上传成功后 record_file 被改为 object key（纯文件名，不含路径分隔符），
+     * 故以 record_file 含路径分隔符判定为"仍待上传/加密"，仅取近 minAge 分钟前
+     * 已结束（status=1）的话单，按结束时间升序限量。</p>
+     *
+     * @param minAgeMinutes 只取结束时间早于当前时间 N 分钟的话单（避开在途任务）
+     * @param maxAgeHours   只取结束时间在近 N 小时内的话单
+     * @param limit         单轮上限
+     */
+    public List<AiCallRecord> selectPendingUploadRecords(
+            @org.apache.ibatis.annotations.Param("minAgeMinutes") int minAgeMinutes,
+            @org.apache.ibatis.annotations.Param("maxAgeHours") int maxAgeHours,
+            @org.apache.ibatis.annotations.Param("limit") int limit);
 }

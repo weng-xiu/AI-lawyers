@@ -17,7 +17,9 @@ import org.slf4j.LoggerFactory;
 import ai.lawyers.system.domain.lawyers.AiCallTicket;
 import ai.lawyers.system.domain.lawyers.AiSlaPolicy;
 import ai.lawyers.system.domain.lawyers.AiTicketFlowDefinition;
+import ai.lawyers.system.domain.lawyers.AiTicketTransfer;
 import ai.lawyers.system.mapper.lawyers.AiCallTicketMapper;
+import ai.lawyers.system.mapper.lawyers.AiTicketTransferMapper;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
 import ai.lawyers.system.service.lawyers.IAiSlaPolicyService;
 import ai.lawyers.system.service.lawyers.TicketFlowService;
@@ -46,6 +48,10 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
     /** P1-6：工单流转合法性 + 角色校验（状态机为唯一依据） */
     @Autowired
     private TicketFlowService ticketFlowService;
+
+    /** P1-6：跨域转办流水，纳入统一工单时间线可审计 */
+    @Autowired
+    private AiTicketTransferMapper aiTicketTransferMapper;
 
     @Override
     public AiCallTicket selectAiCallTicketByTicketId(Long ticketId)
@@ -308,7 +314,68 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
             addTimelineNode(timeline, "SLA超时提醒", "系统", ticket.getRemindTime(),
                     "工单已超过SLA截止时间，请尽快处理", "#d97706", "el-icon-warning");
         }
+        // 6. P1-6：跨域转办（发起 + 外部回调终态），纳入统一工单视图
+        addTransferNodes(timeline, ticketId);
+        // 外派节点时间分布在建单之后、办结之前，统一按时间升序排列
+        timeline.sort((a, b) ->
+        {
+            String ta = String.valueOf(a.get("time"));
+            String tb = String.valueOf(b.get("time"));
+            if (StringUtils.isEmpty(ta)) { return 1; }
+            if (StringUtils.isEmpty(tb)) { return -1; }
+            return ta.compareTo(tb);
+        });
         return timeline;
+    }
+
+    /** 追加该工单的跨域转办节点：每条流水至少有“发起”，收到外部回调终态再补一条结果节点 */
+    private void addTransferNodes(List<Map<String, Object>> timeline, Long ticketId)
+    {
+        AiTicketTransfer query = new AiTicketTransfer();
+        query.setTicketId(ticketId);
+        List<AiTicketTransfer> transfers = aiTicketTransferMapper.selectAiTicketTransferList(query);
+        for (AiTicketTransfer tr : transfers)
+        {
+            boolean out = "OUT".equals(tr.getDirection());
+            String org = StringUtils.isNotEmpty(tr.getOrgName()) ? tr.getOrgName()
+                    : (StringUtils.isNotEmpty(tr.getExternalType()) ? tr.getExternalType() : "外部机构");
+            addTimelineNode(timeline, out ? "跨域转出" : "外部转入",
+                    tr.getCreateBy(), tr.getTransferTime(),
+                    (out ? "已发起跨域转办至：" : "收到外部转入：") + org
+                            + (StringUtils.isNotEmpty(tr.getRemark()) ? "；" + tr.getRemark() : ""),
+                    "#0e7490", out ? "el-icon-share" : "el-icon-download");
+            if (tr.getCallbackTime() != null && StringUtils.isNotEmpty(tr.getExternalStatus()))
+            {
+                String ext = tr.getExternalStatus();
+                boolean ok = "DONE".equals(ext);
+                boolean bad = "REJECTED".equals(ext) || "FAILED".equals(ext);
+                addTimelineNode(timeline,
+                        out ? (ok ? "转出办结" : bad ? "转出异常" : "转出进展")
+                            : (ok ? "转入办结" : bad ? "转入异常" : "转入进展"),
+                        "外部机构", tr.getCallbackTime(),
+                        "外部状态：" + externalStatusLabel(ext)
+                                + (StringUtils.isNotEmpty(tr.getExternalTicketNo())
+                                        ? "；外部工单号：" + tr.getExternalTicketNo() : "")
+                                + (StringUtils.isNotEmpty(tr.getFailReason())
+                                        ? "；" + tr.getFailReason() : ""),
+                        ok ? "#2B8C6E" : bad ? "#d94841" : "#b45309",
+                        ok ? "el-icon-circle-check" : bad ? "el-icon-error" : "el-icon-time");
+            }
+        }
+    }
+
+    private String externalStatusLabel(String ext)
+    {
+        switch (ext)
+        {
+            case "PENDING": return "待受理";
+            case "ACCEPTED": return "已受理";
+            case "PROCESSING": return "处理中";
+            case "DONE": return "已办结";
+            case "REJECTED": return "已驳回";
+            case "FAILED": return "失败";
+            default: return ext;
+        }
     }
 
     private void addTimelineNode(List<Map<String, Object>> timeline, String title, String user,

@@ -122,6 +122,21 @@ public class WebSocketAuthGuard
     }
 
     /**
+     * P1-8：解析流式语音通道握手令牌对应的登录用户（供端点取坐席ID注入话术个性化）。
+     *
+     * @param queryString 会话 query 串
+     * @return 登录用户；鉴权关闭或令牌无效时返回 null
+     */
+    public LoginUser resolveVoiceLoginUser(String queryString)
+    {
+        if (!authEnabled)
+        {
+            return null;
+        }
+        return resolveLoginUser(queryString);
+    }
+
+    /**
      * 解析握手 query 中的令牌并换取登录态；任何异常均视为未认证（不抛异常影响握手流程）。
      */
     private LoginUser resolveLoginUser(String queryString)

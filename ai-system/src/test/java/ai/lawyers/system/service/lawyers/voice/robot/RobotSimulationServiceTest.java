@@ -5,6 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import ai.lawyers.system.service.lawyers.voice.SimulationScorer;
 
 /**
  * P1-8：机器人仿真评测服务单测——期望词命中/缺失、违禁词、降级聚合。
@@ -21,6 +22,11 @@ class RobotSimulationServiceTest
     {
         service = new RobotSimulationService();
         ReflectionTestUtils.setField(service, "voiceRobotService", stubRobot());
+        // P1-8：注入关闭语义的真实评分器（纯关键词，无 embedding 依赖）
+        SimulationScorer scorer = new SimulationScorer();
+        ReflectionTestUtils.setField(scorer, "semanticEnabled", false);
+        ReflectionTestUtils.setField(scorer, "semanticThreshold", 0.75d);
+        ReflectionTestUtils.setField(service, "scorer", scorer);
     }
 
     @Test

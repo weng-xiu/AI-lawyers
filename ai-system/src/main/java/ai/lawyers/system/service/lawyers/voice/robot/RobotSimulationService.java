@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import ai.lawyers.common.utils.StringUtils;
+import ai.lawyers.system.service.lawyers.voice.SimulationScorer;
 
 /**
  * P1-8（V2.60）：上线前仿真回归——用合成对话集自动评测语音机器人应答。
@@ -42,6 +43,10 @@ public class RobotSimulationService
 
     @Autowired
     private VoiceRobotService voiceRobotService;
+
+    /** P1-8：语义打分器（关键词降级 + embedding 相似度） */
+    @Autowired
+    private SimulationScorer scorer;
 
     /**
      * 用请求体用例集执行仿真。
@@ -88,19 +93,21 @@ public class RobotSimulationService
                                 voiceRobotService.simulateAnswer(user, "sim-" + caseId);
                         String answer = result.getAnswer() == null ? "" : result.getAnswer();
 
-                        List<String> missing = new ArrayList<>();
+                        List<String> expectWords = new ArrayList<>();
                         JsonNode expect = t.path("expectKeywords");
                         if (expect.isArray())
                         {
                             for (JsonNode kw : expect)
                             {
                                 String word = kw.asText("");
-                                if (!word.isEmpty() && !answer.contains(word))
+                                if (!word.isEmpty())
                                 {
-                                    missing.add(word);
+                                    expectWords.add(word);
                                 }
                             }
                         }
+                        SimulationScorer.Score expectScore =
+                                scorer.scoreAll(answer, expectWords);
                         List<String> forbiddenHit = new ArrayList<>();
                         JsonNode forbidden = t.path("forbidden");
                         if (forbidden.isArray())
@@ -118,9 +125,13 @@ public class RobotSimulationService
                         ObjectNode turnNode = turnNodes.addObject();
                         turnNode.put("user", user);
                         turnNode.put("answer", answer);
+                        boolean expectPassed = scorer.passed(expectScore);
                         boolean turnPassed = !result.isDegraded()
-                                && missing.isEmpty() && forbiddenHit.isEmpty();
+                                && expectPassed && forbiddenHit.isEmpty();
                         turnNode.put("passed", turnPassed);
+                        turnNode.put("score",
+                                Math.round(expectScore.getSimilarity() * 1000d) / 1000d);
+                        turnNode.put("mode", expectScore.getMode());
                         if (result.isDegraded())
                         {
                             turnNode.put("degradedReason",
@@ -128,7 +139,16 @@ public class RobotSimulationService
                                             ? "degraded" : result.getFallbackReason());
                         }
                         ArrayNode missNode = turnNode.putArray("missing");
-                        missing.forEach(missNode::add);
+                        // 未达语义阈值的期望关键词视为缺失
+                        for (String word : expectWords)
+                        {
+                            if (!expectScore.getMatchedKeywords().contains(word))
+                            {
+                                missNode.add(word);
+                            }
+                        }
+                        ArrayNode matchedNode = turnNode.putArray("matched");
+                        expectScore.getMatchedKeywords().forEach(matchedNode::add);
                         ArrayNode forbNode = turnNode.putArray("forbiddenHit");
                         forbiddenHit.forEach(forbNode::add);
 

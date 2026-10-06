@@ -81,7 +81,11 @@ public class VoiceWebSocketServer
             closeQuietly(session, CloseReason.CloseCodes.VIOLATED_POLICY, "unauthorized");
             return;
         }
-        VoiceSession voiceSession = manager.register(session, sessionId, role);
+        // P1-8：取握手坐席ID（供话术个性化注入采纳画像；鉴权关闭/解析失败为 null）
+        ai.lawyers.common.core.domain.model.LoginUser loginUser =
+                authGuard.resolveVoiceLoginUser(session.getQueryString());
+        Long agentId = loginUser == null ? null : loginUser.getUserId();
+        VoiceSession voiceSession = manager.register(session, sessionId, role, agentId);
         if (voiceSession == null)
         {
             // 功能关闭或超容量

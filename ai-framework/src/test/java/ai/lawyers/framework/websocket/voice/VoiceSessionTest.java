@@ -705,8 +705,10 @@ class VoiceSessionTest
         r.setTickets(java.util.Arrays.asList(
                 new ai.lawyers.system.service.lawyers.voice.copilot.CopilotTicket(
                         7L, "GD2026001", "工资拖欠工单", "2", "拖欠两个月工资")));
+        // P1-8：VoiceSession 改调三参 assist（透传坐席 ID），桩需匹配三参版本
         when(svc.assist(org.mockito.ArgumentMatchers.anyString(),
-                org.mockito.ArgumentMatchers.anyString())).thenReturn(r);
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.<Long>any())).thenReturn(r);
 
         StreamAsrEngine stub = new StreamAsrEngine()
         {

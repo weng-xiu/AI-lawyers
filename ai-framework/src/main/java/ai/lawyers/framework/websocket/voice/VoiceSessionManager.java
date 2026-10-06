@@ -92,6 +92,17 @@ public class VoiceSessionManager
      */
     public VoiceSession register(Session wsSession, String sessionId, String role)
     {
+        return register(wsSession, sessionId, role, null);
+    }
+
+    /**
+     * P1-8：注册并初始化语音会话（带握手坐席ID，供话术个性化）。
+     *
+     * @param agentId 握手登录坐席ID；null 时话术不带采纳画像
+     * @return 会话实例；功能关闭或超容量时返回 null（端点以 1013/1008 关闭）
+     */
+    public VoiceSession register(Session wsSession, String sessionId, String role, Long agentId)
+    {
         if (!enabled)
         {
             log.warn("VoiceWS 功能关闭，拒绝连接 sessionId={}, connId={}", sessionId, wsSession.getId());
@@ -112,7 +123,7 @@ public class VoiceSessionManager
                 engineRegistry != null ? engineRegistry : new VoiceEngineRegistry(),
                 voiceProperties == null || voiceProperties.isVadEnabled(),
                 hotlineMetrics, voiceRobotService, voiceRiskActionService, copilotAssistService,
-                shadowService);
+                shadowService, agentId);
         VoiceSession old = sessions.putIfAbsent(wsSession.getId(), session);
         if (old != null)
         {

@@ -2,6 +2,7 @@ package ai.lawyers.system.service.impl.lawyers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
@@ -11,7 +12,13 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -19,7 +26,9 @@ import org.mockito.MockitoAnnotations;
 import org.springframework.test.util.ReflectionTestUtils;
 import ai.lawyers.system.domain.lawyers.AiCallTicket;
 import ai.lawyers.system.domain.lawyers.AiTicketFlowDefinition;
+import ai.lawyers.system.domain.lawyers.AiTicketTransfer;
 import ai.lawyers.system.mapper.lawyers.AiCallTicketMapper;
+import ai.lawyers.system.mapper.lawyers.AiTicketTransferMapper;
 import ai.lawyers.system.service.lawyers.TicketFlowService;
 import ai.lawyers.system.service.lawyers.rag.TicketVectorService;
 
@@ -36,6 +45,7 @@ class AiCallTicketServiceImplTest
     private AiCallTicketServiceImpl service;
 
     @Mock private AiCallTicketMapper ticketMapper;
+    @Mock private AiTicketTransferMapper transferMapper;
     @Mock private TicketFlowService ticketFlowService;
     @Mock private TicketVectorService ticketVectorService;
 
@@ -45,10 +55,13 @@ class AiCallTicketServiceImplTest
         MockitoAnnotations.openMocks(this);
         service = new AiCallTicketServiceImpl();
         ReflectionTestUtils.setField(service, "aiCallTicketMapper", ticketMapper);
+        ReflectionTestUtils.setField(service, "aiTicketTransferMapper", transferMapper);
         ReflectionTestUtils.setField(service, "ticketFlowService", ticketFlowService);
         ReflectionTestUtils.setField(service, "ticketVectorService", ticketVectorService);
         // 部分用例（再分派/工单不存在）不读角色，用 lenient 避免严格桩冗余报错
         lenient().when(ticketFlowService.currentRoleKeys()).thenReturn(Arrays.asList("agent"));
+        lenient().when(transferMapper.selectAiTicketTransferList(any()))
+                .thenReturn(Collections.emptyList());
     }
 
     private void givenTicket(String status)
@@ -177,5 +190,83 @@ class AiCallTicketServiceImplTest
     {
         when(ticketMapper.selectAiCallTicketByTicketId(TID)).thenReturn(null);
         assertThrows(IllegalArgumentException.class, () -> service.archiveTicket(TID));
+    }
+
+    // ---------------- P1-6：外派纳入统一时间线 ----------------
+
+    private static Date at(String s)
+    {
+        try
+        {
+            return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(s);
+        }
+        catch (ParseException e)
+        {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static boolean hasTitle(List<Map<String, Object>> nodes, String title)
+    {
+        return nodes.stream().anyMatch(n -> title.equals(n.get("title")));
+    }
+
+    @Test
+    void timeline_outTransfer_initiationAndDoneCallback()
+    {
+        givenTicket("2");
+        AiTicketTransfer tr = new AiTicketTransfer();
+        tr.setDirection("OUT");
+        tr.setOrgName("市法律援助中心");
+        tr.setExternalStatus("DONE");
+        tr.setExternalTicketNo("FW-88");
+        tr.setTransferTime(at("2026-10-02 09:00:00"));
+        tr.setCallbackTime(at("2026-10-02 15:00:00"));
+        when(transferMapper.selectAiTicketTransferList(any())).thenReturn(Arrays.asList(tr));
+
+        List<Map<String, Object>> nodes = service.selectTicketTimeline(TID);
+
+        assertTrue(hasTitle(nodes, "跨域转出"));
+        assertTrue(hasTitle(nodes, "转出办结"));
+        // 时间升序：转出发起早于办结回调
+        int startIdx = 0;
+        int doneIdx = 0;
+        for (int i = 0; i < nodes.size(); i++)
+        {
+            if ("跨域转出".equals(nodes.get(i).get("title"))) { startIdx = i; }
+            if ("转出办结".equals(nodes.get(i).get("title"))) { doneIdx = i; }
+        }
+        assertTrue(startIdx < doneIdx);
+    }
+
+    @Test
+    void timeline_inTransfer_rejectedCallback_showsAbnormal()
+    {
+        givenTicket("1");
+        AiTicketTransfer tr = new AiTicketTransfer();
+        tr.setDirection("IN");
+        tr.setExternalType("12345");
+        tr.setExternalStatus("REJECTED");
+        tr.setFailReason("材料不全");
+        tr.setTransferTime(at("2026-10-02 09:00:00"));
+        tr.setCallbackTime(at("2026-10-02 10:00:00"));
+        when(transferMapper.selectAiTicketTransferList(any())).thenReturn(Arrays.asList(tr));
+
+        List<Map<String, Object>> nodes = service.selectTicketTimeline(TID);
+
+        assertTrue(hasTitle(nodes, "外部转入"));
+        assertTrue(hasTitle(nodes, "转入异常"));
+        Map<String, Object> abnormal = nodes.stream()
+                .filter(n -> "转入异常".equals(n.get("title"))).findFirst().orElseThrow();
+        assertTrue(String.valueOf(abnormal.get("description")).contains("材料不全"));
+    }
+
+    @Test
+    void timeline_noTransfer_keepsBaseNodes()
+    {
+        givenTicket("0");
+        List<Map<String, Object>> nodes = service.selectTicketTimeline(TID);
+        assertTrue(hasTitle(nodes, "工单创建"));
+        assertTrue(!hasTitle(nodes, "跨域转出"));
     }
 }

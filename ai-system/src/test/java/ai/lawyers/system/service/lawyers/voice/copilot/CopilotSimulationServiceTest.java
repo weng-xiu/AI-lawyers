@@ -24,6 +24,12 @@ class CopilotSimulationServiceTest
     {
         service = new CopilotSimulationService();
         ReflectionTestUtils.setField(service, "copilotAssistService", stubAssist());
+        // P1-8：注入关闭语义的真实评分器（纯关键词，无 embedding 依赖）
+        ai.lawyers.system.service.lawyers.voice.SimulationScorer scorer =
+                new ai.lawyers.system.service.lawyers.voice.SimulationScorer();
+        ReflectionTestUtils.setField(scorer, "semanticEnabled", false);
+        ReflectionTestUtils.setField(scorer, "semanticThreshold", 0.75d);
+        ReflectionTestUtils.setField(service, "scorer", scorer);
     }
 
     @Test

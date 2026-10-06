@@ -127,6 +127,8 @@ public class VoiceSession
     /* ---- F4：坐席 Copilot 实时辅助（要素/法条/相似工单） ---- */
     /** F4：Copilot 辅助服务（null 时 final 文本不触发辅助） */
     private final ai.lawyers.system.service.lawyers.voice.copilot.CopilotAssistService copilotService;
+    /** P1-8：坐席用户 ID（用于话术个性化画像，null 时不注入画像） */
+    private final Long agentId;
     /** F4：辅助回合单线程执行器（LLM/RAG 调用不阻塞 ASR 回调） */
     private final java.util.concurrent.ExecutorService copilotExecutor;
     /** F4：辅助回合肥号器 */
@@ -209,6 +211,17 @@ public class VoiceSession
             ai.lawyers.system.service.lawyers.voice.copilot.CopilotAssistService copilotService,
             SileroVadShadowService vadShadowService)
     {
+        this(wsSession, sessionId, role, queueCapacity, engineRegistry, vadEnabled, metrics,
+                robotService, emotionAction, copilotService, vadShadowService, null);
+    }
+
+    VoiceSession(Session wsSession, String sessionId, String role, int queueCapacity,
+            VoiceEngineRegistry engineRegistry, boolean vadEnabled, HotlineMetrics metrics,
+            ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotService robotService,
+            ai.lawyers.system.service.lawyers.voice.emotion.VoiceRiskActionService emotionAction,
+            ai.lawyers.system.service.lawyers.voice.copilot.CopilotAssistService copilotService,
+            SileroVadShadowService vadShadowService, Long agentId)
+    {
         this.wsSession = wsSession;
         this.connId = wsSession.getId();
         this.sessionId = sessionId;
@@ -220,6 +233,7 @@ public class VoiceSession
         this.emotionAction = emotionAction;
         this.copilotService = copilotService;
         this.vadShadowService = vadShadowService;
+        this.agentId = agentId;
         int cap = queueCapacity > 0 ? queueCapacity : 1000;
         this.sendQueue = new LinkedBlockingQueue<>(cap);
         this.sender = new Thread(this::runSender, "voice-sender-" + connId);
@@ -783,7 +797,7 @@ public class VoiceSession
         ai.lawyers.system.service.lawyers.voice.copilot.CopilotAssistResult result;
         try
         {
-            result = copilotService.assist(payload, sessionId);
+            result = copilotService.assist(payload, sessionId, agentId);
         }
         catch (Exception e)
         {
@@ -834,6 +848,9 @@ public class VoiceSession
             actions.add(m);
         }
         enqueue(Entry.Kind.OTHER, VoiceFrames.copilotActions(seq, actions));
+
+        // P1-8：对客口播话术（空串表示未生成/已降级，客户端据此隐藏话术区）
+        enqueue(Entry.Kind.OTHER, VoiceFrames.copilotScript(seq, result.getSuggestedScript()));
     }
 
     /* ================= E4：情绪/意图识别联动 ================= */

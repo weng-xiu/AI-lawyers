@@ -12,6 +12,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
@@ -166,47 +167,174 @@ class TicketFlowServiceTest
                 "SLA 时限应约等于 now+24h，实际偏差：" + (actual.getTime() - expectedDue.getTime()) + "ms");
     }
 
-    /** 构造与 seed 一致的 fake 流程 mapper */
+    // ===== P1-6：DSL 管理端 CRUD =====
+
+    @Test
+    void crud_addNewRule_persistsAndDefaultsStatus()
+    {
+        AiTicketFlowDefinition rule = rule("complete", "2", "agent,leader");
+        rule.setStatusFrom("1");
+        rule.setFormSchema(null);
+        assertEquals(1, service.addDefinition(rule));
+        assertNotNull(rule.getFlowId());
+        assertEquals("0", rule.getStatus());
+    }
+
+    @Test
+    void crud_addDuplicate_throws()
+    {
+        AiTicketFlowDefinition dup = rule("start", "1", "agent");
+        // 与 seed 中 HOTLINE/0/start 冲突
+        assertThrows(IllegalArgumentException.class, () -> service.addDefinition(dup));
+    }
+
+    @Test
+    void crud_addMissingRequired_throws()
+    {
+        AiTicketFlowDefinition rule = rule("x", "2", "agent");
+        rule.setActionCode("  ");
+        assertThrows(IllegalArgumentException.class, () -> service.addDefinition(rule));
+    }
+
+    @Test
+    void crud_addInvalidJsonSchema_throws()
+    {
+        AiTicketFlowDefinition rule = rule("complete", "2", "agent");
+        rule.setStatusFrom("1");
+        rule.setFormSchema("{not-json");
+        assertThrows(IllegalArgumentException.class, () -> service.addDefinition(rule));
+    }
+
+    @Test
+    void crud_getExisting_ok()
+    {
+        assertEquals("start", service.getDefinition(1L).getActionCode());
+    }
+
+    @Test
+    void crud_getMissing_throws()
+    {
+        assertThrows(IllegalArgumentException.class, () -> service.getDefinition(999L));
+    }
+
+    @Test
+    void crud_updateExisting_ok()
+    {
+        AiTicketFlowDefinition rule = service.getDefinition(1L);
+        rule.setActionName("受理改名");
+        assertEquals(1, service.updateDefinition(rule));
+        assertEquals("受理改名", service.getDefinition(1L).getActionName());
+    }
+
+    @Test
+    void crud_updateWithoutId_throws()
+    {
+        AiTicketFlowDefinition rule = rule("start", "1", "agent");
+        assertThrows(IllegalArgumentException.class, () -> service.updateDefinition(rule));
+    }
+
+    @Test
+    void crud_list_returnsAll()
+    {
+        assertEquals(2, service.listDefinitions(new AiTicketFlowDefinition()).size());
+    }
+
+    /** 构造与 seed 一致的 fake 流程 mapper（带内存存储，支持管理端 CRUD 测试） */
     private AiTicketFlowDefinitionMapper fakeMapper()
     {
+        final List<AiTicketFlowDefinition> store = new ArrayList<>();
+        final AiTicketFlowDefinition start = rule("start", "1", "agent,leader");
+        start.setFlowId(1L);
+        final AiTicketFlowDefinition transfer = rule("transfer", "0", "leader,admin");
+        transfer.setFlowId(2L);
+        store.add(start);
+        store.add(transfer);
+
         return new AiTicketFlowDefinitionMapper()
         {
             @Override
             public List<AiTicketFlowDefinition> selectActions(String flowCode, String statusFrom)
             {
-                if ("HOTLINE".equals(flowCode) && "0".equals(statusFrom))
+                List<AiTicketFlowDefinition> r = new ArrayList<>();
+                for (AiTicketFlowDefinition d : store)
                 {
-                    return Arrays.asList(rule("start", "1", "agent,leader"),
-                            rule("transfer", "0", "leader,admin"));
+                    if ("0".equals(d.getStatus()) && d.getFlowCode().equals(flowCode)
+                            && d.getStatusFrom().equals(statusFrom))
+                    {
+                        r.add(d);
+                    }
                 }
-                return Collections.emptyList();
+                return r;
             }
 
             @Override
             public List<AiTicketFlowDefinition> selectByFlowCode(String flowCode)
             {
-                return Collections.emptyList();
+                List<AiTicketFlowDefinition> r = new ArrayList<>();
+                for (AiTicketFlowDefinition d : store)
+                {
+                    if (d.getFlowCode().equals(flowCode))
+                    {
+                        r.add(d);
+                    }
+                }
+                return r;
             }
 
             @Override
-            public AiTicketFlowDefinition selectRule(String flowCode, String statusFrom,
-                                                     String actionCode)
+            public List<AiTicketFlowDefinition> selectDefinitionList(AiTicketFlowDefinition query)
             {
-                for (AiTicketFlowDefinition rule : selectActions(flowCode, statusFrom))
+                return new ArrayList<>(store);
+            }
+
+            @Override
+            public AiTicketFlowDefinition selectByFlowId(Long flowId)
+            {
+                for (AiTicketFlowDefinition d : store)
                 {
-                    if (rule.getActionCode().equals(actionCode))
+                    if (d.getFlowId().equals(flowId))
                     {
-                        return rule;
+                        return d;
                     }
                 }
                 return null;
             }
 
             @Override
-            public int insertDefinition(AiTicketFlowDefinition definition) { return 0; }
+            public AiTicketFlowDefinition selectRule(String flowCode, String statusFrom,
+                                                     String actionCode)
+            {
+                for (AiTicketFlowDefinition d : selectActions(flowCode, statusFrom))
+                {
+                    if (d.getActionCode().equals(actionCode))
+                    {
+                        return d;
+                    }
+                }
+                return null;
+            }
 
             @Override
-            public int updateDefinition(AiTicketFlowDefinition definition) { return 0; }
+            public int insertDefinition(AiTicketFlowDefinition definition)
+            {
+                definition.setFlowId((long) (store.size() + 1));
+                store.add(definition);
+                return 1;
+            }
+
+            @Override
+            public int updateDefinition(AiTicketFlowDefinition definition)
+            {
+                for (int i = 0; i < store.size(); i++)
+                {
+                    if (store.get(i).getFlowId().equals(definition.getFlowId()))
+                    {
+                        store.set(i, definition);
+                        return 1;
+                    }
+                }
+                return 0;
+            }
         };
     }
 
@@ -219,6 +347,7 @@ class TicketFlowServiceTest
         d.setActionName(action);
         d.setTargetStatus(target);
         d.setRoleKey(role);
+        d.setStatus("0");
         return d;
     }
 }

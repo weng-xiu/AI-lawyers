@@ -28,6 +28,13 @@ public class AiLegalKnowledgeServiceImpl implements IAiLegalKnowledgeService
     @Autowired
     private IRagIndexService ragIndexService;
 
+    /** P1-10：效力标记后给管理员发站内信提醒 */
+    @Autowired
+    private ai.lawyers.system.service.lawyers.queue.MessageNotifyDispatcher messageNotifyDispatcher;
+
+    @Autowired
+    private ai.lawyers.system.mapper.SysUserMapper sysUserMapper;
+
     /**
      * 查询法律知识库
      * 
@@ -264,5 +271,76 @@ public class AiLegalKnowledgeServiceImpl implements IAiLegalKnowledgeService
         knowledge.setUpdateTime(DateUtils.getNowDate());
         
         return updateAiLegalKnowledge(knowledge);
+    }
+
+    /**
+     * P1-10：标记法规效力状态。
+     */
+    @Override
+    public int markValidStatus(Long knowledgeId, String validStatus, String reason, String operator)
+    {
+        if (StringUtils.isNull(knowledgeId))
+        {
+            throw new ServiceException("知识ID不能为空");
+        }
+        if (!"1".equals(validStatus) && !"2".equals(validStatus) && !"3".equals(validStatus))
+        {
+            throw new ServiceException("效力状态只能为：1现行有效、2已修订、3已失效");
+        }
+        AiLegalKnowledge knowledge = selectAiLegalKnowledgeByKnowledgeId(knowledgeId);
+        if (StringUtils.isNull(knowledge))
+        {
+            throw new ServiceException("法律知识库不存在！");
+        }
+        knowledge.setValidStatus(validStatus);
+        knowledge.setUpdateBy(StringUtils.isNotEmpty(operator) ? operator : "system");
+        knowledge.setUpdateTime(DateUtils.getNowDate());
+        if (StringUtils.isNotEmpty(reason))
+        {
+            knowledge.setAuditRemark(StringUtils.substring(reason, 0, 500));
+        }
+        int rows = aiLegalKnowledgeMapper.updateAiLegalKnowledge(knowledge);
+        if (rows > 0)
+        {
+            // 失效/修订立即从向量索引移除（复用单条重建，内部已按 valid_status 过滤）
+            ragIndexService.rebuildKnowledgeAsync(knowledgeId);
+            notifyValidStatusChanged(knowledge, validStatus, reason);
+        }
+        return rows;
+    }
+
+    /** 给管理员角色发效力变更站内信提醒 */
+    private void notifyValidStatusChanged(AiLegalKnowledge knowledge, String validStatus, String reason)
+    {
+        String label;
+        switch (validStatus)
+        {
+            case "2": label = "已修订"; break;
+            case "3": label = "已失效"; break;
+            default: label = "现行有效"; break;
+        }
+        String title = "法规效力变更提醒：" + StringUtils.substring(knowledge.getTitle(), 0, 80);
+        String content = "知识《" + knowledge.getTitle() + "》被标记为「" + label + "」，"
+                + "已同步刷新 RAG 向量索引。"
+                + (StringUtils.isNotEmpty(reason) ? "原因：" + reason : "");
+        try
+        {
+            List<Long> adminIds = sysUserMapper.selectUserIdsByRoleKey("admin");
+            if (adminIds != null)
+            {
+                for (Long uid : adminIds)
+                {
+                    messageNotifyDispatcher.notify(uid, "1", title,
+                            StringUtils.substring(content, 0, 1000),
+                            "knowledge", knowledge.getKnowledgeId(), "system");
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            // 通知失败不影响主流程
+            org.slf4j.LoggerFactory.getLogger(AiLegalKnowledgeServiceImpl.class)
+                    .warn("法规效力变更通知发送失败 knowledgeId={}: {}", knowledge.getKnowledgeId(), e.getMessage());
+        }
     }
 }
