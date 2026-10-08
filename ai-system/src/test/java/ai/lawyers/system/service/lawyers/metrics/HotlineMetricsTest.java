@@ -164,6 +164,22 @@ class HotlineMetricsTest
     }
 
     @Test
+    void inboundIntercept_counterByReason() throws Exception
+    {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        HotlineMetrics m = withRegistry(registry);
+
+        m.incrementInboundIntercept("blacklist");
+        m.incrementInboundIntercept("hotspot_reject");
+        m.incrementInboundIntercept("hotspot_reject");
+
+        assertThat(registry.find("hotline_inbound.intercept.total")
+                .tag("reason", "blacklist").counter().count()).isEqualTo(1);
+        assertThat(registry.find("hotline_inbound.intercept.total")
+                .tag("reason", "hotspot_reject").counter().count()).isEqualTo(2);
+    }
+
+    @Test
     void pbxFork_noRegistry_allNoop()
     {
         HotlineMetrics m = new HotlineMetrics();

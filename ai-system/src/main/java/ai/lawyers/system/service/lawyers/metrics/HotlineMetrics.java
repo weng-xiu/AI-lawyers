@@ -33,6 +33,7 @@ import io.micrometer.core.instrument.Timer;
  *   <li>hotline_queue_size{queue}             Stream 队列积压（gauge）</li>
  *   <li>hotline_queue_dead_total{queue}       死信计数</li>
  *   <li>hotline_quality_total{result}         质检计数（success/fail）</li>
+ *   <li>hotline_inbound_intercept_total{reason} 入站拦截计数（blacklist/hotspot_reject）</li>
  *   <li>hotline_voice_vad_ms                  A5：VAD 起始判定耗时（预算 80ms，超预算 WARN）</li>
  *   <li>hotline_voice_asr_first_ms            A5：ASR 流式首包（start→首 partial，预算 280ms）</li>
  *   <li>hotline_voice_tts_first_ms            A5：TTS 首包（tts 帧→首音频分片，预算 200ms）</li>
@@ -128,6 +129,15 @@ public class HotlineMetrics
     public void incrementQuality(String result)
     {
         counter("quality.total", "result", result).increment();
+    }
+
+    /**
+     * 入站拦截计数：reason ∈ blacklist（黑名单挂断）/ hotspot_reject（高频置底 REJECT 挂断）。
+     * 用于 Grafana 计算机器人/规则拦截率 = 拦截量 / 入站总量。
+     */
+    public void incrementInboundIntercept(String reason)
+    {
+        counter("inbound.intercept.total", "reason", reason).increment();
     }
 
     /* ================= A5：语音链路首响/打断延迟埋点（超预算 WARN 治理） ================= */

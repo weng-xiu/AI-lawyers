@@ -58,7 +58,7 @@ public abstract class AbstractPermMvcTest
     {
         context = new AnnotationConfigWebApplicationContext();
         context.setServletContext(new MockServletContext());
-        context.register(PermMvcConfig.class);
+        context.register(webMvcConfig());
         registerMocks();
         context.addBeanFactoryPostProcessor(beanFactory ->
                 pendingMocks.forEach(beanFactory::registerSingleton));
@@ -75,6 +75,12 @@ public abstract class AbstractPermMvcTest
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
                 .addFilters(securityFilterChain)
                 .build();
+    }
+
+    /** 子类覆写：替换迷你容器配置（如启用真实 Bean Validation）。 */
+    protected Class<?> webMvcConfig()
+    {
+        return PermMvcConfig.class;
     }
 
     /** 子类覆写：在此调用 {@link #registerMock}（容器刷新前）。 */

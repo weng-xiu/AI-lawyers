@@ -129,6 +129,10 @@ public class DefaultInboundCallHandler implements InboundCallHandler
         if (StringUtils.isNotEmpty(caller) && blacklistService.isBlacklisted(caller))
         {
             log.warn("[Inbound] 黑名单来电拦截: {}", caller);
+            if (metrics != null)
+            {
+                metrics.incrementInboundIntercept("blacklist");
+            }
             if (eslEventBridgeService != null)
             {
                 try
@@ -153,6 +157,10 @@ public class DefaultInboundCallHandler implements InboundCallHandler
         if (suppress != null && "REJECT".equals(suppress.getAction()))
         {
             log.warn("[Inbound] 高频置底规则[{}]拦截来电: {}", suppress.getRuleName(), caller);
+            if (metrics != null)
+            {
+                metrics.incrementInboundIntercept("hotspot_reject");
+            }
             if (eslEventBridgeService != null)
             {
                 try

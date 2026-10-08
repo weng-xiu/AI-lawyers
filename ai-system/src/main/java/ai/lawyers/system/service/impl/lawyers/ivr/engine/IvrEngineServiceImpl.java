@@ -10,18 +10,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.InetAddress;
-import java.net.URI;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -102,7 +90,6 @@ public class IvrEngineServiceImpl implements IIvrEngineService
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final SpelExpressionParser SPEL_PARSER = new SpelExpressionParser();
-    private static final Pattern TEMPLATE_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
 
     /** 子流程最大嵌套深度，防止循环引用 */
     private static final int MAX_CHILD_DEPTH = 3;
@@ -164,6 +151,13 @@ public class IvrEngineServiceImpl implements IIvrEngineService
     /** 高频置底总开关（与入站/外呼共用） */
     @org.springframework.beans.factory.annotation.Value("${hotspot.suppress.enabled:true}")
     private boolean hotspotEnabled;
+
+    /** P2-14：抽出的叶子工具——SSRF 安全 HTTP 客户端、SpEL 模板渲染器 */
+    @Autowired
+    private IvrHttpClient ivrHttpClient;
+
+    @Autowired
+    private IvrTemplateRenderer ivrTemplateRenderer;
 
     @Override
     public IvrExecuteResult executeFlow(IvrExecuteRequest request)
@@ -1098,7 +1092,7 @@ public class IvrEngineServiceImpl implements IIvrEngineService
             return nextNode(current, nodeMap, edges, variables, null);
         }
         // 安全收口(S5)：SSRF 防护，仅允许 http/https 且目标不得为内网/回环/保留地址
-        String ssrfError = checkUrlAllowed(url);
+        String ssrfError = ivrHttpClient.checkUrlAllowed(url);
         if (ssrfError != null)
         {
             variables.put("serviceError", ssrfError);
@@ -1108,11 +1102,11 @@ public class IvrEngineServiceImpl implements IIvrEngineService
         }
         try
         {
-            String responseText = httpCall(url, method, headers, body, timeoutMs);
+            String responseText = ivrHttpClient.httpCall(url, method, headers, body, timeoutMs);
             variables.put(resultVar, responseText);
             if (StringUtils.isNotEmpty(resultPath))
             {
-                Object value = jsonPath(responseText, resultPath);
+                Object value = ivrHttpClient.jsonPath(responseText, resultPath);
                 variables.put("serviceValue", value == null ? "" : String.valueOf(value));
             }
             step.setDetail("HTTP调用成功：" + method + " " + url
@@ -1269,199 +1263,11 @@ public class IvrEngineServiceImpl implements IIvrEngineService
     }
 
     /**
-     * 安全收口(S5)：校验 service 节点目标 URL，防 SSRF。
-     * 仅允许 http/https；解析目标 IP 后拒绝回环/内网/链路本地/保留地址及云元数据地址。
-     *
-     * @return 非 null 表示拦截原因；null 表示放行
-     */
-    private String checkUrlAllowed(String url)
-    {
-        try
-        {
-            URI uri = new URI(url.trim());
-            String scheme = uri.getScheme();
-            if (scheme == null || (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme)))
-            {
-                return "仅允许 http/https 协议";
-            }
-            String host = uri.getHost();
-            if (StringUtils.isEmpty(host))
-            {
-                return "URL缺少主机名";
-            }
-            // 云元数据地址显式拦截
-            String lowerHost = host.toLowerCase();
-            if (lowerHost.startsWith("169.254.") || lowerHost.contains("metadata.google.internal"))
-            {
-                return "禁止访问云元数据地址";
-            }
-            InetAddress address = InetAddress.getByName(host);
-            if (address.isLoopbackAddress() || address.isAnyLocalAddress()
-                    || address.isSiteLocalAddress() || address.isLinkLocalAddress()
-                    || address.isMulticastAddress())
-            {
-                return "禁止访问内网/回环/保留地址：" + host;
-            }
-            return null;
-        }
-        catch (Exception e)
-        {
-            return "URL解析失败：" + e.getMessage();
-        }
-    }
-
-    private String httpCall(String url, String method, Map<String, String> headers, String body,
-                            int timeoutMs) throws Exception
-    {
-        HttpURLConnection connection = null;
-        try
-        {
-            connection = (HttpURLConnection) new URL(url).openConnection();
-            connection.setRequestMethod(method);
-            connection.setConnectTimeout(timeoutMs);
-            connection.setReadTimeout(timeoutMs);
-            connection.setDoOutput(body != null);
-            // 安全收口(S5)：禁止自动跟随重定向，防止 302 跳转绕过 SSRF 校验指向内网
-            connection.setInstanceFollowRedirects(false);
-            for (Map.Entry<String, String> entry : headers.entrySet())
-            {
-                connection.setRequestProperty(entry.getKey(), entry.getValue());
-            }
-            if (body != null)
-            {
-                try (OutputStream out = connection.getOutputStream())
-                {
-                    out.write(body.getBytes(StandardCharsets.UTF_8));
-                    out.flush();
-                }
-            }
-            int status = connection.getResponseCode();
-            InputStream stream = status >= 200 && status < 300
-                    ? connection.getInputStream() : connection.getErrorStream();
-            String response = readText(stream);
-            if (status < 200 || status >= 300)
-            {
-                throw new IllegalStateException("HTTP " + status + "：" + truncate(response, 200));
-            }
-            return response;
-        }
-        finally
-        {
-            if (connection != null)
-            {
-                connection.disconnect();
-            }
-        }
-    }
-
-    private String readText(InputStream in) throws Exception
-    {
-        if (in == null)
-        {
-            return "";
-        }
-        StringBuilder sb = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8)))
-        {
-            String line;
-            while ((line = reader.readLine()) != null)
-            {
-                sb.append(line);
-            }
-        }
-        return sb.toString();
-    }
-
-    /**
-     * 简易 JSON 路径取值：支持 a.b.c 与数组下标 a.b[0]。
-     */
-    private Object jsonPath(String body, String path)
-    {
-        if (StringUtils.isEmpty(path))
-        {
-            return body;
-        }
-        try
-        {
-            JsonNode node = MAPPER.readTree(body);
-            String[] segments = path.trim().split("\\.");
-            for (String segment : segments)
-            {
-                if (StringUtils.isEmpty(segment))
-                {
-                    continue;
-                }
-                int arrayIndex = -1;
-                int bracket = segment.indexOf('[');
-                if (bracket >= 0 && segment.endsWith("]"))
-                {
-                    try
-                    {
-                        arrayIndex = Integer.parseInt(
-                                segment.substring(bracket + 1, segment.length() - 1).trim());
-                    }
-                    catch (Exception ignored)
-                    {
-                    }
-                    segment = segment.substring(0, bracket);
-                }
-                node = node.path(segment);
-                if (arrayIndex >= 0)
-                {
-                    node = node.path(arrayIndex);
-                }
-            }
-            if (node.isMissingNode() || node.isNull())
-            {
-                return null;
-            }
-            return node.isValueNode() ? node.asText() : node.toString();
-        }
-        catch (Exception e)
-        {
-            return null;
-        }
-    }
-
-    /**
      * 渲染 ${表达式} 模板，表达式按 SpEL 在流程变量上下文中求值。
      */
     private String render(String template, Map<String, Object> variables)
     {
-        if (StringUtils.isEmpty(template) || !template.contains("${"))
-        {
-            return template;
-        }
-        Matcher matcher = TEMPLATE_PATTERN.matcher(template);
-        StringBuffer sb = new StringBuffer();
-        while (matcher.find())
-        {
-            Object value = evalExpr(matcher.group(1), variables);
-            matcher.appendReplacement(sb, Matcher.quoteReplacement(value == null ? "" : String.valueOf(value)));
-        }
-        matcher.appendTail(sb);
-        return sb.toString();
-    }
-
-    private Object evalExpr(String expr, Map<String, Object> variables)
-    {
-        try
-        {
-            // 安全收口(S3)：只读数据绑定上下文，禁止类型引用(T(...))/构造器/方法调用/赋值，杜绝 RCE；
-            // 追加 MapAccessor 以支持 ${#var} 之外的 Map 键属性式访问
-            SimpleEvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding().build();
-            context.getPropertyAccessors().add(0, new MapAccessor());
-            if (variables != null)
-            {
-                variables.forEach(context::setVariable);
-            }
-            return SPEL_PARSER.parseExpression(expr).getValue(context);
-        }
-        catch (Exception e)
-        {
-            log.debug("SpEL模板表达式解析失败 expr={} error={}", expr, e.getMessage());
-            return null;
-        }
+        return ivrTemplateRenderer.render(template, variables);
     }
 
     private String cleanJson(String raw)

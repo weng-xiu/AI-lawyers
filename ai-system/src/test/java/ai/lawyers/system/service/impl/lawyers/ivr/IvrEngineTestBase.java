@@ -12,6 +12,8 @@ import ai.lawyers.system.domain.lawyers.ivr.AiIvrNode;
 import ai.lawyers.system.domain.lawyers.ivr.IvrExecuteRequest;
 import ai.lawyers.system.domain.lawyers.ivr.IvrExecuteResult;
 import ai.lawyers.system.service.impl.lawyers.ivr.engine.IvrEngineServiceImpl;
+import ai.lawyers.system.service.impl.lawyers.ivr.engine.IvrHttpClient;
+import ai.lawyers.system.service.impl.lawyers.ivr.engine.IvrTemplateRenderer;
 import ai.lawyers.system.service.lawyers.ivr.IAiIvrEdgeService;
 import ai.lawyers.system.service.lawyers.ivr.IAiIvrExecutionLogService;
 import ai.lawyers.system.service.lawyers.ivr.IAiIvrFlowService;
@@ -47,6 +49,8 @@ abstract class IvrEngineTestBase
         setField("nodeService", nodeService);
         setField("edgeService", edgeService);
         setField("executionLogService", executionLogService);
+        setField("ivrHttpClient", new IvrHttpClient());
+        setField("ivrTemplateRenderer", new IvrTemplateRenderer());
         setField("flowTimeoutMs", 180000L);
     }
 
