@@ -95,6 +95,10 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
     @Autowired
     private QualityTemplateSupport qualityTemplateSupport;
 
+    /** P1-7：声学规则（静默时长/整体语速，离线从录音+VAD 推导） */
+    @Autowired
+    private AcousticFeatureAnalyzer acousticFeatureAnalyzer;
+
     /** 质检总开关 */
     @Value("${ai.quality.enabled:true}")
     private boolean qualityEnabled;
@@ -209,11 +213,14 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
                 throw new IllegalStateException("话单不存在 recordId=" + recordId);
             }
 
-            // 1. 转写：优先复用话单已有转写；否则读录音文件调 ASR
+            // 1. 转写：优先复用话单已有转写；否则读录音文件调 ASR。
+            //    无现成转写时本次已读到录音字节，顺带离线跑声学规则（静默/语速），避免重复读盘。
             String transcript = record.getTranscript();
+            AcousticFeatureAnalyzer.AcousticResult acoustic = null;
             if (StringUtils.isEmpty(transcript))
             {
-                transcript = transcribeRecording(record);
+                LoadedAudio loaded = loadRecording(record);
+                transcript = transcribeAudio(record, loaded);
                 if (StringUtils.isEmpty(transcript))
                 {
                     // ASR 无结果（无录音/引擎未配置）：置失败，不无限重投
@@ -226,10 +233,14 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
                 up.setTranscript(transcript);
                 up.setAsrStatus(2);
                 callRecordMapper.updateRecordingInfo(up);
+
+                // 声学规则：仅对本次加载的 WAV 录音离线执行，失败不阻断质检
+                acoustic = analyzeAcoustic(loaded, transcript);
             }
 
-            // 2. 评分：P1-7 起 AI+规则双引擎融合（LLM 不可用时规则引擎降级，仍可出结果）
-            AiScore score = scoreByDualEngine(transcript, record);
+            // 2. 评分：P1-7 起 AI+规则双引擎融合（LLM 不可用时规则引擎降级，仍可出结果），
+            //    声学规则命中时对服务规范维度追加扣分并合并违规明细
+            AiScore score = scoreByDualEngine(transcript, record, acoustic);
 
             // 3. 落库评分结果
             AiQualityInspection upd = new AiQualityInspection();
@@ -273,8 +284,21 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
         }
     }
 
-    /** 读取录音文件并调 ASR 转写；录音文件不存在时抛异常（队列重投） */
-    private String transcribeRecording(AiCallRecord record) throws Exception
+    /** 已加载到内存的录音（字节 + 来源文件名，供转写与声学分析复用） */
+    private static class LoadedAudio
+    {
+        final byte[] data;
+        final String fileName;
+
+        LoadedAudio(byte[] data, String fileName)
+        {
+            this.data = data;
+            this.fileName = fileName;
+        }
+    }
+
+    /** 读取录音文件到内存（对象存储/本地两种模式）；录音文件不存在时抛异常（队列重投） */
+    private LoadedAudio loadRecording(AiCallRecord record) throws Exception
     {
         byte[] audio;
         String fileName;
@@ -320,13 +344,37 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
             audio = Files.readAllBytes(file.toPath());
             fileName = file.getName();
         }
+        return new LoadedAudio(audio, fileName);
+    }
 
-        String format = guessFormat(fileName);
+    /** 用质检 ASR 引擎转写已加载的录音字节 */
+    private String transcribeAudio(AiCallRecord record, LoadedAudio loaded) throws Exception
+    {
+        String format = guessFormat(loaded.fileName);
         VoiceModelEnum engine = StringUtils.isNotEmpty(qualityAsrEngine)
                 ? VoiceModelEnum.of(qualityAsrEngine)
                 : voiceEngineManager.defaultEngine();
-        String text = voiceEngineManager.transcribe(engine, audio, format, 16000, null);
+        String text = voiceEngineManager.transcribe(engine, loaded.data, format, 16000, null);
         return text == null ? "" : text.trim();
+    }
+
+    /** 离线声学分析：仅处理 WAV（PCM），非 WAV 或解析失败时跳过，不阻断质检 */
+    private AcousticFeatureAnalyzer.AcousticResult analyzeAcoustic(LoadedAudio loaded, String transcript)
+    {
+        try
+        {
+            if (!"wav".equals(guessFormat(loaded.fileName)))
+            {
+                return null;
+            }
+            WavPcmDecoder.Pcm pcm = WavPcmDecoder.decode(loaded.data);
+            return acousticFeatureAnalyzer.analyze(pcm.getSampleRate(), pcm.getData(), transcript);
+        }
+        catch (Exception e)
+        {
+            log.info("声学规则跳过（非 PCM WAV 或解析失败）：{}", e.getMessage());
+            return null;
+        }
     }
 
     /** 解析录音文件路径（绝对路径直接用，相对路径拼 recordings_dir，兼容 $${recordings_dir} 前缀） */
@@ -369,7 +417,8 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
      * LLM 不可用时：仅用规则引擎可评两维（模板中其余维度在 dimensions 中为 null，不计入加权），
      * 质检仍可完成，remark 注明降级——不再因模型抖动整单失败。</p>
      */
-    private AiScore scoreByDualEngine(String transcript, AiCallRecord record)
+    private AiScore scoreByDualEngine(String transcript, AiCallRecord record,
+                                      AcousticFeatureAnalyzer.AcousticResult acoustic)
     {
         QualityTemplateSupport.ActiveTemplate template = qualityTemplateSupport.loadActive();
         QualityRuleEngine.RuleResult rule = qualityRuleEngine.evaluate(transcript);
@@ -383,6 +432,8 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
             double compliance = Math.min(aiDims.path("compliance").asDouble(100d), rule.getComplianceScore());
             double answerAccuracy = aiDims.path("answerAccuracy").asDouble(0d);
             double emotionAttitude = aiDims.path("emotionAttitude").asDouble(0d);
+            // 声学规则对服务规范维度追加扣分（下限0）
+            serviceNorm = applyAcousticPenalty(serviceNorm, acoustic);
 
             ObjectNode allFused = MAPPER.createObjectNode();
             allFused.put("serviceNorm", round1(serviceNorm));
@@ -405,7 +456,7 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
             }
             score.dimensionJson = MAPPER.writeValueAsString(fusedDims);
 
-            // 违规合并：AI 项（source=ai）+ 规则项（source=rule）
+            // 违规合并：AI 项（source=ai）+ 规则项（source=rule）+ 声学项（source=acoustic）
             ArrayNode merged = MAPPER.createArrayNode();
             if (ai.violationNodes != null && ai.violationNodes.isArray())
             {
@@ -424,6 +475,7 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
                 v.put("reason", rv.getReason());
                 v.put("source", "rule");
             }
+            appendAcousticViolations(merged, acoustic);
             score.violationNodes = merged;
             score.violationJson = MAPPER.writeValueAsString(merged);
             double total = template != null
@@ -432,7 +484,8 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
             score.totalScore = BigDecimal.valueOf(round1(total));
             score.remark = "AI+规则双引擎融合评分"
                     + (template != null ? "（模板 " + template.templateId + "）。" : "。")
-                    + (ai.remark == null ? "" : ai.remark);
+                    + (ai.remark == null ? "" : ai.remark)
+                    + acousticRemark(acoustic);
             return score;
         }
         catch (RuntimeException e)
@@ -440,23 +493,63 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
             // scoreByAi 的模型调用/解析失败：规则引擎降级（不重投、不置失败）
             log.warn("AI 评分不可用，质检降级为规则引擎评分 recordId={}: {}",
                     record.getRecordId(), e.getMessage());
-            return ruleOnlyScore(rule, template, e.getMessage());
+            return ruleOnlyScore(rule, template, e.getMessage(), acoustic);
         }
         catch (Exception e)
         {
-            return ruleOnlyScore(rule, template, e.getMessage());
+            return ruleOnlyScore(rule, template, e.getMessage(), acoustic);
         }
+    }
+
+    /** 声学扣分：在服务规范基准分上减去扣分，下限 0；无声学结果原样返回 */
+    private static double applyAcousticPenalty(double serviceNorm,
+                                               AcousticFeatureAnalyzer.AcousticResult acoustic)
+    {
+        if (acoustic == null)
+        {
+            return serviceNorm;
+        }
+        return Math.max(0d, serviceNorm - acoustic.getServiceNormPenalty());
+    }
+
+    /** 追加声学违规明细（source=acoustic） */
+    private static void appendAcousticViolations(ArrayNode target,
+                                                 AcousticFeatureAnalyzer.AcousticResult acoustic)
+    {
+        if (acoustic == null)
+        {
+            return;
+        }
+        for (QualityRuleEngine.RuleViolation rv : acoustic.getViolations())
+        {
+            ObjectNode v = target.addObject();
+            v.put("keyword", rv.getKeyword());
+            v.put("reason", rv.getReason());
+            v.put("source", "acoustic");
+        }
+    }
+
+    /** 声学特征留痕：语速/最长静默/有声时长拼入 remark */
+    private static String acousticRemark(AcousticFeatureAnalyzer.AcousticResult acoustic)
+    {
+        if (acoustic == null)
+        {
+            return "";
+        }
+        return " 声学：语速=" + acoustic.getSpeechRate() + " 字/分，最长静默="
+                + acoustic.getMaxSilenceMs() + "ms，有声=" + acoustic.getVoicedMs() + "ms。";
     }
 
     /** 仅规则引擎评分：serviceNorm/compliance 计分，模板内其余维度置 null 不计加权 */
     private AiScore ruleOnlyScore(QualityRuleEngine.RuleResult rule,
-                                  QualityTemplateSupport.ActiveTemplate template, String failReason)
+                                  QualityTemplateSupport.ActiveTemplate template, String failReason,
+                                  AcousticFeatureAnalyzer.AcousticResult acoustic)
     {
         AiScore score = new AiScore();
         try
         {
             ObjectNode all = MAPPER.createObjectNode();
-            all.put("serviceNorm", round1(rule.serviceNormScore()));
+            all.put("serviceNorm", round1(applyAcousticPenalty(rule.serviceNormScore(), acoustic)));
             all.putNull("answerAccuracy");
             all.putNull("emotionAttitude");
             all.put("compliance", round1(rule.getComplianceScore()));
@@ -483,13 +576,16 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
                 v.put("reason", rv.getReason());
                 v.put("source", "rule");
             }
+            appendAcousticViolations(violations, acoustic);
             score.violationNodes = violations;
             score.violationJson = MAPPER.writeValueAsString(violations);
             double total = template != null
                     ? qualityTemplateSupport.weightedTotal(template, dims)
-                    : (rule.serviceNormScore() + rule.getComplianceScore()) / 2d;
+                    : (applyAcousticPenalty(rule.serviceNormScore(), acoustic)
+                            + rule.getComplianceScore()) / 2d;
             score.totalScore = BigDecimal.valueOf(round1(total));
-            score.remark = "AI 评分不可用，规则引擎降级评分（原因：" + failReason + "）";
+            score.remark = "AI 评分不可用，规则引擎降级评分（原因：" + failReason + "）"
+                    + acousticRemark(acoustic);
         }
         catch (Exception ex)
         {

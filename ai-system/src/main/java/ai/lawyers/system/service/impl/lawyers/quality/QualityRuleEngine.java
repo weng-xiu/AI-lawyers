@@ -15,8 +15,8 @@ import ai.lawyers.common.utils.StringUtils;
  * <p>当前规则：① 高敏违禁/违规话术（承诺胜诉/包赢/私自收费/风险代理等，词表可经
  * {@code ai.quality.banned-words} 覆盖）；② 服务规范用语（问候/自报身份/结束语）。</p>
  *
- * <p>未启用项：长静默、抢话、语速等声学/时间轴规则——需 ASR 输出带时间戳的
- * 逐词结果，当前转写为纯文本，待语音侧补齐后在此扩展（不改动评分融合契约）。</p>
+ * <p>声学规则另由 {@link AcousticFeatureAnalyzer} 承载：质检已能读到完整录音，配合能量 VAD
+ * 即可离线推出静默时长与整体语速；仅抢话/分角色语速因单声道混音需双声道改造，仍留后续。</p>
  *
  * @author ai-lawyers
  */
