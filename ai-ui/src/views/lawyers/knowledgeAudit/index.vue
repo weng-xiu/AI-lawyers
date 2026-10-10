@@ -18,7 +18,8 @@
             <el-form-item label="效力状态" prop="validStatus">
               <el-select v-model="queryParams.validStatus" placeholder="全部" clearable style="width: 130px">
                 <el-option label="现行有效" value="1" />
-                <el-option label="已失效/废止" value="2" />
+                <el-option label="已修订" value="2" />
+                <el-option label="已失效" value="3" />
               </el-select>
             </el-form-item>
             <el-form-item>
@@ -51,15 +52,13 @@
             </el-table-column>
             <el-table-column label="效力" align="center" width="90">
               <template slot-scope="scope">
-                <el-tag size="mini" :type="(scope.row.validStatus || '1') === '1' ? 'success' : 'danger'">
-                  {{ (scope.row.validStatus || '1') === '1' ? '有效' : '失效' }}
-                </el-tag>
+                <el-tag size="mini" :type="validTag(scope.row.validStatus)">{{ validText(scope.row.validStatus) }}</el-tag>
               </template>
             </el-table-column>
             <el-table-column label="生效日期" align="center" prop="effectiveDate" width="110">
               <template slot-scope="scope">{{ scope.row.effectiveDate ? scope.row.effectiveDate.substring(0, 10) : '-' }}</template>
             </el-table-column>
-            <el-table-column label="操作" align="center" width="250" fixed="right">
+            <el-table-column label="操作" align="center" width="320" fixed="right">
               <template slot-scope="scope">
                 <el-button v-if="scope.row.auditStatus !== '0'" v-hasPermi="['lawyers:knowledge:audit:submit']" type="text" size="mini" @click="handleSubmit(scope.row)">提交审核</el-button>
                 <template v-if="scope.row.auditStatus === '0'">
@@ -74,6 +73,9 @@
                   v-if="scope.row.status === '0'"
                   v-hasPermi="['lawyers:knowledge:audit:offline']"
                   type="text" size="mini" @click="openOpinion('offline', scope.row)">下线</el-button>
+                <el-button
+                  v-hasPermi="['lawyers:knowledge:edit']"
+                  type="text" size="mini" @click="openValid(scope.row)">标记效力</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -141,11 +143,34 @@
         <el-button size="small" @click="opinionOpen = false">取 消</el-button>
       </div>
     </el-dialog>
+
+    <!-- 效力标记弹窗 -->
+    <el-dialog title="标记法律效力" :visible.sync="validOpen" width="460px" append-to-body>
+      <el-form ref="validForm" :model="validForm" :rules="validRules" label-width="90px" size="small">
+        <el-form-item label="知识标题">
+          <span>{{ validRow && validRow.title }}</span>
+        </el-form-item>
+        <el-form-item label="效力状态" prop="validStatus">
+          <el-select v-model="validForm.validStatus" placeholder="请选择效力状态" style="width: 100%">
+            <el-option label="现行有效" value="1" />
+            <el-option label="已修订" value="2" />
+            <el-option label="已失效" value="3" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="变更原因" prop="reason">
+          <el-input v-model="validForm.reason" type="textarea" :rows="3" maxlength="500" show-word-limit placeholder="请说明效力变更原因，如新法替代、条款修订、废止等" />
+        </el-form-item>
+      </el-form>
+      <div slot="footer">
+        <el-button type="primary" size="small" @click="submitValid">确 定</el-button>
+        <el-button size="small" @click="validOpen = false">取 消</el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import { listKnowledge } from '@/api/lawyers/knowledge'
+import { listKnowledge, markValidStatus } from '@/api/lawyers/knowledge'
 import { listAuditLog, submitAudit, approveKnowledge, rejectKnowledge, publishKnowledge, offlineKnowledge } from '@/api/lawyers/knowledgeAudit'
 
 export default {
@@ -164,7 +189,14 @@ export default {
       opinionOpen: false,
       opinionAction: '',
       opinionText: '',
-      opinionRow: null
+      opinionRow: null,
+      validOpen: false,
+      validRow: null,
+      validForm: { validStatus: '1', reason: '' },
+      validRules: {
+        validStatus: [{ required: true, message: '请选择效力状态', trigger: 'change' }],
+        reason: [{ required: true, message: '请填写变更原因', trigger: 'blur' }]
+      }
     }
   },
   created() { this.getList() },
@@ -176,6 +208,8 @@ export default {
   methods: {
     auditText(s) { return { '0': '待审核', '1': '通过', '2': '不通过' }[String(s)] || '未提交' },
     auditTag(s) { return { '0': 'warning', '1': 'success', '2': 'danger' }[String(s)] || 'info' },
+    validText(s) { return { '1': '现行有效', '2': '已修订', '3': '已失效' }[String(s || '1')] },
+    validTag(s) { return { '1': 'success', '2': 'warning', '3': 'danger' }[String(s || '1')] },
     actionText(a) { return { SUBMIT: '提交', APPROVE: '通过', REJECT: '驳回', PUBLISH: '发布', OFFLINE: '下线' }[a] || a },
     actionTag(a) { return { SUBMIT: 'info', APPROVE: 'success', REJECT: 'danger', PUBLISH: '', OFFLINE: 'warning' }[a] || 'info' },
     getList() {
@@ -232,6 +266,22 @@ export default {
         this.$modal.msgSuccess('操作成功')
         this.opinionOpen = false
         this.getList()
+      })
+    },
+    openValid(row) {
+      this.validRow = row
+      this.validForm = { validStatus: String(row.validStatus || '1'), reason: '' }
+      this.validOpen = true
+      this.$nextTick(() => { this.$refs.validForm && this.$refs.validForm.clearValidate() })
+    },
+    submitValid() {
+      this.$refs.validForm.validate(valid => {
+        if (!valid) { return }
+        markValidStatus(this.validRow.knowledgeId, this.validForm.validStatus, this.validForm.reason).then(() => {
+          this.$modal.msgSuccess('效力标记成功')
+          this.validOpen = false
+          this.getList()
+        })
       })
     }
   }

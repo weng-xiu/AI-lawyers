@@ -1,0 +1,36 @@
+import request from '@/utils/request'
+
+// 查询流程规则列表（后端返回全量 List，不分页）
+export function listTicketFlow(query) {
+  return request({
+    url: '/lawyers/ticket-flow/list',
+    method: 'get',
+    params: query
+  })
+}
+
+// 查询单条流程规则
+export function getTicketFlow(flowId) {
+  return request({
+    url: '/lawyers/ticket-flow/' + flowId,
+    method: 'get'
+  })
+}
+
+// 新增流程规则
+export function addTicketFlow(data) {
+  return request({
+    url: '/lawyers/ticket-flow',
+    method: 'post',
+    data: data
+  })
+}
+
+// 修改流程规则
+export function updateTicketFlow(data) {
+  return request({
+    url: '/lawyers/ticket-flow',
+    method: 'put',
+    data: data
+  })
+}

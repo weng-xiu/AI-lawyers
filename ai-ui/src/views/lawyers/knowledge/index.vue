@@ -100,6 +100,18 @@
         >审核</el-button>
       </el-col>
       <el-col :span="1.5">
+        <el-dropdown trigger="click" @command="handleDraftCommand">
+          <el-button type="primary" plain icon="el-icon-magic-stick" size="mini" v-hasPermi="['lawyers:knowledge:add']">
+            AI 沉淀<i class="el-icon-arrow-down el-icon--right"></i>
+          </el-button>
+          <el-dropdown-menu slot="dropdown">
+            <el-dropdown-item icon="el-icon-phone-outline" command="call">从通话记录沉淀</el-dropdown-item>
+            <el-dropdown-item icon="el-icon-tickets" command="ticket">从工单沉淀</el-dropdown-item>
+            <el-dropdown-item icon="el-icon-files" command="scan">扫描高分通话批量沉淀</el-dropdown-item>
+          </el-dropdown-menu>
+        </el-dropdown>
+      </el-col>
+      <el-col :span="1.5">
         <el-dropdown trigger="click" @command="handleRagCommand">
           <el-button type="warning" plain icon="el-icon-cpu" size="mini">
             RAG 运维<i class="el-icon-arrow-down el-icon--right"></i>
@@ -314,11 +326,35 @@
         <el-button size="small" @click="rerankOpen = false">关 闭</el-button>
       </div>
     </el-dialog>
+
+    <!-- AI 沉淀：扫描高分通话对话框 -->
+    <el-dialog title="扫描高分通话批量沉淀" :visible.sync="scanOpen" width="480px" append-to-body>
+      <el-form ref="scanForm" :model="scanForm" :rules="scanRules" label-width="100px">
+        <el-form-item label="扫描天数" prop="days">
+          <el-input-number v-model="scanForm.days" :min="1" :max="30" controls-position="right" />
+          <span style="color:#909399;font-size:12px;margin-left:8px;">近 N 天（1-30）</span>
+        </el-form-item>
+        <el-form-item label="质量分阈值" prop="minScore">
+          <el-input-number v-model="scanForm.minScore" :min="0" :max="100" controls-position="right" />
+          <span style="color:#909399;font-size:12px;margin-left:8px;">仅沉淀不低于该分的通话</span>
+        </el-form-item>
+        <el-form-item label="数量上限" prop="limit">
+          <el-input-number v-model="scanForm.limit" :min="1" :max="50" controls-position="right" />
+          <span style="color:#909399;font-size:12px;margin-left:8px;">1-50 条</span>
+        </el-form-item>
+        <el-alert type="info" :closable="false" show-icon
+          title="生成的条目为待审核草稿（创建人 ai-draft），需在知识审核页审核后才会上架。已沉淀过的通话会自动去重。" />
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button type="primary" :loading="scanLoading" @click="submitScan">开始扫描</el-button>
+        <el-button @click="scanOpen = false">取 消</el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import { listKnowledge, getKnowledge, delKnowledge, addKnowledge, updateKnowledge, exportKnowledge, importTemplate, importKnowledge, auditKnowledge, getRagIndexInfo, rebuildRagIndex, testRagRerank } from "@/api/lawyers/knowledge"
+import { listKnowledge, getKnowledge, delKnowledge, addKnowledge, updateKnowledge, exportKnowledge, importTemplate, importKnowledge, auditKnowledge, getRagIndexInfo, rebuildRagIndex, testRagRerank, draftFromCall, draftFromTicket, scanDraft } from "@/api/lawyers/knowledge"
 import { getValidCategories } from "@/api/lawyers/category"
 
 export default {
@@ -372,6 +408,15 @@ export default {
       rerankOpen: false,
       rerankLoading: false,
       rerankResult: null,
+      // AI 沉淀
+      scanOpen: false,
+      scanLoading: false,
+      scanForm: { days: 7, minScore: 90, limit: 20 },
+      scanRules: {
+        days: [{ required: true, message: "扫描天数不能为空", trigger: "blur" }],
+        minScore: [{ required: true, message: "质量分阈值不能为空", trigger: "blur" }],
+        limit: [{ required: true, message: "数量上限不能为空", trigger: "blur" }]
+      },
       // 查询参数
       queryParams: {
         pageNum: 1,
@@ -448,6 +493,46 @@ export default {
         this.fetchRagInfo()
       }).finally(() => {
         this.rerankLoading = false
+      })
+    },
+    /** AI 沉淀命令分发 */
+    handleDraftCommand(command) {
+      if (command === 'call') {
+        this.handleDraftById('call')
+      } else if (command === 'ticket') {
+        this.handleDraftById('ticket')
+      } else if (command === 'scan') {
+        this.scanForm = { days: 7, minScore: 90, limit: 20 }
+        this.scanOpen = true
+      }
+    },
+    /** 按通话/工单 ID 沉淀 */
+    handleDraftById(type) {
+      const isCall = type === 'call'
+      this.$prompt(isCall ? '请输入通话记录 ID' : '请输入工单 ID', isCall ? '从通话记录沉淀' : '从工单沉淀', {
+        confirmButtonText: '确 定',
+        cancelButtonText: '取 消',
+        inputPattern: /^\d+$/,
+        inputErrorMessage: '请输入正确的数字 ID'
+      }).then(({ value }) => {
+        const run = isCall ? draftFromCall(value) : draftFromTicket(value)
+        return run.then(res => {
+          this.$modal.msgSuccess(res.msg || '已生成知识草稿，待审核')
+          this.getList()
+        })
+      }).catch(() => {})
+    },
+    /** 提交批量扫描 */
+    submitScan() {
+      this.$refs.scanForm.validate(valid => {
+        if (!valid) { return }
+        this.scanLoading = true
+        scanDraft(this.scanForm).then(res => {
+          const count = (res.data !== undefined && res.data !== null) ? res.data : ''
+          this.$modal.msgSuccess(count !== '' ? `扫描完成，新生成 ${count} 条草稿` : (res.msg || '扫描完成'))
+          this.scanOpen = false
+          this.getList()
+        }).finally(() => { this.scanLoading = false })
       })
     },
     /** 查询法律知识库列表 */

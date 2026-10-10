@@ -94,6 +94,40 @@ export function auditKnowledge(data) {
   })
 }
 
+// 标记知识效力（1现行有效 2已修订 3已失效）
+export function markValidStatus(knowledgeId, validStatus, reason) {
+  return request({
+    url: '/lawyers/knowledge/valid-status',
+    method: 'put',
+    params: { knowledgeId, validStatus, reason }
+  })
+}
+
+// AI 沉淀：从通话记录生成知识草稿
+export function draftFromCall(recordId) {
+  return request({
+    url: '/lawyers/knowledge/draft/call/' + recordId,
+    method: 'post'
+  })
+}
+
+// AI 沉淀：从工单生成知识草稿
+export function draftFromTicket(ticketId) {
+  return request({
+    url: '/lawyers/knowledge/draft/ticket/' + ticketId,
+    method: 'post'
+  })
+}
+
+// AI 沉淀：扫描高分通话批量生成知识草稿，返回新生成条数
+export function scanDraft(query) {
+  return request({
+    url: '/lawyers/knowledge/draft/scan',
+    method: 'post',
+    params: query
+  })
+}
+
 // RAG 索引状态（向量条目数/索引后端/rerank 开关）
 export function getRagIndexInfo() {
   return request({
