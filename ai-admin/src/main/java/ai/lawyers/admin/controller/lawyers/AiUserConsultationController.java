@@ -52,12 +52,14 @@ public class AiUserConsultationController extends BaseController
             // 获取表单数据
             String category = request.getParameter("category");
             String content = request.getParameter("content");
-            
+            // #16 渠道透传（PHONE/WECHAT_MP/WECHAT_MINI/H5/WEB；空/非法按 H5）
+            String channelType = request.getParameter("channelType");
+
             // 获取上传的文件
             List<MultipartFile> files = ((org.springframework.web.multipart.MultipartHttpServletRequest) request).getFiles("files");
-            
+
             // 调用服务层处理咨询提交
-            AiUserConsultation consultation = aiUserConsultationService.submitConsultation(category, content, files);
+            AiUserConsultation consultation = aiUserConsultationService.submitConsultation(category, content, files, channelType);
             
             return AjaxResult.success("咨询提交成功", consultation);
         } catch (Exception e) {

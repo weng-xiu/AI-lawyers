@@ -42,6 +42,128 @@ class WavPcmDecoderTest
     }
 
     @Test
+    void decodeChannels_stereo_preservesBothChannelsWithoutMix()
+    {
+        // P2-7：立体声保留双声道，左右样本可区分、均为 160 样本，且不做平均下混
+        byte[] wav = buildStereoWav(RATE, 160, (short) 1000, (short) -4000);
+        WavPcmDecoder.ChannelPcm ch = WavPcmDecoder.decodeChannels(wav);
+        assertEquals(RATE, ch.getSampleRate());
+        assertEquals(2, ch.getChannelCount());
+        assertEquals(160 * 2, ch.getChannel(0).length);
+        assertEquals(160 * 2, ch.getChannel(1).length);
+        assertEquals(1000, sampleAt(ch.getChannel(0), 0));
+        assertEquals(-4000, sampleAt(ch.getChannel(1), 0));
+    }
+
+    @Test
+    void decodeChannels_mono_returnsSingleChannel()
+    {
+        byte[] wav = buildWav(RATE, 1, 320, null);
+        WavPcmDecoder.ChannelPcm ch = WavPcmDecoder.decodeChannels(wav);
+        assertEquals(1, ch.getChannelCount());
+        assertEquals(640, ch.getChannel(0).length);
+    }
+
+    @Test
+    void decodeTwoLegs_alignsByZeroPaddingShorterLeg()
+    {
+        // P2-7：两条单声轨（160 / 100 样本）→ 等长双通道，短轨补零
+        byte[] wavA = buildMonoWav(RATE, 160, (short) 1000);
+        byte[] wavB = buildMonoWav(RATE, 100, (short) 2000);
+        WavPcmDecoder.ChannelPcm ch = WavPcmDecoder.decodeTwoLegs(wavA, wavB);
+        assertEquals(2, ch.getChannelCount());
+        assertEquals(160 * 2, ch.getChannel(0).length);
+        assertEquals(160 * 2, ch.getChannel(1).length);
+        // legB 第 100 个样本之后为补零静默
+        assertEquals(2000, sampleAt(ch.getChannel(1), 0));
+        assertEquals(0, sampleAt(ch.getChannel(1), 159));
+    }
+
+    @Test
+    void decodeTwoLegs_sampleRateMismatch_throws()
+    {
+        byte[] wavA = buildMonoWav(RATE, 80, (short) 1000);
+        byte[] wavB = buildMonoWav(8000, 80, (short) 1000);
+        assertThrows(IllegalArgumentException.class,
+                () -> WavPcmDecoder.decodeTwoLegs(wavA, wavB));
+    }
+
+    @Test
+    void decodeTwoLegs_stereoInput_throws()
+    {
+        byte[] wavA = buildStereoWav(RATE, 80, (short) 1, (short) 2);
+        byte[] wavB = buildMonoWav(RATE, 80, (short) 1000);
+        assertThrows(IllegalArgumentException.class,
+                () -> WavPcmDecoder.decodeTwoLegs(wavA, wavB));
+    }
+
+    private static short sampleAt(byte[] pcm, int frame)
+    {
+        int off = frame * 2;
+        return (short) ((pcm[off] & 0xFF) | (pcm[off + 1] << 8));
+    }
+
+    /** 构造每样本固定幅值的单声道 WAV */
+    private static byte[] buildMonoWav(int rate, int frames, short value)
+    {
+        short[] left = new short[frames];
+        java.util.Arrays.fill(left, value);
+        return buildPerChannelWav(rate, left, null);
+    }
+
+    /** 构造左右声道各自固定幅值的立体声 WAV */
+    private static byte[] buildStereoWav(int rate, int framesPerCh, short leftValue, short rightValue)
+    {
+        short[] left = new short[framesPerCh];
+        short[] right = new short[framesPerCh];
+        java.util.Arrays.fill(left, leftValue);
+        java.util.Arrays.fill(right, rightValue);
+        return buildPerChannelWav(rate, left, right);
+    }
+
+    /**
+     * 按左右样本数组构造 WAV（right 为 null 时单声道）。
+     */
+    private static byte[] buildPerChannelWav(int rate, short[] left, short[] right)
+    {
+        int channels = right == null ? 1 : 2;
+        int frames = left.length;
+        int dataBytes = frames * channels * 2;
+        byte[] wav = new byte[44 + dataBytes];
+        putAscii(wav, 0, "RIFF");
+        putU32(wav, 4, 36 + dataBytes);
+        putAscii(wav, 8, "WAVE");
+        putAscii(wav, 12, "fmt ");
+        putU32(wav, 16, 16);
+        putU16(wav, 20, 1);
+        putU16(wav, 22, channels);
+        putU32(wav, 24, rate);
+        putU32(wav, 28, rate * channels * 2);
+        putU16(wav, 32, channels * 2);
+        putU16(wav, 34, 16);
+        putAscii(wav, 36, "data");
+        putU32(wav, 40, dataBytes);
+        int p = 44;
+        for (int i = 0; i < frames; i++)
+        {
+            putSample(wav, p, left[i]);
+            p += 2;
+            if (channels == 2)
+            {
+                putSample(wav, p, right[i]);
+                p += 2;
+            }
+        }
+        return wav;
+    }
+
+    private static void putSample(byte[] b, int off, short v)
+    {
+        b[off] = (byte) (v & 0xFF);
+        b[off + 1] = (byte) ((v >> 8) & 0xFF);
+    }
+
+    @Test
     void decode_notWav_throws()
     {
         byte[] bad = new byte[64];

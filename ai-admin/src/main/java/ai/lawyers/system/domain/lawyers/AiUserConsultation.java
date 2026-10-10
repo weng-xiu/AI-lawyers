@@ -55,6 +55,10 @@ public class AiUserConsultation extends BaseEntity
     @Excel(name = "状态", readConverterExp = "PROCESSING=处理中,COMPLETED=已完成,FAILED=失败")
     private String status;
 
+    /** 提交渠道（PHONE/WECHAT_MP/WECHAT_MINI/H5/WEB，对齐 F6 渠道字典，#16 透传） */
+    @Excel(name = "提交渠道")
+    private String channelType;
+
     /** 处理时间 */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "处理时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
@@ -146,9 +150,19 @@ public class AiUserConsultation extends BaseEntity
         this.status = status;
     }
 
-    public String getStatus() 
+    public String getStatus()
     {
         return status;
+    }
+
+    public void setChannelType(String channelType)
+    {
+        this.channelType = channelType;
+    }
+
+    public String getChannelType()
+    {
+        return channelType;
     }
     public void setProcessTime(Date processTime) 
     {
@@ -173,6 +187,7 @@ public class AiUserConsultation extends BaseEntity
             .append("relatedCases", getRelatedCases())
             .append("confidence", getConfidence())
             .append("status", getStatus())
+            .append("channelType", getChannelType())
             .append("processTime", getProcessTime())
             .append("createBy", getCreateBy())
             .append("createTime", getCreateTime())

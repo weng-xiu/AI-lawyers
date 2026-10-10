@@ -53,9 +53,11 @@ public class AiUserConsultationPortalController extends BaseController
         MultipartHttpServletRequest multipart = (MultipartHttpServletRequest) request;
         String category = multipart.getParameter("category");
         String content = multipart.getParameter("content");
+        // #16 渠道透传（本端为 H5 图文渠道；显式传参优先，空/非法按 H5）
+        String channelType = multipart.getParameter("channelType");
         List<MultipartFile> files = multipart.getFiles("files");
         // 内容长度/敏感词校验在 service 内统一执行；userId 由服务端按登录态写入
-        return AjaxResult.success("咨询提交成功", consultationService.submitConsultation(category, content, files));
+        return AjaxResult.success("咨询提交成功", consultationService.submitConsultation(category, content, files, channelType));
     }
 
     /**
