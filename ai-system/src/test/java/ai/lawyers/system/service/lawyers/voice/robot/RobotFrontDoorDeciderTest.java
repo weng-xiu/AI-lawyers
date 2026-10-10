@@ -130,9 +130,15 @@ class RobotFrontDoorDeciderTest
     {
         java.time.LocalTime now = java.time.LocalTime.now();
         java.time.LocalTime dayStart = java.time.LocalTime.of(0, 0);
-        java.time.LocalTime dayEnd = java.time.LocalTime.of(23, 59);
+        java.time.LocalTime dayEnd = java.time.LocalTime.of(23, 59, 59);
         java.time.LocalTime start = now.minusMinutes(30).isAfter(dayStart) ? now.minusMinutes(30) : dayStart;
         java.time.LocalTime end = now.plusMinutes(30).isBefore(dayEnd) ? now.plusMinutes(30) : dayEnd;
+        // 解析器不支持跨午夜区间：当 30 分钟余量回推越过 00:00（start>now）时，
+        // 将 start 收窄到当日 00:00，保证区间始终落在同一天且包含当前时刻
+        if (start.isAfter(now))
+        {
+            start = dayStart;
+        }
         return start.toString() + "-" + end.toString();
     }
 

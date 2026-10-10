@@ -61,7 +61,8 @@ class ComplianceGuardTest
     @Test
     void callingAllowed_multipleSegments() throws Exception
     {
-        setField(guard, "allowedHours", "00:00-23:59");
+        // 真正全天窗口：分钟精度 23:59 不含其随后的秒，故用秒精度上界覆盖临近午夜时刻
+        setField(guard, "allowedHours", "00:00-23:59:59");
         assertThat(guard.isCallingAllowed()).isTrue();
     }
 

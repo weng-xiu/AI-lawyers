@@ -17,7 +17,11 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import ai.lawyers.system.domain.lawyers.AiCallRecord;
+import ai.lawyers.system.domain.lawyers.AiCallTicket;
 import ai.lawyers.system.domain.lawyers.AiLegalKnowledgeChunk;
+import ai.lawyers.system.service.lawyers.IAiCallRecordService;
+import ai.lawyers.system.service.lawyers.IAiCallTicketService;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 import ai.lawyers.system.service.lawyers.rag.RagChunk;
 import ai.lawyers.system.service.lawyers.rag.RagSearchService;
@@ -36,6 +40,10 @@ class VoiceRobotServiceTest
 
     private IAiModelConfigService modelConfigService;
 
+    private IAiCallRecordService callRecordService;
+
+    private IAiCallTicketService callTicketService;
+
     private VoiceRobotService service;
 
     @BeforeEach
@@ -43,9 +51,14 @@ class VoiceRobotServiceTest
     {
         ragSearchService = mock(RagSearchService.class);
         modelConfigService = mock(IAiModelConfigService.class);
+        callRecordService = mock(IAiCallRecordService.class);
+        callTicketService = mock(IAiCallTicketService.class);
         service = new VoiceRobotService();
         inject("ragSearchService", ragSearchService);
         inject("modelConfigService", modelConfigService);
+        inject("callRecordService", callRecordService);
+        inject("callTicketService", callTicketService);
+        inject("selfQueryEnabled", true);
         service.setEnabled(true);
     }
 
@@ -178,5 +191,142 @@ class VoiceRobotServiceTest
         VoiceRobotResult r = service.answer("问题", "sess-8");
 
         assertThat(r.getAnswer()).isEqualTo("一二三四五六七八九十");
+    }
+
+    /* ---- G6：机器人自助查询 ---- */
+
+    private static AiCallRecord recordWithPhone(String phone)
+    {
+        AiCallRecord record = new AiCallRecord();
+        record.setRecordId(1001L);
+        record.setCallerNumber(phone);
+        return record;
+    }
+
+    private static AiCallTicket ticket(String no, String status, String processContent)
+    {
+        AiCallTicket t = new AiCallTicket();
+        t.setTicketNo(no);
+        t.setStatus(status);
+        t.setProcessContent(processContent);
+        return t;
+    }
+
+    @Test
+    void answer_ticketQueryIntent_returnsOwnTickets()
+    {
+        when(callRecordService.selectAiCallRecordByRecordId(1001L))
+                .thenReturn(recordWithPhone("13800001234"));
+        List<AiCallTicket> tickets = new ArrayList<>();
+        tickets.add(ticket("GD20261009001", "1", "已转交值班律师"));
+        when(callTicketService.selectAiCallTicketList(any(AiCallTicket.class))).thenReturn(tickets);
+
+        VoiceRobotResult r = service.answer("帮我查一下我的工单进度", "sess-g1", 1001L);
+
+        assertThat(r.getAction()).isEqualTo("query_ticket");
+        assertThat(r.getTicketCount()).isEqualTo(1);
+        assertThat(r.getTicketNos()).containsExactly("GD20261009001");
+        assertThat(r.getAnswer()).contains("GD20261009001").contains("处理中").contains("已转交值班律师");
+        // 命中自助查询不再调 LLM/RAG
+        verify(modelConfigService, never()).chat(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void answer_ticketQueryIntentButNoTicket_returnsEmptyHintWithoutLlm()
+    {
+        when(callRecordService.selectAiCallRecordByRecordId(1001L))
+                .thenReturn(recordWithPhone("13800001234"));
+        when(callTicketService.selectAiCallTicketList(any(AiCallTicket.class)))
+                .thenReturn(Collections.emptyList());
+
+        VoiceRobotResult r = service.answer("我的工单办理得怎么样了", "sess-g2", 1001L);
+
+        assertThat(r.getAction()).isEqualTo("query_ticket");
+        assertThat(r.getTicketCount()).isZero();
+        assertThat(r.getAnswer()).contains("没有查到");
+        verify(modelConfigService, never()).chat(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void answer_notTicketIntent_fallsBackToRag()
+    {
+        when(ragSearchService.search(anyString(), any())).thenReturn(Collections.emptyList());
+        when(modelConfigService.chat(anyString(), anyString(), anyString())).thenReturn("法律解答");
+
+        VoiceRobotResult r = service.answer("借钱不还怎么办", "sess-g3", 1001L);
+
+        assertThat(r.getAction()).isNull();
+        assertThat(r.getAnswer()).isEqualTo("法律解答");
+        verify(callRecordService, never()).selectAiCallRecordByRecordId(any());
+    }
+
+    @Test
+    void answer_browserWithoutAnchor_neverQueriesTicketsEvenIfSessionIdNumeric()
+    {
+        when(ragSearchService.search(anyString(), any())).thenReturn(Collections.emptyList());
+        when(modelConfigService.chat(anyString(), anyString(), anyString())).thenReturn("法律解答");
+
+        // 浏览器侧 anchoredRecordId 恒为 null，即便问题命中意图也不得查库（防伪造越权）
+        VoiceRobotResult r = service.answer("查我的工单进度", "1001", null);
+
+        assertThat(r.getAction()).isNull();
+        assertThat(r.getAnswer()).isEqualTo("法律解答");
+        verify(callTicketService, never()).selectAiCallTicketList(any());
+    }
+
+    @Test
+    void answer_recordServiceThrows_fallsBackToRagAndNeverThrows()
+    {
+        when(callRecordService.selectAiCallRecordByRecordId(1001L))
+                .thenThrow(new RuntimeException("db down"));
+        when(ragSearchService.search(anyString(), any())).thenReturn(Collections.emptyList());
+        when(modelConfigService.chat(anyString(), anyString(), anyString())).thenReturn("降级解答");
+
+        VoiceRobotResult r = service.answer("查工单进度", "sess-g4", 1001L);
+
+        assertThat(r.getAction()).isNull();
+        assertThat(r.getAnswer()).isEqualTo("降级解答");
+    }
+
+    @Test
+    void answer_selfQueryDisabled_fallsBackToRag() throws Exception
+    {
+        inject("selfQueryEnabled", false);
+        when(ragSearchService.search(anyString(), any())).thenReturn(Collections.emptyList());
+        when(modelConfigService.chat(anyString(), anyString(), anyString())).thenReturn("法律解答");
+
+        VoiceRobotResult r = service.answer("查工单进度", "sess-g5", 1001L);
+
+        assertThat(r.getAction()).isNull();
+        assertThat(r.getAnswer()).isEqualTo("法律解答");
+        verify(callRecordService, never()).selectAiCallRecordByRecordId(any());
+    }
+
+    @Test
+    void answer_multipleTickets_reportsCountAndLimitsSpeech() throws Exception
+    {
+        inject("selfQueryMaxTickets", 2);
+        when(callRecordService.selectAiCallRecordByRecordId(1001L))
+                .thenReturn(recordWithPhone("13800001234"));
+        List<AiCallTicket> tickets = new ArrayList<>();
+        tickets.add(ticket("NO-1", "0", null));
+        tickets.add(ticket("NO-2", "1", null));
+        tickets.add(ticket("NO-3", "2", null));
+        when(callTicketService.selectAiCallTicketList(any(AiCallTicket.class))).thenReturn(tickets);
+
+        VoiceRobotResult r = service.answer("查工单", "sess-g6", 1001L);
+
+        assertThat(r.getTicketCount()).isEqualTo(2);
+        assertThat(r.getTicketNos()).containsExactly("NO-1", "NO-2");
+        assertThat(r.getAnswer()).contains("NO-1").contains("NO-2").contains("另有1条工单");
+    }
+
+    @Test
+    void ticketQueryIntent_rules()
+    {
+        assertThat(VoiceRobotService.isTicketQueryIntent("查一下我的工单进度")).isTrue();
+        assertThat(VoiceRobotService.isTicketQueryIntent("我之前的工单办理得怎么样了")).isTrue();
+        assertThat(VoiceRobotService.isTicketQueryIntent("借钱不还怎么办")).isFalse();
+        assertThat(VoiceRobotService.isTicketQueryIntent("办理居住证需要什么材料")).isFalse();
     }
 }

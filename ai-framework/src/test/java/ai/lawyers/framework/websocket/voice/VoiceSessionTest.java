@@ -388,8 +388,8 @@ class VoiceSessionTest
     {
         ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotService robot =
                 mock(ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotService.class);
-        when(robot.answer(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString()))
-                .thenReturn(result);
+        when(robot.answer(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(result);
         session.shutdown();
         session = new VoiceSession(wsSession, "sess-1", "agent", 1000, null, true, null, robot);
         return robot;
@@ -417,7 +417,8 @@ class VoiceSessionTest
         assertThat(done.path("degraded").asBoolean()).isFalse();
         // 应答自动进入 TTS 播报
         assertThat(await(n -> type(n, "tts_audio"))).isNotNull();
-        verify(robot, org.mockito.Mockito.timeout(2000).times(1)).answer(eq("被辞退怎么赔偿"), eq("sess-1"));
+        verify(robot, org.mockito.Mockito.timeout(2000).times(1))
+                .answer(eq("被辞退怎么赔偿"), eq("sess-1"), org.mockito.ArgumentMatchers.isNull());
     }
 
     @Test
@@ -489,7 +490,8 @@ class VoiceSessionTest
 
         JsonNode delta = await(n -> type(n, "answer_delta"));
         assertThat(delta.path("text").asText()).contains("劳动仲裁");
-        verify(robot, org.mockito.Mockito.timeout(2000).times(1)).answer(eq("借钱不还怎么办"), eq("sess-1"));
+        verify(robot, org.mockito.Mockito.timeout(2000).times(1))
+                .answer(eq("借钱不还怎么办"), eq("sess-1"), org.mockito.ArgumentMatchers.isNull());
     }
 
     @Test
@@ -499,8 +501,8 @@ class VoiceSessionTest
         final java.util.concurrent.CountDownLatch slow = new java.util.concurrent.CountDownLatch(1);
         ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotService robot =
                 mock(ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotService.class);
-        when(robot.answer(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString()))
-                .thenAnswer(inv -> {
+        when(robot.answer(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> {
                     String q = inv.getArgument(0, String.class);
                     if (q.contains("第一问"))
                     {
@@ -517,7 +519,7 @@ class VoiceSessionTest
         session.handleText("{\"type\":\"ask\",\"text\":\"第一问\"}");
         // 等回合1进入阻塞的 LLM 调用，再发第二问取代之
         verify(robot, org.mockito.Mockito.timeout(2000).times(1))
-                .answer(eq("第一问"), eq("sess-1"));
+                .answer(eq("第一问"), eq("sess-1"), org.mockito.ArgumentMatchers.isNull());
         session.handleText("{\"type\":\"ask\",\"text\":\"第二问\"}");
         slow.countDown();
 

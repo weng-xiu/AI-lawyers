@@ -178,6 +178,9 @@ public class PbxMediaForkHandler
         synthStart.put("engine", resolveEngine());
         synthStart.put("format", "pcm");
         synthStart.put("sampleRate", rate);
+        // G6：来电者媒体链路开启机器人自动应答，并锚定服务端可信话单ID（查本人工单/进度）
+        synthStart.put("robot", true);
+        session.anchorRecordId(Long.valueOf(recordId));
         session.handleText(synthStart.toString());
 
         this.voiceSession = session;

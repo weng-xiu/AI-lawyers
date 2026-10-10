@@ -34,11 +34,32 @@ public class VoiceRobotResult
     /** 降级原因 */
     private String fallbackReason;
 
+    /** G6：机器人自助动作类型（命中自助查询时为 query_ticket，普通问答为 null） */
+    private String action;
+
+    /** G6：本次自助查询命中的工单数 */
+    private int ticketCount;
+
+    /** G6：命中工单的工单号清单（供前端展示，不涉敏感信息） */
+    private List<String> ticketNos = new ArrayList<>();
+
     public static VoiceRobotResult ok(String answer)
     {
         VoiceRobotResult r = new VoiceRobotResult();
         r.answer = answer;
         r.degraded = false;
+        return r;
+    }
+
+    /** G6：自助查询命中结果（口语化答复 + 命中工单摘要） */
+    public static VoiceRobotResult ticketQuery(String answer, List<String> ticketNos)
+    {
+        VoiceRobotResult r = new VoiceRobotResult();
+        r.answer = answer;
+        r.degraded = false;
+        r.action = "query_ticket";
+        r.ticketNos = ticketNos == null ? new ArrayList<>() : ticketNos;
+        r.ticketCount = r.ticketNos.size();
         return r;
     }
 
@@ -104,5 +125,20 @@ public class VoiceRobotResult
     public String getFallbackReason()
     {
         return fallbackReason;
+    }
+
+    public String getAction()
+    {
+        return action;
+    }
+
+    public int getTicketCount()
+    {
+        return ticketCount;
+    }
+
+    public List<String> getTicketNos()
+    {
+        return ticketNos;
     }
 }

@@ -102,6 +102,11 @@ public class VoiceSession
     private final ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotService robotService;
     /** E3：start 帧 "robot":true 开启 ASR final 自动应答 */
     private volatile boolean robotMode;
+    /**
+     * G6：服务端锚定的话单ID（仅 PBX 媒体 fork 桥接时由服务端设置）。
+     * 机器人凭此查本人工单/进度；浏览器侧恒为 null，禁止由前端透传，防伪造越权。
+     */
+    private volatile Long anchoredRecordId;
     /** E3：机器人回合单线程执行器（回合串行，不阻塞 WS/ASR 回调线程） */
     private final java.util.concurrent.ExecutorService robotExecutor;
     /** E3：回合号发号器 */
@@ -689,7 +694,7 @@ public class VoiceSession
         ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotResult result;
         try
         {
-            result = robotService.answer(question, sessionId);
+            result = robotService.answer(question, sessionId, anchoredRecordId);
         }
         catch (Exception e)
         {
@@ -709,6 +714,18 @@ public class VoiceSession
         this.robotQuestionNanos = questionNanos;
         this.robotE2eMarked.set(false);
         startTts(result.getAnswer(), null);
+    }
+
+    /**
+     * G6：由 PBX 媒体 fork 桥接层锚定本通话的话单ID（服务端可信来源）。
+     * 仅允许设置一次，浏览器/坐席链路不调用此方法。
+     */
+    void anchorRecordId(Long recordId)
+    {
+        if (recordId != null && this.anchoredRecordId == null)
+        {
+            this.anchoredRecordId = recordId;
+        }
     }
 
     /* ================= F4：Copilot 实时辅助 ================= */

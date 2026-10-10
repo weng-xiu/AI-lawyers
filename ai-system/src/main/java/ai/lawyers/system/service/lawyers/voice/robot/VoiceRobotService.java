@@ -60,6 +60,17 @@ public class VoiceRobotService
     @Value("${ai.voice-robot.context-max-chars:1200}")
     private int contextMaxChars;
 
+    /**
+     * G6：机器人自助查询开关（查工单/查进度，只读）。
+     * 默认跟随机器人总开关灰度；关闭时一律走 RAG 问答。
+     */
+    @Value("${ai.voice-robot.self-query-enabled:true}")
+    private boolean selfQueryEnabled;
+
+    /** G6：自助查询最多播报工单条数（防 TTS 过长） */
+    @Value("${ai.voice-robot.self-query-max-tickets:3}")
+    private int selfQueryMaxTickets;
+
     @Autowired(required = false)
     private RagSearchService ragSearchService;
 
@@ -68,6 +79,14 @@ public class VoiceRobotService
 
     @Autowired(required = false)
     private HotlineMetrics metrics;
+
+    /** G6：话单服务（按服务端锚定 recordId 取来电号码；未装配时自助查询不生效） */
+    @Autowired(required = false)
+    private ai.lawyers.system.service.lawyers.IAiCallRecordService callRecordService;
+
+    /** G6：工单服务（按本人号码查工单/进度；未装配时自助查询不生效） */
+    @Autowired(required = false)
+    private ai.lawyers.system.service.lawyers.IAiCallTicketService callTicketService;
 
     public boolean isEnabled()
     {
@@ -83,6 +102,17 @@ public class VoiceRobotService
      */
     public VoiceRobotResult answer(String question, String sessionId)
     {
+        return answer(question, sessionId, null);
+    }
+
+    /**
+     * G6：单轮问答（带服务端锚定话单ID）。
+     *
+     * @param anchoredRecordId PBX 媒体链路服务端锚定的话单ID；浏览器侧恒为 null。
+     *        命中"查工单/查进度"意图时凭此解析本人号码并查询，任何异常/未锚定回退 RAG 问答。
+     */
+    public VoiceRobotResult answer(String question, String sessionId, Long anchoredRecordId)
+    {
         if (StringUtils.isEmpty(question) || question.trim().isEmpty())
         {
             return VoiceRobotResult.degraded(FALLBACK_ANSWER, "empty_question");
@@ -91,7 +121,13 @@ public class VoiceRobotService
         {
             return VoiceRobotResult.degraded(FALLBACK_ANSWER, "robot_disabled");
         }
-        return runPipeline(question.trim(), sessionId);
+        String q = question.trim();
+        VoiceRobotResult self = trySelfQuery(q, sessionId, anchoredRecordId);
+        if (self != null)
+        {
+            return self;
+        }
+        return runPipeline(q, sessionId);
     }
 
     /**
@@ -105,6 +141,137 @@ public class VoiceRobotService
             return VoiceRobotResult.degraded(FALLBACK_ANSWER, "empty_question");
         }
         return runPipeline(question.trim(), sessionId);
+    }
+
+    /**
+     * G6：尝试机器人自助查询（查工单/查进度，只读）。
+     *
+     * <p>纪律：意图用确定性词库判定（不让模型决定是否查库）；号码只取自服务端锚定话单，
+     * 不接受前端透传；任何环节异常/未装配/未锚定 → 返回 null 回退 RAG 问答，<b>不外抛</b>。</p>
+     *
+     * @return 命中并完成查询时返回结果；不满足条件或异常时返回 null（回退 RAG）
+     */
+    private VoiceRobotResult trySelfQuery(String question, String sessionId, Long anchoredRecordId)
+    {
+        if (!selfQueryEnabled || anchoredRecordId == null
+                || callRecordService == null || callTicketService == null)
+        {
+            return null;
+        }
+        if (!isTicketQueryIntent(question))
+        {
+            return null;
+        }
+        try
+        {
+            ai.lawyers.system.domain.lawyers.AiCallRecord record =
+                    callRecordService.selectAiCallRecordByRecordId(anchoredRecordId);
+            if (record == null || StringUtils.isEmpty(record.getCallerNumber()))
+            {
+                log.info("VoiceRobot 自助查询未取到来电号码 sessionId={}, recordId={}",
+                        sessionId, anchoredRecordId);
+                return null;
+            }
+            String callerNumber = record.getCallerNumber();
+            ai.lawyers.system.domain.lawyers.AiCallTicket filter =
+                    new ai.lawyers.system.domain.lawyers.AiCallTicket();
+            filter.setCallerNumber(callerNumber);
+            filter.setTokenGroups(ai.lawyers.common.utils.sign.PiiCryptoUtils.tokenGroups(callerNumber));
+            List<ai.lawyers.system.domain.lawyers.AiCallTicket> tickets =
+                    callTicketService.selectAiCallTicketList(filter);
+            if (tickets == null || tickets.isEmpty())
+            {
+                return VoiceRobotResult.ticketQuery(
+                        "我这边暂时没有查到您名下的咨询工单。如果您需要反映问题，我可以为您登记，也可以为您转接人工坐席。",
+                        new ArrayList<>());
+            }
+            return VoiceRobotResult.ticketQuery(buildTicketSpeech(tickets), collectTicketNos(tickets));
+        }
+        catch (Exception e)
+        {
+            log.warn("VoiceRobot 自助查询异常，回退 RAG sessionId={}: {}", sessionId, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * G6：查工单/查进度意图判定（保守词库，需命中"工单/进度/办理"等业务词 +
+     * "查一下/怎么样/到哪"等查询诉求，降低与法律咨询混淆的误判）。
+     */
+    static boolean isTicketQueryIntent(String text)
+    {
+        if (StringUtils.isEmpty(text))
+        {
+            return false;
+        }
+        boolean hasObject = text.contains("工单") || text.contains("进度")
+                || (text.contains("办理") && !text.contains("办理居住证"));
+        if (!hasObject)
+        {
+            return false;
+        }
+        return text.contains("查") || text.contains("进度") || text.contains("怎么样")
+                || text.contains("到哪") || text.contains("状态") || text.contains("结果")
+                || text.contains("回复") || text.contains("反馈");
+    }
+
+    /** G6：取前 N 条工单号（按 create_time desc） */
+    private List<String> collectTicketNos(List<ai.lawyers.system.domain.lawyers.AiCallTicket> tickets)
+    {
+        int limit = selfQueryMaxTickets > 0 ? selfQueryMaxTickets : 3;
+        List<String> nos = new ArrayList<>();
+        for (ai.lawyers.system.domain.lawyers.AiCallTicket t : tickets)
+        {
+            if (nos.size() >= limit)
+            {
+                break;
+            }
+            if (StringUtils.isNotEmpty(t.getTicketNo()))
+            {
+                nos.add(t.getTicketNo());
+            }
+        }
+        return nos;
+    }
+
+    /**
+     * G6：组装口语化工单进度播报（复用 CopilotController.queryTicket 话术口径，
+     * 多条工单只逐条简述工单号+状态，防 TTS 过长，整体再按 answerMaxChars 截断）。
+     */
+    private String buildTicketSpeech(List<ai.lawyers.system.domain.lawyers.AiCallTicket> tickets)
+    {
+        int limit = selfQueryMaxTickets > 0 ? selfQueryMaxTickets : 3;
+        StringBuilder sb = new StringBuilder("为您查到名下的咨询工单：");
+        int n = 0;
+        for (ai.lawyers.system.domain.lawyers.AiCallTicket t : tickets)
+        {
+            if (n >= limit)
+            {
+                break;
+            }
+            sb.append("工单号").append(t.getTicketNo()).append("，当前").append(ticketStatusName(t.getStatus()));
+            if (StringUtils.isNotEmpty(t.getProcessContent()) && n == 0)
+            {
+                sb.append("，最新办理情况是：").append(t.getProcessContent());
+            }
+            sb.append("；");
+            n++;
+        }
+        if (tickets.size() > limit)
+        {
+            sb.append("另有").append(tickets.size() - limit).append("条工单未逐一播报；");
+        }
+        sb.append("如需了解详情或继续反映问题，我可以为您转接人工坐席。");
+        return truncate(sb.toString(), answerMaxChars);
+    }
+
+    /** 工单状态码转中文（与 CopilotController 口径一致） */
+    private static String ticketStatusName(String status)
+    {
+        if ("1".equals(status)) { return "处理中"; }
+        if ("2".equals(status)) { return "已完成"; }
+        if ("3".equals(status)) { return "已归档"; }
+        return "待处理";
     }
 
     /** RAG 检索 + 提示词装配 + LLM 应答（answer 与仿真共用） */
