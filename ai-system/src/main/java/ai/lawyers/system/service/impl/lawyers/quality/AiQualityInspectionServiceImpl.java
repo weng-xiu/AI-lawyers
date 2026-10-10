@@ -37,6 +37,7 @@ import ai.lawyers.system.service.lawyers.storage.RecordingStorageService;
 import ai.lawyers.system.service.lawyers.summary.IAiCallSummaryService;
 import ai.lawyers.system.service.lawyers.voice.VoiceEngineManager;
 import ai.lawyers.system.service.lawyers.voice.VoiceModelEnum;
+import ai.lawyers.system.service.lawyers.voice.speaker.SpeakerDiarizationService;
 
 /**
  * 智能质检服务实现（T4-1 / T4-2 联动）。
@@ -98,6 +99,12 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
     /** P1-7：声学规则（静默时长/整体语速，离线从录音+VAD 推导） */
     @Autowired
     private AcousticFeatureAnalyzer acousticFeatureAnalyzer;
+
+    /**
+     * P2-15：通话内说话人分离影子链路（仅双声道录音触发，best-effort 只打日志不落库；
+     * 声纹模型缺席时整体短路，不产生 ONNX 初始化成本）。首次双声道录音到来时才构造。
+     */
+    private volatile SpeakerDiarizationService speakerDiarizationService;
 
     /** 质检总开关 */
     @Value("${ai.quality.enabled:true}")
@@ -368,12 +375,65 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
                 return null;
             }
             WavPcmDecoder.Pcm pcm = WavPcmDecoder.decode(loaded.data);
+            // P2-15：双声道录音额外跑一次通话内说话人分离（影子链路，只打日志不落库；
+            // 单声道/模型缺席时 service 内部直接短路，不影响评分）
+            runDiarizationShadow(loaded);
             return acousticFeatureAnalyzer.analyze(pcm.getSampleRate(), pcm.getData(), transcript);
         }
         catch (Exception e)
         {
             log.info("声学规则跳过（非 PCM WAV 或解析失败）：{}", e.getMessage());
             return null;
+        }
+    }
+
+    /**
+     * P2-15：通话内说话人分离影子执行——仅双声道 WAV 触发，结果只打结构化日志，
+     * 不落库、不与号码关联（跨通话建档待 PIA/法务评估）；任何异常不外抛。
+     */
+    private void runDiarizationShadow(LoadedAudio loaded)
+    {
+        try
+        {
+            WavPcmDecoder.ChannelPcm channels = WavPcmDecoder.decodeChannels(loaded.data);
+            if (channels.getChannelCount() < 2)
+            {
+                return;
+            }
+            SpeakerDiarizationService service = speakerDiarizationService;
+            if (service == null)
+            {
+                synchronized (this)
+                {
+                    service = speakerDiarizationService;
+                    if (service == null)
+                    {
+                        service = new SpeakerDiarizationService();
+                        speakerDiarizationService = service;
+                    }
+                }
+            }
+            SpeakerDiarizationService.Result result = service.diarizeStereo(loaded.data);
+            if (result.getSpeakerCount() > 0)
+            {
+                StringBuilder roles = new StringBuilder();
+                for (SpeakerDiarizationService.Speaker sp : result.getSpeakers())
+                {
+                    if (roles.length() > 0)
+                    {
+                        roles.append(',');
+                    }
+                    roles.append(sp.getRoleName()).append('=').append(sp.getSegmentCount()).append("段/")
+                            .append(sp.getDurationMs()).append("ms/avgConf=")
+                            .append(String.format(java.util.Locale.ROOT, "%.3f", sp.getAvgConfidence()));
+                }
+                log.info("通话内说话人分离（影子，不落库）file={} sampleRate={} speakers={} [{}]",
+                        loaded.fileName, result.getSampleRate(), result.getSpeakerCount(), roles);
+            }
+        }
+        catch (Exception e)
+        {
+            log.info("通话内说话人分离影子跳过：{}", e.getMessage());
         }
     }
 

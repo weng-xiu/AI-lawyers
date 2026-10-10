@@ -64,13 +64,21 @@ public interface IAiUserConsultationService
 
     /**
      * 提交法律咨询
-     * 
+     *
      * @param category 问题分类
      * @param content 问题内容
      * @param files 附件文件列表
      * @return 咨询记录
      */
     public AiUserConsultation submitConsultation(String category, String content, List<MultipartFile> files);
+
+    /**
+     * 提交法律咨询（带渠道透传，#16：渠道字典 PHONE/WECHAT_MP/WECHAT_MINI/H5/WEB）。
+     *
+     * @param channelType 提交渠道（空按 H5 图文渠道处理）
+     */
+    public AiUserConsultation submitConsultation(String category, String content,
+                                                 List<MultipartFile> files, String channelType);
 
     /**
      * 提交咨询评价

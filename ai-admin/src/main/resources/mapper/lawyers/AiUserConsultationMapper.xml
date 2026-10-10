@@ -15,6 +15,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="relatedCases"      column="related_cases"     />
         <result property="confidence"        column="confidence"        />
         <result property="status"            column="status"            />
+        <result property="channelType"       column="channel_type"      />
         <result property="processTime"        column="process_time"      />
         <result property="createBy"          column="create_by"         />
         <result property="createTime"        column="create_time"       />
@@ -24,7 +25,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectAiUserConsultationVo">
-        select consultation_id, user_id, category, content, attachments, ai_answer, related_laws, related_cases, confidence, status, process_time, create_by, create_time, update_by, update_time, remark from ai_user_consultation
+        select consultation_id, user_id, category, content, attachments, ai_answer, related_laws, related_cases, confidence, status, channel_type, process_time, create_by, create_time, update_by, update_time, remark from ai_user_consultation
     </sql>
 
     <select id="selectAiUserConsultationList" parameterType="AiUserConsultation" resultMap="AiUserConsultationResult">
@@ -34,6 +35,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="category != null  and category != ''"> and category = #{category}</if>
             <if test="content != null  and content != ''"> and content like concat('%', #{content}, '%')</if>
             <if test="status != null  and status != ''"> and status = #{status}</if>
+            <if test="channelType != null  and channelType != ''"> and channel_type = #{channelType}</if>
             <if test="processTime != null "> and process_time = #{processTime}</if>
         </where>
         order by create_time desc
@@ -56,6 +58,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="relatedCases != null">related_cases,</if>
             <if test="confidence != null">confidence,</if>
             <if test="status != null">status,</if>
+            <if test="channelType != null and channelType != ''">channel_type,</if>
             <if test="processTime != null">process_time,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
@@ -73,6 +76,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="relatedCases != null">#{relatedCases},</if>
             <if test="confidence != null">#{confidence},</if>
             <if test="status != null">#{status},</if>
+            <if test="channelType != null and channelType != ''">#{channelType},</if>
             <if test="processTime != null">#{processTime},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
@@ -94,6 +98,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="relatedCases != null">related_cases = #{relatedCases},</if>
             <if test="confidence != null">confidence = #{confidence},</if>
             <if test="status != null">status = #{status},</if>
+            <if test="channelType != null and channelType != ''">channel_type = #{channelType},</if>
             <if test="processTime != null">process_time = #{processTime},</if>
             <if test="createBy != null">create_by = #{createBy},</if>
             <if test="createTime != null">create_time = #{createTime},</if>

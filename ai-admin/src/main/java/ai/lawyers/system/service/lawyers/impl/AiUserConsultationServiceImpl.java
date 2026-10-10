@@ -154,6 +154,18 @@ public class AiUserConsultationServiceImpl implements IAiUserConsultationService
     @Override
     public AiUserConsultation submitConsultation(String category, String content, List<MultipartFile> files)
     {
+        return submitConsultation(category, content, files, null);
+    }
+
+    /**
+     * 提交法律咨询（带渠道透传，#16）。
+     *
+     * @param channelType 提交渠道（PHONE/WECHAT_MP/WECHAT_MINI/H5/WEB；空按 H5）
+     */
+    @Override
+    public AiUserConsultation submitConsultation(String category, String content,
+                                                 List<MultipartFile> files, String channelType)
+    {
         // F8 安全基线：内容长度 + 本地敏感词校验（坐席端/公众端共用，命中即拒绝入库）
         contentSafetyService.validateConsultation(category, content);
 
@@ -188,6 +200,8 @@ public class AiUserConsultationServiceImpl implements IAiUserConsultationService
         consultation.setCategory(category);
         consultation.setContent(content);
         consultation.setStatus("PROCESSING"); // 处理中
+        // #16 渠道透传：白名单校验，空/非法一律回退 H5（图文渠道）
+        consultation.setChannelType(normalizeChannelType(channelType));
         consultation.setCreateTime(new Date());
         
         // 处理附件
@@ -275,6 +289,26 @@ public class AiUserConsultationServiceImpl implements IAiUserConsultationService
         }
         
         return consultation;
+    }
+
+    /** #16 渠道白名单校验：PHONE/WECHAT_MP/WECHAT_MINI/H5/WEB，空/非法一律回退 H5（图文渠道） */
+    static String normalizeChannelType(String channelType)
+    {
+        if (StringUtils.isEmpty(channelType))
+        {
+            return CHANNEL_H5;
+        }
+        switch (channelType.trim().toUpperCase())
+        {
+            case "PHONE":
+            case "WECHAT_MP":
+            case "WECHAT_MINI":
+            case "H5":
+            case "WEB":
+                return channelType.trim().toUpperCase();
+            default:
+                return CHANNEL_H5;
+        }
     }
 
     /** 取当前登录公众用户手机号（公众账号必须绑定手机号） */
