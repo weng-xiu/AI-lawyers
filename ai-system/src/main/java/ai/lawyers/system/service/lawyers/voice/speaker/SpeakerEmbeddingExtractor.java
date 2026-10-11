@@ -19,9 +19,10 @@ import org.slf4j.LoggerFactory;
  * 才真实推理；否则进入降级态，{@link #isModelAvailable()} 返回 false、{@link #extract(byte[])}
  * 返回 null。降级态<b>不伪造向量</b>：伪造身份特征会造成错误聚类，故由调用方跳过聚类。</p>
  *
- * <p><b>模型契约：</b>采用“原始波形输入”的端到端声纹 ONNX 导出（如 3D-Speaker CAM++/
- * ERes2Net、SpeechBrain ECAPA-TDNN 的波形导出版）：单输入 float32 {@code [1, N]}（N 为
- * 采样点，已内部除以 32768 归一到 [-1,1]），单输出 float32 {@code [1, D]} 或 {@code [D]}。
+ * <p><b>模型契约：</b>sherpa-onnx 预导出的 3D-Speaker 声纹 ONNX（CAM++ 等）：
+ * 单输入 float32 {@code [1, T, 80]}（Kaldi 兼容 80 维 fbank，由 {@link KaldiFbank}
+ * 在内部计算——sherpa-onnx 导出未烘焙前端，入参仍为本方法的原始 S16LE PCM），
+ * 单输出 float32 {@code [1, D]} 或 {@code [D]}。
  * 输入/输出名在加载时动态读取。输出经 L2 归一，便于聚类中心平均。</p>
  *
  * @author ai-lawyers
@@ -66,6 +67,9 @@ public class SpeakerEmbeddingExtractor
 
             Class<?> optionsClass = Class.forName("ai.onnxruntime.OrtSession$SessionOptions");
             Object options = optionsClass.getDeclaredConstructor().newInstance();
+            // 单线程推理：话务场景按 VAD 短段提取（1 秒音频约 40ms），多线程收益可忽略，
+            // 且避免 native 线程池常驻，对低配部署机更稳
+            optionsClass.getMethod("setIntraOpNumThreads", int.class).invoke(options, 1);
 
             byte[] modelBytes = loadModelBytes(modelPath);
             if (modelBytes != null && modelBytes.length > 0)
@@ -128,6 +132,18 @@ public class SpeakerEmbeddingExtractor
                 audio[i] = s / 32768.0f;
             }
 
+            // Kaldi 兼容 fbank 前端（模型输入 [1, T, 80]，sherpa-onnx 导出不含前端）
+            float[][] feats = KaldiFbank.compute(audio, sampleRate);
+            if (feats.length == 0)
+            {
+                return null;
+            }
+            float[] flat = new float[feats.length * KaldiFbank.FBANK_DIM];
+            for (int i = 0; i < feats.length; i++)
+            {
+                System.arraycopy(feats[i], 0, flat, i * KaldiFbank.FBANK_DIM, KaldiFbank.FBANK_DIM);
+            }
+
             Class<?> tensorClass = Class.forName("ai.onnxruntime.OnnxTensor");
             Class<?> envClass = Class.forName("ai.onnxruntime.OrtEnvironment");
             Method createTensor = tensorClass.getMethod("createTensor",
@@ -135,7 +151,7 @@ public class SpeakerEmbeddingExtractor
             Method closeTensor = tensorClass.getMethod("close");
 
             Object audioTensor = createTensor.invoke(null, ortEnv,
-                    FloatBuffer.wrap(audio), new long[] { 1, n });
+                    FloatBuffer.wrap(flat), new long[] { 1, feats.length, KaldiFbank.FBANK_DIM });
 
             Map<String, Object> inputs = new HashMap<>();
             inputs.put(inputName, audioTensor);
@@ -146,11 +162,14 @@ public class SpeakerEmbeddingExtractor
             Method getValue = tensorClass.getMethod("getValue");
             Method closeResult = result.getClass().getMethod("close");
 
-            Object outputTensor = getOutput.invoke(result, outputName);
+            // Result.get(String) 返回 Optional<OnnxValue>，须先 get() 再取值
+            Object optionalOut = getOutput.invoke(result, outputName);
+            Object outputTensor = optionalOut.getClass().getMethod("get").invoke(optionalOut);
             Object value = getValue.invoke(outputTensor);
             float[] embedding = parseEmbedding(value);
 
-            closeTensor.invoke(outputTensor);
+            // 只关自建的输入 tensor 与 Result；outputTensor 由 Result.close() 统一释放，
+            // 手动再关一次会双重释放 native 句柄（实测 Windows 偶发 0xC0000374 堆损坏崩溃）
             closeTensor.invoke(audioTensor);
             closeResult.invoke(result);
 

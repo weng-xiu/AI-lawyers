@@ -38,6 +38,16 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- P2-15：ONNX Runtime（声纹 CAM++ / Silero VAD 真实推理）。
+             代码反射调用（SpeakerEmbeddingExtractor/SileroVadDetector），编译期零依赖；
+             runtime scope 随应用发布——模型文件缺席时自动降级跳过（不伪造向量）。 -->
+        <dependency>
+            <groupId>com.microsoft.onnxruntime</groupId>
+            <artifactId>onnxruntime</artifactId>
+            <version>1.16.3</version>
+            <scope>runtime</scope>
+        </dependency>
+
         <!-- T5-2：单元/并发测试（版本由 Spring Boot parent 统一管理，含 JUnit5/Mockito/AssertJ/spring-test） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
