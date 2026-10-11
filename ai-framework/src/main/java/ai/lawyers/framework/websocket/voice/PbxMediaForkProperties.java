@@ -26,6 +26,14 @@ public class PbxMediaForkProperties
     @Value("${call.pbx.media.default-rate:16000}")
     private int defaultRate;
 
+    /** #1 下行媒体预留开关（开启后 TTS 分片经防抖缓冲双路分发到 PBX 下行 sink；当前为空实现，真实下行播放模块待媒体环境） */
+    @Value("${call.pbx.media.downlink-enabled:false}")
+    private boolean downlinkEnabled;
+
+    /** #1 下行防抖缓冲目标时长（毫秒，钳制 100~200，默认 150） */
+    @Value("${call.pbx.media.downlink-buffer-ms:150}")
+    private int downlinkBufferMs;
+
     public boolean isEnabled()
     {
         return enabled;
@@ -39,5 +47,15 @@ public class PbxMediaForkProperties
     public int getDefaultRate()
     {
         return defaultRate;
+    }
+
+    public boolean isDownlinkEnabled()
+    {
+        return downlinkEnabled;
+    }
+
+    public int getDownlinkBufferMs()
+    {
+        return downlinkBufferMs;
     }
 }

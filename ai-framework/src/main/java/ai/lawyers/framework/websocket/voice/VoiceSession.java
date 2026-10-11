@@ -159,6 +159,10 @@ public class VoiceSession
     /** 本次 VAD 起始判定起点（首个有声帧进入时刻） */
     private volatile long vadSpeechBeginNanos;
 
+    /* ---- #1 下行媒体预留（PBX 侧空实现；媒体桥接就绪后替换 sink 即可） ---- */
+    /** 下行防抖缓冲（attach 时创建，内含 sink 引用；可空=未挂下行） */
+    private volatile DownlinkDebouncer downlinkDebouncer;
+
     VoiceSession(Session wsSession, String sessionId, String role, int queueCapacity)
     {
         this(wsSession, sessionId, role, queueCapacity, null);
@@ -257,6 +261,39 @@ public class VoiceSession
     }
 
     /* ================= 生命周期 ================= */
+
+    /**
+     * #1：附加 PBX 下行音频 sink（TTS 双路分发预留；bufferMs 钳制 100~200）。
+     * 重复 attach 覆盖旧值；传 null 摘除。
+     */
+    void attachDownlinkSink(PbxDownlinkAudioSink sink, int bufferMs)
+    {
+        this.downlinkDebouncer = sink == null ? null : new DownlinkDebouncer(sink, bufferMs);
+        log.info("VoiceWS downlink sink attached conn={} sink={} bufferMs={}", connId,
+                sink == null ? "none" : sink.getClass().getSimpleName(),
+                downlinkDebouncer == null ? -1 : downlinkDebouncer.getBufferMillis());
+    }
+
+    /** #1：打断/取消时丢弃下行防抖缓冲（与浏览器侧 drainPendingTts 对齐） */
+    private void discardDownlink()
+    {
+        DownlinkDebouncer downlink = downlinkDebouncer;
+        if (downlink != null)
+        {
+            downlink.discard();
+        }
+    }
+
+    /** #1：会话释放——清残余下行缓冲并关闭 sink */
+    private void releaseDownlink()
+    {
+        DownlinkDebouncer downlink = downlinkDebouncer;
+        downlinkDebouncer = null;
+        if (downlink != null)
+        {
+            downlink.release();
+        }
+    }
 
     void sendConnected()
     {
@@ -381,7 +418,9 @@ public class VoiceSession
         {
             tts.cancel();
         }
+        discardDownlink();
         sendQueue.offer(Entry.POISON);
+        releaseDownlink();
         long dropped = droppedFrames.get();
         log.info("VoiceWS session shutdown conn={}, sessionId={}, droppedFrames={}", connId, sessionId, dropped);
     }
@@ -578,6 +617,7 @@ public class VoiceSession
         {
             prev.cancel();
             drainPendingTts();
+            discardDownlink();
         }
         final int ttsRate = this.sampleRate;
         // A5：TTS 首包计时起点（新请求重置，覆盖旧任务）
@@ -618,6 +658,12 @@ public class VoiceSession
                                     "robot", sessionId);
                         }
                         enqueue(Entry.Kind.TTS, VoiceFrames.ttsAudio(seq, chunkCount, ttsRate, pcm));
+                        // #1：下行双路分发——浏览器侧已入发送队列，PBX 侧经防抖缓冲合片写 sink
+                        DownlinkDebouncer downlink = downlinkDebouncer;
+                        if (downlink != null)
+                        {
+                            downlink.offer(pcm, ttsRate);
+                        }
                     }
 
                     @Override
@@ -628,12 +674,24 @@ public class VoiceSession
                         {
                             return;
                         }
+                        // #1：正常结束补写不足一个防抖窗口的尾片（先 flush 再发 tts_end，保序）
+                        DownlinkDebouncer downlink = downlinkDebouncer;
+                        if (downlink != null)
+                        {
+                            downlink.flush();
+                        }
                         enqueue(Entry.Kind.OTHER, VoiceFrames.ttsEnd(false, null));
                     }
 
                     @Override
                     public void onError(String code, String message)
                     {
+                        // #1：合成失败——已分发到浏览器的部分分片照常补写下行使两侧一致
+                        DownlinkDebouncer downlink = downlinkDebouncer;
+                        if (downlink != null)
+                        {
+                            downlink.flush();
+                        }
                         enqueue(Entry.Kind.OTHER, VoiceFrames.error(code, message));
                     }
                 });
@@ -984,6 +1042,7 @@ public class VoiceSession
             long bargeinBegin = System.nanoTime();
             tts.cancel();
             drainPendingTts();
+            discardDownlink();
             enqueue(Entry.Kind.OTHER, VoiceFrames.ttsEnd(true, "vad_speech_start"));
             // A5：VAD 触发的打断停止耗时
             if (metrics != null)
@@ -1011,6 +1070,7 @@ public class VoiceSession
             tts.cancel();
         }
         drainPendingTts();
+        discardDownlink();
         // 明确发一帧 interrupted tts_end，客户端复位 AudioContext 播放队列
         enqueue(Entry.Kind.OTHER, VoiceFrames.ttsEnd(true, "bargein"));
         // A5：客户端主动打断停止耗时

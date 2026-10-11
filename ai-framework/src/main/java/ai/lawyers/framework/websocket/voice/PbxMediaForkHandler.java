@@ -185,9 +185,15 @@ public class PbxMediaForkHandler
 
         this.voiceSession = session;
         this.started = true;
+        // #1：下行媒体预留——按开关给会话挂下行 sink（当前空实现，TTS 分片经防抖缓冲双路分发；
+        // 真实 PBX 播放模块就绪后替换 NoopPbxDownlinkAudioSink 即可）
+        if (properties.isDownlinkEnabled())
+        {
+            session.attachDownlinkSink(new NoopPbxDownlinkAudioSink(), properties.getDownlinkBufferMs());
+        }
         PbxMediaWebSocketServer.onForkStarted(this);
-        log.info("[PbxMedia] caller 媒体链路已接通 recordId={} rate={} connId={}",
-                recordId, rate, wsSession.getId());
+        log.info("[PbxMedia] caller 媒体链路已接通 recordId={} rate={} connId={} downlink={}",
+                recordId, rate, wsSession.getId(), properties.isDownlinkEnabled());
     }
 
     private void handleStop()
