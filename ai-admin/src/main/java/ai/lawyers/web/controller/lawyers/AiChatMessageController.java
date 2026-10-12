@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import com.github.pagehelper.PageHelper;
 import ai.lawyers.common.annotation.Log;
 import ai.lawyers.common.core.controller.BaseController;
 import ai.lawyers.common.core.domain.AjaxResult;
@@ -51,6 +52,9 @@ public class AiChatMessageController extends BaseController
     {
         AiChatMessage query = new AiChatMessage();
         query.setSessionId(sessionId);
+        // P1：防御性上限——避免超长会话全量拉取压垮内存；count=false 不触发 COUNT 查询，
+        // 正序返回语义不变（正常会话远低于上限，超限时前端已有分段加载兜底）
+        PageHelper.startPage(1, 2000, false);
         List<AiChatMessage> list = aiChatMessageService.selectAiChatMessageList(query);
         return getDataTable(list);
     }

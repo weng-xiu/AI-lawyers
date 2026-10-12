@@ -13,7 +13,7 @@
     "orientationAngle": 0,
     "orientationType": "landscape-primary"
   },
-  "timestamp": "2026-09-19T09:40:08.446Z",
+  "timestamp": "2026-10-11T13:35:09.985Z",
   "url": "http://localhost:8091/register",
   "toolOptions": {
     "runOnly": {
@@ -81,6 +81,23 @@
       "description": "Ensures every ARIA button, link and menuitem has an accessible name",
       "help": "ARIA commands must have an accessible name",
       "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-command-name?application=playwright",
+      "nodes": []
+    },
+    {
+      "id": "aria-hidden-focus",
+      "impact": null,
+      "tags": [
+        "cat.name-role-value",
+        "wcag2a",
+        "wcag412",
+        "TTv5",
+        "TT6.a",
+        "EN-301-549",
+        "EN-9.4.1.2"
+      ],
+      "description": "Ensures aria-hidden elements are not focusable nor contain focusable elements",
+      "help": "ARIA hidden element must not be focusable or contain focusable elements",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-hidden-focus?application=playwright",
       "nodes": []
     },
     {
@@ -175,6 +192,24 @@
       "description": "Ensure aria-roledescription is only used on elements with an implicit or explicit role",
       "help": "aria-roledescription must be on elements with a semantic role",
       "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-roledescription?application=playwright",
+      "nodes": []
+    },
+    {
+      "id": "aria-toggle-field-name",
+      "impact": null,
+      "tags": [
+        "cat.aria",
+        "wcag2a",
+        "wcag412",
+        "TTv5",
+        "TT5.c",
+        "EN-301-549",
+        "EN-9.4.1.2",
+        "ACT"
+      ],
+      "description": "Ensures every ARIA toggle field has an accessible name",
+      "help": "ARIA toggle fields must have an accessible name",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-toggle-field-name?application=playwright",
       "nodes": []
     },
     {
@@ -836,9 +871,9 @@
             }
           ],
           "impact": null,
-          "html": "<label data-v-63ae9146=\"\" role=\"radio\" aria-checked=\"true\" tabindex=\"0\" class=\"el-radio is-checked\">",
+          "html": "<div data-v-63ae9146=\"\" role=\"radiogroup\" aria-label=\"性别\" class=\"sex-radio-group\">",
           "target": [
-            ".is-checked.el-radio[role=\"radio\"]"
+            ".sex-radio-group"
           ]
         }
       ]
@@ -942,9 +977,9 @@
           ],
           "none": [],
           "impact": null,
-          "html": "<label data-v-63ae9146=\"\" role=\"radio\" aria-checked=\"true\" tabindex=\"0\" class=\"el-radio is-checked\">",
+          "html": "<div data-v-63ae9146=\"\" role=\"radiogroup\" aria-label=\"性别\" class=\"sex-radio-group\">",
           "target": [
-            ".is-checked.el-radio[role=\"radio\"]"
+            ".sex-radio-group"
           ]
         }
       ]
@@ -994,63 +1029,9 @@
             }
           ],
           "impact": null,
-          "html": "<div data-v-63ae9146=\"\" role=\"radiogroup\" class=\"el-radio-group\">",
+          "html": "<div data-v-63ae9146=\"\" role=\"radiogroup\" aria-label=\"性别\" class=\"sex-radio-group\">",
           "target": [
-            ".el-radio-group"
-          ]
-        },
-        {
-          "any": [],
-          "all": [],
-          "none": [
-            {
-              "id": "deprecatedrole",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "minor",
-              "message": "ARIA role is not deprecated"
-            }
-          ],
-          "impact": null,
-          "html": "<label data-v-63ae9146=\"\" role=\"radio\" tabindex=\"-1\" class=\"el-radio\">",
-          "target": [
-            ".el-radio[role=\"radio\"]:nth-child(1)"
-          ]
-        },
-        {
-          "any": [],
-          "all": [],
-          "none": [
-            {
-              "id": "deprecatedrole",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "minor",
-              "message": "ARIA role is not deprecated"
-            }
-          ],
-          "impact": null,
-          "html": "<label data-v-63ae9146=\"\" role=\"radio\" tabindex=\"-1\" class=\"el-radio\">",
-          "target": [
-            ".el-radio[role=\"radio\"]:nth-child(2)"
-          ]
-        },
-        {
-          "any": [],
-          "all": [],
-          "none": [
-            {
-              "id": "deprecatedrole",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "minor",
-              "message": "ARIA role is not deprecated"
-            }
-          ],
-          "impact": null,
-          "html": "<label data-v-63ae9146=\"\" role=\"radio\" aria-checked=\"true\" tabindex=\"0\" class=\"el-radio is-checked\">",
-          "target": [
-            ".is-checked.el-radio[role=\"radio\"]"
+            ".sex-radio-group"
           ]
         }
       ]
@@ -1087,120 +1068,6 @@
           "html": "<body>",
           "target": [
             "body"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "aria-hidden-focus",
-      "impact": null,
-      "tags": [
-        "cat.name-role-value",
-        "wcag2a",
-        "wcag412",
-        "TTv5",
-        "TT6.a",
-        "EN-301-549",
-        "EN-9.4.1.2"
-      ],
-      "description": "Ensures aria-hidden elements are not focusable nor contain focusable elements",
-      "help": "ARIA hidden element must not be focusable or contain focusable elements",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-hidden-focus?application=playwright",
-      "nodes": [
-        {
-          "any": [],
-          "all": [
-            {
-              "id": "focusable-modal-open",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "serious",
-              "message": "No focusable elements while a modal is open"
-            },
-            {
-              "id": "focusable-disabled",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "serious",
-              "message": "No focusable elements contained within element"
-            },
-            {
-              "id": "focusable-not-tabbable",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "serious",
-              "message": "No focusable elements contained within element"
-            }
-          ],
-          "none": [],
-          "impact": null,
-          "html": "<input type=\"radio\" aria-hidden=\"true\" tabindex=\"-1\" autocomplete=\"off\" class=\"el-radio__original\" value=\"0\">",
-          "target": [
-            "input[value=\"0\"]"
-          ]
-        },
-        {
-          "any": [],
-          "all": [
-            {
-              "id": "focusable-modal-open",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "serious",
-              "message": "No focusable elements while a modal is open"
-            },
-            {
-              "id": "focusable-disabled",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "serious",
-              "message": "No focusable elements contained within element"
-            },
-            {
-              "id": "focusable-not-tabbable",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "serious",
-              "message": "No focusable elements contained within element"
-            }
-          ],
-          "none": [],
-          "impact": null,
-          "html": "<input type=\"radio\" aria-hidden=\"true\" tabindex=\"-1\" autocomplete=\"off\" class=\"el-radio__original\" value=\"1\">",
-          "target": [
-            "input[value=\"1\"]"
-          ]
-        },
-        {
-          "any": [],
-          "all": [
-            {
-              "id": "focusable-modal-open",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "serious",
-              "message": "No focusable elements while a modal is open"
-            },
-            {
-              "id": "focusable-disabled",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "serious",
-              "message": "No focusable elements contained within element"
-            },
-            {
-              "id": "focusable-not-tabbable",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "serious",
-              "message": "No focusable elements contained within element"
-            }
-          ],
-          "none": [],
-          "impact": null,
-          "html": "<input type=\"radio\" aria-hidden=\"true\" tabindex=\"-1\" autocomplete=\"off\" class=\"el-radio__original\" value=\"2\">",
-          "target": [
-            "input[value=\"2\"]"
           ]
         }
       ]
@@ -1304,16 +1171,16 @@
             }
           ],
           "impact": null,
-          "html": "<label data-v-63ae9146=\"\" role=\"radio\" aria-checked=\"true\" tabindex=\"0\" class=\"el-radio is-checked\">",
+          "html": "<div data-v-63ae9146=\"\" role=\"radiogroup\" aria-label=\"性别\" class=\"sex-radio-group\">",
           "target": [
-            ".is-checked.el-radio[role=\"radio\"]"
+            ".sex-radio-group"
           ]
         }
       ]
     },
     {
       "id": "aria-required-attr",
-      "impact": "critical",
+      "impact": null,
       "tags": [
         "cat.aria",
         "wcag2a",
@@ -1356,27 +1223,9 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<div data-v-63ae9146=\"\" role=\"radiogroup\" class=\"el-radio-group\">",
+          "html": "<div data-v-63ae9146=\"\" role=\"radiogroup\" aria-label=\"性别\" class=\"sex-radio-group\">",
           "target": [
-            ".el-radio-group"
-          ]
-        },
-        {
-          "any": [
-            {
-              "id": "aria-required-attr",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "critical",
-              "message": "All required ARIA attributes are present"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": null,
-          "html": "<label data-v-63ae9146=\"\" role=\"radio\" aria-checked=\"true\" tabindex=\"0\" class=\"el-radio is-checked\">",
-          "target": [
-            ".is-checked.el-radio[role=\"radio\"]"
+            ".sex-radio-group"
           ]
         }
       ]
@@ -1454,202 +1303,9 @@
             }
           ],
           "impact": null,
-          "html": "<div data-v-63ae9146=\"\" role=\"radiogroup\" class=\"el-radio-group\">",
+          "html": "<div data-v-63ae9146=\"\" role=\"radiogroup\" aria-label=\"性别\" class=\"sex-radio-group\">",
           "target": [
-            ".el-radio-group"
-          ]
-        },
-        {
-          "any": [],
-          "all": [],
-          "none": [
-            {
-              "id": "invalidrole",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "critical",
-              "message": "ARIA role is valid"
-            },
-            {
-              "id": "abstractrole",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "critical",
-              "message": "Abstract roles are not used"
-            },
-            {
-              "id": "unsupportedrole",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "critical",
-              "message": "ARIA role is supported"
-            }
-          ],
-          "impact": null,
-          "html": "<label data-v-63ae9146=\"\" role=\"radio\" tabindex=\"-1\" class=\"el-radio\">",
-          "target": [
-            ".el-radio[role=\"radio\"]:nth-child(1)"
-          ]
-        },
-        {
-          "any": [],
-          "all": [],
-          "none": [
-            {
-              "id": "invalidrole",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "critical",
-              "message": "ARIA role is valid"
-            },
-            {
-              "id": "abstractrole",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "critical",
-              "message": "Abstract roles are not used"
-            },
-            {
-              "id": "unsupportedrole",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "critical",
-              "message": "ARIA role is supported"
-            }
-          ],
-          "impact": null,
-          "html": "<label data-v-63ae9146=\"\" role=\"radio\" tabindex=\"-1\" class=\"el-radio\">",
-          "target": [
-            ".el-radio[role=\"radio\"]:nth-child(2)"
-          ]
-        },
-        {
-          "any": [],
-          "all": [],
-          "none": [
-            {
-              "id": "invalidrole",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "critical",
-              "message": "ARIA role is valid"
-            },
-            {
-              "id": "abstractrole",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "critical",
-              "message": "Abstract roles are not used"
-            },
-            {
-              "id": "unsupportedrole",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "critical",
-              "message": "ARIA role is supported"
-            }
-          ],
-          "impact": null,
-          "html": "<label data-v-63ae9146=\"\" role=\"radio\" aria-checked=\"true\" tabindex=\"0\" class=\"el-radio is-checked\">",
-          "target": [
-            ".is-checked.el-radio[role=\"radio\"]"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "aria-toggle-field-name",
-      "impact": null,
-      "tags": [
-        "cat.aria",
-        "wcag2a",
-        "wcag412",
-        "TTv5",
-        "TT5.c",
-        "EN-301-549",
-        "EN-9.4.1.2",
-        "ACT"
-      ],
-      "description": "Ensures every ARIA toggle field has an accessible name",
-      "help": "ARIA toggle fields must have an accessible name",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-toggle-field-name?application=playwright",
-      "nodes": [
-        {
-          "any": [
-            {
-              "id": "has-visible-text",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "serious",
-              "message": "Element has text that is visible to screen readers"
-            }
-          ],
-          "all": [],
-          "none": [
-            {
-              "id": "no-implicit-explicit-label",
-              "data": "radio",
-              "relatedNodes": [],
-              "impact": "serious",
-              "message": "There is no mismatch between a <label> and accessible name"
-            }
-          ],
-          "impact": null,
-          "html": "<label data-v-63ae9146=\"\" role=\"radio\" tabindex=\"-1\" class=\"el-radio\">",
-          "target": [
-            ".el-radio[role=\"radio\"]:nth-child(1)"
-          ]
-        },
-        {
-          "any": [
-            {
-              "id": "has-visible-text",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "serious",
-              "message": "Element has text that is visible to screen readers"
-            }
-          ],
-          "all": [],
-          "none": [
-            {
-              "id": "no-implicit-explicit-label",
-              "data": "radio",
-              "relatedNodes": [],
-              "impact": "serious",
-              "message": "There is no mismatch between a <label> and accessible name"
-            }
-          ],
-          "impact": null,
-          "html": "<label data-v-63ae9146=\"\" role=\"radio\" tabindex=\"-1\" class=\"el-radio\">",
-          "target": [
-            ".el-radio[role=\"radio\"]:nth-child(2)"
-          ]
-        },
-        {
-          "any": [
-            {
-              "id": "has-visible-text",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "serious",
-              "message": "Element has text that is visible to screen readers"
-            }
-          ],
-          "all": [],
-          "none": [
-            {
-              "id": "no-implicit-explicit-label",
-              "data": "radio",
-              "relatedNodes": [],
-              "impact": "serious",
-              "message": "There is no mismatch between a <label> and accessible name"
-            }
-          ],
-          "impact": null,
-          "html": "<label data-v-63ae9146=\"\" role=\"radio\" aria-checked=\"true\" tabindex=\"0\" class=\"el-radio is-checked\">",
-          "target": [
-            ".is-checked.el-radio[role=\"radio\"]"
+            ".sex-radio-group"
           ]
         }
       ]
@@ -1823,9 +1479,9 @@
           ],
           "none": [],
           "impact": null,
-          "html": "<label data-v-63ae9146=\"\" role=\"radio\" aria-checked=\"true\" tabindex=\"0\" class=\"el-radio is-checked\">",
+          "html": "<div data-v-63ae9146=\"\" role=\"radiogroup\" aria-label=\"性别\" class=\"sex-radio-group\">",
           "target": [
-            ".is-checked.el-radio[role=\"radio\"]"
+            ".sex-radio-group"
           ]
         }
       ]
@@ -1929,9 +1585,9 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<label data-v-63ae9146=\"\" role=\"radio\" aria-checked=\"true\" tabindex=\"0\" class=\"el-radio is-checked\">",
+          "html": "<div data-v-63ae9146=\"\" role=\"radiogroup\" aria-label=\"性别\" class=\"sex-radio-group\">",
           "target": [
-            ".is-checked.el-radio[role=\"radio\"]"
+            ".sex-radio-group"
           ]
         }
       ]
@@ -2137,7 +1793,7 @@
           "impact": null,
           "html": "<div class=\"el-form-item__content\" style=\"margin-left: 80px;\"><div data-v-63ae9146=\"\" class=\"el-input\"><!----><input type=\"text\" autocomplete=\"off\" placeholder=\"请输入用户名\" class=\"el-input__inner\"><!----><!----><!----><!----></div><!----></div>",
           "target": [
-            ".is-required.el-form-item[data-v-63ae9146=\"\"]:nth-child(1) > .el-form-item__content"
+            ".is-required.el-form-item:nth-child(1) > .el-form-item__content"
           ]
         },
         {
@@ -2201,7 +1857,7 @@
           "impact": null,
           "html": "<div class=\"el-form-item__content\" style=\"margin-left: 80px;\"><div data-v-63ae9146=\"\" class=\"el-input\"><!----><input type=\"text\" autocomplete=\"off\" placeholder=\"请输入昵称\" class=\"el-input__inner\"><!----><!----><!----><!----></div><!----></div>",
           "target": [
-            ".is-required.el-form-item[data-v-63ae9146=\"\"]:nth-child(2) > .el-form-item__content"
+            ".is-required.el-form-item:nth-child(2) > .el-form-item__content"
           ]
         },
         {
@@ -2265,7 +1921,7 @@
           "impact": null,
           "html": "<div class=\"el-form-item__content\" style=\"margin-left: 80px;\"><div data-v-63ae9146=\"\" class=\"el-input\"><!----><input type=\"password\" autocomplete=\"off\" placeholder=\"请输入密码\" class=\"el-input__inner\"><!----><!----><!----><!----></div><!----></div>",
           "target": [
-            ".is-required.el-form-item[data-v-63ae9146=\"\"]:nth-child(3) > .el-form-item__content"
+            ".is-required.el-form-item:nth-child(3) > .el-form-item__content"
           ]
         },
         {
@@ -2329,7 +1985,7 @@
           "impact": null,
           "html": "<div class=\"el-form-item__content\" style=\"margin-left: 80px;\"><div data-v-63ae9146=\"\" class=\"el-input\"><!----><input type=\"password\" autocomplete=\"off\" placeholder=\"请确认密码\" class=\"el-input__inner\"><!----><!----><!----><!----></div><!----></div>",
           "target": [
-            ".is-required.el-form-item[data-v-63ae9146=\"\"]:nth-child(4) > .el-form-item__content"
+            ".is-required.el-form-item:nth-child(4) > .el-form-item__content"
           ]
         },
         {
@@ -2393,7 +2049,7 @@
           "impact": null,
           "html": "<div class=\"el-form-item__content\" style=\"margin-left: 80px;\"><div data-v-63ae9146=\"\" class=\"el-input\"><!----><input type=\"text\" autocomplete=\"off\" placeholder=\"请输入手机号\" class=\"el-input__inner\"><!----><!----><!----><!----></div><!----></div>",
           "target": [
-            ".el-form-item[data-v-63ae9146=\"\"]:nth-child(5) > .el-form-item__content"
+            ".el-form-item:nth-child(5) > .el-form-item__content"
           ]
         },
         {
@@ -2457,7 +2113,7 @@
           "impact": null,
           "html": "<div class=\"el-form-item__content\" style=\"margin-left: 80px;\"><div data-v-63ae9146=\"\" class=\"el-input\"><!----><input type=\"text\" autocomplete=\"off\" placeholder=\"请输入邮箱\" class=\"el-input__inner\"><!----><!----><!----><!----></div><!----></div>",
           "target": [
-            ".el-form-item[data-v-63ae9146=\"\"]:nth-child(6) > .el-form-item__content"
+            ".el-form-item:nth-child(6) > .el-form-item__content"
           ]
         },
         {
@@ -2521,7 +2177,7 @@
           "impact": null,
           "html": "<div class=\"el-form-item__content\" style=\"margin-left: 80px;\">",
           "target": [
-            ".el-form-item[data-v-63ae9146=\"\"]:nth-child(7) > .el-form-item__content"
+            ".el-form-item:nth-child(7) > .el-form-item__content"
           ]
         },
         {
@@ -2553,7 +2209,7 @@
           "impact": null,
           "html": "<div class=\"el-form-item__content\" style=\"margin-left: 80px;\">",
           "target": [
-            ".el-form-item[data-v-63ae9146=\"\"]:nth-child(8) > .el-form-item__content"
+            ".el-form-item:nth-child(8) > .el-form-item__content"
           ]
         }
       ]
@@ -2701,7 +2357,7 @@
     },
     {
       "id": "color-contrast",
-      "impact": "serious",
+      "impact": null,
       "tags": [
         "cat.color",
         "wcag2aa",
@@ -2771,16 +2427,16 @@
             {
               "id": "color-contrast",
               "data": {
-                "fgColor": "#606266",
+                "fgColor": "#1f2a3a",
                 "bgColor": "#ffffff",
-                "contrastRatio": 6.11,
+                "contrastRatio": 14.47,
                 "fontSize": "10.5pt (14px)",
                 "fontWeight": "normal",
                 "expectedContrastRatio": "4.5:1"
               },
               "relatedNodes": [],
               "impact": "serious",
-              "message": "Element has sufficient color contrast of 6.11"
+              "message": "Element has sufficient color contrast of 14.47"
             }
           ],
           "all": [],
@@ -2796,16 +2452,16 @@
             {
               "id": "color-contrast",
               "data": {
-                "fgColor": "#606266",
+                "fgColor": "#1f2a3a",
                 "bgColor": "#ffffff",
-                "contrastRatio": 6.11,
+                "contrastRatio": 14.47,
                 "fontSize": "10.5pt (14px)",
                 "fontWeight": "normal",
                 "expectedContrastRatio": "4.5:1"
               },
               "relatedNodes": [],
               "impact": "serious",
-              "message": "Element has sufficient color contrast of 6.11"
+              "message": "Element has sufficient color contrast of 14.47"
             }
           ],
           "all": [],
@@ -2821,16 +2477,16 @@
             {
               "id": "color-contrast",
               "data": {
-                "fgColor": "#606266",
+                "fgColor": "#1f2a3a",
                 "bgColor": "#ffffff",
-                "contrastRatio": 6.11,
+                "contrastRatio": 14.47,
                 "fontSize": "10.5pt (14px)",
                 "fontWeight": "normal",
                 "expectedContrastRatio": "4.5:1"
               },
               "relatedNodes": [],
               "impact": "serious",
-              "message": "Element has sufficient color contrast of 6.11"
+              "message": "Element has sufficient color contrast of 14.47"
             }
           ],
           "all": [],
@@ -2846,16 +2502,16 @@
             {
               "id": "color-contrast",
               "data": {
-                "fgColor": "#606266",
+                "fgColor": "#1f2a3a",
                 "bgColor": "#ffffff",
-                "contrastRatio": 6.11,
+                "contrastRatio": 14.47,
                 "fontSize": "10.5pt (14px)",
                 "fontWeight": "normal",
                 "expectedContrastRatio": "4.5:1"
               },
               "relatedNodes": [],
               "impact": "serious",
-              "message": "Element has sufficient color contrast of 6.11"
+              "message": "Element has sufficient color contrast of 14.47"
             }
           ],
           "all": [],
@@ -2871,16 +2527,16 @@
             {
               "id": "color-contrast",
               "data": {
-                "fgColor": "#606266",
+                "fgColor": "#1f2a3a",
                 "bgColor": "#ffffff",
-                "contrastRatio": 6.11,
+                "contrastRatio": 14.47,
                 "fontSize": "10.5pt (14px)",
                 "fontWeight": "normal",
                 "expectedContrastRatio": "4.5:1"
               },
               "relatedNodes": [],
               "impact": "serious",
-              "message": "Element has sufficient color contrast of 6.11"
+              "message": "Element has sufficient color contrast of 14.47"
             }
           ],
           "all": [],
@@ -2896,16 +2552,16 @@
             {
               "id": "color-contrast",
               "data": {
-                "fgColor": "#606266",
+                "fgColor": "#1f2a3a",
                 "bgColor": "#ffffff",
-                "contrastRatio": 6.11,
+                "contrastRatio": 14.47,
                 "fontSize": "10.5pt (14px)",
                 "fontWeight": "normal",
                 "expectedContrastRatio": "4.5:1"
               },
               "relatedNodes": [],
               "impact": "serious",
-              "message": "Element has sufficient color contrast of 6.11"
+              "message": "Element has sufficient color contrast of 14.47"
             }
           ],
           "all": [],
@@ -2921,16 +2577,16 @@
             {
               "id": "color-contrast",
               "data": {
-                "fgColor": "#606266",
+                "fgColor": "#1f2a3a",
                 "bgColor": "#ffffff",
-                "contrastRatio": 6.11,
+                "contrastRatio": 14.47,
                 "fontSize": "10.5pt (14px)",
                 "fontWeight": "normal",
                 "expectedContrastRatio": "4.5:1"
               },
               "relatedNodes": [],
               "impact": "serious",
-              "message": "Element has sufficient color contrast of 6.11"
+              "message": "Element has sufficient color contrast of 14.47"
             }
           ],
           "all": [],
@@ -2946,16 +2602,16 @@
             {
               "id": "color-contrast",
               "data": {
-                "fgColor": "#606266",
+                "fgColor": "#1f2a3a",
                 "bgColor": "#ffffff",
-                "contrastRatio": 6.11,
+                "contrastRatio": 14.47,
                 "fontSize": "10.5pt (14px)",
                 "fontWeight": "normal",
                 "expectedContrastRatio": "4.5:1"
               },
               "relatedNodes": [],
               "impact": "serious",
-              "message": "Element has sufficient color contrast of 6.11"
+              "message": "Element has sufficient color contrast of 14.47"
             }
           ],
           "all": [],
@@ -2971,16 +2627,16 @@
             {
               "id": "color-contrast",
               "data": {
-                "fgColor": "#606266",
+                "fgColor": "#1f2a3a",
                 "bgColor": "#ffffff",
-                "contrastRatio": 6.11,
+                "contrastRatio": 14.47,
                 "fontSize": "10.5pt (14px)",
                 "fontWeight": "normal",
                 "expectedContrastRatio": "4.5:1"
               },
               "relatedNodes": [],
               "impact": "serious",
-              "message": "Element has sufficient color contrast of 6.11"
+              "message": "Element has sufficient color contrast of 14.47"
             }
           ],
           "all": [],
@@ -2996,16 +2652,16 @@
             {
               "id": "color-contrast",
               "data": {
-                "fgColor": "#606266",
+                "fgColor": "#1f2a3a",
                 "bgColor": "#ffffff",
-                "contrastRatio": 6.11,
+                "contrastRatio": 14.47,
                 "fontSize": "10.5pt (14px)",
                 "fontWeight": "normal",
                 "expectedContrastRatio": "4.5:1"
               },
               "relatedNodes": [],
               "impact": "serious",
-              "message": "Element has sufficient color contrast of 6.11"
+              "message": "Element has sufficient color contrast of 14.47"
             }
           ],
           "all": [],
@@ -3021,16 +2677,16 @@
             {
               "id": "color-contrast",
               "data": {
-                "fgColor": "#606266",
+                "fgColor": "#1f2a3a",
                 "bgColor": "#ffffff",
-                "contrastRatio": 6.11,
+                "contrastRatio": 14.47,
                 "fontSize": "10.5pt (14px)",
                 "fontWeight": "normal",
                 "expectedContrastRatio": "4.5:1"
               },
               "relatedNodes": [],
               "impact": "serious",
-              "message": "Element has sufficient color contrast of 6.11"
+              "message": "Element has sufficient color contrast of 14.47"
             }
           ],
           "all": [],
@@ -3046,16 +2702,16 @@
             {
               "id": "color-contrast",
               "data": {
-                "fgColor": "#606266",
+                "fgColor": "#1f2a3a",
                 "bgColor": "#ffffff",
-                "contrastRatio": 6.11,
+                "contrastRatio": 14.47,
                 "fontSize": "10.5pt (14px)",
                 "fontWeight": "normal",
                 "expectedContrastRatio": "4.5:1"
               },
               "relatedNodes": [],
               "impact": "serious",
-              "message": "Element has sufficient color contrast of 6.11"
+              "message": "Element has sufficient color contrast of 14.47"
             }
           ],
           "all": [],
@@ -3071,16 +2727,16 @@
             {
               "id": "color-contrast",
               "data": {
-                "fgColor": "#606266",
+                "fgColor": "#1f2a3a",
                 "bgColor": "#ffffff",
-                "contrastRatio": 6.11,
+                "contrastRatio": 14.47,
                 "fontSize": "10.5pt (14px)",
                 "fontWeight": "normal",
                 "expectedContrastRatio": "4.5:1"
               },
               "relatedNodes": [],
               "impact": "serious",
-              "message": "Element has sufficient color contrast of 6.11"
+              "message": "Element has sufficient color contrast of 14.47"
             }
           ],
           "all": [],
@@ -3096,24 +2752,24 @@
             {
               "id": "color-contrast",
               "data": {
-                "fgColor": "#606266",
+                "fgColor": "#1f2a3a",
                 "bgColor": "#ffffff",
-                "contrastRatio": 6.11,
+                "contrastRatio": 14.47,
                 "fontSize": "10.5pt (14px)",
                 "fontWeight": "normal",
                 "expectedContrastRatio": "4.5:1"
               },
               "relatedNodes": [],
               "impact": "serious",
-              "message": "Element has sufficient color contrast of 6.11"
+              "message": "Element has sufficient color contrast of 14.47"
             }
           ],
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<span class=\"el-radio__label\">男<!----></span>",
+          "html": "<span data-v-63ae9146=\"\">男</span>",
           "target": [
-            ".el-radio[role=\"radio\"]:nth-child(1) > .el-radio__label"
+            ".sex-radio:nth-child(1) > span"
           ]
         },
         {
@@ -3121,24 +2777,24 @@
             {
               "id": "color-contrast",
               "data": {
-                "fgColor": "#606266",
+                "fgColor": "#1f2a3a",
                 "bgColor": "#ffffff",
-                "contrastRatio": 6.11,
+                "contrastRatio": 14.47,
                 "fontSize": "10.5pt (14px)",
                 "fontWeight": "normal",
                 "expectedContrastRatio": "4.5:1"
               },
               "relatedNodes": [],
               "impact": "serious",
-              "message": "Element has sufficient color contrast of 6.11"
+              "message": "Element has sufficient color contrast of 14.47"
             }
           ],
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<span class=\"el-radio__label\">女<!----></span>",
+          "html": "<span data-v-63ae9146=\"\">女</span>",
           "target": [
-            ".el-radio[role=\"radio\"]:nth-child(2) > .el-radio__label"
+            ".sex-radio:nth-child(2) > span"
           ]
         },
         {
@@ -3146,16 +2802,66 @@
             {
               "id": "color-contrast",
               "data": {
-                "fgColor": "#606266",
+                "fgColor": "#1f2a3a",
                 "bgColor": "#ffffff",
-                "contrastRatio": 6.11,
+                "contrastRatio": 14.47,
                 "fontSize": "10.5pt (14px)",
                 "fontWeight": "normal",
                 "expectedContrastRatio": "4.5:1"
               },
               "relatedNodes": [],
               "impact": "serious",
-              "message": "Element has sufficient color contrast of 6.11"
+              "message": "Element has sufficient color contrast of 14.47"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<span data-v-63ae9146=\"\">未知</span>",
+          "target": [
+            ".sex-radio:nth-child(3) > span"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#ffffff",
+                "bgColor": "#1a3c6e",
+                "contrastRatio": 10.96,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 10.96"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<span>注 册</span>",
+          "target": [
+            ".el-button--primary > span"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#1f2a3a",
+                "bgColor": "#ffffff",
+                "contrastRatio": 14.47,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 14.47"
             }
           ],
           "all": [],
@@ -3164,6 +2870,31 @@
           "html": "<span>重 置</span>",
           "target": [
             ".el-button--default > span"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#1a3c6e",
+                "bgColor": "#ffffff",
+                "contrastRatio": 10.96,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 10.96"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<span>返回登录</span>",
+          "target": [
+            ".el-button--text > span"
           ]
         }
       ]
@@ -3327,6 +3058,81 @@
           "html": "<input type=\"text\" autocomplete=\"off\" placeholder=\"请输入邮箱\" class=\"el-input__inner\">",
           "target": [
             "input[placeholder=\"请输入邮箱\"]"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "multiple-label",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<label data-v-63ae9146=\"\" class=\"sex-radio\"><input data-v-63ae9146=\"\" type=\"radio\" name=\"sex\" value=\"0\"><span data-v-63ae9146=\"\">男</span></label>",
+                  "target": [
+                    ".sex-radio:nth-child(1)"
+                  ]
+                }
+              ],
+              "impact": "moderate",
+              "message": "Form field does not have multiple label elements"
+            }
+          ],
+          "impact": null,
+          "html": "<input data-v-63ae9146=\"\" type=\"radio\" name=\"sex\" value=\"0\">",
+          "target": [
+            "input[value=\"0\"]"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "multiple-label",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<label data-v-63ae9146=\"\" class=\"sex-radio\"><input data-v-63ae9146=\"\" type=\"radio\" name=\"sex\" value=\"1\"><span data-v-63ae9146=\"\">女</span></label>",
+                  "target": [
+                    ".sex-radio:nth-child(2)"
+                  ]
+                }
+              ],
+              "impact": "moderate",
+              "message": "Form field does not have multiple label elements"
+            }
+          ],
+          "impact": null,
+          "html": "<input data-v-63ae9146=\"\" type=\"radio\" name=\"sex\" value=\"1\">",
+          "target": [
+            "input[value=\"1\"]"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "multiple-label",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<label data-v-63ae9146=\"\" class=\"sex-radio\"><input data-v-63ae9146=\"\" type=\"radio\" name=\"sex\" value=\"2\"><span data-v-63ae9146=\"\">未知</span></label>",
+                  "target": [
+                    ".sex-radio:nth-child(3)"
+                  ]
+                }
+              ],
+              "impact": "moderate",
+              "message": "Form field does not have multiple label elements"
+            }
+          ],
+          "impact": null,
+          "html": "<input data-v-63ae9146=\"\" type=\"radio\" name=\"sex\" value=\"2\">",
+          "target": [
+            "input[value=\"2\"]"
           ]
         }
       ]
@@ -3579,6 +3385,111 @@
           "target": [
             "input[placeholder=\"请输入邮箱\"]"
           ]
+        },
+        {
+          "any": [
+            {
+              "id": "implicit-label",
+              "data": {
+                "implicitLabel": "男"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<label data-v-63ae9146=\"\" class=\"sex-radio\"><input data-v-63ae9146=\"\" type=\"radio\" name=\"sex\" value=\"0\"><span data-v-63ae9146=\"\">男</span></label>",
+                  "target": [
+                    ".sex-radio:nth-child(1)"
+                  ]
+                }
+              ],
+              "impact": "critical",
+              "message": "Form element has an implicit (wrapped) <label>"
+            }
+          ],
+          "all": [],
+          "none": [
+            {
+              "id": "hidden-explicit-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Form element has a visible explicit <label>"
+            }
+          ],
+          "impact": null,
+          "html": "<input data-v-63ae9146=\"\" type=\"radio\" name=\"sex\" value=\"0\">",
+          "target": [
+            "input[value=\"0\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "implicit-label",
+              "data": {
+                "implicitLabel": "女"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<label data-v-63ae9146=\"\" class=\"sex-radio\"><input data-v-63ae9146=\"\" type=\"radio\" name=\"sex\" value=\"1\"><span data-v-63ae9146=\"\">女</span></label>",
+                  "target": [
+                    ".sex-radio:nth-child(2)"
+                  ]
+                }
+              ],
+              "impact": "critical",
+              "message": "Form element has an implicit (wrapped) <label>"
+            }
+          ],
+          "all": [],
+          "none": [
+            {
+              "id": "hidden-explicit-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Form element has a visible explicit <label>"
+            }
+          ],
+          "impact": null,
+          "html": "<input data-v-63ae9146=\"\" type=\"radio\" name=\"sex\" value=\"1\">",
+          "target": [
+            "input[value=\"1\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "implicit-label",
+              "data": {
+                "implicitLabel": "未知"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<label data-v-63ae9146=\"\" class=\"sex-radio\"><input data-v-63ae9146=\"\" type=\"radio\" name=\"sex\" value=\"2\"><span data-v-63ae9146=\"\">未知</span></label>",
+                  "target": [
+                    ".sex-radio:nth-child(3)"
+                  ]
+                }
+              ],
+              "impact": "critical",
+              "message": "Form element has an implicit (wrapped) <label>"
+            }
+          ],
+          "all": [],
+          "none": [
+            {
+              "id": "hidden-explicit-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Form element has a visible explicit <label>"
+            }
+          ],
+          "impact": null,
+          "html": "<input data-v-63ae9146=\"\" type=\"radio\" name=\"sex\" value=\"2\">",
+          "target": [
+            "input[value=\"2\"]"
+          ]
         }
       ]
     },
@@ -3701,7 +3612,7 @@
     },
     {
       "id": "nested-interactive",
-      "impact": "serious",
+      "impact": null,
       "tags": [
         "cat.keyboard",
         "wcag2a",
@@ -3715,6 +3626,60 @@
       "help": "Interactive controls must not be nested",
       "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/nested-interactive?application=playwright",
       "nodes": [
+        {
+          "any": [
+            {
+              "id": "no-focusable-content",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element does not have focusable descendants"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<input data-v-63ae9146=\"\" type=\"radio\" name=\"sex\" value=\"0\">",
+          "target": [
+            "input[value=\"0\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "no-focusable-content",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element does not have focusable descendants"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<input data-v-63ae9146=\"\" type=\"radio\" name=\"sex\" value=\"1\">",
+          "target": [
+            "input[value=\"1\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "no-focusable-content",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element does not have focusable descendants"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<input data-v-63ae9146=\"\" type=\"radio\" name=\"sex\" value=\"2\">",
+          "target": [
+            "input[value=\"2\"]"
+          ]
+        },
         {
           "any": [
             {
@@ -3773,287 +3738,5 @@
     }
   ],
   "incomplete": [],
-  "violations": [
-    {
-      "id": "aria-required-attr",
-      "impact": "critical",
-      "tags": [
-        "cat.aria",
-        "wcag2a",
-        "wcag412",
-        "EN-301-549",
-        "EN-9.4.1.2"
-      ],
-      "description": "Ensures elements with ARIA roles have all required ARIA attributes",
-      "help": "Required ARIA attributes must be provided",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-required-attr?application=playwright",
-      "nodes": [
-        {
-          "any": [
-            {
-              "id": "aria-required-attr",
-              "data": [
-                "aria-checked"
-              ],
-              "relatedNodes": [],
-              "impact": "critical",
-              "message": "Required ARIA attribute not present: aria-checked"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": "critical",
-          "html": "<label data-v-63ae9146=\"\" role=\"radio\" tabindex=\"-1\" class=\"el-radio\">",
-          "target": [
-            ".el-radio[role=\"radio\"]:nth-child(1)"
-          ],
-          "failureSummary": "Fix any of the following:\n  Required ARIA attribute not present: aria-checked"
-        },
-        {
-          "any": [
-            {
-              "id": "aria-required-attr",
-              "data": [
-                "aria-checked"
-              ],
-              "relatedNodes": [],
-              "impact": "critical",
-              "message": "Required ARIA attribute not present: aria-checked"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": "critical",
-          "html": "<label data-v-63ae9146=\"\" role=\"radio\" tabindex=\"-1\" class=\"el-radio\">",
-          "target": [
-            ".el-radio[role=\"radio\"]:nth-child(2)"
-          ],
-          "failureSummary": "Fix any of the following:\n  Required ARIA attribute not present: aria-checked"
-        }
-      ]
-    },
-    {
-      "id": "color-contrast",
-      "impact": "serious",
-      "tags": [
-        "cat.color",
-        "wcag2aa",
-        "wcag143",
-        "TTv5",
-        "TT13.c",
-        "EN-301-549",
-        "EN-9.1.4.3",
-        "ACT"
-      ],
-      "description": "Ensures the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
-      "help": "Elements must meet minimum color contrast ratio thresholds",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/color-contrast?application=playwright",
-      "nodes": [
-        {
-          "any": [
-            {
-              "id": "color-contrast",
-              "data": {
-                "fgColor": "#409eff",
-                "bgColor": "#ffffff",
-                "contrastRatio": 2.78,
-                "fontSize": "10.5pt (14px)",
-                "fontWeight": "normal",
-                "messageKey": null,
-                "expectedContrastRatio": "4.5:1"
-              },
-              "relatedNodes": [
-                {
-                  "html": "<div data-v-63ae9146=\"\" class=\"el-card register-card is-always-shadow\">",
-                  "target": [
-                    ".el-card"
-                  ]
-                }
-              ],
-              "impact": "serious",
-              "message": "Element has insufficient color contrast of 2.78 (foreground color: #409eff, background color: #ffffff, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": "serious",
-          "html": "<span class=\"el-radio__label\">未知<!----></span>",
-          "target": [
-            ".is-checked.el-radio[role=\"radio\"] > .el-radio__label"
-          ],
-          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 2.78 (foreground color: #409eff, background color: #ffffff, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
-        },
-        {
-          "any": [
-            {
-              "id": "color-contrast",
-              "data": {
-                "fgColor": "#ffffff",
-                "bgColor": "#409eff",
-                "contrastRatio": 2.78,
-                "fontSize": "10.5pt (14px)",
-                "fontWeight": "normal",
-                "messageKey": null,
-                "expectedContrastRatio": "4.5:1"
-              },
-              "relatedNodes": [
-                {
-                  "html": "<button data-v-63ae9146=\"\" type=\"button\" class=\"el-button el-button--primary\"><!----><!----><span>注 册</span></button>",
-                  "target": [
-                    ".el-button--primary"
-                  ]
-                }
-              ],
-              "impact": "serious",
-              "message": "Element has insufficient color contrast of 2.78 (foreground color: #ffffff, background color: #409eff, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": "serious",
-          "html": "<span>注 册</span>",
-          "target": [
-            ".el-button--primary > span"
-          ],
-          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 2.78 (foreground color: #ffffff, background color: #409eff, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
-        },
-        {
-          "any": [
-            {
-              "id": "color-contrast",
-              "data": {
-                "fgColor": "#409eff",
-                "bgColor": "#ffffff",
-                "contrastRatio": 2.78,
-                "fontSize": "10.5pt (14px)",
-                "fontWeight": "normal",
-                "messageKey": null,
-                "expectedContrastRatio": "4.5:1"
-              },
-              "relatedNodes": [
-                {
-                  "html": "<div data-v-63ae9146=\"\" class=\"el-card register-card is-always-shadow\">",
-                  "target": [
-                    ".el-card"
-                  ]
-                }
-              ],
-              "impact": "serious",
-              "message": "Element has insufficient color contrast of 2.78 (foreground color: #409eff, background color: #ffffff, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": "serious",
-          "html": "<span>返回登录</span>",
-          "target": [
-            ".el-button--text > span"
-          ],
-          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 2.78 (foreground color: #409eff, background color: #ffffff, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
-        }
-      ]
-    },
-    {
-      "id": "nested-interactive",
-      "impact": "serious",
-      "tags": [
-        "cat.keyboard",
-        "wcag2a",
-        "wcag412",
-        "TTv5",
-        "TT6.a",
-        "EN-301-549",
-        "EN-9.4.1.2"
-      ],
-      "description": "Ensures interactive controls are not nested as they are not always announced by screen readers or can cause focus problems for assistive technologies",
-      "help": "Interactive controls must not be nested",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/nested-interactive?application=playwright",
-      "nodes": [
-        {
-          "any": [
-            {
-              "id": "no-focusable-content",
-              "data": {
-                "messageKey": "notHidden"
-              },
-              "relatedNodes": [
-                {
-                  "html": "<input type=\"radio\" aria-hidden=\"true\" tabindex=\"-1\" autocomplete=\"off\" class=\"el-radio__original\" value=\"0\">",
-                  "target": [
-                    "input[value=\"0\"]"
-                  ]
-                }
-              ],
-              "impact": "serious",
-              "message": "Using a negative tabindex on an element inside an interactive control does not prevent assistive technologies from focusing the element (even with aria-hidden=\"true\")"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": "serious",
-          "html": "<label data-v-63ae9146=\"\" role=\"radio\" tabindex=\"-1\" class=\"el-radio\">",
-          "target": [
-            ".el-radio[role=\"radio\"]:nth-child(1)"
-          ],
-          "failureSummary": "Fix any of the following:\n  Using a negative tabindex on an element inside an interactive control does not prevent assistive technologies from focusing the element (even with aria-hidden=\"true\")"
-        },
-        {
-          "any": [
-            {
-              "id": "no-focusable-content",
-              "data": {
-                "messageKey": "notHidden"
-              },
-              "relatedNodes": [
-                {
-                  "html": "<input type=\"radio\" aria-hidden=\"true\" tabindex=\"-1\" autocomplete=\"off\" class=\"el-radio__original\" value=\"1\">",
-                  "target": [
-                    "input[value=\"1\"]"
-                  ]
-                }
-              ],
-              "impact": "serious",
-              "message": "Using a negative tabindex on an element inside an interactive control does not prevent assistive technologies from focusing the element (even with aria-hidden=\"true\")"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": "serious",
-          "html": "<label data-v-63ae9146=\"\" role=\"radio\" tabindex=\"-1\" class=\"el-radio\">",
-          "target": [
-            ".el-radio[role=\"radio\"]:nth-child(2)"
-          ],
-          "failureSummary": "Fix any of the following:\n  Using a negative tabindex on an element inside an interactive control does not prevent assistive technologies from focusing the element (even with aria-hidden=\"true\")"
-        },
-        {
-          "any": [
-            {
-              "id": "no-focusable-content",
-              "data": {
-                "messageKey": "notHidden"
-              },
-              "relatedNodes": [
-                {
-                  "html": "<input type=\"radio\" aria-hidden=\"true\" tabindex=\"-1\" autocomplete=\"off\" class=\"el-radio__original\" value=\"2\">",
-                  "target": [
-                    "input[value=\"2\"]"
-                  ]
-                }
-              ],
-              "impact": "serious",
-              "message": "Using a negative tabindex on an element inside an interactive control does not prevent assistive technologies from focusing the element (even with aria-hidden=\"true\")"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": "serious",
-          "html": "<label data-v-63ae9146=\"\" role=\"radio\" aria-checked=\"true\" tabindex=\"0\" class=\"el-radio is-checked\">",
-          "target": [
-            ".is-checked.el-radio[role=\"radio\"]"
-          ],
-          "failureSummary": "Fix any of the following:\n  Using a negative tabindex on an element inside an interactive control does not prevent assistive technologies from focusing the element (even with aria-hidden=\"true\")"
-        }
-      ]
-    }
-  ]
+  "violations": []
 }

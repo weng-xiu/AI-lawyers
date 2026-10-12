@@ -25,11 +25,15 @@
           <el-input v-model="registerForm.email" placeholder="请输入邮箱"></el-input>
         </el-form-item>
         <el-form-item label="性别" prop="sex">
-          <el-radio-group v-model="registerForm.sex">
-            <el-radio label="0">男</el-radio>
-            <el-radio label="1">女</el-radio>
-            <el-radio label="2">未知</el-radio>
-          </el-radio-group>
+          <!-- V1 无障碍修复：原生 radio 替代 el-radio。
+               ElementUI 2.15 的 label[role=radio] 缺 aria-checked 且内嵌原生 input
+               触发 axe 基线 2 处 critical(aria-required-attr) + 3 处 serious(nested-interactive) -->
+          <div class="sex-radio-group" role="radiogroup" aria-label="性别">
+            <label v-for="opt in sexOptions" :key="opt.value" class="sex-radio">
+              <input v-model="registerForm.sex" type="radio" name="sex" :value="opt.value">
+              <span>{{ opt.label }}</span>
+            </label>
+          </div>
         </el-form-item>
         <el-form-item v-if="captchaEnabled" label="验证码" prop="code">
           <el-row :gutter="20" class="captcha-row">
@@ -77,6 +81,12 @@ export default {
       codeUrl: '',
       captchaExpr: '',
       speechSupported,
+      // 性别选项（原生 radio 渲染，字典与后端 sex 字典值保持一致）
+      sexOptions: [
+        { value: '0', label: '男' },
+        { value: '1', label: '女' },
+        { value: '2', label: '未知' }
+      ],
       registerForm: {
         username: '',
         nickName: '',
@@ -202,6 +212,38 @@ export default {
   color: #303133;
 }
 .captcha-row { display: flex; align-items: center; }
+/* 性别原生单选样式（视觉对齐 ElementUI 单选，兼顾关怀模式字号/热区） */
+.sex-radio-group {
+  display: flex;
+  gap: 24px;
+  min-height: 32px;
+  align-items: center;
+}
+.sex-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--color-text-primary, #1F2A3A);
+}
+.sex-radio input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--color-brand-deep, #1A3C6E);
+  cursor: pointer;
+}
+.sex-radio input:focus-visible {
+  outline: 3px solid #ffd04b;
+  outline-offset: 2px;
+}
+html.care-large .sex-radio { font-size: 17px; }
+html.care-large .sex-radio input { width: 18px; height: 18px; }
+html.care-xlarge .sex-radio { font-size: 20px; }
+html.care-xlarge .sex-radio input { width: 22px; height: 22px; }
+html.care-high-contrast .sex-radio { color: #000; }
+html.care-high-contrast .sex-radio input { outline: 2px solid #000; }
 .register-code-img {
   height: 38px;
   cursor: pointer;

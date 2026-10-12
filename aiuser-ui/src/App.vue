@@ -30,9 +30,9 @@
             class="nav-menu"
             mode="horizontal"
             router
-            background-color="#0b1f4a"
+            background-color="#1A3C6E"
             text-color="#d7e2f3"
-            active-text-color="#ffd04b">
+            active-text-color="#C9A96E">
             <el-menu-item index="/consultation/submit">我要咨询</el-menu-item>
             <el-menu-item index="/ticket">我的工单</el-menu-item>
             <el-menu-item index="/channels">渠道绑定</el-menu-item>
@@ -54,7 +54,7 @@
             <el-tooltip content="高对比度主题，文字更清晰" placement="bottom">
               <el-switch
                 :value="care.state.highContrast"
-                active-color="#ffd04b"
+                active-color="#C9A96E"
                 inactive-color="#3a5a8c"
                 active-text=""
                 aria-label="高对比度模式"
@@ -181,8 +181,8 @@ html, body {
   top: 0;
   z-index: 9999;
   padding: 10px 18px;
-  background: #ffd04b;
-  color: #0b1f4a;
+  background: var(--color-brand-gold, #C9A96E);
+  color: var(--color-brand-deep, #1A3C6E);
   font-weight: 600;
   border-radius: 0 0 6px 0;
 }
@@ -247,12 +247,12 @@ button:focus-visible,
 }
 
 .app-header {
-  background-color: #0b1f4a;
+  background-color: var(--color-brand-deep, #1A3C6E);
   color: #fff;
   padding: 0;
   height: 60px !important;
   line-height: 60px;
-  box-shadow: 0 2px 8px rgba(11, 31, 74, 0.25);
+  box-shadow: 0 2px 8px rgba(26, 60, 110, 0.25);
 }
 
 .header-content {
@@ -285,7 +285,7 @@ button:focus-visible,
   font-size: 15px;
 }
 .el-menu--horizontal > .el-menu-item.is-active {
-  border-bottom: 3px solid #ffd04b !important;
+  border-bottom: 3px solid var(--color-brand-gold, #C9A96E) !important;
 }
 
 .care-bar {
@@ -300,7 +300,7 @@ button:focus-visible,
   color: #fff;
   cursor: pointer;
 }
-.login-link { color: #ffd04b !important; font-size: 15px; }
+.login-link { color: var(--color-brand-gold, #C9A96E) !important; font-size: 15px; }
 
 .el-main {
   background-color: #f5f7fa;
@@ -309,7 +309,7 @@ button:focus-visible,
 }
 
 .app-footer {
-  background-color: #0b1f4a;
+  background-color: var(--color-brand-deep, #1A3C6E);
   color: #aebdd6;
   text-align: center;
   height: 60px !important;

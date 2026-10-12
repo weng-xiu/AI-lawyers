@@ -3,7 +3,6 @@ package ai.lawyers.system.service.impl.lawyers.storage;
 import java.io.File;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import jakarta.annotation.PostConstruct;
@@ -15,6 +14,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import ai.lawyers.system.domain.lawyers.AiCallRecord;
 import ai.lawyers.system.mapper.lawyers.AiCallRecordMapper;
+import ai.lawyers.system.service.lawyers.concurrent.ExecutorRegistry;
 import ai.lawyers.system.service.lawyers.storage.RecordingStorageService;
 
 /**
@@ -41,6 +41,10 @@ public class RecordingUploadService
 
     @Autowired
     private AiCallRecordMapper callRecordMapper;
+
+    /** P2：线程池统一注册中心（命名/有界队列/拒绝策略/Micrometer 指标/水位告警/统一停机） */
+    @Autowired
+    private ExecutorRegistry executorRegistry;
 
     /** 对象存储模式下，上传成功后是否删除本地文件 */
     @Value("${call.recording.s3.delete-local-after-upload:true}")
@@ -82,13 +86,9 @@ public class RecordingUploadService
         if (needPool)
         {
             int poolSize = Math.max(1, workers);
-            executor = new ThreadPoolExecutor(poolSize, poolSize, 0L, TimeUnit.MILLISECONDS,
-                    new LinkedBlockingQueue<Runnable>(Math.max(1, queueCapacity)),
-                    r -> {
-                        Thread t = new Thread(r, "recording-upload");
-                        t.setDaemon(true);
-                        return t;
-                    });
+            // P2：改由 ExecutorRegistry 统一纳管——保留 AbortPolicy 语义（队列满由补扫任务兜底，不回压呼叫主链路）
+            executor = executorRegistry.create("recording-upload", poolSize, poolSize, Math.max(1, queueCapacity),
+                    new ThreadPoolExecutor.AbortPolicy());
             log.info("[RecordingUpload] worker 池就绪 workers={} queue={} mode={}",
                     poolSize, queueCapacity,
                     storageService.isObjectStorage() ? "s3" : "local-encrypt");

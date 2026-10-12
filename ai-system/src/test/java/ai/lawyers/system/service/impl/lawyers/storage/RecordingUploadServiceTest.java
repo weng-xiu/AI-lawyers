@@ -11,10 +11,13 @@ import static org.mockito.Mockito.when;
 import java.io.File;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.util.ReflectionTestUtils;
 import ai.lawyers.system.domain.lawyers.AiCallRecord;
 import ai.lawyers.system.mapper.lawyers.AiCallRecordMapper;
+import ai.lawyers.system.service.lawyers.concurrent.ExecutorRegistry;
 import ai.lawyers.system.service.lawyers.storage.RecordingStorageService;
+import io.micrometer.core.instrument.MeterRegistry;
 
 /**
  * F2/P0-5：{@link RecordingUploadService} 单元测试。
@@ -38,6 +41,11 @@ class RecordingUploadServiceTest
         RecordingUploadService svc = new RecordingUploadService();
         ReflectionTestUtils.setField(svc, "storageService", storageService);
         ReflectionTestUtils.setField(svc, "callRecordMapper", callRecordMapper);
+        // P2：注入真实 ExecutorRegistry——单测环境无 MeterRegistry（getIfAvailable 返回 null 自动跳过指标绑定）
+        @SuppressWarnings("unchecked")
+        ObjectProvider<MeterRegistry> meterRegistryProvider = Mockito.mock(ObjectProvider.class);
+        Mockito.when(meterRegistryProvider.getIfAvailable()).thenReturn(null);
+        ReflectionTestUtils.setField(svc, "executorRegistry", new ExecutorRegistry(meterRegistryProvider));
         ReflectionTestUtils.setField(svc, "deleteLocalAfterUpload", true);
         ReflectionTestUtils.setField(svc, "workers", 2);
         ReflectionTestUtils.setField(svc, "queueCapacity", 100);

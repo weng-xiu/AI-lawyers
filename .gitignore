@@ -57,3 +57,4 @@ nbdist/
 /doc/*.md
 /doc/archive/*.md
 /tmp-verify/
+/doc/

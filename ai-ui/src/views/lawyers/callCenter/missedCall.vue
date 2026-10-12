@@ -79,7 +79,11 @@
           <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
         </el-row>
 
-        <el-table v-loading="loading" :data="missedList" @selection-change="handleSelectionChange">
+        <ErrorRetry v-if="loadError" @retry="getList" />
+        <el-table v-else v-loading="loading" :data="missedList" @selection-change="handleSelectionChange">
+          <template slot="empty">
+            <TableEmpty text="暂无未接来电" hint="未接来电会在挂机后自动登记" />
+          </template>
           <el-table-column type="selection" width="50" align="center" />
           <el-table-column label="来电号码" prop="callerNumber" width="130" />
           <el-table-column label="来电人" prop="callerName" width="100" />
@@ -149,7 +153,11 @@
             <el-button type="primary" plain icon="el-icon-bell" size="mini" :disabled="multiple" @click="handleBatchNotice">批量通知</el-button>
           </el-col>
         </el-row>
-        <el-table v-loading="loading" :data="noticeList" @selection-change="handleSelectionChange">
+        <ErrorRetry v-if="noticeError" @retry="getNoticeList" />
+        <el-table v-else v-loading="loading" :data="noticeList" @selection-change="handleSelectionChange">
+          <template slot="empty">
+            <TableEmpty text="暂无漏话通知" hint="可选择来电记录批量发送漏话通知" />
+          </template>
           <el-table-column type="selection" width="50" align="center" />
           <el-table-column label="来电号码" prop="callerNumber" width="130" />
           <el-table-column label="来电人" prop="callerName" width="100" />
@@ -220,6 +228,8 @@ export default {
   data() {
     return {
       loading: false,
+      loadError: false,
+      noticeError: false,
       showSearch: true,
       activeTab: 'missed',
       stats: {},
@@ -278,18 +288,25 @@ export default {
     },
     getList() {
       this.loading = true
+      this.loadError = false
       listMissedCall(this.addDateRange(this.queryParams, this.dateRange)).then(res => {
         this.missedList = res.rows
         this.total = res.total
+      }).catch(() => {
+        // V2 三态：失败给出统一错误重试态
+        this.loadError = true
       }).finally(() => {
         this.loading = false
       })
     },
     getNoticeList() {
       this.loading = true
+      this.noticeError = false
       listMissedCall(this.noticeQuery).then(res => {
         this.noticeList = res.rows
         this.noticeTotal = res.total
+      }).catch(() => {
+        this.noticeError = true
       }).finally(() => {
         this.loading = false
       })

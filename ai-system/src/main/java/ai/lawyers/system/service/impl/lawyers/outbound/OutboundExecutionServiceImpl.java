@@ -5,11 +5,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -45,6 +42,7 @@ import ai.lawyers.system.mapper.lawyers.trunk.AiCallDialLogMapper;
 import ai.lawyers.system.service.ISysUserService;
 import ai.lawyers.system.service.lawyers.cluster.RedisLeaderLock;
 import ai.lawyers.system.service.lawyers.cluster.InstanceDrainState;
+import ai.lawyers.system.service.lawyers.concurrent.ExecutorRegistry;
 import ai.lawyers.system.service.lawyers.IAiCallRecordService;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
 import ai.lawyers.system.service.lawyers.IAiHotspotSuppressService;
@@ -181,8 +179,11 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
 
     private final AtomicBoolean scanning = new AtomicBoolean(false);
 
-    /** T2-2 并发拨号线程池（有界，daemon） */
+    /** T2-2 并发拨号线程池（P2：改由 ExecutorRegistry 统一纳管，有界队列+CallerRuns 回压+水位指标） */
     private ExecutorService dialPool;
+
+    /** 拨号池有界队列容量：单任务批次 ≤100，千级缓冲足够；打满由 CallerRuns 回压到扫描线程 */
+    private static final int OUTBOUND_DIAL_QUEUE_CAPACITY = 1000;
 
     /** N7：扫描/对账任务的集群单主锁（Lua CAS 释放，替代原裸 delete 锁） */
     private static final String SCAN_LOCK_NAME = "job:outbound-scan";
@@ -192,6 +193,10 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
     @Autowired
     private RedisLeaderLock leaderLock;
 
+    /** P2：线程池统一注册中心（命名/有界队列/拒绝策略/Micrometer 指标/水位告警/统一停机） */
+    @Autowired
+    private ExecutorRegistry executorRegistry;
+
     /**
      * R11 防护：模拟接通开关仅允许在开发/测试环境开启。
      * 生产环境若误开，将直接产生假话单/假接通统计，启动时强告警以便第一时间发现配置错误。
@@ -200,19 +205,10 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
     public void checkSimulateSwitch()
     {
         transactionTemplate = new TransactionTemplate(transactionManager);
-        // T2-2 并发拨号线程池：按配置并发数创建有界固定池，daemon 线程不阻止 JVM 退出
+        // T2-2 并发拨号线程池：P2 改由 ExecutorRegistry 统一创建——
+        // 有界队列（原实现为无界 LinkedBlockingQueue）+ CallerRuns 回压 + Micrometer 指标 + 30s 水位巡检
         int poolSize = Math.max(1, Math.min(dialConcurrent, 64));
-        final AtomicInteger threadSeq = new AtomicInteger(1);
-        dialPool = Executors.newFixedThreadPool(poolSize, new ThreadFactory()
-        {
-            @Override
-            public Thread newThread(Runnable r)
-            {
-                Thread t = new Thread(r, "outbound-dial-" + threadSeq.getAndIncrement());
-                t.setDaemon(true);
-                return t;
-            }
-        });
+        dialPool = executorRegistry.create("outbound-dial", poolSize, poolSize, OUTBOUND_DIAL_QUEUE_CAPACITY);
         if (!simulateAnswer)
         {
             return;

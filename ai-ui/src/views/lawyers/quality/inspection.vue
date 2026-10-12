@@ -66,7 +66,11 @@
     </el-row>
 
     <!-- ==================== 质检列表 ==================== -->
-    <el-table v-loading="loading" :data="qualityList">
+    <ErrorRetry v-if="loadError" @retry="getList" />
+    <el-table v-else v-loading="loading" :data="qualityList">
+      <template slot="empty">
+        <TableEmpty text="暂无质检记录" hint="通话完成并转写后将自动进入质检" />
+      </template>
       <el-table-column label="质检ID" align="center" prop="inspectionId" width="80" />
       <el-table-column label="坐席" align="center" min-width="100">
         <template slot-scope="scope">
@@ -377,6 +381,7 @@ export default {
   data() {
     return {
       loading: true,
+      loadError: false,
       showSearch: true,
       total: 0,
       qualityList: [],
@@ -433,6 +438,7 @@ export default {
     /** 查询质检列表 */
     getList() {
       this.loading = true
+      this.loadError = false
       if (this.dateRange && this.dateRange.length === 2) {
         this.queryParams.params = { beginTime: this.dateRange[0], endTime: this.dateRange[1] }
       } else {
@@ -442,6 +448,10 @@ export default {
         this.qualityList = response.rows
         this.total = response.total
         this.loading = false
+      }).catch(() => {
+        // V2 三态：失败不再永久卡 loading，给出统一错误重试态
+        this.loading = false
+        this.loadError = true
       })
     },
     /** 详情 */

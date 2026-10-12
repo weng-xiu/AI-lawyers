@@ -24,6 +24,10 @@ import { parseTime, resetForm, addDateRange, selectDictLabel, selectDictLabels, 
 import careMode from '@/utils/careMode'
 // 分页组件
 import Pagination from "@/components/Pagination"
+// V2 三态组件：空态 / 骨架加载 / 错误重试
+import TableEmpty from "@/components/TableEmpty"
+import PageLoading from "@/components/PageLoading"
+import ErrorRetry from "@/components/ErrorRetry"
 // 自定义表格工具组件
 import RightToolbar from "@/components/RightToolbar"
 // 富文本组件
@@ -55,6 +59,9 @@ Vue.prototype.handleTree = handleTree
 // 全局组件挂载
 Vue.component('DictTag', DictTag)
 Vue.component('Pagination', Pagination)
+Vue.component('TableEmpty', TableEmpty)
+Vue.component('PageLoading', PageLoading)
+Vue.component('ErrorRetry', ErrorRetry)
 Vue.component('RightToolbar', RightToolbar)
 Vue.component('Editor', Editor)
 Vue.component('FileUpload', FileUpload)

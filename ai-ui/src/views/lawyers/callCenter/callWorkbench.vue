@@ -50,10 +50,7 @@
             <span class="wb-badge" v-if="pendingTodoCount">{{ pendingTodoCount }}</span>
           </div>
           <div class="wb-todo-list" v-loading="todoLoading">
-            <div v-if="todoList.length === 0" class="wb-empty">
-              <i class="el-icon-circle-check"></i>
-              <p>暂无待办，一切就绪</p>
-            </div>
+            <TableEmpty v-if="todoList.length === 0" compact icon="el-icon-circle-check" text="暂无待办，一切就绪" />
             <div class="wb-todo-item" v-for="item in todoList" :key="item.todoId" @click="handleTodoClick(item)">
               <div class="wb-todo-bar" :class="'pri-' + item.priority"></div>
               <div class="wb-todo-body">
@@ -133,10 +130,10 @@
               </template>
             </el-table-column>
             <el-table-column label="时间" prop="callTime" width="150" align="left" />
+            <template slot="empty">
+              <TableEmpty compact icon="el-icon-phone-outline" text="暂无通话记录" />
+            </template>
           </el-table>
-          <div v-if="!filteredCalls.length" class="wb-table-empty">
-            <i class="el-icon-phone-outline"></i><span>暂无通话记录</span>
-          </div>
           <el-pagination
             v-if="filteredCalls.length > pageSize"
             layout="prev, pager, next"
@@ -157,10 +154,7 @@
             <el-button type="text" size="mini" @click="$router.push('/system/notice')">更多</el-button>
           </div>
           <div class="wb-notice-list" v-loading="noticeLoading">
-            <div v-if="noticeList.length === 0" class="wb-empty">
-              <i class="el-icon-document"></i>
-              <p>暂无公告</p>
-            </div>
+            <TableEmpty v-if="noticeList.length === 0" compact icon="el-icon-document" text="暂无公告" />
             <div class="wb-notice-item" v-for="(n, i) in noticeList" :key="i" @click="showNotice(n)">
               <div class="wb-nc-bar"></div>
               <div class="wb-nc-body">
@@ -506,11 +500,6 @@ export default {
 
 /* 待办 */
 .wb-todo-list { min-height: 120px; }
-.wb-empty {
-  text-align: center; color: #B0BCCA; padding: 24px 0;
-  i { font-size: 32px; display: block; margin-bottom: 8px; opacity: .7; }
-  p { font-size: 13px; margin: 0; }
-}
 .wb-todo-item {
   display: flex; align-items: stretch;
   padding: 12px 0; border-bottom: 1px dashed #F5F7FA;
@@ -573,11 +562,6 @@ export default {
   ::v-deep th { background: #F5F7FA !important; }
   ::v-deep td { border-color: #F5F7FA !important; }
   .wb-phone { font-weight: 600; color: #1F2A3A; font-family: 'Consolas', monospace; }
-}
-.wb-table-empty {
-  text-align: center; color: #B0BCCA; padding: 28px 0;
-  i { font-size: 28px; display: block; margin-bottom: 6px; }
-  span { font-size: 13px; }
 }
 
 /* 公告 */

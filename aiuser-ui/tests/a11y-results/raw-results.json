@@ -10,7 +10,9 @@
     "grep": {},
     "grepInvert": null,
     "maxFailures": 0,
-    "metadata": {},
+    "metadata": {
+      "actualWorkers": 1
+    },
     "preserveOutput": "always",
     "reporter": [
       [
@@ -50,27 +52,355 @@
     "version": "1.47.2",
     "workers": 1,
     "webServer": {
-      "command": "npm run dev -- --port 8081",
-      "url": "http://localhost:8081",
+      "command": "npm run dev -- --port 8091",
+      "url": "http://localhost:8091",
       "timeout": 240000,
       "reuseExistingServer": false,
       "env": {
         "NODE_OPTIONS": "--openssl-legacy-provider",
-        "npm_config_port": "8081"
+        "npm_config_port": "8091"
       }
     }
   },
-  "suites": [],
-  "errors": [
+  "suites": [
     {
-      "message": "Error: http://localhost:8081 is already used, make sure that nothing is running on the port/url or set reuseExistingServer:true in config.webServer.",
-      "stack": "Error: http://localhost:8081 is already used, make sure that nothing is running on the port/url or set reuseExistingServer:true in config.webServer."
+      "title": "axe-scan.spec.js",
+      "file": "axe-scan.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "axe 扫描：login (/login)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "status": "passed",
+                  "duration": 9366,
+                  "errors": [],
+                  "stdout": [
+                    {
+                      "text": "[login] violations=0 critical/serious=0\n"
+                    }
+                  ],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-11T13:15:04.363Z",
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "efa6be2194cbabd98ccd-3a80f79523f50c860cf2",
+          "file": "axe-scan.spec.js",
+          "line": 49,
+          "column": 3
+        },
+        {
+          "title": "axe 扫描：register (/register)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "status": "passed",
+                  "duration": 2908,
+                  "errors": [],
+                  "stdout": [
+                    {
+                      "text": "[register] violations=0 critical/serious=0\n"
+                    }
+                  ],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-11T13:15:14.084Z",
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "efa6be2194cbabd98ccd-675f8f6fad1fb5385a19",
+          "file": "axe-scan.spec.js",
+          "line": 49,
+          "column": 3
+        },
+        {
+          "title": "axe 扫描：services (/services)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "status": "passed",
+                  "duration": 2616,
+                  "errors": [],
+                  "stdout": [
+                    {
+                      "text": "[services] violations=0 critical/serious=0\n"
+                    }
+                  ],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-11T13:15:16.996Z",
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "efa6be2194cbabd98ccd-93cdc8f28296f5710df9",
+          "file": "axe-scan.spec.js",
+          "line": 49,
+          "column": 3
+        },
+        {
+          "title": "axe 扫描：my-tickets (/ticket)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "status": "passed",
+                  "duration": 3027,
+                  "errors": [],
+                  "stdout": [
+                    {
+                      "text": "[my-tickets] violations=0 critical/serious=0\n"
+                    }
+                  ],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-11T13:15:19.617Z",
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "efa6be2194cbabd98ccd-87f4f32c0db4b59b9c48",
+          "file": "axe-scan.spec.js",
+          "line": 49,
+          "column": 3
+        },
+        {
+          "title": "axe 扫描：my-channels (/channels)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "status": "passed",
+                  "duration": 3062,
+                  "errors": [],
+                  "stdout": [
+                    {
+                      "text": "[my-channels] violations=0 critical/serious=0\n"
+                    }
+                  ],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-11T13:15:22.648Z",
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "efa6be2194cbabd98ccd-19de5755171abbef8313",
+          "file": "axe-scan.spec.js",
+          "line": 49,
+          "column": 3
+        },
+        {
+          "title": "axe 扫描：submit-question (/consultation/submit)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "status": "passed",
+                  "duration": 3010,
+                  "errors": [],
+                  "stdout": [
+                    {
+                      "text": "[submit-question] violations=0 critical/serious=0\n"
+                    }
+                  ],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-11T13:15:25.714Z",
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "efa6be2194cbabd98ccd-6256ad64df7135edbf3e",
+          "file": "axe-scan.spec.js",
+          "line": 49,
+          "column": 3
+        },
+        {
+          "title": "axe 扫描：consultation-result (/consultation/result?id=1)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "status": "passed",
+                  "duration": 3016,
+                  "errors": [],
+                  "stdout": [
+                    {
+                      "text": "[consultation-result] violations=0 critical/serious=0\n"
+                    }
+                  ],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-11T13:15:28.728Z",
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "efa6be2194cbabd98ccd-76638b3721b8cd1f5e04",
+          "file": "axe-scan.spec.js",
+          "line": 49,
+          "column": 3
+        },
+        {
+          "title": "axe 扫描：consultation-history (/consultation/history)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "status": "passed",
+                  "duration": 3025,
+                  "errors": [],
+                  "stdout": [
+                    {
+                      "text": "[consultation-history] violations=0 critical/serious=0\n"
+                    }
+                  ],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-11T13:15:31.747Z",
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "efa6be2194cbabd98ccd-b3a3de4c73ff2029a458",
+          "file": "axe-scan.spec.js",
+          "line": 49,
+          "column": 3
+        },
+        {
+          "title": "axe 扫描：evaluation (/consultation/evaluation?id=1)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "status": "passed",
+                  "duration": 3013,
+                  "errors": [],
+                  "stdout": [
+                    {
+                      "text": "[evaluation] violations=0 critical/serious=0\n"
+                    }
+                  ],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-11T13:15:34.775Z",
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "efa6be2194cbabd98ccd-4e85a760ea1ecac092cd",
+          "file": "axe-scan.spec.js",
+          "line": 49,
+          "column": 3
+        }
+      ]
     }
   ],
+  "errors": [],
   "stats": {
-    "startTime": "2026-09-19T09:38:29.543Z",
-    "duration": 695.3940000000002,
-    "expected": 0,
+    "startTime": "2026-10-11T13:14:37.271Z",
+    "duration": 1192198.116,
+    "expected": 9,
     "skipped": 0,
     "unexpected": 0,
     "flaky": 0

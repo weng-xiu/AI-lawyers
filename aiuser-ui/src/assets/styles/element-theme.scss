@@ -1,0 +1,55 @@
+/**
+ * 公众端（aiuser-ui）Element UI 司法蓝主题
+ *
+ * Design Token 依据《配色.md》（12348 政务风）：
+ * - 主色 #1A3C6E 深邃法蓝：白底对比度 10.97:1、白字对比度 10.97:1，
+ *   满足 WCAG 2.1 AA（≥4.5:1），替换 Element 默认主色 #409eff（仅 2.78:1，
+ *   为 axe 基线 5 处 color-contrast 违规的根因）。
+ * - 与管理端 ai-ui/src/assets/styles/element-variables.scss 保持同源。
+ */
+
+/* theme color - 司法蓝政务风（12348配色规范） */
+$--color-primary: #1A3C6E;
+$--color-success: #2B8C6E;
+$--color-warning: #E8923A;
+$--color-danger: #C63D4A;
+$--color-info: #8C8C8C;
+
+$--button-font-weight: 400;
+
+$--color-text-primary: #1F2A3A;
+$--color-text-regular: #1F2A3A;
+$--color-text-secondary: #5A6A7E;
+$--color-text-placeholder: #B0BCCA;
+
+$--border-color-base: #DCE2EB;
+$--border-color-light: #DCE2EB;
+$--border-color-lighter: #EAF0F8;
+$--border-color-extra-light: #F0F3F8;
+
+$--background-color-base: #F5F7FA;
+
+$--table-border: 1px solid #DCE2EB;
+$--table-header-background-color: #EDF0F5;
+
+/* icon font path, required */
+$--font-path: '~element-ui/lib/theme-chalk/fonts';
+
+@import "~element-ui/packages/theme-chalk/src/index";
+
+/* Design Token CSS 变量（配色.md 第八部分命名），供页面样式统一引用 */
+:root {
+  --color-brand-deep: #1A3C6E;
+  --color-brand-hover: #255A99;
+  --color-brand-gold: #C9A96E;
+  --color-brand-gold-light: #F3EDE0;
+  --color-status-success: #2B8C6E;
+  --color-status-info: #2B6BB0;
+  --color-status-warning: #E8923A;
+  --color-status-danger: #C63D4A;
+  --color-status-muted: #8C8C8C;
+  --color-text-primary: #1F2A3A;
+  --color-text-secondary: #5A6A7E;
+  --color-border: #DCE2EB;
+  --color-bg-page: #F5F7FA;
+}

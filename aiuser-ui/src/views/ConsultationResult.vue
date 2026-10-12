@@ -319,7 +319,7 @@ export default {
   padding: 15px;
   background-color: #f8f9fa;
   border-radius: 6px;
-  border-left: 4px solid #409EFF;
+  border-left: 4px solid var(--color-brand-deep, #1A3C6E);
 }
 
 .related-laws {

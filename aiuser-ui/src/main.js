@@ -3,7 +3,8 @@ import App from './App.vue'
 import router from './router'
 import store from './store'
 import ElementUI from 'element-ui'
-import 'element-ui/lib/theme-chalk/index.css'
+// V1 品牌色统一：以司法蓝 #1A3C6E 重建 Element 主题（含 Design Token 变量），替换默认蓝 #409eff
+import './assets/styles/element-theme.scss'
 import http from './utils/http'
 import careMode from './utils/careMode'
 

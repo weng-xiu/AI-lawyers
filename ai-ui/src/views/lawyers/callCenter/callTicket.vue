@@ -87,7 +87,11 @@
       <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
-    <el-table v-loading="loading" :data="ticketList" @selection-change="handleSelectionChange">
+    <ErrorRetry v-if="loadError" @retry="getList" />
+    <el-table v-else v-loading="loading" :data="ticketList" @selection-change="handleSelectionChange">
+      <template slot="empty">
+        <TableEmpty text="暂无工单" hint="调整筛选条件或时间范围后重试" />
+      </template>
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="工单ID" align="center" prop="ticketId" />
       <el-table-column label="工单号" align="center" prop="ticketNo" />
@@ -248,6 +252,7 @@ export default {
   data() {
     return {
       loading: true,
+      loadError: false,
       ids: [],
       single: true,
       multiple: true,
@@ -297,6 +302,7 @@ export default {
     },
     getList() {
       this.loading = true
+      this.loadError = false
       const params = {
         ...this.queryParams,
         ...this.addDateRange(this.queryParams, this.dateRange)
@@ -305,6 +311,10 @@ export default {
         this.ticketList = response.rows
         this.total = response.total
         this.loading = false
+      }).catch(() => {
+        // V2 三态：失败不再永久卡 loading，给出统一错误重试态
+        this.loading = false
+        this.loadError = true
       })
     },
     getStatusType(status) {

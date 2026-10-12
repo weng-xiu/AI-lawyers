@@ -13,7 +13,7 @@
     "orientationAngle": 0,
     "orientationType": "landscape-primary"
   },
-  "timestamp": "2026-09-19T09:40:05.083Z",
+  "timestamp": "2026-10-11T13:35:07.087Z",
   "url": "http://localhost:8091/login",
   "toolOptions": {
     "runOnly": {
@@ -1798,7 +1798,7 @@
     },
     {
       "id": "color-contrast",
-      "impact": "serious",
+      "impact": null,
       "tags": [
         "cat.color",
         "wcag2aa",
@@ -1868,16 +1868,16 @@
             {
               "id": "color-contrast",
               "data": {
-                "fgColor": "#606266",
+                "fgColor": "#1f2a3a",
                 "bgColor": "#ffffff",
-                "contrastRatio": 6.11,
+                "contrastRatio": 14.47,
                 "fontSize": "10.5pt (14px)",
                 "fontWeight": "normal",
                 "expectedContrastRatio": "4.5:1"
               },
               "relatedNodes": [],
               "impact": "serious",
-              "message": "Element has sufficient color contrast of 6.11"
+              "message": "Element has sufficient color contrast of 14.47"
             }
           ],
           "all": [],
@@ -1893,16 +1893,16 @@
             {
               "id": "color-contrast",
               "data": {
-                "fgColor": "#606266",
+                "fgColor": "#1f2a3a",
                 "bgColor": "#ffffff",
-                "contrastRatio": 6.11,
+                "contrastRatio": 14.47,
                 "fontSize": "10.5pt (14px)",
                 "fontWeight": "normal",
                 "expectedContrastRatio": "4.5:1"
               },
               "relatedNodes": [],
               "impact": "serious",
-              "message": "Element has sufficient color contrast of 6.11"
+              "message": "Element has sufficient color contrast of 14.47"
             }
           ],
           "all": [],
@@ -1911,6 +1911,31 @@
           "html": "<input type=\"password\" autocomplete=\"current-password\" id=\"login-password\" placeholder=\"密码\" class=\"el-input__inner\">",
           "target": [
             "#login-password"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#ffffff",
+                "bgColor": "#1a3c6e",
+                "contrastRatio": 10.96,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 10.96"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<span data-v-26084dc2=\"\">登 录</span>",
+          "target": [
+            "span > span"
           ]
         },
         {
@@ -1936,6 +1961,31 @@
           "html": "<span data-v-26084dc2=\"\">还没有账号？</span>",
           "target": [
             ".login-register > span"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#1a3c6e",
+                "bgColor": "#ffffff",
+                "contrastRatio": 10.96,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 10.96"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<span class=\"el-link--inner\">立即注册</span>",
+          "target": [
+            ".el-link--inner"
           ]
         }
       ]
@@ -2427,93 +2477,5 @@
     }
   ],
   "incomplete": [],
-  "violations": [
-    {
-      "id": "color-contrast",
-      "impact": "serious",
-      "tags": [
-        "cat.color",
-        "wcag2aa",
-        "wcag143",
-        "TTv5",
-        "TT13.c",
-        "EN-301-549",
-        "EN-9.1.4.3",
-        "ACT"
-      ],
-      "description": "Ensures the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
-      "help": "Elements must meet minimum color contrast ratio thresholds",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/color-contrast?application=playwright",
-      "nodes": [
-        {
-          "any": [
-            {
-              "id": "color-contrast",
-              "data": {
-                "fgColor": "#ffffff",
-                "bgColor": "#409eff",
-                "contrastRatio": 2.78,
-                "fontSize": "10.5pt (14px)",
-                "fontWeight": "normal",
-                "messageKey": null,
-                "expectedContrastRatio": "4.5:1"
-              },
-              "relatedNodes": [
-                {
-                  "html": "<button data-v-26084dc2=\"\" type=\"button\" class=\"el-button el-button--primary el-button--medium\" style=\"width: 100%;\"><!----><!----><span><span data-v-26084dc2=\"\">登 录</span></span></button>",
-                  "target": [
-                    "button"
-                  ]
-                }
-              ],
-              "impact": "serious",
-              "message": "Element has insufficient color contrast of 2.78 (foreground color: #ffffff, background color: #409eff, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": "serious",
-          "html": "<span data-v-26084dc2=\"\">登 录</span>",
-          "target": [
-            "span > span"
-          ],
-          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 2.78 (foreground color: #ffffff, background color: #409eff, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
-        },
-        {
-          "any": [
-            {
-              "id": "color-contrast",
-              "data": {
-                "fgColor": "#409eff",
-                "bgColor": "#ffffff",
-                "contrastRatio": 2.78,
-                "fontSize": "10.5pt (14px)",
-                "fontWeight": "normal",
-                "messageKey": null,
-                "expectedContrastRatio": "4.5:1"
-              },
-              "relatedNodes": [
-                {
-                  "html": "<div data-v-26084dc2=\"\" class=\"el-card login-card is-always-shadow\">",
-                  "target": [
-                    ".el-card"
-                  ]
-                }
-              ],
-              "impact": "serious",
-              "message": "Element has insufficient color contrast of 2.78 (foreground color: #409eff, background color: #ffffff, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": "serious",
-          "html": "<span class=\"el-link--inner\">立即注册</span>",
-          "target": [
-            ".el-link--inner"
-          ],
-          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 2.78 (foreground color: #409eff, background color: #ffffff, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
-        }
-      ]
-    }
-  ]
+  "violations": []
 }
