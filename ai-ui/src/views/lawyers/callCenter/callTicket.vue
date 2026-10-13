@@ -1,40 +1,26 @@
 <template>
   <div class="app-container cc-page">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="工单号" prop="ticketNo">
-        <el-input
-          v-model="queryParams.ticketNo"
-          placeholder="请输入工单号"
-          clearable
-          style="width: 240px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="工单标题" prop="title">
-        <el-input
-          v-model="queryParams.title"
-          placeholder="请输入工单标题"
-          clearable
-          style="width: 240px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="工单状态" prop="status">
-        <el-select v-model="queryParams.status" placeholder="请选择状态" clearable>
-          <el-option label="待处理" value="0" />
-          <el-option label="处理中" value="1" />
-          <el-option label="已完成" value="2" />
-          <el-option label="已归档" value="3" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="优先级" prop="priority">
-        <el-select v-model="queryParams.priority" placeholder="请选择优先级" clearable>
-          <el-option label="低" value="0" />
-          <el-option label="中" value="1" />
-          <el-option label="高" value="2" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="创建时间">
+    <!-- V3：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ErrorRetry v-if="loadError" @retry="getList" />
+    <ProTable
+      v-else
+      ref="proTable"
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="ticketList"
+      :loading="loading"
+      :total="total"
+      :show-search.sync="showSearch"
+      has-selection
+      empty-text="暂无工单"
+      empty-hint="调整筛选条件或时间范围后重试"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList"
+      @selection-change="handleSelectionChange"
+    >
+      <template #query-dateRange>
         <el-date-picker
           v-model="dateRange"
           style="width: 240px"
@@ -44,15 +30,8 @@
           start-placeholder="开始日期"
           end-placeholder="结束日期"
         ></el-date-picker>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
-
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
+      </template>
+      <template #toolbar-left>
         <el-button
           type="primary"
           plain
@@ -61,8 +40,6 @@
           @click="handleAdd"
           v-hasPermi="['lawyers:call:ticket:add']"
         >新增</el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button
           type="success"
           plain
@@ -72,8 +49,6 @@
           @click="handleUpdate"
           v-hasPermi="['lawyers:call:ticket:edit']"
         >修改</el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button
           type="danger"
           plain
@@ -83,94 +58,61 @@
           @click="handleDelete"
           v-hasPermi="['lawyers:call:ticket:remove']"
         >删除</el-button>
-      </el-col>
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
-    </el-row>
-
-    <ErrorRetry v-if="loadError" @retry="getList" />
-    <el-table v-else v-loading="loading" :data="ticketList" @selection-change="handleSelectionChange">
-      <template slot="empty">
-        <TableEmpty text="暂无工单" hint="调整筛选条件或时间范围后重试" />
       </template>
-      <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="工单ID" align="center" prop="ticketId" />
-      <el-table-column label="工单号" align="center" prop="ticketNo" />
-      <el-table-column label="工单标题" align="center" prop="title" />
-      <el-table-column label="工单状态" align="center" prop="status" width="100">
-        <template slot-scope="scope">
-          <el-tag :type="getStatusType(scope.row.status)">{{ getStatusLabel(scope.row.status) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="优先级" align="center" prop="priority" width="80">
-        <template slot-scope="scope">
-          <el-tag :type="getPriorityType(scope.row.priority)">{{ getPriorityLabel(scope.row.priority) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="处理人" align="center" prop="assignUserName" />
-      <el-table-column label="关联来电" align="center" prop="recordId" />
-      <el-table-column label="创建时间" align="center" prop="createTime" width="180">
-        <template slot-scope="scope">
-          <span>{{ parseTime(scope.row.createTime) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
-        <template slot-scope="scope">
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-view"
-            @click="handleDetail(scope.row)"
-            v-hasPermi="['lawyers:call:ticket:query']"
-          >详情</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-edit"
-            @click="handleUpdate(scope.row)"
-            v-hasPermi="['lawyers:call:ticket:edit']"
-          >修改</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-delete"
-            @click="handleDelete(scope.row)"
-            v-hasPermi="['lawyers:call:ticket:remove']"
-          >删除</el-button>
-          <el-button
-            v-if="scope.row.status == '0'"
-            size="mini"
-            type="text"
-            icon="el-icon-setting"
-            @click="handleProcess(scope.row)"
-            v-hasPermi="['lawyers:call:ticket:process']"
-          >开始处理</el-button>
-          <el-button
-            v-if="scope.row.status == '1'"
-            size="mini"
-            type="text"
-            icon="el-icon-check"
-            @click="handleComplete(scope.row)"
-            v-hasPermi="['lawyers:call:ticket:complete']"
-          >完成工单</el-button>
-          <el-button
-            v-if="scope.row.status == '2'"
-            size="mini"
-            type="text"
-            icon="el-icon-folder-add"
-            @click="handleArchive(scope.row)"
-            v-hasPermi="['lawyers:call:ticket:archive']"
-          >归档</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <pagination
-      v-show="total>0"
-      :total="total"
-      :page.sync="queryParams.pageNum"
-      :limit.sync="queryParams.pageSize"
-      @pagination="getList"
-    />
+      <template #column-status="{ row }">
+        <el-tag :type="getStatusType(row.status)">{{ getStatusLabel(row.status) }}</el-tag>
+      </template>
+      <template #column-priority="{ row }">
+        <el-tag :type="getPriorityType(row.priority)">{{ getPriorityLabel(row.priority) }}</el-tag>
+      </template>
+      <template #column-action="{ row }">
+        <el-button
+          size="mini"
+          type="text"
+          icon="el-icon-view"
+          @click="handleDetail(row)"
+          v-hasPermi="['lawyers:call:ticket:query']"
+        >详情</el-button>
+        <el-button
+          size="mini"
+          type="text"
+          icon="el-icon-edit"
+          @click="handleUpdate(row)"
+          v-hasPermi="['lawyers:call:ticket:edit']"
+        >修改</el-button>
+        <el-button
+          size="mini"
+          type="text"
+          icon="el-icon-delete"
+          @click="handleDelete(row)"
+          v-hasPermi="['lawyers:call:ticket:remove']"
+        >删除</el-button>
+        <el-button
+          v-if="row.status == '0'"
+          size="mini"
+          type="text"
+          icon="el-icon-setting"
+          @click="handleProcess(row)"
+          v-hasPermi="['lawyers:call:ticket:process']"
+        >开始处理</el-button>
+        <el-button
+          v-if="row.status == '1'"
+          size="mini"
+          type="text"
+          icon="el-icon-check"
+          @click="handleComplete(row)"
+          v-hasPermi="['lawyers:call:ticket:complete']"
+        >完成工单</el-button>
+        <el-button
+          v-if="row.status == '2'"
+          size="mini"
+          type="text"
+          icon="el-icon-folder-add"
+          @click="handleArchive(row)"
+          v-hasPermi="['lawyers:call:ticket:archive']"
+        >归档</el-button>
+      </template>
+    </ProTable>
 
     <el-dialog :title="title" :visible.sync="open" width="700px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="80px">
@@ -259,6 +201,18 @@ export default {
       showSearch: true,
       total: 0,
       ticketList: [],
+      // V3：ProTable 列定义（status/priority/action 走插槽，时间列用 formatter）
+      columns: [
+        { prop: 'ticketId', label: '工单ID' },
+        { prop: 'ticketNo', label: '工单号' },
+        { prop: 'title', label: '工单标题' },
+        { prop: 'status', label: '工单状态', width: 100, slot: true },
+        { prop: 'priority', label: '优先级', width: 80, slot: true },
+        { prop: 'assignUserName', label: '处理人' },
+        { prop: 'recordId', label: '关联来电' },
+        { prop: 'createTime', label: '创建时间', width: 180, formatter: (row) => this.parseTime(row.createTime) },
+        { prop: 'action', label: '操作', slot: true, className: 'small-padding fixed-width' }
+      ],
       title: "",
       open: false,
       detailOpen: false,
@@ -295,6 +249,23 @@ export default {
   },
   created() {
     this.getList()
+  },
+  computed: {
+    /** V3：ProTable 查询字段（日期范围走 #query-dateRange 插槽） */
+    queryFormItems() {
+      return [
+        { prop: 'ticketNo', label: '工单号', placeholder: '请输入工单号' },
+        { prop: 'title', label: '工单标题', placeholder: '请输入工单标题' },
+        { prop: 'status', label: '工单状态', type: 'select', placeholder: '请选择状态', options: [
+          { label: '待处理', value: '0' }, { label: '处理中', value: '1' },
+          { label: '已完成', value: '2' }, { label: '已归档', value: '3' }
+        ] },
+        { prop: 'priority', label: '优先级', type: 'select', placeholder: '请选择优先级', options: [
+          { label: '低', value: '0' }, { label: '中', value: '1' }, { label: '高', value: '2' }
+        ] },
+        { prop: 'dateRange', label: '创建时间', slot: true }
+      ]
+    }
   },
   methods: {
     onAssignUserChange(val, user) {
@@ -358,8 +329,8 @@ export default {
       this.getList()
     },
     resetQuery() {
+      // V3：ProTable 内部已对表单字段 resetFields，这里补插槽字段复位后重查
       this.dateRange = []
-      this.resetForm("queryForm")
       this.handleQuery()
     },
     handleAdd() {

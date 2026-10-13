@@ -13,87 +13,44 @@
       </template>
     </el-alert>
 
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="坐席名称" prop="agentName">
-        <el-input
-          v-model="queryParams.agentName"
-          placeholder="请输入坐席名称"
-          clearable
-          style="width: 200px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="坐席状态" prop="status">
-        <el-select v-model="queryParams.status" placeholder="请选择状态" clearable style="width: 140px">
-          <el-option label="离线" value="0" />
-          <el-option label="在线" value="1" />
-          <el-option label="忙碌" value="2" />
-          <el-option label="休息" value="3" />
-        </el-select>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
-
-    <el-row :gutter="10" class="mb8">
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
-    </el-row>
-
-    <el-table v-loading="loading" :data="agentList">
-      <el-table-column label="坐席工号" align="center" prop="agentId" width="90" />
-      <el-table-column label="坐席名称" align="center" prop="agentName" min-width="100" />
-      <el-table-column label="绑定用户" align="center" min-width="140">
-        <template slot-scope="scope">
-          <span v-if="scope.row.userId">
-            {{ scope.row.nickName || '-' }}
-            <span style="color:#909399">（{{ scope.row.userName }}）</span>
-          </span>
-          <span v-else style="color:#c0c4cc">未绑定</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="所属部门" align="center" prop="deptName" min-width="120" />
-      <el-table-column label="手机号" align="center" prop="phonenumber" width="120" />
-      <el-table-column label="SIP分机" align="center" prop="sipExtension" width="90">
-        <template slot-scope="scope">
-          <el-tag size="mini" type="info" v-if="scope.row.sipExtension">{{ scope.row.sipExtension }}</el-tag>
-          <span v-else style="color:#c0c4cc">--</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="坐席状态" align="center" prop="status" width="90">
-        <template slot-scope="scope">
-          <el-tag :type="getStatusType(scope.row.status)">{{ getStatusLabel(scope.row.status) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="通话状态" align="center" prop="callStatus" width="90">
-        <template slot-scope="scope">
-          <el-tag size="mini" :type="getCallStatusType(scope.row.callStatus)">{{ getCallStatusLabel(scope.row.callStatus) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="应答模式" align="center" width="90">
-        <template slot-scope="scope">
-          <span>{{ scope.row.callMode === '1' ? '手动' : '自动' }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="登录时间" align="center" prop="loginTime" width="160">
-        <template slot-scope="scope">
-          <span>{{ parseTime(scope.row.loginTime) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" align="center" width="160" class-name="small-padding fixed-width">
-        <template slot-scope="scope">
-          <el-button size="mini" type="text" icon="el-icon-view" @click="handleDetail(scope.row)"
-            v-hasPermi="['lawyers:call:agent:query']">详情</el-button>
-          <el-button v-if="scope.row.status == '1' || scope.row.status == '2'" size="mini" type="text"
-            icon="el-icon-switch-button" @click="handleLogout(scope.row)"
-            v-hasPermi="['lawyers:call:agent:logout']">强制下线</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <pagination v-show="total>0" :total="total" :page.sync="queryParams.pageNum"
-      :limit.sync="queryParams.pageSize" @pagination="getList" />
+    <!-- V3：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="agentList"
+      :loading="loading"
+      :total="total"
+      :show-search.sync="showSearch"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList"
+    >
+      <template #column-bindUser="{ row }">
+        <span v-if="row.userId">
+          {{ row.nickName || '-' }}
+          <span style="color:#909399">（{{ row.userName }}）</span>
+        </span>
+        <span v-else style="color:#c0c4cc">未绑定</span>
+      </template>
+      <template #column-sipExtension="{ row }">
+        <el-tag size="mini" type="info" v-if="row.sipExtension">{{ row.sipExtension }}</el-tag>
+        <span v-else style="color:#c0c4cc">--</span>
+      </template>
+      <template #column-status="{ row }">
+        <el-tag :type="getStatusType(row.status)">{{ getStatusLabel(row.status) }}</el-tag>
+      </template>
+      <template #column-callStatus="{ row }">
+        <el-tag size="mini" :type="getCallStatusType(row.callStatus)">{{ getCallStatusLabel(row.callStatus) }}</el-tag>
+      </template>
+      <template #column-action="{ row }">
+        <el-button size="mini" type="text" icon="el-icon-view" @click="handleDetail(row)"
+          v-hasPermi="['lawyers:call:agent:query']">详情</el-button>
+        <el-button v-if="row.status == '1' || row.status == '2'" size="mini" type="text"
+          icon="el-icon-switch-button" @click="handleLogout(row)"
+          v-hasPermi="['lawyers:call:agent:logout']">强制下线</el-button>
+      </template>
+    </ProTable>
 
     <el-dialog title="坐席详情" :visible.sync="detailOpen" width="600px" append-to-body>
       <el-descriptions :column="1" border>
@@ -136,6 +93,20 @@ export default {
       showSearch: true,
       total: 0,
       agentList: [],
+      // V3：ProTable 列定义（bindUser/sipExtension/status/callStatus/action 走插槽，时间/应答模式列用 formatter）
+      columns: [
+        { prop: 'agentId', label: '坐席工号', width: 90 },
+        { prop: 'agentName', label: '坐席名称', minWidth: 100 },
+        { prop: 'bindUser', label: '绑定用户', minWidth: 140, slot: true },
+        { prop: 'deptName', label: '所属部门', minWidth: 120 },
+        { prop: 'phonenumber', label: '手机号', width: 120 },
+        { prop: 'sipExtension', label: 'SIP分机', width: 90, slot: true },
+        { prop: 'status', label: '坐席状态', width: 90, slot: true },
+        { prop: 'callStatus', label: '通话状态', width: 90, slot: true },
+        { prop: 'callMode', label: '应答模式', width: 90, formatter: (row) => (row.callMode === '1' ? '手动' : '自动') },
+        { prop: 'loginTime', label: '登录时间', width: 160, formatter: (row) => this.parseTime(row.loginTime) },
+        { prop: 'action', label: '操作', width: 160, slot: true, className: 'small-padding fixed-width' }
+      ],
       detailOpen: false,
       queryParams: {
         pageNum: 1,
@@ -148,6 +119,18 @@ export default {
   },
   created() {
     this.getList()
+  },
+  computed: {
+    /** V3：ProTable 查询字段（静态配置，保持 computed 形式与全站一致） */
+    queryFormItems() {
+      return [
+        { prop: 'agentName', label: '坐席名称', placeholder: '请输入坐席名称', width: '200px' },
+        { prop: 'status', label: '坐席状态', type: 'select', placeholder: '请选择状态', width: '140px', options: [
+          { label: '离线', value: '0' }, { label: '在线', value: '1' },
+          { label: '忙碌', value: '2' }, { label: '休息', value: '3' }
+        ] }
+      ]
+    }
   },
   methods: {
     getList() {
@@ -182,7 +165,7 @@ export default {
       this.getList()
     },
     resetQuery() {
-      this.resetForm("queryForm")
+      // V3：ProTable 内部已对表单字段 resetFields，这里复位插槽字段后重查
       this.handleQuery()
     },
     handleDetail(row) {

@@ -1,83 +1,44 @@
 <template>
   <div class="trunk-container">
-    <el-card class="search-card" shadow="never">
-      <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" label-width="80px">
-        <el-form-item label="线路名称" prop="trunkName">
-          <el-input v-model="queryParams.trunkName" placeholder="请输入线路名称" clearable style="width: 160px" />
-        </el-form-item>
-        <el-form-item label="运营商" prop="carrier">
-          <el-select v-model="queryParams.carrier" placeholder="请选择" clearable style="width: 140px">
-            <el-option v-for="item in carrierOptions" :key="item.value" :label="item.label" :value="item.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="健康状态" prop="healthStatus">
-          <el-select v-model="queryParams.healthStatus" placeholder="请选择" clearable style="width: 140px">
-            <el-option label="正常" value="1" />
-            <el-option label="亚健康" value="2" />
-            <el-option label="故障" value="3" />
-            <el-option label="熔断" value="4" />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">查询</el-button>
-          <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
-
-    <el-card shadow="never" class="table-card">
-      <el-row :gutter="10" class="mb8">
-        <el-col :span="1.5">
-          <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd">新增线路</el-button>
-        </el-col>
-        <el-col :span="1.5">
-          <el-button type="success" plain icon="el-icon-refresh" size="mini" @click="refreshSegment">刷新号段缓存</el-button>
-        </el-col>
-      </el-row>
-
-      <el-table v-loading="loading" :data="trunkList" size="small" border>
-        <el-table-column label="线路编码" prop="trunkCode" width="130" />
-        <el-table-column label="线路名称" prop="trunkName" min-width="140" />
-        <el-table-column label="运营商" prop="carrier" width="90" align="center">
-          <template slot-scope="scope">
-            <el-tag :type="carrierTagType(scope.row.carrier)" size="mini">{{ carrierLabel(scope.row.carrier) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="线路类型" prop="trunkType" width="90" align="center">
-          <template slot-scope="scope">{{ scope.row.trunkType === 'SIP' ? 'SIP' : scope.row.trunkType === 'PSTN' ? 'PSTN' : scope.row.trunkType }}</template>
-        </el-table-column>
-        <el-table-column label="网关地址" prop="gatewayHost" width="140" />
-        <el-table-column label="主用/备用" prop="isPrimary" width="80" align="center">
-          <template slot-scope="scope">
-            <el-tag :type="scope.row.isPrimary === '1' ? 'warning' : 'info'" size="mini">{{ scope.row.isPrimary === '1' ? '主用' : '备用' }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="并发" width="110" align="center">
-          <template slot-scope="scope">{{ scope.row.currentConcurrent }}/{{ scope.row.maxConcurrent }}</template>
-        </el-table-column>
-        <el-table-column label="健康状态" prop="healthStatus" width="90" align="center">
-          <template slot-scope="scope">
-            <el-tag :type="healthTagType(scope.row.healthStatus)" size="mini">{{ healthLabel(scope.row.healthStatus) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="接通率" width="90" align="center">
-          <template slot-scope="scope">{{ scope.row.successRate != null ? (scope.row.successRate * 100).toFixed(1) + '%' : '-' }}</template>
-        </el-table-column>
-        <el-table-column label="启用" prop="status" width="70" align="center">
-          <template slot-scope="scope">
-            <el-switch v-model="scope.row.status" active-value="0" inactive-value="1" @change="handleStatusChange(scope.row)" />
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="200" align="center" fixed="right">
-          <template slot-scope="scope">
-            <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(scope.row)">编辑</el-button>
-            <el-button size="mini" type="text" icon="el-icon-camera" @click="handleTest(scope.row)">测试</el-button>
-            <el-button size="mini" type="text" icon="el-icon-phone" @click="handleCallTest(scope.row)">拨测</el-button>
-            <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(scope.row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+    <!-- V3：查询区/工具条/表格骨架收敛到 ProTable（本页无分页） -->
+    <ProTable
+      ref="proTable"
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="trunkList"
+      :loading="loading"
+      :total="trunkList.length"
+      :show-search.sync="showSearch"
+      label-width="80px"
+      :table-attrs="{ border: true, size: 'small' }"
+      hide-pagination
+      @query="handleQuery"
+      @reset="resetQuery"
+    >
+      <template #toolbar-left>
+        <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd">新增线路</el-button>
+        <el-button type="success" plain icon="el-icon-refresh" size="mini" @click="refreshSegment">刷新号段缓存</el-button>
+      </template>
+      <template #column-carrier="{ row }">
+        <el-tag :type="carrierTagType(row.carrier)" size="mini">{{ carrierLabel(row.carrier) }}</el-tag>
+      </template>
+      <template #column-isPrimary="{ row }">
+        <el-tag :type="row.isPrimary === '1' ? 'warning' : 'info'" size="mini">{{ row.isPrimary === '1' ? '主用' : '备用' }}</el-tag>
+      </template>
+      <template #column-healthStatus="{ row }">
+        <el-tag :type="healthTagType(row.healthStatus)" size="mini">{{ healthLabel(row.healthStatus) }}</el-tag>
+      </template>
+      <template #column-status="{ row }">
+        <el-switch v-model="row.status" active-value="0" inactive-value="1" @change="handleStatusChange(row)" />
+      </template>
+      <template #column-action="{ row }">
+        <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(row)">编辑</el-button>
+        <el-button size="mini" type="text" icon="el-icon-camera" @click="handleTest(row)">测试</el-button>
+        <el-button size="mini" type="text" icon="el-icon-phone" @click="handleCallTest(row)">拨测</el-button>
+        <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(row)">删除</el-button>
+      </template>
+    </ProTable>
 
     <!-- 线路编辑对话框 -->
     <el-dialog :title="title" :visible.sync="open" width="640px" append-to-body>
@@ -232,9 +193,24 @@ export default {
   data() {
     return {
       loading: false,
+      showSearch: true,
       open: false,
       title: '',
       trunkList: [],
+      // V3：ProTable 列定义（运营商/主备/健康状态/启用/操作走插槽，纯文本列用 formatter）
+      columns: [
+        { prop: 'trunkCode', label: '线路编码', width: 130 },
+        { prop: 'trunkName', label: '线路名称', minWidth: 140 },
+        { prop: 'carrier', label: '运营商', width: 90, slot: true },
+        { prop: 'trunkType', label: '线路类型', width: 90, formatter: (row) => row.trunkType === 'SIP' ? 'SIP' : row.trunkType === 'PSTN' ? 'PSTN' : row.trunkType },
+        { prop: 'gatewayHost', label: '网关地址', width: 140 },
+        { prop: 'isPrimary', label: '主用/备用', width: 80, slot: true },
+        { prop: 'currentConcurrent', label: '并发', width: 110, formatter: (row) => row.currentConcurrent + '/' + row.maxConcurrent },
+        { prop: 'healthStatus', label: '健康状态', width: 90, slot: true },
+        { prop: 'successRate', label: '接通率', width: 90, formatter: (row) => row.successRate != null ? (row.successRate * 100).toFixed(1) + '%' : '-' },
+        { prop: 'status', label: '启用', width: 70, slot: true },
+        { prop: 'action', label: '操作', width: 200, fixed: 'right', slot: true }
+      ],
       testNumber: '',
       recognizeResult: null,
       callTestOpen: false,
@@ -274,6 +250,19 @@ export default {
   created() {
     this.getList()
   },
+  computed: {
+    /** V3：ProTable 查询字段（运营商下拉依赖 carrierOptions，用 computed 保证响应式） */
+    queryFormItems() {
+      return [
+        { prop: 'trunkName', label: '线路名称', placeholder: '请输入线路名称', width: '160px' },
+        { prop: 'carrier', label: '运营商', type: 'select', placeholder: '请选择', width: '140px', options: this.carrierOptions },
+        { prop: 'healthStatus', label: '健康状态', type: 'select', placeholder: '请选择', width: '140px', options: [
+          { label: '正常', value: '1' }, { label: '亚健康', value: '2' },
+          { label: '故障', value: '3' }, { label: '熔断', value: '4' }
+        ] }
+      ]
+    }
+  },
   methods: {
     getList() {
       this.loading = true
@@ -287,8 +276,7 @@ export default {
       this.getList()
     },
     resetQuery() {
-      this.resetForm('queryForm')
-      this.queryParams = { trunkName: undefined, carrier: undefined, healthStatus: undefined }
+      // V3：ProTable 内部已对表单字段 resetFields，这里只需重新查询
       this.handleQuery()
     },
     handleAdd() {

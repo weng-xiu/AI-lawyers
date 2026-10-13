@@ -1,55 +1,5 @@
 <template>
   <div class="call-ledger">
-    <el-card class="search-card" shadow="never">
-      <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" label-width="80px">
-        <el-form-item label="登记时间">
-          <el-date-picker
-            v-model="dateRange"
-            style="width: 240px"
-            value-format="yyyy-MM-dd"
-            type="daterange"
-            range-separator="-"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-          ></el-date-picker>
-        </el-form-item>
-        <el-form-item label="咨询类型" prop="categoryName">
-          <el-input v-model="queryParams.categoryName" placeholder="请输入咨询类型" clearable style="width: 150px" />
-        </el-form-item>
-        <el-form-item label="咨询人" prop="callerName">
-          <el-input v-model="queryParams.callerName" placeholder="请输入咨询人" clearable style="width: 150px" />
-        </el-form-item>
-        <el-form-item label="联系电话" prop="callerPhone">
-          <el-input v-model="queryParams.callerPhone" placeholder="请输入联系电话" clearable style="width: 150px" />
-        </el-form-item>
-        <el-form-item label="承办律师" prop="lawyerId">
-          <user-select v-model="queryParams.lawyerId" placeholder="全部律师" lawyer style="width:170px" />
-        </el-form-item>
-        <el-form-item label="服务方式" prop="serviceType">
-          <el-select v-model="queryParams.serviceType" placeholder="请选择" clearable style="width: 150px">
-            <el-option label="全部" value="" />
-            <el-option label="电话咨询" value="1" />
-            <el-option label="现场咨询" value="2" />
-            <el-option label="网络咨询" value="3" />
-            <el-option label="视频咨询" value="4" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="满意度" prop="satisfaction">
-          <el-select v-model="queryParams.satisfaction" placeholder="请选择" clearable style="width: 150px">
-            <el-option label="全部" value="" />
-            <el-option label="非常满意" value="1" />
-            <el-option label="满意" value="2" />
-            <el-option label="一般" value="3" />
-            <el-option label="不满意" value="4" />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-          <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">查询</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
-
     <el-row :gutter="16" class="stat-row">
       <el-col :span="4">
         <div class="stat-card stat-total">
@@ -107,91 +57,83 @@
       </el-col>
     </el-row>
 
+    <!-- 台账模板快捷区（保持原样，置于 ProTable 骨架上方） -->
+    <div class="template-bar">
+      <span class="template-label">台账模板：</span>
+      <el-button
+        v-for="tpl in templates"
+        :key="tpl.templateId"
+        size="mini"
+        plain
+        class="tpl-btn"
+        @click="handleApplyTemplate(tpl)"
+      >
+        <i class="el-icon-document-copy"></i>{{ tpl.templateName }}
+      </el-button>
+    </div>
+
+    <!-- V3：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
     <el-card class="table-card" shadow="never">
-      <div class="toolbar">
-        <div class="toolbar-left">
+      <ProTable
+        ref="proTable"
+        :columns="columns"
+        :query-form-items="queryFormItems"
+        :query-params="queryParams"
+        :data="ledgerList"
+        :loading="loading"
+        :total="total"
+        :show-search.sync="showSearch"
+        has-selection
+        :table-attrs="{ border: true }"
+        @query="handleQuery"
+        @reset="resetQuery"
+        @pagination="getList"
+        @selection-change="handleSelectionChange"
+      >
+        <template #query-dateRange>
+          <el-date-picker
+            v-model="dateRange"
+            style="width: 240px"
+            value-format="yyyy-MM-dd"
+            type="daterange"
+            range-separator="-"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+          ></el-date-picker>
+        </template>
+        <template #query-lawyerId>
+          <user-select v-model="queryParams.lawyerId" placeholder="全部律师" lawyer style="width:170px" />
+        </template>
+        <template #toolbar-left>
           <el-button type="success" icon="el-icon-download" size="mini" @click="handleExport">导出Excel</el-button>
           <el-button type="warning" icon="el-icon-printer" size="mini" @click="handleBatchPrint">批量打印</el-button>
-        </div>
-        <div class="toolbar-right">
           <el-button type="primary" icon="el-icon-plus" size="mini" @click="handleAdd">新增登记</el-button>
-        </div>
-      </div>
-
-      <!-- 台账模板快捷区 -->
-      <div class="template-bar">
-        <span class="template-label">台账模板：</span>
-        <el-button
-          v-for="tpl in templates"
-          :key="tpl.templateId"
-          size="mini"
-          plain
-          class="tpl-btn"
-          @click="handleApplyTemplate(tpl)"
-        >
-          <i class="el-icon-document-copy"></i>{{ tpl.templateName }}
-        </el-button>
-      </div>
-
-      <el-table v-loading="loading" :data="ledgerList" @selection-change="handleSelectionChange" border>
-        <el-table-column type="selection" width="55" align="center" />
-        <el-table-column label="登记编号" align="center" prop="ledgerNo" width="160">
-          <template slot-scope="scope">
-            <span class="link-blue" @click="handleDetail(scope.row)">{{ scope.row.ledgerNo }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="登记时间" align="center" prop="createTime" width="170" />
-        <el-table-column label="咨询人" align="center" prop="callerName" width="100" />
-        <el-table-column label="联系电话" align="center" prop="callerPhone" width="130" />
-        <el-table-column label="身份证号" align="center" prop="callerIdCard" width="180" />
-        <el-table-column label="咨询类型" align="center" prop="categoryName" width="100">
-          <template slot-scope="scope">
-            <el-tag :type="getConsultTypeTag(scope.row.categoryName)">{{ scope.row.categoryName }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="服务方式" align="center" prop="serviceType" width="100">
-          <template slot-scope="scope">
-            <el-tag :type="getServiceTypeTag(scope.row.serviceType)" effect="plain">{{ getServiceTypeLabel(scope.row.serviceType) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="承办律师" align="center" prop="lawyerName" width="100" />
-        <el-table-column label="咨询时长" align="center" prop="consultDuration" width="100">
-          <template slot-scope="scope">{{ scope.row.consultDuration }}分钟</template>
-        </el-table-column>
-        <el-table-column label="满意度" align="center" prop="satisfaction" width="130">
-          <template slot-scope="scope">
-            <span :class="['satisfaction-text', 'satisfaction-' + scope.row.satisfaction]">
-              <i v-for="n in getSatisfactionStars(scope.row.satisfaction)" :key="n" class="el-icon-star-on"></i>
-              {{ getSatisfactionLabel(scope.row.satisfaction) }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column label="工单" align="center" width="90">
-          <template slot-scope="scope">
-            <el-tag v-if="scope.row.ticketId" type="success" size="mini">已转单</el-tag>
-            <span v-else class="text-muted">-</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" align="center" width="180" fixed="right">
-          <template slot-scope="scope">
-            <el-button type="text" size="mini" icon="el-icon-view" @click="handleDetail(scope.row)">查看详情</el-button>
-            <el-button type="text" size="mini" icon="el-icon-edit" @click="handleEdit(scope.row)">编辑</el-button>
-            <el-button type="text" size="mini" icon="el-icon-delete" style="color: #C63D4A" @click="handleDelete(scope.row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <el-pagination
-        class="pagination"
-        background
-        layout="total, sizes, prev, pager, next, jumper"
-        :total="total"
-        :page-sizes="[10, 20, 50, 100]"
-        :page-size="queryParams.pageSize"
-        :current-page="queryParams.pageNum"
-        @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
-      />
+        </template>
+        <template #column-ledgerNo="{ row }">
+          <span class="link-blue" @click="handleDetail(row)">{{ row.ledgerNo }}</span>
+        </template>
+        <template #column-categoryName="{ row }">
+          <el-tag :type="getConsultTypeTag(row.categoryName)">{{ row.categoryName }}</el-tag>
+        </template>
+        <template #column-serviceType="{ row }">
+          <el-tag :type="getServiceTypeTag(row.serviceType)" effect="plain">{{ getServiceTypeLabel(row.serviceType) }}</el-tag>
+        </template>
+        <template #column-satisfaction="{ row }">
+          <span :class="['satisfaction-text', 'satisfaction-' + row.satisfaction]">
+            <i v-for="n in getSatisfactionStars(row.satisfaction)" :key="n" class="el-icon-star-on"></i>
+            {{ getSatisfactionLabel(row.satisfaction) }}
+          </span>
+        </template>
+        <template #column-ticketId="{ row }">
+          <el-tag v-if="row.ticketId" type="success" size="mini">已转单</el-tag>
+          <span v-else class="text-muted">-</span>
+        </template>
+        <template #column-action="{ row }">
+          <el-button type="text" size="mini" icon="el-icon-view" @click="handleDetail(row)">查看详情</el-button>
+          <el-button type="text" size="mini" icon="el-icon-edit" @click="handleEdit(row)">编辑</el-button>
+          <el-button type="text" size="mini" icon="el-icon-delete" style="color: #C63D4A" @click="handleDelete(row)">删除</el-button>
+        </template>
+      </ProTable>
     </el-card>
 
     <!-- 详情弹窗 -->
@@ -437,10 +379,26 @@ export default {
   data() {
     return {
       loading: true,
+      showSearch: true,
       submitting: false,
       ids: [],
       total: 0,
       ledgerList: [],
+      // V3：ProTable 列定义（ledgerNo/categoryName/serviceType/satisfaction/ticketId/action 走插槽，时长列用 formatter）
+      columns: [
+        { prop: 'ledgerNo', label: '登记编号', width: 160, slot: true },
+        { prop: 'createTime', label: '登记时间', width: 170 },
+        { prop: 'callerName', label: '咨询人', width: 100 },
+        { prop: 'callerPhone', label: '联系电话', width: 130 },
+        { prop: 'callerIdCard', label: '身份证号', width: 180 },
+        { prop: 'categoryName', label: '咨询类型', width: 100, slot: true },
+        { prop: 'serviceType', label: '服务方式', width: 100, slot: true },
+        { prop: 'lawyerName', label: '承办律师', width: 100 },
+        { prop: 'consultDuration', label: '咨询时长', width: 100, formatter: (row) => (row.consultDuration == null ? '' : row.consultDuration) + '分钟' },
+        { prop: 'satisfaction', label: '满意度', width: 130, slot: true },
+        { prop: 'ticketId', label: '工单', width: 90, slot: true },
+        { prop: 'action', label: '操作', width: 180, fixed: 'right', slot: true }
+      ],
       detailOpen: false,
       formOpen: false,
       formTitle: '',
@@ -480,6 +438,32 @@ export default {
   created() {
     this.getList()
     this.loadTemplates()
+  },
+  computed: {
+    /** V3：ProTable 查询字段（dateRange/lawyerId 为自定义控件走插槽，字段顺序与原查询区一致） */
+    queryFormItems() {
+      return [
+        { prop: 'dateRange', label: '登记时间', slot: true },
+        { prop: 'categoryName', label: '咨询类型', placeholder: '请输入咨询类型', width: '150px' },
+        { prop: 'callerName', label: '咨询人', placeholder: '请输入咨询人', width: '150px' },
+        { prop: 'callerPhone', label: '联系电话', placeholder: '请输入联系电话', width: '150px' },
+        { prop: 'lawyerId', label: '承办律师', slot: true },
+        { prop: 'serviceType', label: '服务方式', type: 'select', placeholder: '请选择', width: '150px', options: [
+          { label: '全部', value: '' },
+          { label: '电话咨询', value: '1' },
+          { label: '现场咨询', value: '2' },
+          { label: '网络咨询', value: '3' },
+          { label: '视频咨询', value: '4' }
+        ] },
+        { prop: 'satisfaction', label: '满意度', type: 'select', placeholder: '请选择', width: '150px', options: [
+          { label: '全部', value: '' },
+          { label: '非常满意', value: '1' },
+          { label: '满意', value: '2' },
+          { label: '一般', value: '3' },
+          { label: '不满意', value: '4' }
+        ] }
+      ]
+    }
   },
   methods: {
     // 选中律师时同步回填 lawyerName，保持列表/详情展示兼容
@@ -541,12 +525,9 @@ export default {
       this.getList()
     },
     resetQuery() {
+      // V3：ProTable 内部已对表单字段 resetFields，这里复位插槽字段（dateRange/lawyerId）后重查
       this.dateRange = []
-      this.queryParams = {
-        pageNum: 1, pageSize: 10,
-        categoryName: '', callerName: '', callerPhone: '',
-        lawyerId: undefined, serviceType: '', satisfaction: ''
-      }
+      this.queryParams.lawyerId = undefined
       this.handleQuery()
     },
     handleSelectionChange(selection) {
@@ -683,14 +664,6 @@ export default {
     },
     handlePrint() {
       this.$message.success('打印任务已提交')
-    },
-    handleSizeChange(val) {
-      this.queryParams.pageSize = val
-      this.getList()
-    },
-    handleCurrentChange(val) {
-      this.queryParams.pageNum = val
-      this.getList()
     }
   }
 }
@@ -701,12 +674,6 @@ export default {
   padding: 24px;
   background-color: #F5F7FA;
   min-height: calc(100vh - 84px);
-}
-
-.search-card {
-  border-radius: 8px;
-  margin-bottom: 20px;
-  ::v-deep .el-card__body { padding: 20px 24px; }
 }
 
 .stat-row {
@@ -740,12 +707,6 @@ export default {
 .table-card {
   border-radius: 8px;
   ::v-deep .el-card__body { padding: 20px 24px; }
-  .toolbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
-  }
 }
 
 .template-bar {
@@ -763,12 +724,6 @@ export default {
     margin: 8px 8px 8px 0;
     i { margin-right: 6px; }
   }
-}
-
-.pagination {
-  margin-top: 20px;
-  display: flex;
-  justify-content: flex-end;
 }
 
 .link-blue {

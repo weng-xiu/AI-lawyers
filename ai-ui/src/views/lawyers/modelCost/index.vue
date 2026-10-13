@@ -341,7 +341,7 @@ export default {
     },
     renderTrend() {
       if (!this.$refs.trendChart) return
-      if (!this.trendChart) this.trendChart = echarts.init(this.$refs.trendChart)
+      if (!this.trendChart) this.trendChart = echarts.init(this.$refs.trendChart, 'judicial')
       const rows = this.trendRows
       this.trendChart.setOption({
         tooltip: { trigger: 'axis' },
@@ -362,7 +362,7 @@ export default {
     },
     renderModelPie() {
       if (!this.$refs.modelChart) return
-      if (!this.modelChart) this.modelChart = echarts.init(this.$refs.modelChart)
+      if (!this.modelChart) this.modelChart = echarts.init(this.$refs.modelChart, 'judicial')
       const data = this.modelRows.map(r => ({
         name: r.modelName || '未知模型',
         value: this.num(r.totalCalls)

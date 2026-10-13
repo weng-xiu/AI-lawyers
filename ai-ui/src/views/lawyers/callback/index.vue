@@ -293,7 +293,7 @@ export default {
     drawTrend(data) {
       this.$nextTick(() => {
         if (!this.$refs.trendChart) return
-        if (!this.trendChart) this.trendChart = echarts.init(this.$refs.trendChart)
+        if (!this.trendChart) this.trendChart = echarts.init(this.$refs.trendChart, 'judicial') // V4：统一司法蓝主题
         const option = {
           tooltip: { trigger: 'axis' },
           legend: { data: ['非常满意', '满意', '一般', '不满意'] },

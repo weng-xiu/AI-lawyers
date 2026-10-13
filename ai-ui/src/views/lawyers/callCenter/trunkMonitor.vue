@@ -170,6 +170,7 @@ import {
   trunkAlarmList, handleTrunkAlarm, trunkHealthCheck,
   pjsipEndpoints, pjsipQueues, pjsipSummary, pjsipRegistrations
 } from '@/api/lawyers/trunk'
+import * as echarts from 'echarts'
 
 export default {
   name: 'TrunkMonitor',
@@ -251,8 +252,10 @@ export default {
       })
     },
     renderTrend(list) {
-      if (!this.$echarts) return
-      if (!this.chart) this.chart = this.$echarts.init(this.$refs.trendChart)
+      // V4：修复原 this.$echarts 未挂载导致趋势图静默失效的问题；统一司法蓝主题
+      const trendEl = this.$refs.trendChart
+      if (!trendEl) return
+      if (!this.chart) this.chart = echarts.init(trendEl, 'judicial')
       const x = list.map(i => i.statMinute)
       const y = list.map(i => i.connectRate != null ? (i.connectRate * 100).toFixed(1) : 0)
       this.chart.setOption({
@@ -260,7 +263,8 @@ export default {
         grid: { left: 40, right: 20, top: 20, bottom: 30 },
         xAxis: { type: 'category', data: x, axisLabel: { rotate: 40, fontSize: 10 } },
         yAxis: { type: 'value', axisLabel: { formatter: '{value}%' } },
-        series: [{ type: 'line', smooth: true, data: y, areaStyle: {}, itemStyle: { color: '#1A3C6E' } }]
+        // 首色即主题主序列 #1A3C6E，去掉硬编码 itemStyle
+        series: [{ type: 'line', smooth: true, data: y, areaStyle: {} }]
       })
     },
     handleAlarm(row) {

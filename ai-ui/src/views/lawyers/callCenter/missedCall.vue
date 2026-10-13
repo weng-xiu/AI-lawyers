@@ -44,72 +44,44 @@
     <el-tabs v-model="activeTab" class="mc-tabs" @tab-click="handleTabClick">
       <!-- 未接来电 -->
       <el-tab-pane label="未接来电" name="missed">
-        <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="80px">
-          <el-form-item label="来电号码" prop="callerNumber">
-            <el-input v-model="queryParams.callerNumber" placeholder="请输入来电号码" clearable style="width: 200px" @keyup.enter.native="handleQuery" />
-          </el-form-item>
-          <el-form-item label="来电人" prop="callerName">
-            <el-input v-model="queryParams.callerName" placeholder="请输入来电人" clearable style="width: 200px" @keyup.enter.native="handleQuery" />
-          </el-form-item>
-          <el-form-item label="回拨状态" prop="status">
-            <el-select v-model="queryParams.status" placeholder="全部" clearable style="width: 140px">
-              <el-option label="未回拨" value="0" />
-              <el-option label="已回拨" value="1" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="来电时间">
-            <el-date-picker v-model="dateRange" style="width: 240px" value-format="yyyy-MM-dd" type="daterange" range-separator="-" start-placeholder="开始日期" end-placeholder="结束日期" />
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-            <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-          </el-form-item>
-        </el-form>
-
-        <el-row :gutter="10" class="mb8">
-          <el-col :span="1.5">
-            <el-button type="danger" plain icon="el-icon-delete" size="mini" :disabled="multiple" @click="handleDelete" v-hasPermi="['lawyers:call:missed:remove']">删除</el-button>
-          </el-col>
-          <el-col :span="1.5">
-            <el-button type="warning" plain icon="el-icon-download" size="mini" @click="handleExport" v-hasPermi="['lawyers:call:missed:export']">导出</el-button>
-          </el-col>
-          <el-col :span="1.5">
-            <el-button type="success" plain icon="el-icon-refresh" size="mini" @click="loadStats">刷新统计</el-button>
-          </el-col>
-          <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
-        </el-row>
-
+        <!-- V3：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
         <ErrorRetry v-if="loadError" @retry="getList" />
-        <el-table v-else v-loading="loading" :data="missedList" @selection-change="handleSelectionChange">
-          <template slot="empty">
-            <TableEmpty text="暂无未接来电" hint="未接来电会在挂机后自动登记" />
+        <ProTable
+          v-else
+          ref="proTable"
+          :columns="columns"
+          :query-form-items="queryFormItems"
+          :query-params="queryParams"
+          :data="missedList"
+          :loading="loading"
+          :total="total"
+          :show-search.sync="showSearch"
+          label-width="80px"
+          has-selection
+          empty-text="暂无未接来电"
+          empty-hint="未接来电会在挂机后自动登记"
+          @query="handleQuery"
+          @reset="resetQuery"
+          @pagination="getList"
+          @selection-change="handleSelectionChange"
+        >
+          <template #query-dateRange>
+            <el-date-picker v-model="dateRange" style="width: 240px" value-format="yyyy-MM-dd" type="daterange" range-separator="-" start-placeholder="开始日期" end-placeholder="结束日期" />
           </template>
-          <el-table-column type="selection" width="50" align="center" />
-          <el-table-column label="来电号码" prop="callerNumber" width="130" />
-          <el-table-column label="来电人" prop="callerName" width="100" />
-          <el-table-column label="来电时间" prop="callTime" width="160" />
-          <el-table-column label="状态" prop="status" width="90" align="center">
-            <template slot-scope="scope">
-              <el-tag size="mini" :type="scope.row.status === '1' ? 'success' : 'danger'">{{ scope.row.status === '1' ? '已回拨' : '未回拨' }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="回拨时间" prop="callbackTime" width="160">
-            <template slot-scope="scope">{{ scope.row.callbackTime || '-' }}</template>
-          </el-table-column>
-          <el-table-column label="回拨人" prop="callbackBy" width="100">
-            <template slot-scope="scope">{{ scope.row.callbackBy || '-' }}</template>
-          </el-table-column>
-          <el-table-column label="备注" prop="remark" show-overflow-tooltip />
-          <el-table-column label="操作" align="center" width="200" fixed="right">
-            <template slot-scope="scope">
-              <el-button size="mini" type="text" icon="el-icon-phone" v-if="scope.row.status === '0'" @click="handleCallback(scope.row)" v-hasPermi="['lawyers:call:missed:callback']">回拨标记</el-button>
-              <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(scope.row)" v-hasPermi="['lawyers:call:missed:edit']">修改</el-button>
-              <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(scope.row)" v-hasPermi="['lawyers:call:missed:remove']">删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-
-        <pagination v-show="total > 0" :total="total" :page.sync="queryParams.pageNum" :limit.sync="queryParams.pageSize" @pagination="getList" />
+          <template #toolbar-left>
+            <el-button type="danger" plain icon="el-icon-delete" size="mini" :disabled="multiple" @click="handleDelete" v-hasPermi="['lawyers:call:missed:remove']">删除</el-button>
+            <el-button type="warning" plain icon="el-icon-download" size="mini" @click="handleExport" v-hasPermi="['lawyers:call:missed:export']">导出</el-button>
+            <el-button type="success" plain icon="el-icon-refresh" size="mini" @click="loadStats">刷新统计</el-button>
+          </template>
+          <template #column-status="{ row }">
+            <el-tag size="mini" :type="row.status === '1' ? 'success' : 'danger'">{{ row.status === '1' ? '已回拨' : '未回拨' }}</el-tag>
+          </template>
+          <template #column-action="{ row }">
+            <el-button size="mini" type="text" icon="el-icon-phone" v-if="row.status === '0'" @click="handleCallback(row)" v-hasPermi="['lawyers:call:missed:callback']">回拨标记</el-button>
+            <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(row)" v-hasPermi="['lawyers:call:missed:edit']">修改</el-button>
+            <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(row)" v-hasPermi="['lawyers:call:missed:remove']">删除</el-button>
+          </template>
+        </ProTable>
       </el-tab-pane>
 
       <!-- 语音留言 -->
@@ -148,42 +120,36 @@
 
       <!-- 漏话通知 -->
       <el-tab-pane label="漏话通知" name="notice">
-        <el-row :gutter="10" class="mb8">
-          <el-col :span="1.5">
-            <el-button type="primary" plain icon="el-icon-bell" size="mini" :disabled="multiple" @click="handleBatchNotice">批量通知</el-button>
-          </el-col>
-        </el-row>
+        <!-- V3：工具条/表格/分页收敛到 ProTable（无查询表单，queryFormItems 为空时查询区自动隐藏） -->
         <ErrorRetry v-if="noticeError" @retry="getNoticeList" />
-        <el-table v-else v-loading="loading" :data="noticeList" @selection-change="handleSelectionChange">
-          <template slot="empty">
-            <TableEmpty text="暂无漏话通知" hint="可选择来电记录批量发送漏话通知" />
+        <ProTable
+          v-else
+          :columns="noticeColumns"
+          :query-params="noticeQuery"
+          :data="noticeList"
+          :loading="loading"
+          :total="noticeTotal"
+          :show-toolbar="false"
+          has-selection
+          empty-text="暂无漏话通知"
+          empty-hint="可选择来电记录批量发送漏话通知"
+          @pagination="getNoticeList"
+          @selection-change="handleSelectionChange"
+        >
+          <template #toolbar-left>
+            <el-button type="primary" plain icon="el-icon-bell" size="mini" :disabled="multiple" @click="handleBatchNotice">批量通知</el-button>
           </template>
-          <el-table-column type="selection" width="50" align="center" />
-          <el-table-column label="来电号码" prop="callerNumber" width="130" />
-          <el-table-column label="来电人" prop="callerName" width="100" />
-          <el-table-column label="来电时间" prop="callTime" width="160" />
-          <el-table-column label="通知状态" prop="noticeStatus" width="100" align="center">
-            <template slot-scope="scope">
-              <el-tag size="mini" :type="scope.row.noticeStatus === '1' ? 'success' : 'info'">{{ scope.row.noticeStatus === '1' ? '已通知' : '未通知' }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="通知方式" prop="noticeChannel" width="120" align="center">
-            <template slot-scope="scope">{{ channelText(scope.row.noticeChannel) }}</template>
-          </el-table-column>
-          <el-table-column label="回拨状态" prop="status" width="100" align="center">
-            <template slot-scope="scope">
-              <el-tag size="mini" :type="scope.row.status === '1' ? 'success' : 'danger'">{{ scope.row.status === '1' ? '已回拨' : '未回拨' }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="备注" prop="remark" show-overflow-tooltip />
-          <el-table-column label="操作" align="center" width="180" fixed="right">
-            <template slot-scope="scope">
-              <el-button size="mini" type="text" icon="el-icon-message" v-if="scope.row.noticeStatus === '0'" @click="handleNotice(scope.row)">发送通知</el-button>
-              <el-button size="mini" type="text" icon="el-icon-phone" v-if="scope.row.status === '0'" @click="handleCallback(scope.row)" v-hasPermi="['lawyers:call:missed:callback']">回拨</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-        <pagination v-show="noticeTotal > 0" :total="noticeTotal" :page.sync="noticeQuery.pageNum" :limit.sync="noticeQuery.pageSize" @pagination="getNoticeList" />
+          <template #column-noticeStatus="{ row }">
+            <el-tag size="mini" :type="row.noticeStatus === '1' ? 'success' : 'info'">{{ row.noticeStatus === '1' ? '已通知' : '未通知' }}</el-tag>
+          </template>
+          <template #column-status="{ row }">
+            <el-tag size="mini" :type="row.status === '1' ? 'success' : 'danger'">{{ row.status === '1' ? '已回拨' : '未回拨' }}</el-tag>
+          </template>
+          <template #column-action="{ row }">
+            <el-button size="mini" type="text" icon="el-icon-message" v-if="row.noticeStatus === '0'" @click="handleNotice(row)">发送通知</el-button>
+            <el-button size="mini" type="text" icon="el-icon-phone" v-if="row.status === '0'" @click="handleCallback(row)" v-hasPermi="['lawyers:call:missed:callback']">回拨</el-button>
+          </template>
+        </ProTable>
       </el-tab-pane>
     </el-tabs>
 
@@ -238,6 +204,28 @@ export default {
       noticeList: [],
       total: 0,
       noticeTotal: 0,
+      // V3：ProTable 列定义（未接来电主表，status/action 走插槽，空值列用 formatter）
+      columns: [
+        { prop: 'callerNumber', label: '来电号码', width: 130 },
+        { prop: 'callerName', label: '来电人', width: 100 },
+        { prop: 'callTime', label: '来电时间', width: 160 },
+        { prop: 'status', label: '状态', width: 90, slot: true },
+        { prop: 'callbackTime', label: '回拨时间', width: 160, formatter: (row) => row.callbackTime || '-' },
+        { prop: 'callbackBy', label: '回拨人', width: 100, formatter: (row) => row.callbackBy || '-' },
+        { prop: 'remark', label: '备注', showOverflowTooltip: true },
+        { prop: 'action', label: '操作', width: 200, align: 'center', fixed: 'right', slot: true }
+      ],
+      // V3：漏话通知副表列定义（noticeStatus/status/action 走插槽，通知方式用 formatter）
+      noticeColumns: [
+        { prop: 'callerNumber', label: '来电号码', width: 130 },
+        { prop: 'callerName', label: '来电人', width: 100 },
+        { prop: 'callTime', label: '来电时间', width: 160 },
+        { prop: 'noticeStatus', label: '通知状态', width: 100, slot: true },
+        { prop: 'noticeChannel', label: '通知方式', width: 120, formatter: (row) => this.channelText(row.noticeChannel) },
+        { prop: 'status', label: '回拨状态', width: 100, slot: true },
+        { prop: 'remark', label: '备注', showOverflowTooltip: true },
+        { prop: 'action', label: '操作', width: 180, align: 'center', fixed: 'right', slot: true }
+      ],
       open: false,
       title: '',
       ids: [],
@@ -271,6 +259,17 @@ export default {
       const cb = Number(this.stats.callbacked || 0)
       if (total === 0) return 0
       return ((cb / total) * 100).toFixed(1)
+    },
+    /** V3：ProTable 查询字段（未接来电标签页；日期范围走 #query-dateRange 插槽） */
+    queryFormItems() {
+      return [
+        { prop: 'callerNumber', label: '来电号码', placeholder: '请输入来电号码', width: '200px' },
+        { prop: 'callerName', label: '来电人', placeholder: '请输入来电人', width: '200px' },
+        { prop: 'status', label: '回拨状态', type: 'select', placeholder: '全部', width: '140px', options: [
+          { label: '未回拨', value: '0' }, { label: '已回拨', value: '1' }
+        ] },
+        { prop: 'dateRange', label: '来电时间', slot: true }
+      ]
     }
   },
   created() {
@@ -333,8 +332,8 @@ export default {
       this.getList()
     },
     resetQuery() {
+      // V3：ProTable 内部已对表单字段 resetFields，这里补插槽字段复位后重查
       this.dateRange = []
-      this.resetForm('queryForm')
       this.handleQuery()
     },
     handleSelectionChange(selection) {

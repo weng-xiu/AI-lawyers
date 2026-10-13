@@ -91,7 +91,8 @@ export default {
         this.cache = response.data
         this.$modal.closeLoading()
 
-        this.commandstats = echarts.init(this.$refs.commandstats, "macarons")
+        // V4：统一司法蓝主题
+        this.commandstats = echarts.init(this.$refs.commandstats, 'judicial')
         this.commandstats.setOption({
           tooltip: {
             trigger: "item",
@@ -110,7 +111,8 @@ export default {
             }
           ]
         })
-        this.usedmemory = echarts.init(this.$refs.usedmemory, "macarons")
+        // V4：统一司法蓝主题
+        this.usedmemory = echarts.init(this.$refs.usedmemory, 'judicial')
         this.usedmemory.setOption({
           tooltip: {
             formatter: "{b} <br/>{a} : " + this.cache.info.used_memory_human,

@@ -212,7 +212,7 @@ export default {
     },
     renderBiz() {
       if (!this.$refs.bizChart) return;
-      if (!this.bizChart) this.bizChart = echarts.init(this.$refs.bizChart);
+      if (!this.bizChart) this.bizChart = echarts.init(this.$refs.bizChart, 'judicial');
       const rows = this.achieveByBizType;
       this.bizChart.setOption({
         tooltip: {

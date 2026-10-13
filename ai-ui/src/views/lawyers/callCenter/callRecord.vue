@@ -1,38 +1,26 @@
 <template>
   <div class="app-container cc-page">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="来电号码" prop="callerNumber">
-        <el-input
-          v-model="queryParams.callerNumber"
-          placeholder="请输入来电号码"
-          clearable
-          style="width: 240px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="坐席名称" prop="agentId">
-        <el-select v-model="queryParams.agentId" placeholder="请选择坐席" clearable filterable style="width: 240px">
-          <el-option v-for="a in agentOptions" :key="a.agentId" :label="a.agentName+'('+a.agentId+')'" :value="a.agentId" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="来电状态" prop="status">
-        <el-select v-model="queryParams.status" placeholder="请选择状态" clearable>
-          <el-option label="未接" value="0" />
-          <el-option label="已接" value="1" />
-          <el-option label="已转接" value="2" />
-          <el-option label="已结束" value="3" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="咨询分类" prop="consultationCategory">
-        <el-input
-          v-model="queryParams.consultationCategory"
-          placeholder="请输入咨询分类"
-          clearable
-          style="width: 240px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="来电时间">
+    <ErrorRetry v-if="loadError" @retry="getList" />
+    <!-- V3：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      v-else
+      ref="proTable"
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="recordList"
+      :loading="loading"
+      :total="total"
+      :show-search.sync="showSearch"
+      has-selection
+      empty-text="暂无话单"
+      empty-hint="调整筛选条件或时间范围后重试"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList"
+      @selection-change="handleSelectionChange"
+    >
+      <template #query-dateRange>
         <el-date-picker
           v-model="dateRange"
           style="width: 240px"
@@ -42,16 +30,11 @@
           start-placeholder="开始日期"
           end-placeholder="结束日期"
         ></el-date-picker>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
+      </template>
+      <template #query-extra>
         <el-button type="warning" icon="el-icon-data-line" size="mini" @click="handleStatistics">统计分析</el-button>
-      </el-form-item>
-    </el-form>
-
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
+      </template>
+      <template #toolbar-left>
         <el-button
           type="primary"
           plain
@@ -60,8 +43,6 @@
           @click="handleAdd"
           v-hasPermi="['lawyers:call:record:add']"
         >新增</el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button
           type="success"
           plain
@@ -71,8 +52,6 @@
           @click="handleUpdate"
           v-hasPermi="['lawyers:call:record:edit']"
         >修改</el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button
           type="danger"
           plain
@@ -82,79 +61,41 @@
           @click="handleDelete"
           v-hasPermi="['lawyers:call:record:remove']"
         >删除</el-button>
-      </el-col>
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
-    </el-row>
-
-    <ErrorRetry v-if="loadError" @retry="getList" />
-    <el-table v-else v-loading="loading" :data="recordList" @selection-change="handleSelectionChange">
-      <template slot="empty">
-        <TableEmpty text="暂无话单" hint="调整筛选条件或时间范围后重试" />
       </template>
-      <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="记录ID" align="center" prop="recordId" />
-      <el-table-column label="来电号码" align="center" prop="callerNumber" />
-      <el-table-column label="来电姓名" align="center" prop="callerName" />
-      <el-table-column label="坐席名称" align="center" prop="agentName" />
-      <el-table-column label="咨询分类" align="center" prop="consultationCategory" />
-      <el-table-column label="咨询内容" align="center" prop="consultationContent" :show-overflow-tooltip="true" />
-      <el-table-column label="来电状态" align="center" prop="status" width="100">
-        <template slot-scope="scope">
-          <el-tag :type="getStatusType(scope.row.status)">{{ getStatusLabel(scope.row.status) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="通话时长(秒)" align="center" prop="callDuration" />
-      <el-table-column label="来电时间" align="center" prop="callTime" width="180">
-        <template slot-scope="scope">
-          <span>{{ parseTime(scope.row.callTime) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="创建时间" align="center" prop="createTime" width="180">
-        <template slot-scope="scope">
-          <span>{{ parseTime(scope.row.createTime) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
-        <template slot-scope="scope">
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-view"
-            @click="handleDetail(scope.row)"
-            v-hasPermi="['lawyers:call:record:query']"
-          >详情</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-edit"
-            @click="handleUpdate(scope.row)"
-            v-hasPermi="['lawyers:call:record:edit']"
-          >修改</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-delete"
-            @click="handleDelete(scope.row)"
-            v-hasPermi="['lawyers:call:record:remove']"
-          >删除</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-tickets"
-            @click="handleCreateTicket(scope.row)"
-            v-hasPermi="['lawyers:call:ticket:add']"
-          >生成工单</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <pagination
-      v-show="total>0"
-      :total="total"
-      :page.sync="queryParams.pageNum"
-      :limit.sync="queryParams.pageSize"
-      @pagination="getList"
-    />
+      <template #column-status="{ row }">
+        <el-tag :type="getStatusType(row.status)">{{ getStatusLabel(row.status) }}</el-tag>
+      </template>
+      <template #column-action="{ row }">
+        <el-button
+          size="mini"
+          type="text"
+          icon="el-icon-view"
+          @click="handleDetail(row)"
+          v-hasPermi="['lawyers:call:record:query']"
+        >详情</el-button>
+        <el-button
+          size="mini"
+          type="text"
+          icon="el-icon-edit"
+          @click="handleUpdate(row)"
+          v-hasPermi="['lawyers:call:record:edit']"
+        >修改</el-button>
+        <el-button
+          size="mini"
+          type="text"
+          icon="el-icon-delete"
+          @click="handleDelete(row)"
+          v-hasPermi="['lawyers:call:record:remove']"
+        >删除</el-button>
+        <el-button
+          size="mini"
+          type="text"
+          icon="el-icon-tickets"
+          @click="handleCreateTicket(row)"
+          v-hasPermi="['lawyers:call:ticket:add']"
+        >生成工单</el-button>
+      </template>
+    </ProTable>
 
     <el-dialog :title="title" :visible.sync="open" width="700px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="80px">
@@ -400,6 +341,20 @@ export default {
       showSearch: true,
       total: 0,
       recordList: [],
+      // V3：ProTable 列定义（status/action 走插槽，时间列用 formatter）
+      columns: [
+        { prop: 'recordId', label: '记录ID' },
+        { prop: 'callerNumber', label: '来电号码' },
+        { prop: 'callerName', label: '来电姓名' },
+        { prop: 'agentName', label: '坐席名称' },
+        { prop: 'consultationCategory', label: '咨询分类' },
+        { prop: 'consultationContent', label: '咨询内容', showOverflowTooltip: true },
+        { prop: 'status', label: '来电状态', width: 100, slot: true },
+        { prop: 'callDuration', label: '通话时长(秒)' },
+        { prop: 'callTime', label: '来电时间', width: 180, formatter: (row) => this.parseTime(row.callTime) },
+        { prop: 'createTime', label: '创建时间', width: 180, formatter: (row) => this.parseTime(row.createTime) },
+        { prop: 'action', label: '操作', slot: true, className: 'small-padding fixed-width' }
+      ],
       title: "",
       open: false,
       detailOpen: false,
@@ -449,6 +404,22 @@ export default {
   created() {
     this.getList()
     this.loadAgents()
+  },
+  computed: {
+    /** V3：ProTable 查询字段（坐席下拉依赖异步 agentOptions，用 computed 保证响应式） */
+    queryFormItems() {
+      return [
+        { prop: 'callerNumber', label: '来电号码', placeholder: '请输入来电号码' },
+        { prop: 'agentId', label: '坐席名称', type: 'select', placeholder: '请选择坐席', filterable: true,
+          options: this.agentOptions.map(a => ({ label: a.agentName + '(' + a.agentId + ')', value: a.agentId })) },
+        { prop: 'status', label: '来电状态', type: 'select', placeholder: '请选择状态', options: [
+          { label: '未接', value: '0' }, { label: '已接', value: '1' },
+          { label: '已转接', value: '2' }, { label: '已结束', value: '3' }
+        ] },
+        { prop: 'consultationCategory', label: '咨询分类', placeholder: '请输入咨询分类' },
+        { prop: 'dateRange', label: '来电时间', slot: true }
+      ]
+    }
   },
   methods: {
     loadAgents() {
@@ -510,7 +481,7 @@ export default {
     },
     resetQuery() {
       this.dateRange = []
-      this.resetForm("queryForm")
+      // V3：ProTable 内部已对表单字段 resetFields，这里补插槽字段复位后重查
       this.handleQuery()
     },
     handleAdd() {
@@ -628,7 +599,8 @@ export default {
       this.$nextTick(() => {
         const chartDom = this.$refs.categoryChart
         if (!chartDom) return
-        const myChart = echarts.init(chartDom)
+        // V4：统一司法蓝主题
+        const myChart = echarts.init(chartDom, 'judicial')
         const option = {
           tooltip: { trigger: 'item', formatter: '{a} <br/>{b}: {c} ({d}%)' },
           legend: { orient: 'vertical', left: 10, data: data.map(item => item.category_name) },
@@ -647,7 +619,8 @@ export default {
       this.$nextTick(() => {
         const chartDom = this.$refs.dateChart
         if (!chartDom) return
-        const myChart = echarts.init(chartDom)
+        // V4：统一司法蓝主题
+        const myChart = echarts.init(chartDom, 'judicial')
         const option = {
           tooltip: { trigger: 'axis' },
           xAxis: { type: 'category', data: data.map(item => item.date) },

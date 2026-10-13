@@ -28,6 +28,8 @@ import Pagination from "@/components/Pagination"
 import TableEmpty from "@/components/TableEmpty"
 import PageLoading from "@/components/PageLoading"
 import ErrorRetry from "@/components/ErrorRetry"
+// V3 ProTable：查询区 + 工具条 + 表格 + 分页 一体化封装
+import ProTable from "@/components/ProTable"
 // 自定义表格工具组件
 import RightToolbar from "@/components/RightToolbar"
 // 富文本组件
@@ -62,6 +64,7 @@ Vue.component('Pagination', Pagination)
 Vue.component('TableEmpty', TableEmpty)
 Vue.component('PageLoading', PageLoading)
 Vue.component('ErrorRetry', ErrorRetry)
+Vue.component('ProTable', ProTable)
 Vue.component('RightToolbar', RightToolbar)
 Vue.component('Editor', Editor)
 Vue.component('FileUpload', FileUpload)
@@ -73,6 +76,11 @@ Vue.use(directive)
 Vue.use(plugins)
 Vue.use(careMode)
 DictData.install()
+
+// V4：ECharts 司法蓝主题统一注册——所有图表 init 统一传 'judicial'（配色.md 数据可视化规范）
+import * as echarts from 'echarts'
+import judicialTheme from '@/assets/styles/echarts-theme'
+echarts.registerTheme('judicial', judicialTheme)
 
 /**
  * If you don't want to use mock-server

@@ -1,83 +1,37 @@
 <template>
   <div class="app-container">
-    <el-card class="search-card" shadow="never">
-      <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" label-width="80px">
-        <el-form-item label="流程类型" prop="flowCode">
-          <el-input v-model="queryParams.flowCode" placeholder="如 HOTLINE" clearable style="width: 150px" @keyup.enter.native="handleQuery" />
-        </el-form-item>
-        <el-form-item label="源状态" prop="statusFrom">
-          <el-select v-model="queryParams.statusFrom" placeholder="全部" clearable style="width: 140px">
-            <el-option v-for="s in statusOptions" :key="s.value" :label="s.label" :value="s.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="动作" prop="actionCode">
-          <el-input v-model="queryParams.actionCode" placeholder="如 start" clearable style="width: 140px" @keyup.enter.native="handleQuery" />
-        </el-form-item>
-        <el-form-item label="状态" prop="status">
-          <el-select v-model="queryParams.status" placeholder="全部" clearable style="width: 110px">
-            <el-option label="启用" value="0" />
-            <el-option label="停用" value="1" />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">查询</el-button>
-          <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
-
-    <el-card shadow="never" class="table-card">
-      <el-row :gutter="10" class="mb8">
-        <el-col :span="1.5">
-          <el-button v-hasPermi="['lawyers:ticketFlow:add']" type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd">新增</el-button>
-        </el-col>
-      </el-row>
-
-      <el-table v-loading="loading" :data="pagedList" border size="small">
-        <el-table-column label="ID" align="center" prop="flowId" width="70" />
-        <el-table-column label="流程类型" align="center" prop="flowCode" width="110" />
-        <el-table-column label="源状态" align="center" width="100">
-          <template slot-scope="scope">{{ statusText(scope.row.statusFrom) }}</template>
-        </el-table-column>
-        <el-table-column label="动作" align="center" width="110">
-          <template slot-scope="scope">
-            <div>{{ scope.row.actionCode }}</div>
-            <div class="sub-text">{{ scope.row.actionName }}</div>
-          </template>
-        </el-table-column>
-        <el-table-column label="目标状态" align="center" width="100">
-          <template slot-scope="scope">{{ statusText(scope.row.targetStatus) }}</template>
-        </el-table-column>
-        <el-table-column label="允许角色" align="center" prop="roleKey" min-width="140" show-overflow-tooltip />
-        <el-table-column label="排序" align="center" prop="sortNo" width="70" />
-        <el-table-column label="SLA(小时)" align="center" width="90">
-          <template slot-scope="scope">
-            <span v-if="scope.row.slaHours == null">—</span>
-            <span v-else-if="scope.row.slaHours === 0">清时限</span>
-            <span v-else>{{ scope.row.slaHours }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="状态" align="center" width="90">
-          <template slot-scope="scope">
-            <el-tag :type="scope.row.status === '0' ? 'success' : 'info'" size="mini">
-              {{ scope.row.status === '0' ? '启用' : '停用' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" align="center" width="120" fixed="right">
-          <template slot-scope="scope">
-            <el-button v-hasPermi="['lawyers:ticketFlow:edit']" type="text" size="mini" icon="el-icon-edit" @click="handleUpdate(scope.row)">编辑</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <pagination
-        v-show="filteredList.length > 0"
-        :total="filteredList.length"
-        :page.sync="pageNum"
-        :limit.sync="pageSize"
-      />
-    </el-card>
+    <!-- V3：查询区/工具条/表格/分页四段式骨架收敛到 ProTable（本页为前端本地分页） -->
+    <ProTable
+      ref="proTable"
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="pagedList"
+      :loading="loading"
+      :total="filteredList.length"
+      :show-search.sync="showSearch"
+      label-width="80px"
+      :table-attrs="{ border: true, size: 'small' }"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="paginate"
+    >
+      <template #toolbar-left>
+        <el-button v-hasPermi="['lawyers:ticketFlow:add']" type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd">新增</el-button>
+      </template>
+      <template #column-actionCode="{ row }">
+        <div>{{ row.actionCode }}</div>
+        <div class="sub-text">{{ row.actionName }}</div>
+      </template>
+      <template #column-status="{ row }">
+        <el-tag :type="row.status === '0' ? 'success' : 'info'" size="mini">
+          {{ row.status === '0' ? '启用' : '停用' }}
+        </el-tag>
+      </template>
+      <template #column-action="{ row }">
+        <el-button v-hasPermi="['lawyers:ticketFlow:edit']" type="text" size="mini" icon="el-icon-edit" @click="handleUpdate(row)">编辑</el-button>
+      </template>
+    </ProTable>
 
     <el-dialog :title="title" :visible.sync="open" width="620px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="110px" size="small">
@@ -133,15 +87,30 @@ export default {
   data() {
     return {
       loading: false,
+      showSearch: true,
       allList: [],
       filteredList: [],
       pagedList: [],
-      pageNum: 1,
-      pageSize: 10,
+      // V3：ProTable 列定义（源状态/目标状态/SLA 用 formatter，动作/状态/操作走插槽）
+      columns: [
+        { prop: 'flowId', label: 'ID', width: 70 },
+        { prop: 'flowCode', label: '流程类型', width: 110 },
+        { prop: 'statusFrom', label: '源状态', width: 100, formatter: (row) => this.statusText(row.statusFrom) },
+        { prop: 'actionCode', label: '动作', width: 110, slot: true },
+        { prop: 'targetStatus', label: '目标状态', width: 100, formatter: (row) => this.statusText(row.targetStatus) },
+        { prop: 'roleKey', label: '允许角色', minWidth: 140, showOverflowTooltip: true },
+        { prop: 'sortNo', label: '排序', width: 70 },
+        { prop: 'slaHours', label: 'SLA(小时)', width: 90, formatter: (row) => row.slaHours == null ? '—' : (row.slaHours === 0 ? '清时限' : row.slaHours) },
+        { prop: 'status', label: '状态', width: 90, slot: true },
+        { prop: 'action', label: '操作', width: 120, fixed: 'right', slot: true }
+      ],
       open: false,
       title: '',
       isEdit: false,
+      // V3：pageNum/pageSize 仅供 ProTable 本地分页使用，查询时不下发后端
       queryParams: {
+        pageNum: 1,
+        pageSize: 10,
         flowCode: undefined,
         statusFrom: undefined,
         actionCode: undefined,
@@ -167,6 +136,19 @@ export default {
   created() {
     this.getList()
   },
+  computed: {
+    /** V3：ProTable 查询字段（源状态下拉依赖 statusOptions，用 computed 保证响应式） */
+    queryFormItems() {
+      return [
+        { prop: 'flowCode', label: '流程类型', placeholder: '如 HOTLINE', width: '150px' },
+        { prop: 'statusFrom', label: '源状态', type: 'select', placeholder: '全部', width: '140px', options: this.statusOptions },
+        { prop: 'actionCode', label: '动作', placeholder: '如 start', width: '140px' },
+        { prop: 'status', label: '状态', type: 'select', placeholder: '全部', width: '110px', options: [
+          { label: '启用', value: '0' }, { label: '停用', value: '1' }
+        ] }
+      ]
+    }
+  },
   methods: {
     statusText(v) {
       const hit = this.statusOptions.find(s => s.value === String(v))
@@ -174,7 +156,8 @@ export default {
     },
     getList() {
       this.loading = true
-      listTicketFlow(this.queryParams).then(res => {
+      const { pageNum, pageSize, ...filters } = this.queryParams
+      listTicketFlow(filters).then(res => {
         this.allList = res.data || []
         this.applyLocalFilter()
         this.loading = false
@@ -190,20 +173,19 @@ export default {
         if (q.status != null && q.status !== '' && r.status !== q.status) return false
         return true
       })
-      this.pageNum = 1
+      q.pageNum = 1
       this.paginate()
     },
     paginate() {
-      const start = (this.pageNum - 1) * this.pageSize
-      this.pagedList = this.filteredList.slice(start, start + this.pageSize)
+      const start = (this.queryParams.pageNum - 1) * this.queryParams.pageSize
+      this.pagedList = this.filteredList.slice(start, start + this.queryParams.pageSize)
     },
     handleQuery() {
       this.getList()
     },
     resetQuery() {
-      this.resetForm('queryForm')
-      this.queryParams = { flowCode: undefined, statusFrom: undefined, actionCode: undefined, status: undefined }
-      this.getList()
+      // V3：ProTable 内部已对表单字段 resetFields，这里只需重新查询（本地过滤会重置页码）
+      this.handleQuery()
     },
     reset() {
       this.form = {
@@ -261,8 +243,8 @@ export default {
     }
   },
   watch: {
-    pageNum() { this.paginate() },
-    pageSize() { this.pageNum = 1; this.paginate() }
+    'queryParams.pageNum'() { this.paginate() },
+    'queryParams.pageSize'() { this.queryParams.pageNum = 1; this.paginate() }
   }
 }
 </script>

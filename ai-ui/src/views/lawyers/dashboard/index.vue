@@ -243,7 +243,7 @@ export default {
       });
     },
     renderTrend() {
-      if (!this.trendChart) this.trendChart = echarts.init(this.$refs.trendChart);
+      if (!this.trendChart) this.trendChart = echarts.init(this.$refs.trendChart, 'judicial');
       const x = this.callTrend.map(i => i.timeLabel);
       const total = this.callTrend.map(i => this.num(i.totalCalls));
       const answered = this.callTrend.map(i => this.num(i.answeredCalls));
@@ -264,7 +264,7 @@ export default {
       });
     },
     renderCategory() {
-      if (!this.categoryChart) this.categoryChart = echarts.init(this.$refs.categoryChart);
+      if (!this.categoryChart) this.categoryChart = echarts.init(this.$refs.categoryChart, 'judicial');
       this.categoryChart.setOption({
         tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
         legend: { orient: 'vertical', left: 'left' },
@@ -279,7 +279,7 @@ export default {
       });
     },
     renderAi() {
-      if (!this.aiChart) this.aiChart = echarts.init(this.$refs.aiChart);
+      if (!this.aiChart) this.aiChart = echarts.init(this.$refs.aiChart, 'judicial');
       const total = this.num(this.aiRatio.totalSessions);
       const handoff = this.num(this.aiRatio.handoffSessions);
       const solved = Math.max(0, total - handoff);
@@ -299,7 +299,7 @@ export default {
       });
     },
     renderLang() {
-      if (!this.langChart) this.langChart = echarts.init(this.$refs.langChart);
+      if (!this.langChart) this.langChart = echarts.init(this.$refs.langChart, 'judicial');
       const colors = { 'zh-CN': '#1A3C6E', 'yue-CN': '#C9A96E' };
       this.langChart.setOption({
         tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
@@ -318,7 +318,7 @@ export default {
       });
     },
     renderChannel() {
-      if (!this.channelChart) this.channelChart = echarts.init(this.$refs.channelChart);
+      if (!this.channelChart) this.channelChart = echarts.init(this.$refs.channelChart, 'judicial');
       const sessions = this.bizMetrics.channelSessions || [];
       const binds = this.bizMetrics.channelBinds || [];
       const nameSet = [];

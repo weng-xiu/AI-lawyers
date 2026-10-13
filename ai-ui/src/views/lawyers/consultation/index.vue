@@ -689,7 +689,7 @@ export default {
         const chartDom = this.$refs.categoryChart
         if (!chartDom) return
         
-        const myChart = echarts.init(chartDom)
+        const myChart = echarts.init(chartDom, 'judicial') // V4：统一司法蓝主题
         const option = {
           tooltip: {
             trigger: 'item',
@@ -740,7 +740,7 @@ export default {
         const chartDom = this.$refs.dateChart
         if (!chartDom) return
         
-        const myChart = echarts.init(chartDom)
+        const myChart = echarts.init(chartDom, 'judicial') // V4：统一司法蓝主题
         const option = {
           tooltip: {
             trigger: 'axis'

@@ -260,7 +260,7 @@ export default {
     },
     renderTrend() {
       if (!this.$refs.trendChart) return;
-      if (!this.charts.trend) this.charts.trend = echarts.init(this.$refs.trendChart);
+      if (!this.charts.trend) this.charts.trend = echarts.init(this.$refs.trendChart, 'judicial');
       const rows = this.callbackTrend;
       this.charts.trend.setOption({
         tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
@@ -279,7 +279,7 @@ export default {
     },
     renderSentiment() {
       if (!this.$refs.sentimentChart) return;
-      if (!this.charts.sentiment) this.charts.sentiment = echarts.init(this.$refs.sentimentChart);
+      if (!this.charts.sentiment) this.charts.sentiment = echarts.init(this.$refs.sentimentChart, 'judicial');
       this.charts.sentiment.setOption({
         tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
         legend: { bottom: 0 },
@@ -297,7 +297,7 @@ export default {
     },
     renderReason() {
       if (!this.$refs.reasonChart) return;
-      if (!this.charts.reason) this.charts.reason = echarts.init(this.$refs.reasonChart);
+      if (!this.charts.reason) this.charts.reason = echarts.init(this.$refs.reasonChart, 'judicial');
       const rows = [...this.reasonTop].reverse();
       this.charts.reason.setOption({
         tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },

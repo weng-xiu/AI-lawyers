@@ -1,60 +1,5 @@
 <template>
   <div class="app-container work-order-page">
-    <el-card class="search-card" shadow="never">
-      <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" label-width="80px">
-        <el-form-item label="工单编号" prop="ticketNo">
-          <el-input
-            v-model="queryParams.ticketNo"
-            placeholder="请输入工单编号"
-            clearable
-            style="width: 200px"
-            @keyup.enter.native="handleQuery"
-          />
-        </el-form-item>
-        <el-form-item label="咨询类型" prop="title">
-          <el-input
-            v-model="queryParams.title"
-            placeholder="请输入咨询类型"
-            clearable
-            style="width: 160px"
-            @keyup.enter.native="handleQuery"
-          />
-        </el-form-item>
-        <el-form-item label="办理人" prop="assignUserId">
-          <user-select
-            v-model="queryParams.assignUserId"
-            placeholder="全部办理人"
-            clearable
-            style="width: 200px"
-          />
-        </el-form-item>
-        <el-form-item label="状态" prop="status">
-          <el-select v-model="queryParams.status" placeholder="全部" clearable style="width: 140px">
-            <el-option label="全部" value="" />
-            <el-option label="待处理" value="0" />
-            <el-option label="处理中" value="1" />
-            <el-option label="已完成" value="2" />
-            <el-option label="已归档" value="3" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="时间范围">
-          <el-date-picker
-            v-model="dateRange"
-            style="width: 240px"
-            value-format="yyyy-MM-dd"
-            type="daterange"
-            range-separator="-"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-          ></el-date-picker>
-        </el-form-item>
-        <el-form-item class="search-btns">
-          <el-button icon="el-icon-refresh-left" size="mini" @click="resetQuery">重置</el-button>
-          <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">查询</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
-
     <el-row :gutter="16" class="stat-cards">
       <el-col :span="6">
         <div class="stat-card stat-pending" @click="filterByStatus('0')">
@@ -102,90 +47,84 @@
       </el-col>
     </el-row>
 
+    <!-- V3：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
     <el-card class="table-card" shadow="never">
-      <div class="toolbar">
-        <div class="toolbar-left">
+      <ProTable
+        ref="proTable"
+        :columns="columns"
+        :query-form-items="queryFormItems"
+        :query-params="queryParams"
+        :data="orderList"
+        :loading="loading"
+        :total="total"
+        :show-search.sync="showSearch"
+        has-selection
+        :table-attrs="{ border: true }"
+        @query="handleQuery"
+        @reset="resetQuery"
+        @pagination="getList"
+        @selection-change="handleSelectionChange"
+      >
+        <template #query-assignUserId>
+          <user-select
+            v-model="queryParams.assignUserId"
+            placeholder="全部办理人"
+            clearable
+            style="width: 200px"
+          />
+        </template>
+        <template #query-dateRange>
+          <el-date-picker
+            v-model="dateRange"
+            style="width: 240px"
+            value-format="yyyy-MM-dd"
+            type="daterange"
+            range-separator="-"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+          ></el-date-picker>
+        </template>
+        <template #toolbar-left>
           <el-checkbox v-model="isAllSelected" @change="handleSelectAll" style="margin-right: 16px">全选</el-checkbox>
           <el-button size="mini" icon="el-icon-setting" :disabled="multiple" @click="handleBatchProcess">批量处理</el-button>
           <el-button size="mini" icon="el-icon-download" :disabled="multiple" @click="handleExport">导出</el-button>
-        </div>
-        <div class="toolbar-right">
           <el-button type="primary" size="mini" icon="el-icon-plus" @click="handleAdd">新增工单</el-button>
-        </div>
-      </div>
-
-      <el-table
-        v-loading="loading"
-        :data="orderList"
-        @selection-change="handleSelectionChange"
-        border
-        style="width: 100%"
-      >
-        <el-table-column type="selection" width="50" align="center" />
-        <el-table-column label="工单编号" align="center" prop="ticketNo" width="160">
-          <template slot-scope="scope">
-            <span class="order-link" @click="handleView(scope.row)">{{ scope.row.ticketNo }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="来电号码" align="center" prop="callerNumber" width="130" />
-        <el-table-column label="咨询类型" align="center" prop="title" width="110">
-          <template slot-scope="scope">
-            <el-tag :type="getConsultTypeTag(scope.row.title)" size="mini">{{ scope.row.title }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="咨询内容摘要" align="left" prop="content" min-width="200" show-overflow-tooltip>
-          <template slot-scope="scope">
-            {{ scope.row.content ? scope.row.content.substring(0, 30) : '' }}
-          </template>
-        </el-table-column>
-        <el-table-column label="优先级" align="center" prop="priority" width="80">
-          <template slot-scope="scope">
-            <el-tag :type="getPriorityTag(scope.row.priority)" size="mini">{{ getPriorityLabel(scope.row.priority) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="当前处理人" align="center" prop="assignUserName" width="100" />
-        <el-table-column label="状态" align="center" prop="status" width="100">
-          <template slot-scope="scope">
-            <el-tag :type="getStatusTag(scope.row.status)" size="mini">{{ getStatusLabel(scope.row.status) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="创建时间" align="center" prop="createTime" width="160" />
-        <el-table-column label="操作" align="center" width="230" fixed="right">
-          <template slot-scope="scope">
-            <el-button type="text" size="mini" icon="el-icon-view" @click="handleView(scope.row)">查看</el-button>
-            <el-button type="text" size="mini" icon="el-icon-edit" @click="handleEdit(scope.row)">编辑</el-button>
-            <el-button type="text" size="mini" icon="el-icon-delete" style="color: #C63D4A" @click="handleDelete(scope.row)">删除</el-button>
-            <el-dropdown
-              v-if="actionsOf(scope.row.status).length"
-              trigger="click"
-              style="margin-left: 8px"
-              @command="handleFlowAction(scope.row, $event)"
-            >
-              <span class="flow-trigger">流转<i class="el-icon-arrow-down el-icon--right"></i></span>
-              <el-dropdown-menu slot="dropdown">
-                <el-dropdown-item
-                  v-for="action in actionsOf(scope.row.status)"
-                  :key="action.actionCode"
-                  :command="action"
-                >
-                  {{ flowActionName(action) }}
-                </el-dropdown-item>
-              </el-dropdown-menu>
-            </el-dropdown>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <el-pagination
-        style="margin-top: 16px; text-align: right"
-        @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
-        :current-page="queryParams.pageNum"
-        :page-sizes="[10, 20, 50, 100]"
-        :page-size="queryParams.pageSize"
-        layout="total, sizes, prev, pager, next, jumper"
-        :total="total"
-      />
+        </template>
+        <template #column-ticketNo="{ row }">
+          <span class="order-link" @click="handleView(row)">{{ row.ticketNo }}</span>
+        </template>
+        <template #column-title="{ row }">
+          <el-tag :type="getConsultTypeTag(row.title)" size="mini">{{ row.title }}</el-tag>
+        </template>
+        <template #column-priority="{ row }">
+          <el-tag :type="getPriorityTag(row.priority)" size="mini">{{ getPriorityLabel(row.priority) }}</el-tag>
+        </template>
+        <template #column-status="{ row }">
+          <el-tag :type="getStatusTag(row.status)" size="mini">{{ getStatusLabel(row.status) }}</el-tag>
+        </template>
+        <template #column-action="{ row }">
+          <el-button type="text" size="mini" icon="el-icon-view" @click="handleView(row)">查看</el-button>
+          <el-button type="text" size="mini" icon="el-icon-edit" @click="handleEdit(row)">编辑</el-button>
+          <el-button type="text" size="mini" icon="el-icon-delete" style="color: #C63D4A" @click="handleDelete(row)">删除</el-button>
+          <el-dropdown
+            v-if="actionsOf(row.status).length"
+            trigger="click"
+            style="margin-left: 8px"
+            @command="handleFlowAction(row, $event)"
+          >
+            <span class="flow-trigger">流转<i class="el-icon-arrow-down el-icon--right"></i></span>
+            <el-dropdown-menu slot="dropdown">
+              <el-dropdown-item
+                v-for="action in actionsOf(row.status)"
+                :key="action.actionCode"
+                :command="action"
+              >
+                {{ flowActionName(action) }}
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </el-dropdown>
+        </template>
+      </ProTable>
     </el-card>
 
     <el-drawer
@@ -372,6 +311,7 @@ export default {
   data() {
     return {
       loading: false,
+      showSearch: true,
       total: 0,
       dateRange: [],
       isAllSelected: false,
@@ -395,6 +335,18 @@ export default {
         status: undefined
       },
       orderList: [],
+      // V3：ProTable 列定义（ticketNo/title/priority/status/action 走插槽，内容摘要列用 formatter 截断）
+      columns: [
+        { prop: 'ticketNo', label: '工单编号', width: 160, slot: true },
+        { prop: 'callerNumber', label: '来电号码', width: 130 },
+        { prop: 'title', label: '咨询类型', width: 110, slot: true },
+        { prop: 'content', label: '咨询内容摘要', align: 'left', minWidth: 200, showOverflowTooltip: true, formatter: (row) => (row.content ? row.content.substring(0, 30) : '') },
+        { prop: 'priority', label: '优先级', width: 80, slot: true },
+        { prop: 'assignUserName', label: '当前处理人', width: 100 },
+        { prop: 'status', label: '状态', width: 100, slot: true },
+        { prop: 'createTime', label: '创建时间', width: 160 },
+        { prop: 'action', label: '操作', width: 230, fixed: 'right', slot: true }
+      ],
       // P1-6：按工单状态缓存当前用户可执行动作（同状态动作一致）
       actionMap: {},
       timelineList: [],
@@ -420,6 +372,24 @@ export default {
     this.getList()
     this.calcStatData()
     this.loadFlowActions()
+  },
+  computed: {
+    /** V3：ProTable 查询字段（assignUserId 为 user-select 走插槽，dateRange 走插槽，字段顺序与原查询区一致） */
+    queryFormItems() {
+      return [
+        { prop: 'ticketNo', label: '工单编号', placeholder: '请输入工单编号', width: '200px' },
+        { prop: 'title', label: '咨询类型', placeholder: '请输入咨询类型', width: '160px' },
+        { prop: 'assignUserId', label: '办理人', slot: true },
+        { prop: 'status', label: '状态', type: 'select', placeholder: '全部', width: '140px', options: [
+          { label: '全部', value: '' },
+          { label: '待处理', value: '0' },
+          { label: '处理中', value: '1' },
+          { label: '已完成', value: '2' },
+          { label: '已归档', value: '3' }
+        ] },
+        { prop: 'dateRange', label: '时间范围', slot: true }
+      ]
+    }
   },
   methods: {
     onAssignUserChange(val, user) {
@@ -550,15 +520,9 @@ export default {
       this.getList()
     },
     resetQuery() {
+      // V3：ProTable 内部已对表单字段 resetFields，这里复位插槽字段（dateRange/assignUserId）后重查
       this.dateRange = []
-      this.queryParams = {
-        pageNum: 1,
-        pageSize: 10,
-        ticketNo: undefined,
-        title: undefined,
-        assignUserId: undefined,
-        status: undefined
-      }
+      this.queryParams.assignUserId = undefined
       this.handleQuery()
     },
     filterByStatus(status) {
@@ -571,15 +535,9 @@ export default {
       this.isAllSelected = selection.length === this.orderList.length && this.orderList.length > 0
     },
     handleSelectAll(val) {
-      this.$refs.table && this.$refs.table.toggleAllSelection()
-    },
-    handleSizeChange(val) {
-      this.queryParams.pageSize = val
-      this.getList()
-    },
-    handleCurrentChange(val) {
-      this.queryParams.pageNum = val
-      this.getList()
+      // V3：el-table 在 ProTable 内部，经 proTable ref 获取后全选/反选
+      const table = this.$refs.proTable && this.$refs.proTable.$refs.table
+      table && table.toggleAllSelection()
     },
     handleBatchProcess() {
       const ids = this.selectedIds
@@ -824,25 +782,6 @@ export default {
   background: #F5F7FA;
   padding: 24px;
 
-  .search-card {
-    background: #fff;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    border: none;
-
-    ::v-deep .el-card__body {
-      padding: 20px 24px;
-    }
-
-    .search-btns {
-      margin-left: auto;
-
-      .el-button + .el-button {
-        margin-left: 12px;
-      }
-    }
-  }
-
   .stat-cards {
     margin-bottom: 20px;
 
@@ -923,19 +862,6 @@ export default {
 
     ::v-deep .el-card__body {
       padding: 20px 24px 24px;
-    }
-
-    .toolbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-
-      .toolbar-left {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-      }
     }
 
     .order-link {

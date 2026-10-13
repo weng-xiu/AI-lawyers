@@ -1,33 +1,22 @@
 <template>
   <div class="app-container cc-page">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="90px">
-      <el-form-item label="来电记录ID" prop="recordId">
-        <el-input
-          v-model="queryParams.recordId"
-          placeholder="请输入来电记录ID"
-          clearable
-          style="width: 200px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="转出坐席" prop="fromAgentId">
-        <el-select v-model="queryParams.fromAgentId" placeholder="全部坐席" filterable clearable style="width: 200px">
-          <el-option v-for="a in agentOptions" :key="a.agentId" :label="a.agentName+'('+a.agentId+')'" :value="a.agentId" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="转入坐席" prop="toAgentId">
-        <el-select v-model="queryParams.toAgentId" placeholder="全部坐席" filterable clearable style="width: 200px">
-          <el-option v-for="a in agentOptions" :key="a.agentId" :label="a.agentName+'('+a.agentId+')'" :value="a.agentId" />
-        </el-select>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
-
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
+    <!-- V3：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="transferList"
+      :loading="loading"
+      :total="total"
+      :show-search.sync="showSearch"
+      label-width="90px"
+      has-selection
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList"
+      @selection-change="handleSelectionChange"
+    >
+      <template #toolbar-left>
         <el-button
           type="primary"
           plain
@@ -36,8 +25,6 @@
           @click="handleAdd"
           v-hasPermi="['lawyers:call:transfer:add']"
         >新增</el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button
           type="danger"
           plain
@@ -47,8 +34,6 @@
           @click="handleDelete"
           v-hasPermi="['lawyers:call:transfer:remove']"
         >删除</el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button
           type="warning"
           plain
@@ -57,50 +42,24 @@
           @click="handleExport"
           v-hasPermi="['lawyers:call:transfer:export']"
         >导出</el-button>
-      </el-col>
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
-    </el-row>
-
-    <el-table v-loading="loading" :data="transferList" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="转接ID" align="center" prop="transferId" width="90" />
-      <el-table-column label="来电记录ID" align="center" prop="recordId" width="110" />
-      <el-table-column label="转出坐席" align="center" prop="fromAgentName" />
-      <el-table-column label="转入坐席" align="center" prop="toAgentName" />
-      <el-table-column label="转接原因" align="center" prop="reason" :show-overflow-tooltip="true" />
-      <el-table-column label="转接时间" align="center" prop="transferTime" width="180">
-        <template slot-scope="scope">
-          <span>{{ parseTime(scope.row.transferTime) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="160">
-        <template slot-scope="scope">
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-view"
-            @click="handleDetail(scope.row)"
-            v-hasPermi="['lawyers:call:transfer:query']"
-          >详情</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-delete"
-            @click="handleDelete(scope.row)"
-            v-hasPermi="['lawyers:call:transfer:remove']"
-          >删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <pagination
-      v-show="total>0"
-      :total="total"
-      :page.sync="queryParams.pageNum"
-      :limit.sync="queryParams.pageSize"
-      @pagination="getList"
-    />
+      </template>
+      <template #column-action="{ row }">
+        <el-button
+          size="mini"
+          type="text"
+          icon="el-icon-view"
+          @click="handleDetail(row)"
+          v-hasPermi="['lawyers:call:transfer:query']"
+        >详情</el-button>
+        <el-button
+          size="mini"
+          type="text"
+          icon="el-icon-delete"
+          @click="handleDelete(row)"
+          v-hasPermi="['lawyers:call:transfer:remove']"
+        >删除</el-button>
+      </template>
+    </ProTable>
 
     <el-dialog :title="title" :visible.sync="open" width="600px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
@@ -165,6 +124,17 @@ export default {
       showSearch: true,
       total: 0,
       transferList: [],
+      // V3：ProTable 列定义（action 走插槽，时间列用 formatter）
+      columns: [
+        { prop: 'transferId', label: '转接ID', width: 90 },
+        { prop: 'recordId', label: '来电记录ID', width: 110 },
+        { prop: 'fromAgentName', label: '转出坐席' },
+        { prop: 'toAgentName', label: '转入坐席' },
+        { prop: 'reason', label: '转接原因', showOverflowTooltip: true },
+        { prop: 'transferTime', label: '转接时间', width: 180, formatter: (row) => this.parseTime(row.transferTime) },
+        { prop: 'remark', label: '备注', showOverflowTooltip: true },
+        { prop: 'action', label: '操作', width: 160, slot: true, className: 'small-padding fixed-width' }
+      ],
       agentOptions: [],
       title: "",
       open: false,
@@ -194,6 +164,17 @@ export default {
   created() {
     this.loadAgents()
     this.getList()
+  },
+  computed: {
+    /** V3：ProTable 查询字段（坐席下拉依赖异步 agentOptions，用 computed 保证响应式） */
+    queryFormItems() {
+      const agentOpts = this.agentOptions.map(a => ({ label: a.agentName + '(' + a.agentId + ')', value: a.agentId }))
+      return [
+        { prop: 'recordId', label: '来电记录ID', placeholder: '请输入来电记录ID', width: '200px' },
+        { prop: 'fromAgentId', label: '转出坐席', type: 'select', placeholder: '全部坐席', filterable: true, width: '200px', options: agentOpts },
+        { prop: 'toAgentId', label: '转入坐席', type: 'select', placeholder: '全部坐席', filterable: true, width: '200px', options: agentOpts }
+      ]
+    }
   },
   methods: {
     loadAgents() {
@@ -240,7 +221,7 @@ export default {
       this.getList()
     },
     resetQuery() {
-      this.resetForm("queryForm")
+      // V3：ProTable 内部已对表单字段 resetFields，这里复位插槽字段后重查
       this.handleQuery()
     },
     handleAdd() {

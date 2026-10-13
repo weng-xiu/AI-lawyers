@@ -4,7 +4,7 @@
 
 <script>
 import * as echarts from 'echarts'
-require('echarts/theme/macarons') // echarts theme
+// V4：主题已在 main.js 统一注册（judicial 司法蓝），不再 require macarons
 import resize from './mixins/resize'
 
 export default {
@@ -58,7 +58,7 @@ export default {
   },
   methods: {
     initChart() {
-      this.chart = echarts.init(this.$el, 'macarons')
+      this.chart = echarts.init(this.$el, 'judicial')
       this.setOptions(this.chartData)
     },
     setOptions({ expectedData, actualData } = {}) {
