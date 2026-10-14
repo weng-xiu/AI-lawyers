@@ -13,12 +13,14 @@
       :total="total"
       :show-search.sync="showSearch"
       has-selection
+      persist-query
       empty-text="暂无话单"
       empty-hint="调整筛选条件或时间范围后重试"
       @query="handleQuery"
       @reset="resetQuery"
       @pagination="getList"
       @selection-change="handleSelectionChange"
+      @persist-restored="getList"
     >
       <template #query-dateRange>
         <el-date-picker
@@ -402,6 +404,10 @@ export default {
     }
   },
   created() {
+    // U3：命令面板话单直达——预填来电号码查询
+    if (this.$route.query.callerNumber) {
+      this.queryParams.callerNumber = this.$route.query.callerNumber
+    }
     this.getList()
     this.loadAgents()
   },

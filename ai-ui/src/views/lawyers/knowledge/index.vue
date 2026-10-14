@@ -215,7 +215,7 @@
         </el-form-item>
       </el-form>
       <div slot="footer" class="dialog-footer">
-        <el-button type="primary" @click="submitForm">确 定</el-button>
+        <el-button type="primary" :loading="draftSubmitting" @click="submitForm">确 定</el-button>
         <el-button @click="cancel">取 消</el-button>
       </div>
     </el-dialog>
@@ -356,10 +356,18 @@
 <script>
 import { listKnowledge, getKnowledge, delKnowledge, addKnowledge, updateKnowledge, exportKnowledge, importTemplate, importKnowledge, auditKnowledge, getRagIndexInfo, rebuildRagIndex, testRagRerank, draftFromCall, draftFromTicket, scanDraft } from "@/api/lawyers/knowledge"
 import { getValidCategories } from "@/api/lawyers/category"
+import { createDraftMixin } from '@/utils/draft'
 
 export default {
   name: "Knowledge",
   dicts: ['lawyers_audit_status'],
+  // U4 表单防丢失：新增态自动存草稿（按用户隔离），knowledgeId/viewCount 不入草稿
+  mixins: [createDraftMixin({
+    key: vm => 'knowledge:' + ((vm.$store && vm.$store.state.user.name) || 'anon'),
+    formKey: 'form',
+    excludes: ['knowledgeId', 'viewCount'],
+    when: vm => vm.form.knowledgeId == undefined
+  })],
   data() {
     return {
       // 遮罩层
@@ -453,6 +461,10 @@ export default {
     }
   },
   created() {
+    // U3：命令面板知识直达——预填标题查询
+    if (this.$route.query.title) {
+      this.queryParams.title = this.$route.query.title
+    }
     this.getList()
     this.getCategoryOptions()
     this.fetchRagInfo()
@@ -584,6 +596,8 @@ export default {
       this.reset()
       this.open = true
       this.title = "添加法律知识"
+      // U4：弹窗打开后询问恢复未提交草稿
+      this.draftRestorePrompt()
     },
     // 多选框选中数据
     handleSelectionChange(selection) {
@@ -613,18 +627,22 @@ export default {
     submitForm: function() {
       this.$refs["form"].validate(valid => {
         if (valid) {
+          // U4：提交中防重复提交
+          if (this.draftSubmitting) return
+          this.lockSubmit()
           if (this.form.knowledgeId != undefined) {
             updateKnowledge(this.form).then(response => {
               this.$modal.msgSuccess("修改成功")
               this.open = false
               this.getList()
-            })
+            }).finally(() => this.unlockSubmit())
           } else {
             addKnowledge(this.form).then(response => {
               this.$modal.msgSuccess("新增成功")
               this.open = false
+              this.draftClear()
               this.getList()
-            })
+            }).finally(() => this.unlockSubmit())
           }
         }
       })

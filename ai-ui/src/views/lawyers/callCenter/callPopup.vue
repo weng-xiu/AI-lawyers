@@ -197,22 +197,22 @@
     <!-- 通话操作按钮 -->
     <div class="cp-action-bar">
       <el-button type="success" size="medium" class="cp-action-btn cp-btn-green" @click="handleAnswer" :disabled="connected || !incomingRinging">
-        <i class="el-icon-microphone"></i><span>接听</span>
+        <i class="el-icon-microphone"></i><span>接听</span><kbd class="cp-kbd">Ctrl+1</kbd>
       </el-button>
       <el-button size="medium" class="cp-action-btn cp-btn-orange" :disabled="!connected || !(callStatus === '1' || callStatus === '2')" @click="handleHold">
-        <i :class="callStatus === '2' ? 'el-icon-video-play' : 'el-icon-video-pause'"></i><span>{{ callStatus === '2' ? '恢复' : '保持' }}</span>
+        <i :class="callStatus === '2' ? 'el-icon-video-play' : 'el-icon-video-pause'"></i><span>{{ callStatus === '2' ? '恢复' : '保持' }}</span><kbd class="cp-kbd">Ctrl+2</kbd>
       </el-button>
       <el-button size="medium" class="cp-action-btn cp-btn-gray" :disabled="!connected || callStatus !== '1'" @click="handleTransfer">
-        <i class="el-icon-s-promotion"></i><span>转接</span>
+        <i class="el-icon-s-promotion"></i><span>转接</span><kbd class="cp-kbd">Ctrl+3</kbd>
       </el-button>
       <el-button type="primary" size="medium" class="cp-action-btn cp-btn-blue" @click="handleLedger">
-        <i class="el-icon-document"></i><span>一键登记台账</span>
+        <i class="el-icon-document"></i><span>一键登记台账</span><kbd class="cp-kbd">Ctrl+4</kbd>
       </el-button>
       <el-button size="medium" class="cp-action-btn cp-btn-purple" :disabled="!connected || !(callStatus === '1' || callStatus === '5')" @click="handleAfterWork">
-        <i class="el-icon-edit-outline"></i><span>话后整理</span>
+        <i class="el-icon-edit-outline"></i><span>话后整理</span><kbd class="cp-kbd">Ctrl+5</kbd>
       </el-button>
       <el-button type="danger" size="medium" class="cp-action-btn cp-btn-red" :disabled="!connected" @click="handleHangup">
-        <i class="el-icon-bangzhu"></i><span>挂机</span>
+        <i class="el-icon-bangzhu"></i><span>挂机</span><kbd class="cp-kbd">Ctrl+6</kbd>
       </el-button>
     </div>
 
@@ -300,7 +300,16 @@ export default {
       // P3-A6：实时字幕累计文本（供 AI 辅助面板联动分析）
       liveCaptionText: '',
       // F4：实时 Copilot 数据（要素/法条/相似工单/建议动作，按 seq 回合刷新）
-      copilotData: { seq: 0, element: null, laws: [], tickets: [], actions: [] }
+      copilotData: { seq: 0, element: null, laws: [], tickets: [], actions: [] },
+      // U1：工作台快捷键映射（Ctrl+数字 触发对应通话动作，可按需调整）
+      shortcutMap: [
+        { keys: 'Ctrl+1', method: 'handleAnswer', label: '接听' },
+        { keys: 'Ctrl+2', method: 'handleHold', label: '保持/恢复' },
+        { keys: 'Ctrl+3', method: 'handleTransfer', label: '转接' },
+        { keys: 'Ctrl+4', method: 'handleLedger', label: '登记台账' },
+        { keys: 'Ctrl+5', method: 'handleAfterWork', label: '话后整理' },
+        { keys: 'Ctrl+6', method: 'handleHangup', label: '挂机' }
+      ]
     }
   },
   computed: {
@@ -376,7 +385,12 @@ export default {
       this.loadProfile(callerNumber)
     }
   },
+  mounted() {
+    // U1：注册工作台全局快捷键监听
+    document.addEventListener('keydown', this.handleKeydown)
+  },
   beforeDestroy() {
+    document.removeEventListener('keydown', this.handleKeydown)
     this.clearTimer()
     if (this.pollTimer) clearInterval(this.pollTimer)
     this.unregisterCallSocket()
@@ -387,6 +401,21 @@ export default {
     }
   },
   methods: {
+    // U1：工作台全局快捷键处理（Ctrl+1~6 映射通话动作）
+    handleKeydown(e) {
+      // 输入框/可编辑元素内不触发，避免与表单输入冲突
+      const tag = (e.target.tagName || '').toLowerCase()
+      if (['input', 'textarea', 'select'].includes(tag) || e.target.isContentEditable) return
+      // 弹窗打开时不触发（转接、编辑档案等）
+      if (this.transferOpen || this.editOpen) return
+      if (!e.ctrlKey) return
+      const keyMap = { '1': 'handleAnswer', '2': 'handleHold', '3': 'handleTransfer', '4': 'handleLedger', '5': 'handleAfterWork', '6': 'handleHangup' }
+      const method = keyMap[e.key]
+      if (method) {
+        e.preventDefault()
+        this[method]()
+      }
+    },
     // 浏览器侧 SIP 通话结束（对方挂机/拒接/失败）：立即结束本页通话状态
     onSipHangup() {
       if (!this.connected && !this.incomingRinging) return
@@ -741,4 +770,6 @@ export default {
   &.cp-btn-orange { background: linear-gradient(135deg, #E8923A, #d97706); border: none; color: #fff; &:hover { background: linear-gradient(135deg, #d97706, #b45309); } }
   &.cp-btn-red { background: linear-gradient(135deg, #C63D4A, #9E2F3A); border: none; color: #fff; &:hover { background: linear-gradient(135deg, #9E2F3A, #7E2530); } }
 }
+.cp-kbd { display: inline-block; padding: 1px 6px; font-size: 11px; font-family: Menlo, Consolas, monospace; line-height: 1.4; color: #5A6A7E; background: rgba(255,255,255,0.85); border: 1px solid #DCE2EB; border-radius: 4px; box-shadow: 0 1px 0 #DCE2EB; }
+.cp-action-btn:not(.cp-btn-gray) .cp-kbd { color: #1A3C6E; background: rgba(255,255,255,0.9); border-color: rgba(255,255,255,0.6); }
 </style>

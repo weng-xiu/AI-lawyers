@@ -259,6 +259,12 @@ export default {
       const x = list.map(i => i.statMinute)
       const y = list.map(i => i.connectRate != null ? (i.connectRate * 100).toFixed(1) : 0)
       this.chart.setOption({
+        // V4.1：空数据时渲染占位提示（text 空串即隐藏，覆盖切换线路时的状态残留）
+        title: {
+          text: list.length ? '' : '暂无趋势数据',
+          left: 'center', top: 'middle',
+          textStyle: { color: '#B0BCCA', fontSize: 14, fontWeight: 'normal' }
+        },
         tooltip: { trigger: 'axis' },
         grid: { left: 40, right: 20, top: 20, bottom: 30 },
         xAxis: { type: 'category', data: x, axisLabel: { rotate: 40, fontSize: 10 } },

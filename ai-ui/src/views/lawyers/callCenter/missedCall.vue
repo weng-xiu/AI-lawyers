@@ -130,6 +130,7 @@
           :loading="loading"
           :total="noticeTotal"
           :show-toolbar="false"
+          persist-key="missedCall-notice"
           has-selection
           empty-text="暂无漏话通知"
           empty-hint="可选择来电记录批量发送漏话通知"

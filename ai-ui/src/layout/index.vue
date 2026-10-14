@@ -10,6 +10,8 @@
       </div>
       <app-main/>
       <settings ref="settingRef"/>
+      <!-- U3：全局命令面板（Ctrl+K 唤起） -->
+      <command-palette />
       <draggable-dialer
         :visible="dialerVisible && !!agent"
         :agent="agent"
@@ -28,6 +30,7 @@ import { mapState } from 'vuex'
 import variables from '@/assets/styles/variables.scss'
 import AgentStatusBar from '@/components/CallCenter/AgentStatusBar'
 import DraggableDialer from '@/components/CallCenter/DraggableDialer'
+import CommandPalette from '@/components/CommandPalette'
 
 export default {
   name: 'Layout',
@@ -35,6 +38,7 @@ export default {
     AppMain,
     AgentStatusBar,
     DraggableDialer,
+    CommandPalette,
     Navbar,
     Settings,
     Sidebar,

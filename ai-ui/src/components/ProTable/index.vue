@@ -59,7 +59,7 @@
       </el-form-item>
     </el-form>
 
-    <!-- 工具条：左侧操作按钮 + 右侧 RightToolbar（刷新/显隐搜索/显隐列） -->
+    <!-- 工具条：左侧操作按钮 + 右侧 RightToolbar（刷新/显隐搜索）+ 密度/列设置（U5） -->
     <el-row :gutter="10" class="mb8" v-if="$slots['toolbar-left'] || showToolbar">
       <el-col :span="1.5">
         <slot name="toolbar-left"></slot>
@@ -72,6 +72,25 @@
       >
         <slot name="toolbar-right"></slot>
       </right-toolbar>
+      <div v-if="showToolbar" class="table-tools">
+        <!-- U5：表格密度切换（宽松/中等/紧凑），选择持久化到 localStorage -->
+        <el-dropdown trigger="click" @command="handleSizeCommand">
+          <el-button size="mini" icon="el-icon-s-grid" circle plain title="表格密度" />
+          <el-dropdown-menu slot="dropdown">
+            <el-dropdown-item command="default" :class="{ 'is-active-option': tableSize === 'default' }">宽松</el-dropdown-item>
+            <el-dropdown-item command="medium" :class="{ 'is-active-option': tableSize === 'medium' }">中等</el-dropdown-item>
+            <el-dropdown-item command="small" :class="{ 'is-active-option': tableSize === 'small' }">紧凑</el-dropdown-item>
+          </el-dropdown-menu>
+        </el-dropdown>
+        <!-- U5：列设置（显隐列），选择持久化到 localStorage -->
+        <el-popover placement="bottom-end" width="180" trigger="click">
+          <el-button slot="reference" size="mini" icon="el-icon-set-up" circle plain title="列设置" />
+          <el-checkbox-group v-model="visibleCols" class="col-setting">
+            <el-checkbox v-for="col in columns" :key="colKey(col)" :label="colKey(col)">{{ col.label }}</el-checkbox>
+          </el-checkbox-group>
+          <el-button type="text" size="mini" class="col-reset" @click="resetColumns">重置</el-button>
+        </el-popover>
+      </div>
     </el-row>
 
     <!-- 表格主体：loading / 空态内建，列由 columns 驱动，自定义渲染走 #column-{prop} 插槽 -->
@@ -79,6 +98,7 @@
       ref="table"
       v-bind="tableAttrs"
       v-loading="loading"
+      :size="tableSize"
       :data="data"
       @selection-change="$emit('selection-change', $event)"
       @sort-change="$emit('sort-change', $event)"
@@ -93,7 +113,7 @@
       <el-table-column v-if="hasSelection" type="selection" width="55" align="center" />
       <el-table-column v-if="hasIndex" type="index" label="序号" width="55" align="center" />
       <el-table-column
-        v-for="col in columns"
+        v-for="col in displayColumns"
         :key="col.prop || col.label"
         :prop="col.prop"
         :label="col.label"
@@ -182,7 +202,19 @@ export default {
     /** 内建空态提示 */
     emptyHint: { type: String, default: '' },
     /** 透传 el-table 原生属性（border/stripe/size/max-height 等） */
-    tableAttrs: { type: Object, default: () => ({}) }
+    tableAttrs: { type: Object, default: () => ({}) },
+    /** U5 持久化标识：列设置/密度/筛选存档的 key，默认取当前路由路径 */
+    persistKey: { type: String, default: '' },
+    /** U5 筛选条件保存开关：开启后查询参数（除分页）自动持久化并在下次进入时恢复 */
+    persistQuery: { type: Boolean, default: false }
+  },
+  data() {
+    return {
+      // U5：表格密度（default 宽松 / medium 中等 / small 紧凑）
+      tableSize: 'default',
+      // U5：当前显示列 key 集合（全量默认显示）
+      visibleCols: []
+    }
   },
   computed: {
     showSearchSync: {
@@ -192,9 +224,116 @@ export default {
       set(val) {
         this.$emit('update:showSearch', val)
       }
+    },
+    /** 持久化命名空间：页面显式 persistKey 优先，否则用路由路径 */
+    persistId() {
+      return this.persistKey || (this.$route && this.$route.path) || 'default'
+    },
+    /** 列设置过滤后的渲染列 */
+    displayColumns() {
+      if (!this.visibleCols.length) return this.columns
+      return this.columns.filter(c => this.visibleCols.indexOf(this.colKey(c)) !== -1)
     }
   },
+  watch: {
+    columns: {
+      immediate: true,
+      handler() {
+        // 列定义变化：剔除已不存在的 key；首次/新增列默认显示
+        const keys = this.columns.map(this.colKey)
+        const signature = keys.join()
+        this.visibleCols = this.visibleCols.filter(k => keys.indexOf(k) !== -1)
+        if (this._colKeysInit !== signature) {
+          keys.forEach(k => {
+            if (this.visibleCols.indexOf(k) === -1) this.visibleCols.push(k)
+          })
+          this._colKeysInit = signature
+        }
+      }
+    },
+    tableSize() {
+      this.persistTools()
+    },
+    visibleCols() {
+      this.persistTools()
+    },
+    queryParams: {
+      deep: true,
+      handler() {
+        // U5：筛选条件防抖持久化（剔除分页字段）
+        if (!this.persistQuery) return
+        clearTimeout(this._queryTimer)
+        this._queryTimer = setTimeout(() => this.saveQuery(), 600)
+      }
+    }
+  },
+  created() {
+    this.restoreTools()
+    if (this.persistQuery) this.restoreQuery()
+  },
   methods: {
+    colKey(col) {
+      return col.prop || col.label
+    },
+    /** U5：密度切换 */
+    handleSizeCommand(size) {
+      this.tableSize = size
+    },
+    /** U5：列设置恢复全显 */
+    resetColumns() {
+      this.visibleCols = this.columns.map(this.colKey)
+    },
+    /** U5：密度/列设置持久化 */
+    persistTools() {
+      try {
+        localStorage.setItem('proTable:tools:' + this.persistId, JSON.stringify({
+          size: this.tableSize,
+          cols: this.visibleCols
+        }))
+      } catch (e) { /* 存储满忽略 */ }
+    },
+    restoreTools() {
+      try {
+        const raw = localStorage.getItem('proTable:tools:' + this.persistId)
+        if (!raw) return
+        const saved = JSON.parse(raw)
+        if (saved && ['default', 'medium', 'small'].indexOf(saved.size) !== -1) {
+          this.tableSize = saved.size
+        }
+        if (saved && Array.isArray(saved.cols) && saved.cols.length) {
+          const keys = this.columns.map(this.colKey)
+          // 仅保留仍存在的列 key，至少保证一列显示
+          const valid = saved.cols.filter(k => keys.indexOf(k) !== -1)
+          if (valid.length) this.visibleCols = valid
+        }
+      } catch (e) { /* 损坏存档忽略 */ }
+    },
+    /** U5：筛选条件持久化 */
+    saveQuery() {
+      try {
+        const q = Object.assign({}, this.queryParams)
+        delete q.pageNum
+        delete q.pageSize
+        localStorage.setItem('proTable:query:' + this.persistId, JSON.stringify(q))
+      } catch (e) { /* 存储满忽略 */ }
+    },
+    /** U5：恢复筛选条件（仅覆盖 queryParams 已有 key），恢复后通知页面重查 */
+    restoreQuery() {
+      try {
+        const raw = localStorage.getItem('proTable:query:' + this.persistId)
+        if (!raw) return
+        const saved = JSON.parse(raw)
+        if (!saved) return
+        let changed = false
+        Object.keys(saved).forEach(k => {
+          if (k in this.queryParams) {
+            this.$set(this.queryParams, k, saved[k])
+            changed = true
+          }
+        })
+        if (changed) this.$emit('persist-restored')
+      } catch (e) { /* 损坏存档忽略 */ }
+    },
     getControlType(item) {
       return item.type || 'input'
     },
@@ -220,6 +359,49 @@ export default {
 .pro-table {
   .el-table {
     margin-bottom: 8px;
+  }
+
+  // U5：密度/列设置工具组（贴工具条右侧，RightToolbar 之前）
+  .table-tools {
+    float: right;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: 10px;
+    margin-left: 10px;
+
+    ::v-deep .el-button.is-circle {
+      padding: 7px;
+    }
+  }
+
+  // U5：列设置弹层
+  .col-setting {
+    display: flex;
+    flex-direction: column;
+
+    ::v-deep .el-checkbox {
+      margin-right: 0;
+      line-height: 24px;
+
+      .el-checkbox__label {
+        font-size: 13px;
+      }
+    }
+  }
+
+  .col-reset {
+    width: 100%;
+    text-align: center;
+    border-top: 1px solid #ebeef5;
+    padding-top: 6px;
+    margin-top: 4px;
+  }
+
+  ::v-deep .el-dropdown-menu__item.is-active-option {
+    color: #1a3c6e;
+    font-weight: 600;
+    background-color: #f0f4fa;
   }
 }
 </style>

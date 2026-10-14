@@ -59,11 +59,13 @@
         :total="total"
         :show-search.sync="showSearch"
         has-selection
+        persist-query
         :table-attrs="{ border: true }"
         @query="handleQuery"
         @reset="resetQuery"
         @pagination="getList"
         @selection-change="handleSelectionChange"
+        @persist-restored="getList"
       >
         <template #query-assignUserId>
           <user-select
@@ -87,6 +89,7 @@
         <template #toolbar-left>
           <el-checkbox v-model="isAllSelected" @change="handleSelectAll" style="margin-right: 16px">全选</el-checkbox>
           <el-button size="mini" icon="el-icon-setting" :disabled="multiple" @click="handleBatchProcess">批量处理</el-button>
+          <el-button size="mini" icon="el-icon-sort" :disabled="multiple" @click="handleBatchTransfer">批量转派</el-button>
           <el-button size="mini" icon="el-icon-download" :disabled="multiple" @click="handleExport">导出</el-button>
           <el-button type="primary" size="mini" icon="el-icon-plus" @click="handleAdd">新增工单</el-button>
         </template>
@@ -256,11 +259,11 @@
       </el-form>
       <div slot="footer" class="dialog-footer">
         <el-button size="small" @click="formOpen = false">取 消</el-button>
-        <el-button type="primary" size="small" @click="submitForm">确 定</el-button>
+        <el-button type="primary" size="small" :loading="draftSubmitting" @click="submitForm">确 定</el-button>
       </div>
     </el-dialog>
 
-    <el-dialog title="转派工单" :visible.sync="transferOpen" width="400px" append-to-body>
+    <el-dialog :title="transferIds.length ? '批量转派工单' : '转派工单'" :visible.sync="transferOpen" width="400px" append-to-body>
       <el-form label-width="80px">
         <el-form-item label="转派给">
           <user-select v-model="transferUserId" placeholder="请选择新办理人" @change="onTransferUserChange" />
@@ -297,6 +300,7 @@
 import { listTicket, getTicket, addTicket, updateTicket, delTicket, processTicket, completeTicket, archiveTicket, generateTicketNo, listTicketActions, transferOutTicket } from "@/api/lawyers/callCenter"
 import { listExternalOrg } from "@/api/lawyers/externalOrg"
 import request from '@/utils/request'
+import { createDraftMixin } from '@/utils/draft'
 
 // 查询工单流转记录（若后端接口存在）
 export function getTicketTimeline(ticketId) {
@@ -308,6 +312,13 @@ export function getTicketTimeline(ticketId) {
 
 export default {
   name: "WorkOrder",
+  // U4 表单防丢失：新增态自动存草稿（按用户隔离），ticketNo 系统生成不入草稿
+  mixins: [createDraftMixin({
+    key: vm => 'workOrder:' + ((vm.$store && vm.$store.state.user.name) || 'anon'),
+    formKey: 'form',
+    excludes: ['ticketId', 'ticketNo'],
+    when: vm => !vm.isEdit
+  })],
   data() {
     return {
       loading: false,
@@ -357,6 +368,8 @@ export default {
       transferUserId: null,
       transferUserName: '',
       transferRow: null,
+      // U5：批量转派的工单 ID 集合（非空表示批量态）
+      transferIds: [],
       // P1-6：外派转办（跨域协同机构）
       externalOrgs: [],
       transferOrgVisible: false,
@@ -369,6 +382,10 @@ export default {
     }
   },
   created() {
+    // U3：命令面板工单直达——预填工单号查询
+    if (this.$route.query.ticketNo) {
+      this.queryParams.ticketNo = this.$route.query.ticketNo
+    }
     this.getList()
     this.calcStatData()
     this.loadFlowActions()
@@ -587,6 +604,8 @@ export default {
       generateTicketNo().then(response => {
         this.form.ticketNo = response.data
         this.formOpen = true
+        // U4：弹窗打开后询问恢复未提交草稿
+        this.draftRestorePrompt()
       }).catch(() => {})
     },
     handleView(row) {
@@ -685,15 +704,19 @@ export default {
       }).catch(() => {})
     },
     submitForm() {
+      // U4：提交中防重复提交
+      if (this.draftSubmitting) return
       this.$refs.ticketForm.validate(valid => {
         if (!valid) return
+        this.lockSubmit()
         const save = this.isEdit ? updateTicket(this.form) : addTicket(this.form)
         save.then(() => {
           this.$message.success(this.isEdit ? '修改成功' : '新增成功')
           this.formOpen = false
+          if (!this.isEdit) this.draftClear()
           this.getList()
           this.calcStatData()
-        }).catch(() => {})
+        }).catch(() => {}).finally(() => this.unlockSubmit())
       })
     },
     handleDelete(row) {
@@ -711,6 +734,20 @@ export default {
     },
     handleTransfer() {
       this.transferRow = this.currentOrder
+      this.transferIds = []
+      this.transferUserId = null
+      this.transferUserName = ''
+      this.transferOpen = true
+    },
+    /** U5：批量转派（勾选工单后复用转派弹窗） */
+    handleBatchTransfer() {
+      const ids = this.selectedIds
+      if (!ids || ids.length === 0) {
+        this.$message.warning('请先选择要转派的工单')
+        return
+      }
+      this.transferIds = ids
+      this.transferRow = null
       this.transferUserId = null
       this.transferUserName = ''
       this.transferOpen = true
@@ -724,6 +761,23 @@ export default {
         return
       }
       const name = this.transferUserName
+      // U5：批量态循环复用单条转派接口（与批量处理同模式），单条态走原逻辑
+      if (this.transferIds.length) {
+        const ids = this.transferIds
+        this.loading = true
+        Promise.all(ids.map(id => processTicket({
+          ticketId: id,
+          processContent: '工单批量转派给：' + (name || this.transferUserId),
+          assignUserId: this.transferUserId,
+          assignUserName: name
+        }))).then(() => {
+          this.$message.success('已成功转派 ' + ids.length + ' 条工单')
+          this.transferOpen = false
+          this.getList()
+          this.calcStatData()
+        }).finally(() => { this.loading = false })
+        return
+      }
       processTicket({
         ticketId: this.transferRow.ticketId,
         processContent: '工单转派给：' + (name || this.transferUserId),
