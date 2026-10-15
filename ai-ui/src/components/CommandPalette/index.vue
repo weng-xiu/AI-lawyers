@@ -97,6 +97,7 @@ export default {
           } else if (title) {
             items.push({
               key: path,
+              type: 'menu',
               title: parentTitle && title !== parentTitle ? parentTitle + ' / ' + title : title,
               sub: path,
               path,
