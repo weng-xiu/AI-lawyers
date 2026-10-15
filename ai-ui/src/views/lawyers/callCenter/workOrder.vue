@@ -390,6 +390,15 @@ export default {
     this.calcStatData()
     this.loadFlowActions()
   },
+  watch: {
+    // U3：已在工单页时再次命令面板直达，路由组件复用 created 不重跑，监听 query 变化补预填并重查
+    '$route.query.ticketNo'(val) {
+      if (val && val !== this.queryParams.ticketNo) {
+        this.queryParams.ticketNo = val
+        this.handleQuery()
+      }
+    }
+  },
   computed: {
     /** V3：ProTable 查询字段（assignUserId 为 user-select 走插槽，dateRange 走插槽，字段顺序与原查询区一致） */
     queryFormItems() {
