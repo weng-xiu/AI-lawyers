@@ -31,6 +31,8 @@ import ErrorRetry from "@/components/ErrorRetry"
 // V3 ProTable：查询区 + 工具条 + 表格 + 分页 一体化封装
 import ProTable from "@/components/ProTable"
 import ProDialog from "@/components/ProDialog"
+import ProForm from "@/components/ProForm"
+import ProFormItem from "@/components/ProForm/ProFormItem"
 // 自定义表格工具组件
 import RightToolbar from "@/components/RightToolbar"
 // 富文本组件
@@ -67,6 +69,8 @@ Vue.component('PageLoading', PageLoading)
 Vue.component('ErrorRetry', ErrorRetry)
 Vue.component('ProTable', ProTable)
 Vue.component('ProDialog', ProDialog)
+Vue.component('ProForm', ProForm)
+Vue.component('ProFormItem', ProFormItem)
 Vue.component('RightToolbar', RightToolbar)
 Vue.component('Editor', Editor)
 Vue.component('FileUpload', FileUpload)

@@ -100,42 +100,12 @@
       @confirm="submitForm"
       @closed="reset"
     >
-      <el-form ref="form" :model="form" :rules="rules" label-width="100px" size="small">
-        <el-form-item label="电话号码" prop="phoneNumber">
-          <el-input v-model="form.phoneNumber" placeholder="请输入电话号码" maxlength="20" />
-        </el-form-item>
-        <el-form-item label="名单类型" prop="listType">
-          <el-radio-group v-model="form.listType">
-            <el-radio label="1">黑名单</el-radio>
-            <el-radio label="2">白名单</el-radio>
-            <el-radio label="3">退订名单</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="原因" prop="reason">
-          <el-input v-model="form.reason" type="textarea" :rows="3" placeholder="请输入加入名单原因" />
-        </el-form-item>
-        <el-form-item label="状态" prop="status">
-          <el-switch v-model="form.status" active-value="1" inactive-value="0" active-text="启用" inactive-text="停用" />
-        </el-form-item>
-        <el-form-item label="生效开始时间" prop="effectiveStart">
-          <el-date-picker
-            v-model="form.effectiveStart"
-            type="datetime"
-            value-format="yyyy-MM-dd HH:mm:ss"
-            placeholder="选择生效开始时间"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="生效结束时间" prop="effectiveEnd">
-          <el-date-picker
-            v-model="form.effectiveEnd"
-            type="datetime"
-            value-format="yyyy-MM-dd HH:mm:ss"
-            placeholder="选择生效结束时间"
-            style="width: 100%"
-          />
-        </el-form-item>
-      </el-form>
+      <pro-form
+        ref="form"
+        :model="form"
+        :fields="formFields"
+        label-width="100px"
+      />
     </pro-dialog>
 
     <!-- 号码检查对话框 -->
@@ -194,10 +164,22 @@ export default {
         status: undefined
       },
       form: {},
-      rules: {
-        phoneNumber: [{ required: true, message: '电话号码不能为空', trigger: 'blur' }],
-        listType: [{ required: true, message: '请选择名单类型', trigger: 'change' }]
-      }
+      // V3 ProForm：新增/编辑表单 schema（校验规则随字段声明）
+      formFields: [
+        { prop: 'phoneNumber', label: '电话号码', type: 'input', required: true, attrs: { maxlength: 20 } },
+        {
+          prop: 'listType', label: '名单类型', type: 'radio', required: true,
+          options: [
+            { label: '黑名单', value: '1' },
+            { label: '白名单', value: '2' },
+            { label: '退订名单', value: '3' }
+          ]
+        },
+        { prop: 'reason', label: '原因', type: 'textarea', rows: 3 },
+        { prop: 'status', label: '状态', type: 'switch', activeValue: '1', inactiveValue: '0', activeText: '启用', inactiveText: '停用' },
+        { prop: 'effectiveStart', label: '生效开始时间', type: 'datetime', placeholder: '选择生效开始时间' },
+        { prop: 'effectiveEnd', label: '生效结束时间', type: 'datetime', placeholder: '选择生效结束时间' }
+      ]
     }
   },
   computed: {

@@ -116,62 +116,12 @@
       @confirm="submitForm"
       @closed="reset"
     >
-      <el-form ref="form" :model="form" :rules="rules" label-width="110px" size="small">
-        <el-form-item label="规则名称" prop="ruleName">
-          <el-input v-model="form.ruleName" placeholder="请输入规则名称" maxlength="64" />
-        </el-form-item>
-        <el-form-item label="匹配方式" prop="matchType">
-          <el-radio-group v-model="form.matchType">
-            <el-radio label="PHONE">号码匹配（主叫精确匹配）</el-radio>
-            <el-radio label="KEYWORD">关键词匹配（文本包含）</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item :label="form.matchType === 'KEYWORD' ? '关键词' : '主叫号码'" prop="matchValue">
-          <el-input v-model="form.matchValue" :placeholder="form.matchType === 'KEYWORD' ? '请输入关键词' : '请输入主叫号码'" maxlength="64" />
-        </el-form-item>
-        <el-form-item label="处置动作" prop="action">
-          <el-radio-group v-model="form.action">
-            <el-radio label="PRIORITY">降权置底（沉到普通来电之后，仍可接听）</el-radio>
-            <el-radio label="REJECT">直接挂断</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item v-if="form.action === 'PRIORITY'" label="置底优先级" prop="priorityLevel">
-          <el-input-number v-model="form.priorityLevel" :max="-1" :step="10" controls-position="right" />
-          <span class="form-tip">负数，越小越靠后（普通来电默认 0）</span>
-        </el-form-item>
-        <el-form-item label="频次阈值">
-          <el-input-number v-model="form.triggerCount" :min="0" controls-position="right" />
-          <span class="form-tip">0 = 每次命中即处置；&gt;0 = 时间窗内累计命中达该次数才处置</span>
-        </el-form-item>
-        <el-form-item label="统计窗口(秒)">
-          <el-input-number v-model="form.windowSeconds" :min="0" :step="60" controls-position="right" />
-          <span class="form-tip">0 = 不限时间窗（按历史累计）</span>
-        </el-form-item>
-        <el-form-item label="状态" prop="status">
-          <el-switch v-model="form.status" active-value="0" inactive-value="1" active-text="启用" inactive-text="停用" />
-        </el-form-item>
-        <el-form-item label="生效开始时间" prop="effectiveStart">
-          <el-date-picker
-            v-model="form.effectiveStart"
-            type="datetime"
-            value-format="yyyy-MM-dd HH:mm:ss"
-            placeholder="留空表示立即生效"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="生效结束时间" prop="effectiveEnd">
-          <el-date-picker
-            v-model="form.effectiveEnd"
-            type="datetime"
-            value-format="yyyy-MM-dd HH:mm:ss"
-            placeholder="留空表示永久有效"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="备注" prop="remark">
-          <el-input v-model="form.remark" type="textarea" :rows="2" placeholder="请输入备注" />
-        </el-form-item>
-      </el-form>
+      <pro-form
+        ref="form"
+        :model="form"
+        :fields="formFields"
+        label-width="110px"
+      />
     </pro-dialog>
 
     <!-- 命中日志对话框 -->
@@ -249,12 +199,6 @@ export default {
         status: undefined
       },
       form: {},
-      rules: {
-        ruleName: [{ required: true, message: '规则名称不能为空', trigger: 'blur' }],
-        matchType: [{ required: true, message: '请选择匹配方式', trigger: 'change' }],
-        matchValue: [{ required: true, message: '匹配值不能为空', trigger: 'blur' }],
-        action: [{ required: true, message: '请选择处置动作', trigger: 'change' }]
-      },
       logOpen: false,
       logTitle: '命中日志',
       logLoading: false,
@@ -273,6 +217,41 @@ export default {
     /** 表单相对打开时是否有改动（供 ProDialog 关闭拦截） */
     formDirty() {
       return this.open && this.formSnapshot !== JSON.stringify(this.form)
+    },
+    /** V3 ProForm：新增/编辑表单 schema（matchValue 随匹配方式切换语义；priorityLevel 仅降权置底时出现） */
+    formFields() {
+      const isKeyword = this.form.matchType === 'KEYWORD'
+      return [
+        { prop: 'ruleName', label: '规则名称', type: 'input', required: true, message: '规则名称不能为空', attrs: { maxlength: 64 } },
+        {
+          prop: 'matchType', label: '匹配方式', type: 'radio', required: true,
+          options: [
+            { label: '号码匹配（主叫精确匹配）', value: 'PHONE' },
+            { label: '关键词匹配（文本包含）', value: 'KEYWORD' }
+          ]
+        },
+        {
+          prop: 'matchValue',
+          label: isKeyword ? '关键词' : '主叫号码',
+          type: 'input', required: true, message: '匹配值不能为空',
+          placeholder: isKeyword ? '请输入关键词' : '请输入主叫号码',
+          attrs: { maxlength: 64 }
+        },
+        {
+          prop: 'action', label: '处置动作', type: 'radio', required: true,
+          options: [
+            { label: '降权置底（沉到普通来电之后，仍可接听）', value: 'PRIORITY' },
+            { label: '直接挂断', value: 'REJECT' }
+          ]
+        },
+        { prop: 'priorityLevel', label: '置底优先级', type: 'number', max: -1, step: 10, tip: '负数，越小越靠后（普通来电默认 0）', visible: m => m.action === 'PRIORITY' },
+        { prop: 'triggerCount', label: '频次阈值', type: 'number', min: 0, tip: '0 = 每次命中即处置；>0 = 时间窗内累计命中达该次数才处置' },
+        { prop: 'windowSeconds', label: '统计窗口(秒)', type: 'number', min: 0, step: 60, tip: '0 = 不限时间窗（按历史累计）' },
+        { prop: 'status', label: '状态', type: 'switch', activeValue: '0', inactiveValue: '1', activeText: '启用', inactiveText: '停用' },
+        { prop: 'effectiveStart', label: '生效开始时间', type: 'datetime', placeholder: '留空表示立即生效' },
+        { prop: 'effectiveEnd', label: '生效结束时间', type: 'datetime', placeholder: '留空表示永久有效' },
+        { prop: 'remark', label: '备注', type: 'textarea', rows: 2 }
+      ]
     }
   },
   created() {
@@ -414,7 +393,3 @@ export default {
   }
 }
 </script>
-
-<style scoped>
-.form-tip { margin-left: 10px; color: #909399; font-size: 12px; }
-</style>

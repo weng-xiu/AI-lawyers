@@ -82,59 +82,55 @@
       @confirm="submitForm"
       @closed="reset"
     >
-      <el-form ref="form" :model="form" :rules="rules" label-width="110px">
-        <el-row>
-          <el-col :span="12">
-            <el-form-item label="通道名称" prop="configName">
-              <el-input v-model="form.configName" placeholder="请输入通道名称" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="供应商" prop="provider">
-              <el-select v-model="form.provider" placeholder="请选择供应商" style="width: 100%">
-                <el-option label="本地模拟（无凭证）" value="mock" />
-                <el-option label="阿里云短信" value="aliyun" />
-                <el-option label="腾讯云短信" value="tencent" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-form-item label="短信签名">
+      <!-- V3 ProForm 自由模式：无 schema，pro-form-item（el-col+el-form-item）手工栅格，双列 span=12 -->
+      <pro-form
+        ref="form"
+        :model="form"
+        :rules="rules"
+        label-width="110px"
+        size="medium"
+        :gutter="0"
+      >
+        <pro-form-item label="通道名称" prop="configName" :span="12">
+          <el-input v-model="form.configName" placeholder="请输入通道名称" />
+        </pro-form-item>
+        <pro-form-item label="供应商" prop="provider" :span="12">
+          <el-select v-model="form.provider" placeholder="请选择供应商" style="width: 100%">
+            <el-option label="本地模拟（无凭证）" value="mock" />
+            <el-option label="阿里云短信" value="aliyun" />
+            <el-option label="腾讯云短信" value="tencent" />
+          </el-select>
+        </pro-form-item>
+        <pro-form-item label="短信签名" prop="signName">
           <el-input v-model="form.signName" placeholder="如：AI法律咨询" />
-        </el-form-item>
+        </pro-form-item>
         <template v-if="form.provider !== 'mock'">
-          <el-form-item label="AccessKey ID">
+          <pro-form-item label="AccessKey ID" prop="accessKeyId">
             <el-input v-model="form.accessKeyId" placeholder="云厂商访问密钥ID" />
-          </el-form-item>
-          <el-form-item label="AccessKey Secret">
+          </pro-form-item>
+          <pro-form-item label="AccessKey Secret" prop="accessKeySecret">
             <el-input v-model="form.accessKeySecret" type="password" show-password placeholder="云厂商访问密钥Secret" />
-          </el-form-item>
-          <el-form-item v-if="form.provider === 'aliyun'" label="地域">
+          </pro-form-item>
+          <pro-form-item v-if="form.provider === 'aliyun'" label="地域" prop="regionId">
             <el-input v-model="form.regionId" placeholder="如 cn-hangzhou" />
-          </el-form-item>
-          <el-form-item v-if="form.provider === 'tencent'" label="SDK AppId">
+          </pro-form-item>
+          <pro-form-item v-if="form.provider === 'tencent'" label="SDK AppId" prop="sdkAppId">
             <el-input v-model="form.sdkAppId" placeholder="腾讯云短信应用AppId" />
-          </el-form-item>
+          </pro-form-item>
         </template>
-        <el-row>
-          <el-col :span="12">
-            <el-form-item label="日发送上限">
-              <el-input-number v-model="form.dailyLimit" :min="1" :max="1000" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="状态">
-              <el-radio-group v-model="form.status">
-                <el-radio label="1">启用</el-radio>
-                <el-radio label="0">停用</el-radio>
-              </el-radio-group>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-form-item label="备注">
+        <pro-form-item label="日发送上限" prop="dailyLimit" :span="12">
+          <el-input-number v-model="form.dailyLimit" :min="1" :max="1000" />
+        </pro-form-item>
+        <pro-form-item label="状态" prop="status" :span="12">
+          <el-radio-group v-model="form.status">
+            <el-radio label="1">启用</el-radio>
+            <el-radio label="0">停用</el-radio>
+          </el-radio-group>
+        </pro-form-item>
+        <pro-form-item label="备注" prop="remark">
           <el-input v-model="form.remark" type="textarea" :rows="2" placeholder="请输入备注" />
-        </el-form-item>
-      </el-form>
+        </pro-form-item>
+      </pro-form>
     </pro-dialog>
   </div>
 </template>
