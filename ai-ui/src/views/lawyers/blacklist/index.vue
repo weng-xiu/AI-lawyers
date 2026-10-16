@@ -90,8 +90,16 @@
       />
     </el-card>
 
-    <!-- 新增/编辑对话框 -->
-    <el-dialog :title="title" :visible.sync="open" width="560px" append-to-body>
+    <!-- 新增/编辑对话框（V3 ProDialog：统一外壳 + 提交 loading + 脏改动关闭拦截） -->
+    <pro-dialog
+      v-model="open"
+      :title="title"
+      width="560px"
+      :confirm-loading="submitting"
+      :dirty="formDirty"
+      @confirm="submitForm"
+      @closed="reset"
+    >
       <el-form ref="form" :model="form" :rules="rules" label-width="100px" size="small">
         <el-form-item label="电话号码" prop="phoneNumber">
           <el-input v-model="form.phoneNumber" placeholder="请输入电话号码" maxlength="20" />
@@ -128,11 +136,7 @@
           />
         </el-form-item>
       </el-form>
-      <div slot="footer" class="dialog-footer">
-        <el-button type="primary" size="small" @click="submitForm">确 定</el-button>
-        <el-button size="small" @click="cancel">取 消</el-button>
-      </div>
-    </el-dialog>
+    </pro-dialog>
 
     <!-- 号码检查对话框 -->
     <el-dialog title="号码检查" :visible.sync="checkOpen" width="460px" append-to-body>
@@ -175,6 +179,9 @@ export default {
       blacklistList: [],
       open: false,
       title: '',
+      // V3 ProDialog：提交防重锁 + 脏改动快照
+      submitting: false,
+      formSnapshot: '',
       checkOpen: false,
       checkPhone: '',
       checkResult: null,
@@ -205,6 +212,10 @@ export default {
       if (!this.checkResult) return 'info'
       if (!this.checkResult.listed) return 'success'
       return String(this.checkResult.listType) === '1' ? 'error' : 'warning'
+    },
+    /** 表单相对打开时是否有改动（供 ProDialog 关闭拦截） */
+    formDirty() {
+      return this.open && this.formSnapshot !== JSON.stringify(this.form)
     }
   },
   created() {
@@ -252,6 +263,7 @@ export default {
         effectiveStart: undefined,
         effectiveEnd: undefined
       }
+      this.formSnapshot = JSON.stringify(this.form)
       this.$nextTick(() => { this.$refs.form && this.$refs.form.clearValidate() })
     },
     handleAdd() {
@@ -263,24 +275,24 @@ export default {
       this.reset()
       getBlacklist(row.id).then(res => {
         this.form = res.data || {}
+        this.formSnapshot = JSON.stringify(this.form)
         this.open = true
         this.title = '编辑名单'
       })
     },
     submitForm() {
       this.$refs.form.validate(valid => {
-        if (!valid) return
+        if (!valid || this.submitting) return
+        this.submitting = true
         const api = this.form.id != null ? updateBlacklist : addBlacklist
         api(this.form).then(() => {
           this.$modal.msgSuccess('保存成功')
           this.open = false
           this.getList()
+        }).finally(() => {
+          this.submitting = false
         })
       })
-    },
-    cancel() {
-      this.open = false
-      this.reset()
     },
     handleStatusChange(row) {
       const oldStatus = row.status === '1' ? '0' : '1'

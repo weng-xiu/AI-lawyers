@@ -106,8 +106,16 @@
       />
     </el-card>
 
-    <!-- 新增/编辑对话框 -->
-    <el-dialog :title="title" :visible.sync="open" width="600px" append-to-body>
+    <!-- 新增/编辑对话框（V3 ProDialog） -->
+    <pro-dialog
+      v-model="open"
+      :title="title"
+      width="600px"
+      :confirm-loading="submitting"
+      :dirty="formDirty"
+      @confirm="submitForm"
+      @closed="reset"
+    >
       <el-form ref="form" :model="form" :rules="rules" label-width="110px" size="small">
         <el-form-item label="规则名称" prop="ruleName">
           <el-input v-model="form.ruleName" placeholder="请输入规则名称" maxlength="64" />
@@ -164,11 +172,7 @@
           <el-input v-model="form.remark" type="textarea" :rows="2" placeholder="请输入备注" />
         </el-form-item>
       </el-form>
-      <div slot="footer" class="dialog-footer">
-        <el-button type="primary" size="small" @click="submitForm">确 定</el-button>
-        <el-button size="small" @click="cancel">取 消</el-button>
-      </div>
-    </el-dialog>
+    </pro-dialog>
 
     <!-- 命中日志对话框 -->
     <el-dialog :title="logTitle" :visible.sync="logOpen" width="900px" append-to-body>
@@ -233,6 +237,9 @@ export default {
       ruleList: [],
       open: false,
       title: '',
+      // V3 ProDialog：提交防重锁 + 脏改动快照
+      submitting: false,
+      formSnapshot: '',
       queryParams: {
         pageNum: 1,
         pageSize: 10,
@@ -260,6 +267,12 @@ export default {
         callerNumber: undefined,
         direction: undefined
       }
+    }
+  },
+  computed: {
+    /** 表单相对打开时是否有改动（供 ProDialog 关闭拦截） */
+    formDirty() {
+      return this.open && this.formSnapshot !== JSON.stringify(this.form)
     }
   },
   created() {
@@ -308,6 +321,7 @@ export default {
         effectiveEnd: undefined,
         remark: undefined
       }
+      this.formSnapshot = JSON.stringify(this.form)
       this.$nextTick(() => { this.$refs.form && this.$refs.form.clearValidate() })
     },
     handleAdd() {
@@ -319,24 +333,24 @@ export default {
       this.reset()
       getHotspot(row.suppressId).then(res => {
         this.form = res.data || {}
+        this.formSnapshot = JSON.stringify(this.form)
         this.open = true
         this.title = '编辑高频置底规则'
       })
     },
     submitForm() {
       this.$refs.form.validate(valid => {
-        if (!valid) return
+        if (!valid || this.submitting) return
+        this.submitting = true
         const api = this.form.suppressId != null ? updateHotspot : addHotspot
         api(this.form).then(() => {
           this.$modal.msgSuccess('保存成功')
           this.open = false
           this.getList()
+        }).finally(() => {
+          this.submitting = false
         })
       })
-    },
-    cancel() {
-      this.open = false
-      this.reset()
     },
     handleStatusChange(row) {
       const oldStatus = row.status === '0' ? '1' : '0'

@@ -71,8 +71,17 @@
     <pagination v-show="total > 0" :total="total" :page.sync="queryParams.pageNum" :limit.sync="queryParams.pageSize"
       @pagination="getList" />
 
-    <!-- 新增/修改对话框 -->
-    <el-dialog :title="title" :visible.sync="open" width="620px" append-to-body>
+    <!-- 新增/编辑对话框（V3 ProDialog） -->
+    <pro-dialog
+      v-model="open"
+      :title="title"
+      width="620px"
+      footer-size="medium"
+      :confirm-loading="submitting"
+      :dirty="formDirty"
+      @confirm="submitForm"
+      @closed="reset"
+    >
       <el-form ref="form" :model="form" :rules="rules" label-width="110px">
         <el-row>
           <el-col :span="12">
@@ -126,11 +135,7 @@
           <el-input v-model="form.remark" type="textarea" :rows="2" placeholder="请输入备注" />
         </el-form-item>
       </el-form>
-      <div slot="footer" class="dialog-footer">
-        <el-button type="primary" @click="submitForm">确 定</el-button>
-        <el-button @click="cancel">取 消</el-button>
-      </div>
-    </el-dialog>
+    </pro-dialog>
   </div>
 </template>
 
@@ -150,6 +155,9 @@ export default {
       configList: [],
       title: "",
       open: false,
+      // V3 ProDialog：提交防重锁 + 脏改动快照
+      submitting: false,
+      formSnapshot: "",
       queryParams: {
         pageNum: 1,
         pageSize: 10,
@@ -163,6 +171,12 @@ export default {
         provider: [{ required: true, message: "请选择供应商", trigger: "change" }]
       }
     };
+  },
+  computed: {
+    /** 表单相对打开时是否有改动（供 ProDialog 关闭拦截） */
+    formDirty() {
+      return this.open && this.formSnapshot !== JSON.stringify(this.form);
+    }
   },
   created() {
     this.getList();
@@ -182,15 +196,12 @@ export default {
     providerTag(p) {
       return { mock: "info", aliyun: "warning", tencent: "success" }[p] || "";
     },
-    cancel() {
-      this.open = false;
-      this.reset();
-    },
     reset() {
       this.form = {
         configId: null, configName: null, provider: "mock", accessKeyId: null, accessKeySecret: null,
         signName: null, regionId: null, sdkAppId: null, dailyLimit: 10, status: "1", remark: null
       };
+      this.formSnapshot = JSON.stringify(this.form);
       this.$nextTick(() => { this.$refs["form"] && this.$refs["form"].clearValidate(); });
     },
     handleQuery() {
@@ -216,26 +227,24 @@ export default {
       const configId = row.configId || this.ids[0];
       getSmsConfig(configId).then(response => {
         this.form = response.data;
+        this.formSnapshot = JSON.stringify(this.form);
         this.open = true;
         this.title = "修改短信通道";
       });
     },
     submitForm() {
       this.$refs["form"].validate(valid => {
-        if (!valid) return;
-        if (this.form.configId != null) {
-          updateSmsConfig(this.form).then(() => {
-            this.$modal.msgSuccess("修改成功");
-            this.open = false;
-            this.getList();
-          });
-        } else {
-          addSmsConfig(this.form).then(() => {
-            this.$modal.msgSuccess("新增成功");
-            this.open = false;
-            this.getList();
-          });
-        }
+        if (!valid || this.submitting) return;
+        this.submitting = true;
+        const isEdit = this.form.configId != null;
+        const request = isEdit ? updateSmsConfig(this.form) : addSmsConfig(this.form);
+        request.then(() => {
+          this.$modal.msgSuccess(isEdit ? "修改成功" : "新增成功");
+          this.open = false;
+          this.getList();
+        }).finally(() => {
+          this.submitting = false;
+        });
       });
     },
     handleDelete(row) {
