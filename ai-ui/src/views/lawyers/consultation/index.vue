@@ -794,7 +794,12 @@ export default {
     /** 删除按钮操作 */
     handleDelete(row) {
       const consultationIds = row.consultationId || this.ids
-      this.$modal.confirm('是否确认删除法律咨询记录编号为"' + consultationIds + '"的数据项？').then(function() {
+      const count = row.consultationId ? 1 : (this.ids || []).length
+      this.$modal.dangerConfirm({
+        content: '将删除选中的法律咨询记录',
+        count: count,
+        countNoun: '条记录'
+      }).then(function() {
         return delConsultation(consultationIds)
       }).then(() => {
         this.getList()

@@ -650,7 +650,13 @@ export default {
     /** 删除按钮操作 */
     handleDelete(row) {
       const knowledgeIds = row.knowledgeId || this.ids
-      this.$modal.confirm('是否确认删除法律知识库编号为"' + knowledgeIds + '"的数据项？').then(function() {
+      const count = row.knowledgeId ? 1 : (this.ids || []).length
+      this.$modal.dangerConfirm({
+        content: '将删除选中的法律知识条目',
+        count: count,
+        countNoun: '条知识',
+        tip: '删除后向量索引同步失效，需重建索引才能完全回收检索空间'
+      }).then(function() {
         return delKnowledge(knowledgeIds)
       }).then(() => {
         this.getList()

@@ -374,7 +374,12 @@ export default {
     /** 删除按钮操作 */
     handleDelete(row) {
       const promptIds = row.promptId || this.ids;
-      this.$modal.confirm('是否确认删除系统提示词配置编号为"' + promptIds + '"的数据项？').then(function() {
+      const count = row.promptId ? 1 : (this.ids || []).length;
+      this.$modal.dangerConfirm({
+        content: '将删除选中的系统提示词配置',
+        count: count,
+        countNoun: '条配置'
+      }).then(function() {
         return delSystemPrompt(promptIds);
       }).then(() => {
         this.getList();

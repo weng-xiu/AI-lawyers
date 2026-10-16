@@ -237,7 +237,12 @@ export default {
     handleSelectionChange(sel) { this.ids = sel.map(i => i.orgId); this.multiple = !sel.length },
     handleDelete(row) {
       const ids = row.orgId ? [row.orgId] : this.ids
-      this.$modal.confirm('确认删除选中的 ' + ids.length + ' 家机构吗？删除后历史转办流水仍保留。').then(() => delExternalOrg(ids)).then(() => {
+      this.$modal.dangerConfirm({
+        content: '将删除选中的外部协作机构',
+        count: ids.length,
+        countNoun: '家机构',
+        tip: '删除后历史转办流水仍保留'
+      }).then(() => delExternalOrg(ids)).then(() => {
         this.$modal.msgSuccess('删除成功')
         this.getList()
       }).catch(() => {})

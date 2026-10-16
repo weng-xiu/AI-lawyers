@@ -302,7 +302,12 @@ export default {
     /** 删除按钮操作 */
     handleDelete(row) {
       const todoIds = row.todoId || this.ids
-      this.$modal.confirm('是否确认删除待办编号为"' + todoIds + '"的数据项？').then(function() {
+      const count = row.todoId ? 1 : (this.ids || []).length
+      this.$modal.dangerConfirm({
+        content: '将删除选中的待办事项',
+        count: count,
+        countNoun: '条待办'
+      }).then(function() {
         return delTodo(todoIds)
       }).then(() => {
         this.getList()

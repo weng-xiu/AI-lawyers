@@ -495,7 +495,13 @@ export default {
     /** 删除按钮操作 */
     handleDelete(row) {
       const jobIds = row.jobId || this.ids
-      this.$modal.confirm('是否确认删除定时任务编号为"' + jobIds + '"的数据项？').then(function() {
+      const count = row.jobId ? 1 : (this.ids || []).length
+      this.$modal.dangerConfirm({
+        content: '将删除选中的定时调度任务',
+        count: count,
+        countNoun: '个任务',
+        tip: '删除后该任务不再按 cron 调度执行，请确认无业务依赖'
+      }).then(function() {
         return delJob(jobIds)
       }).then(() => {
         this.getList()

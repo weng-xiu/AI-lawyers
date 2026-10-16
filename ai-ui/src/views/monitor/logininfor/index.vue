@@ -209,7 +209,12 @@ export default {
     /** 删除按钮操作 */
     handleDelete(row) {
       const infoIds = row.infoId || this.ids
-      this.$modal.confirm('是否确认删除访问编号为"' + infoIds + '"的数据项？').then(function() {
+      const count = row.infoId ? 1 : (this.ids || []).length
+      this.$modal.dangerConfirm({
+        content: '将删除选中的登录访问日志',
+        count: count,
+        countNoun: '条日志'
+      }).then(function() {
         return delLogininfor(infoIds)
       }).then(() => {
         this.getList()
@@ -218,7 +223,11 @@ export default {
     },
     /** 清空按钮操作 */
     handleClean() {
-      this.$modal.confirm('是否确认清空所有登录日志数据项？').then(function() {
+      this.$modal.dangerConfirm({
+        actionType: 'clear',
+        content: '将清空全部登录日志（含历史登录痕迹与异常排查依据）',
+        tip: '建议先导出留存，清空后不可恢复'
+      }).then(function() {
         return cleanLogininfor()
       }).then(() => {
         this.getList()

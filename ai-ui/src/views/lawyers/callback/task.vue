@@ -327,7 +327,11 @@ export default {
     },
     handleDelete(row) {
       const ids = row.taskId ? [row.taskId] : this.ids
-      this.$confirm('是否确认删除选中的回访任务？', '删除确认', { type: 'warning' }).then(() => {
+      this.$modal.dangerConfirm({
+        content: '将删除选中的回访任务',
+        count: ids.length,
+        countNoun: '个任务'
+      }).then(() => {
         return delReturnVisitTask(ids)
       }).then(() => {
         this.$message.success('删除成功')

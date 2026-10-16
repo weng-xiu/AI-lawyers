@@ -790,7 +790,12 @@ export default {
     /** 删除按钮操作 */
     handleDelete(row) {
       const warningIds = row.warningId || this.ids
-      this.$modal.confirm('是否确认删除风险预警记录编号为"' + warningIds + '"的数据项？').then(function() {
+      const count = row.warningId ? 1 : (this.ids || []).length
+      this.$modal.dangerConfirm({
+        content: '将删除选中的风险预警记录',
+        count: count,
+        countNoun: '条预警记录'
+      }).then(function() {
         return delRiskWarning(warningIds)
       }).then(() => {
         this.getWarningList()
@@ -916,7 +921,13 @@ export default {
     /** 删除按钮操作 */
     handleRuleDelete(row) {
       const ruleIds = row.ruleId || this.ruleIds
-      this.$modal.confirm('是否确认删除预警规则编号为"' + ruleIds + '"的数据项？').then(function() {
+      const count = row.ruleId ? 1 : (this.ruleIds || []).length
+      this.$modal.dangerConfirm({
+        content: '将删除选中的风险预警规则',
+        count: count,
+        countNoun: '条规则',
+        tip: '规则删除后不再产生新的预警，历史预警记录保留'
+      }).then(function() {
         return delRiskWarningRule(ruleIds)
       }).then(() => {
         this.getRuleList()

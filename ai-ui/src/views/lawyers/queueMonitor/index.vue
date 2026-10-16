@@ -152,7 +152,11 @@ export default {
       }).catch(() => {})
     },
     handleRemove(row) {
-      this.$modal.confirm('确认删除该死信记录？删除后不可恢复。').then(() => {
+      this.$modal.dangerConfirm({
+        content: '将删除队列「' + this.currentQueue + '」中的死信消息',
+        count: 1,
+        countNoun: '条消息'
+      }).then(() => {
         return removeDeadLetter(this.currentQueue, row.id)
       }).then(() => {
         this.$modal.msgSuccess('删除成功')

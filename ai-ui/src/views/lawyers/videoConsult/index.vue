@@ -206,7 +206,12 @@ export default {
     },
     handleDelete(row) {
       const consultIds = row.consultId || this.ids
-      this.$modal.confirm('确认删除编号为"' + consultIds + '"的视频咨询记录？').then(() => {
+      const count = row.consultId ? 1 : (this.ids || []).length
+      this.$modal.dangerConfirm({
+        content: '将删除选中的视频咨询记录',
+        count: count,
+        countNoun: '条记录'
+      }).then(() => {
         return delVideoConsult(consultIds)
       }).then(() => { this.getList(); this.$modal.msgSuccess("删除成功") }).catch(() => {})
     },

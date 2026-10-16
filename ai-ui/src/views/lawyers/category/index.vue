@@ -474,7 +474,12 @@ export default {
     },
     /** 删除按钮操作 */
     handleDelete(row) {
-      this.$modal.confirm('是否确认删除名称为"' + row.categoryName + '"的数据项？').then(function() {
+      this.$modal.dangerConfirm({
+        content: '将删除咨询分类「' + row.categoryName + '」',
+        count: 1,
+        countNoun: '个分类',
+        tip: '删除前请确认该分类下已无咨询/知识挂载'
+      }).then(function() {
         return delConsultationCategory(row.categoryId)
       }).then(() => {
         this.getList()

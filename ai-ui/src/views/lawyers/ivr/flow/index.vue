@@ -309,7 +309,12 @@ export default {
       })
     },
     handlePublish(row) {
-      this.$modal.confirm('是否确认发布流程"' + row.flowName + '"？').then(function() {
+      this.$modal.dangerConfirm({
+        actionType: 'publish',
+        content: '将发布 IVR 流程「' + row.flowName + '」，发布后来电路由按新流程执行',
+        count: 1,
+        countNoun: '个流程'
+      }).then(function() {
         return publishFlow(row.flowId)
       }).then(() => {
         this.getList()
@@ -336,7 +341,12 @@ export default {
       })
     },
     handleDelete(row) {
-      this.$modal.confirm('是否确认删除流程"' + row.flowName + '"？').then(function() {
+      this.$modal.dangerConfirm({
+        content: '将删除 IVR 流程「' + row.flowName + '」及其节点连线配置',
+        count: 1,
+        countNoun: '个流程',
+        tip: '若该流程仍被来电路由引用，删除后相关呼叫将走默认兜底流程'
+      }).then(function() {
         return delFlow(row.flowId)
       }).then(() => {
         this.getList()

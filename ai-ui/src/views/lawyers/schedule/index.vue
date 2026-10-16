@@ -358,13 +358,31 @@ export default {
       })
     },
     handleShiftStatusChange(row) {
+      const oldStatus = row.status === '1' ? '0' : '1'
+      const text = row.status === '1' ? '启用' : '停用'
       updateShift({ shiftId: row.shiftId, status: row.status }).then(() => {
-        this.$modal.msgSuccess('状态已更新')
+        // U2：班次启停 30 秒内可撤销；失败回退开关
+        this.$modal.undo({
+          message: '班次已' + text,
+          undoSuccessText: '已撤销，班次已' + (oldStatus === '1' ? '启用' : '停用'),
+          onUndo: () => updateShift({ shiftId: row.shiftId, status: oldStatus }).then(() => {
+            row.status = oldStatus
+            this.loadEnabledShifts()
+          })
+        })
         this.loadEnabledShifts()
+      }).catch(() => {
+        row.status = oldStatus
+        this.$modal.msgError('状态更新失败，已恢复原状态')
       })
     },
     handleDeleteShift(row) {
-      this.$modal.confirm('确认删除班次「' + row.shiftName + '」吗？').then(() => {
+      this.$modal.dangerConfirm({
+        content: '将删除班次「' + row.shiftName + '」',
+        count: 1,
+        countNoun: '个班次',
+        tip: '已使用该班次的历史排班记录不受影响'
+      }).then(() => {
         return delShift(row.shiftId)
       }).then(() => {
         this.$modal.msgSuccess('删除成功')
@@ -458,7 +476,11 @@ export default {
       })
     },
     handleDeleteSchedule(row) {
-      this.$modal.confirm('确认删除该条排班记录吗？').then(() => {
+      this.$modal.dangerConfirm({
+        content: '将删除该条排班记录（坐席当日班次安排）',
+        count: 1,
+        countNoun: '条排班'
+      }).then(() => {
         return delSchedule(row.scheduleId)
       }).then(() => {
         this.$modal.msgSuccess('删除成功')

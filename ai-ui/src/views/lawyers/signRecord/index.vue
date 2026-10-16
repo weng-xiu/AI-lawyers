@@ -307,7 +307,12 @@ export default {
     },
     handleDelete(row) {
       const signIds = row.signId || this.ids;
-      this.$modal.confirm('是否确认删除签署记录编号为"' + signIds + '"的数据项？').then(function() {
+      const count = row.signId ? 1 : (this.ids || []).length;
+      this.$modal.dangerConfirm({
+        content: '将删除选中的电子材料签署记录',
+        count: count,
+        countNoun: '条记录'
+      }).then(function() {
         return delSignRecord(signIds);
       }).then(() => {
         this.getList();

@@ -339,12 +339,29 @@ export default {
       this.reset()
     },
     handleStatusChange(row) {
+      const oldStatus = row.status === '0' ? '1' : '0'
+      const text = row.status === '0' ? '启用' : '停用'
       updateHotspot(row).then(() => {
-        this.$modal.msgSuccess('状态已更新')
+        // U2：置底规则启停 30 秒内可撤销；失败回退开关
+        this.$modal.undo({
+          message: '置底规则已' + text,
+          undoSuccessText: '已撤销，规则已' + (oldStatus === '0' ? '启用' : '停用'),
+          onUndo: () => updateHotspot({ ...row, status: oldStatus }).then(() => {
+            row.status = oldStatus
+          })
+        })
+      }).catch(() => {
+        row.status = oldStatus
+        this.$modal.msgError('状态更新失败，已恢复原状态')
       })
     },
     handleDelete(row) {
-      this.$modal.confirm('确认删除规则「' + row.ruleName + '」吗？历史命中日志将保留。').then(() => {
+      this.$modal.dangerConfirm({
+        content: '将删除高频置底规则「' + row.ruleName + '」',
+        count: 1,
+        countNoun: '条规则',
+        tip: '删除后该号码/区域不再被置底，历史命中日志保留'
+      }).then(() => {
         return delHotspot(row.suppressId)
       }).then(() => {
         this.$modal.msgSuccess('删除成功')

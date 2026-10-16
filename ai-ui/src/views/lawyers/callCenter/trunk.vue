@@ -315,8 +315,20 @@ export default {
       this.$nextTick(() => { if (this.$refs.form) this.$refs.form.clearValidate() })
     },
     handleStatusChange(row) {
+      const oldStatus = row.status === '0' ? '1' : '0'
+      const text = row.status === '0' ? '启用' : '停用'
       changeTrunkStatus({ trunkId: row.trunkId, status: row.status }).then(() => {
-        this.$modal.msgSuccess('状态已更新')
+        // U2：30 秒内可撤销；失败立即回退开关，避免界面与库状态不一致
+        this.$modal.undo({
+          message: '线路已' + text,
+          undoSuccessText: '已撤销，线路已' + (oldStatus === '0' ? '启用' : '停用'),
+          onUndo: () => changeTrunkStatus({ trunkId: row.trunkId, status: oldStatus }).then(() => {
+            row.status = oldStatus
+          })
+        })
+      }).catch(() => {
+        row.status = oldStatus
+        this.$modal.msgError('状态更新失败，已恢复原状态')
       })
     },
     handleTest(row) {
@@ -344,7 +356,12 @@ export default {
       })
     },
     handleDelete(row) {
-      this.$modal.confirm('确认删除线路「' + row.trunkName + '」？').then(() => {
+      this.$modal.dangerConfirm({
+        content: '将删除中继线路「' + row.trunkName + '」',
+        count: 1,
+        countNoun: '条线路',
+        tip: '删除后该线路将无法继续接入/拨出呼叫，请确认已无在用话务'
+      }).then(() => {
         return delTrunk(row.trunkId)
       }).then(() => {
         this.$modal.msgSuccess('删除成功')

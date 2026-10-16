@@ -329,7 +329,15 @@ export default {
       }).catch(() => {})
     },
     handleExecute(row) {
-      this.$modal.confirm('是否立即执行任务"' + row.taskName + '"（将拨出一批号码并生成话单/结果）？').then(function() {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        title: '立即执行确认',
+        confirmText: '确认立即执行',
+        content: '将立即执行外呼任务「' + row.taskName + '」，拨出一批号码并生成话单/结果',
+        count: 1,
+        countNoun: '个任务',
+        tip: '外呼将真实接通公众电话，请确认任务名单与线路状态'
+      }).then(function() {
         return executeTask(row.taskId)
       }).then(() => {
         this.getList()
@@ -380,7 +388,11 @@ export default {
       })
     },
     handleDelete(row) {
-      this.$modal.confirm('是否确认删除任务"' + row.taskName + '"？').then(function() {
+      this.$modal.dangerConfirm({
+        content: '将删除外呼任务「' + row.taskName + '」及其执行结果',
+        count: 1,
+        countNoun: '个任务'
+      }).then(function() {
         return delTask(row.taskId)
       }).then(() => {
         this.getList()

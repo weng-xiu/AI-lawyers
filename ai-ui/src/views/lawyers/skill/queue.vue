@@ -177,7 +177,15 @@ export default {
       })
     },
     handleKick(row) {
-      this.$modal.confirm('确认踢除该排队通话吗？').then(() => {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        title: '踢除排队确认',
+        confirmText: '确认踢除',
+        content: '将踢除当前排队中的一通来电，该来电会被引导至溢出/结束流程',
+        count: 1,
+        countNoun: '通来电',
+        tip: '踢除会影响公众来电话务体验，请确认该通话确需清理'
+      }).then(() => {
         return kickQueue(row.queueId, '管理员踢除')
       }).then(() => {
         this.$modal.msgSuccess('已踢除')

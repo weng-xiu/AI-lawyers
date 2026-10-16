@@ -664,7 +664,12 @@ export default {
     },
     handleDelete(row) {
       const recordIds = row.recordId || this.ids
-      this.$modal.confirm('是否确认删除来电记录编号为"' + recordIds + '"的数据项？').then(function() {
+      const count = row.recordId ? 1 : (this.ids || []).length
+      this.$modal.dangerConfirm({
+        content: '将删除选中的来电记录',
+        count: count,
+        countNoun: '条来电记录'
+      }).then(function() {
         return delRecord(recordIds)
       }).then(() => {
         this.getList()

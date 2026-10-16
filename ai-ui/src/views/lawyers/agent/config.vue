@@ -286,7 +286,11 @@ export default {
     },
     handleDelete(row) {
       const agentIds = row.agentId ? [row.agentId] : this.ids;
-      this.$modal.confirm('是否确认删除选中的智能体？').then(() => {
+      this.$modal.dangerConfirm({
+        content: '将删除选中的智能体配置',
+        count: agentIds.length,
+        countNoun: '个智能体'
+      }).then(() => {
         return delAgentConfig(agentIds);
       }).then(() => {
         this.getList();
@@ -301,7 +305,15 @@ export default {
       this.$modal.confirm(`确认${text}"${row.agentName}"吗？`).then(() => {
         return updateAgentConfig({ agentId: row.agentId, status: row.status });
       }).then(() => {
-        this.$modal.msgSuccess(text + "成功");
+        // U2：智能体启停 30 秒内可撤销
+        const oldStatus = row.status === "1" ? "0" : "1";
+        this.$modal.undo({
+          message: '智能体已' + text,
+          undoSuccessText: '已撤销，智能体已' + (oldStatus === "1" ? "启用" : "停用"),
+          onUndo: () => updateAgentConfig({ agentId: row.agentId, status: oldStatus }).then(() => {
+            row.status = oldStatus;
+          })
+        });
       }).catch(() => {
         row.status = row.status === "1" ? "0" : "1";
       });

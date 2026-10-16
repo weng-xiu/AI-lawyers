@@ -340,7 +340,11 @@ export default {
       })
     },
     handleDelete(row) {
-      this.$modal.confirm('是否确认删除号码"' + row.phoneNumber + '"？').then(function() {
+      this.$modal.dangerConfirm({
+        content: '将删除外呼号码「' + row.phoneNumber + '」',
+        count: 1,
+        countNoun: '个号码'
+      }).then(function() {
         return delCallee(row.calleeId)
       }).then(() => {
         this.getList()
@@ -352,7 +356,11 @@ export default {
         this.$modal.msgError("请先选择任务")
         return
       }
-      this.$modal.confirm('是否确认清空该任务的所有号码？').then(function() {
+      this.$modal.dangerConfirm({
+        actionType: 'clear',
+        content: '将清空当前任务下导入的全部外呼号码',
+        tip: '清空后号码名单不可恢复，请确认已导出留存'
+      }).then(function() {
         return delCalleeByTaskId(this.taskId)
       }.bind(this)).then(() => {
         this.getList()

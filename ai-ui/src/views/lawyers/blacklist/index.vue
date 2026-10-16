@@ -283,13 +283,30 @@ export default {
       this.reset()
     },
     handleStatusChange(row) {
+      const oldStatus = row.status === '1' ? '0' : '1'
+      const text = row.status === '1' ? '启用' : '停用'
       const data = { id: row.id, status: row.status }
       updateBlacklist(data).then(() => {
-        this.$modal.msgSuccess('状态已更新')
+        // U2：名单启停 30 秒内可撤销；失败回退开关
+        this.$modal.undo({
+          message: '黑名单已' + text,
+          undoSuccessText: '已撤销，黑名单已' + (oldStatus === '1' ? '启用' : '停用'),
+          onUndo: () => updateBlacklist({ id: row.id, status: oldStatus }).then(() => {
+            row.status = oldStatus
+          })
+        })
+      }).catch(() => {
+        row.status = oldStatus
+        this.$modal.msgError('状态更新失败，已恢复原状态')
       })
     },
     handleDelete(row) {
-      this.$modal.confirm('确认删除该名单记录吗？').then(() => {
+      this.$modal.dangerConfirm({
+        content: '将删除号码「' + row.phone + '」的黑名单记录',
+        count: 1,
+        countNoun: '条名单',
+        tip: '删除后来电拦截策略不再对该号码生效'
+      }).then(() => {
         return delBlacklist(row.id)
       }).then(() => {
         this.$modal.msgSuccess('删除成功')

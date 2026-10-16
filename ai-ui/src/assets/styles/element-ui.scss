@@ -90,3 +90,72 @@
   .el-submenu__icon-arrow {
   display: none;
 }
+
+// ==================== U2 危险操作统一确认 / 可撤销提示 ====================
+// 危险确认弹窗（MessageBox customClass=danger-confirm-box）
+.danger-confirm-box {
+  .el-message-box__content {
+    padding-top: 12px;
+  }
+
+  .danger-confirm-content {
+    font-size: 14px;
+    color: #303133;
+    line-height: 1.6;
+  }
+
+  .danger-confirm-count {
+    margin-top: 6px;
+    font-size: 13px;
+    color: #f56c6c;
+
+    b {
+      font-size: 15px;
+      font-weight: 600;
+      margin: 0 2px;
+    }
+  }
+
+  .danger-confirm-tip {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #909399;
+    line-height: 1.5;
+  }
+
+  // 发布/高关注类操作的影响条数用警示橙
+  &.is-caution .danger-confirm-count {
+    color: #e6a23c;
+  }
+}
+
+// 30 秒可撤销轻提示（Message customClass=el-message-undo）
+.el-message-undo {
+  .el-message__content {
+    display: flex;
+    align-items: center;
+  }
+
+  .el-message-undo__btn {
+    margin-left: 10px;
+    padding: 0 10px;
+    height: 22px;
+    line-height: 20px;
+    border: 1px solid #67c23a;
+    border-radius: 11px;
+    background: #fff;
+    color: #67c23a;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      background: #67c23a;
+      color: #fff;
+    }
+
+    &:active {
+      opacity: 0.8;
+    }
+  }
+}

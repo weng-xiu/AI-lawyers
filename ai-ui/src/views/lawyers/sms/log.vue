@@ -193,7 +193,11 @@ export default {
     },
     handleDelete(row) {
       const logIds = row.logId ? [row.logId] : this.ids;
-      this.$modal.confirm('是否确认删除选中的短信记录？').then(() => {
+      this.$modal.dangerConfirm({
+        content: '将删除选中的短信发送记录',
+        count: logIds.length,
+        countNoun: '条记录'
+      }).then(() => {
         return delSmsLog(logIds);
       }).then(() => {
         this.getList();

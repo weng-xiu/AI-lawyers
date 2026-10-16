@@ -451,7 +451,13 @@ export default {
     /** 删除按钮操作 */
     handleDelete(row) {
       const paidIds = row.paidId || this.ids
-      this.$modal.confirm('是否确认删除有偿法律服务编号为"' + paidIds + '"的数据项？').then(function() {
+      const count = row.paidId ? 1 : (this.ids || []).length
+      this.$modal.dangerConfirm({
+        content: '将删除选中的有偿法律服务记录',
+        count: count,
+        countNoun: '条记录',
+        tip: '删除可能影响服务订单与计费留痕，请确认'
+      }).then(function() {
         return delPaidService(paidIds)
       }).then(() => {
         this.getList()

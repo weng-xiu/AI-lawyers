@@ -282,7 +282,12 @@ export default {
     },
     handleDelete() {
       if (!this.current) return
-      this.$modal.confirm('确认删除技能组「' + this.current.groupName + '」吗？其成员关系将一并删除。').then(() => {
+      this.$modal.dangerConfirm({
+        content: '将删除技能组「' + this.current.groupName + '」，其成员关系将一并删除',
+        count: 1,
+        countNoun: '个技能组',
+        tip: '删除后来电将不再按该技能组分配坐席'
+      }).then(() => {
         return delSkillGroup(this.current.groupId)
       }).then(() => {
         this.$modal.msgSuccess('删除成功')
@@ -309,7 +314,11 @@ export default {
     },
     handleRemoveMembers() {
       const ids = this.selectedMembers.map(m => m.agentId)
-      this.$modal.confirm('确认移除选中的 ' + ids.length + ' 名成员吗？').then(() => {
+      this.$modal.dangerConfirm({
+        content: '将从当前技能组移除选中的坐席成员',
+        count: ids.length,
+        countNoun: '名成员'
+      }).then(() => {
         return removeMembers(this.current.groupId, ids)
       }).then(() => {
         this.$modal.msgSuccess('移除成功')

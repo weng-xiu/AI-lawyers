@@ -295,7 +295,12 @@ export default {
     /** 删除按钮操作 */
     handleDelete(row) {
       const operIds = row.operId || this.ids
-      this.$modal.confirm('是否确认删除日志编号为"' + operIds + '"的数据项？').then(function() {
+      const count = row.operId ? 1 : (this.ids || []).length
+      this.$modal.dangerConfirm({
+        content: '将删除选中的操作日志',
+        count: count,
+        countNoun: '条日志'
+      }).then(function() {
         return delOperlog(operIds)
       }).then(() => {
         this.getList()
@@ -304,7 +309,11 @@ export default {
     },
     /** 清空按钮操作 */
     handleClean() {
-      this.$modal.confirm('是否确认清空所有操作日志数据项？').then(function() {
+      this.$modal.dangerConfirm({
+        actionType: 'clear',
+        content: '将清空全部操作日志（含敏感操作审计与故障定责依据）',
+        tip: '建议先导出留存，清空后不可恢复'
+      }).then(function() {
         return cleanOperlog()
       }).then(() => {
         this.getList()

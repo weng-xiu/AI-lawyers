@@ -408,7 +408,12 @@ export default {
     },
     handleDelete(row) {
       const ticketIds = row.ticketId || this.ids
-      this.$modal.confirm('是否确认删除工单编号为"' + ticketIds + '"的数据项？').then(function() {
+      const count = row.ticketId ? 1 : (this.ids || []).length
+      this.$modal.dangerConfirm({
+        content: '将删除选中的工单',
+        count: count,
+        countNoun: '条工单'
+      }).then(function() {
         return delTicket(ticketIds)
       }).then(() => {
         this.getList()

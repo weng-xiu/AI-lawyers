@@ -187,7 +187,12 @@ export default {
     },
     handleDelete(row) {
       const messageIds = row.messageId || this.ids;
-      this.$modal.confirm('是否确认删除选中的站内消息？').then(function() {
+      const count = row.messageId ? 1 : (this.ids || []).length;
+      this.$modal.dangerConfirm({
+        content: '将删除选中的站内消息',
+        count: count,
+        countNoun: '条消息'
+      }).then(function() {
         return delMessage(messageIds);
       }).then(() => {
         this.getList();

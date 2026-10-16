@@ -175,7 +175,15 @@ export default {
       })
     },
     handleLogout(row) {
-      this.$modal.confirm('是否确认强制下线坐席 "' + row.agentName + '"？').then(function() {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        title: '强制下线确认',
+        confirmText: '确认强制下线',
+        content: '将强制坐席 "' + row.agentName + '" 退出签入状态',
+        count: 1,
+        countNoun: '名坐席',
+        tip: '若该坐席正在通话，强制下线可能影响其话务台操作，请谨慎'
+      }).then(function() {
         return agentLogout({ agentId: row.agentId })
       }).then(() => {
         this.getList()

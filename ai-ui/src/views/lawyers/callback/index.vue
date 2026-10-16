@@ -369,7 +369,11 @@ export default {
     },
     handleDelete(row) {
       const ids = row.callbackId ? [row.callbackId] : this.ids
-      this.$confirm('是否确认删除选中的回访记录？', '删除确认', { type: 'warning' }).then(() => {
+      this.$modal.dangerConfirm({
+        content: '将删除选中的客户回访记录',
+        count: ids.length,
+        countNoun: '条记录'
+      }).then(() => {
         return delCallback(ids)
       }).then(() => {
         this.$message.success('删除成功')

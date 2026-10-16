@@ -413,8 +413,14 @@ export default {
     },
     handleBatchNotice() {
       if (!this.ids.length) return
-      this.$confirm('是否对选中的 ' + this.ids.length + ' 条记录发送漏话通知？', '批量通知', {
-        type: 'warning'
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        title: '批量通知确认',
+        confirmText: '确认发送',
+        content: '将向选中记录对应的来电号码发送漏话短信通知',
+        count: this.ids.length,
+        countNoun: '条记录',
+        tip: '短信将真实下发至公众手机，请确认号码与话术无误'
       }).then(() => {
         const tasks = this.ids.map(id => updateMissedCall({ missedCallId: id, noticeStatus: '1', noticeChannel: '1' }))
         Promise.all(tasks).then(() => {
@@ -456,8 +462,10 @@ export default {
     },
     handleDelete(row) {
       const ids = row.missedCallId ? [row.missedCallId] : this.ids
-      this.$confirm('是否确认删除选中的未接来电记录？', '删除确认', {
-        type: 'warning'
+      this.$modal.dangerConfirm({
+        content: '将删除选中的未接来电记录',
+        count: ids.length,
+        countNoun: '条记录'
       }).then(() => {
         return delMissedCall(ids)
       }).then(() => {

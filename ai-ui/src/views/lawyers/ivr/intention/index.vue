@@ -239,7 +239,12 @@ export default {
       })
     },
     handleDelete(row) {
-      this.$modal.confirm('是否确认删除意图"' + row.intentionName + '"？').then(function() {
+      this.$modal.dangerConfirm({
+        content: '将删除 IVR 意图「' + row.intentionName + '」及其识别配置',
+        count: 1,
+        countNoun: '个意图',
+        tip: '删除后来电路由将无法再按该意图分流'
+      }).then(function() {
         return delIntention(row.intentionId)
       }).then(() => {
         this.getList()

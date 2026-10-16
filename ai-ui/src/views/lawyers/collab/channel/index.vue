@@ -161,7 +161,12 @@ export default {
       }).catch(() => {})
     },
     handleUnbind(row) {
-      this.$modal.confirm('解绑后该渠道身份将无法继续关联本档案，确认解绑吗？（手机号过户/多人共用场景）').then(() => unbindIdentity(row.id)).then(() => {
+      this.$modal.dangerConfirm({
+        content: '将解除该渠道身份与当前档案的关联（手机号过户/多人共用场景）',
+        count: 1,
+        countNoun: '条绑定关系',
+        tip: '解绑后该渠道身份将无法继续关联本档案，需重新走绑定校验'
+      }).then(() => unbindIdentity(row.id)).then(() => {
         this.$modal.msgSuccess('已解绑')
         this.getList()
       }).catch(() => {})

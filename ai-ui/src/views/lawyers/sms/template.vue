@@ -239,7 +239,11 @@ export default {
     },
     handleDelete(row) {
       const templateIds = row.templateId ? [row.templateId] : this.ids;
-      this.$modal.confirm('是否确认删除选中的短信模板？').then(() => {
+      this.$modal.dangerConfirm({
+        content: '将删除选中的短信模板',
+        count: templateIds.length,
+        countNoun: '个模板'
+      }).then(() => {
         return delSmsTemplate(templateIds);
       }).then(() => {
         this.getList();
@@ -251,7 +255,15 @@ export default {
       this.$modal.confirm(`确认${text}"${row.templateName}"吗？`).then(() => {
         return updateSmsTemplate({ templateId: row.templateId, status: row.status });
       }).then(() => {
-        this.$modal.msgSuccess(text + "成功");
+        // U2：模板启停 30 秒内可撤销
+        const oldStatus = row.status === "1" ? "0" : "1";
+        this.$modal.undo({
+          message: '短信模板已' + text,
+          undoSuccessText: '已撤销，模板已' + (oldStatus === "1" ? "启用" : "停用"),
+          onUndo: () => updateSmsTemplate({ templateId: row.templateId, status: oldStatus }).then(() => {
+            row.status = oldStatus;
+          })
+        });
       }).catch(() => {
         row.status = row.status === "1" ? "0" : "1";
       });

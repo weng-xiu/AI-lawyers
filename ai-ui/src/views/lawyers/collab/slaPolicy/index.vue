@@ -202,7 +202,12 @@ export default {
     handleSelectionChange(sel) { this.ids = sel.map(i => i.policyId); this.multiple = !sel.length },
     handleDelete(row) {
       const ids = row.policyId ? [row.policyId] : this.ids
-      this.$modal.confirm('确认删除选中的 ' + ids.length + ' 条 SLA 策略吗？').then(() => delSlaPolicy(ids)).then(() => {
+      this.$modal.dangerConfirm({
+        content: '将删除选中的 SLA 服务时效策略',
+        count: ids.length,
+        countNoun: '条策略',
+        tip: '删除后新转办单不再适用该时效要求'
+      }).then(() => delSlaPolicy(ids)).then(() => {
         this.$modal.msgSuccess('删除成功')
         this.getList()
       }).catch(() => {})

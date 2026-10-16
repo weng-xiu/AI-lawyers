@@ -571,10 +571,14 @@ export default {
         this.$message.warning('请先选择要处理的工单')
         return
       }
-      this.$confirm('是否确认批量完成选中的 ' + ids.length + ' 条工单？', '警告', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        title: '批量办结确认',
+        confirmText: '确认办结',
+        content: '将把选中工单标记为已完成，完成后工单进入终态',
+        count: ids.length,
+        countNoun: '条工单',
+        tip: null
       }).then(() => {
         this.loading = true
         Promise.all(ids.map(id => completeTicket({ ticketId: id }))).then(() => {
@@ -729,10 +733,10 @@ export default {
       })
     },
     handleDelete(row) {
-      this.$confirm('是否确认删除工单编号为"' + row.ticketNo + '"的数据项？', '警告', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
+      this.$modal.dangerConfirm({
+        content: '将删除工单「' + row.ticketNo + '」',
+        count: 1,
+        countNoun: '条工单'
       }).then(() => {
         delTicket(row.ticketId).then(() => {
           this.$message.success('删除成功')

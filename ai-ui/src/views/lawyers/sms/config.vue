@@ -240,7 +240,11 @@ export default {
     },
     handleDelete(row) {
       const configIds = row.configId ? [row.configId] : this.ids;
-      this.$modal.confirm('是否确认删除选中的短信通道？').then(() => {
+      this.$modal.dangerConfirm({
+        content: '将删除选中的短信通道配置',
+        count: configIds.length,
+        countNoun: '个通道'
+      }).then(() => {
         return delSmsConfig(configIds);
       }).then(() => {
         this.getList();
@@ -252,7 +256,15 @@ export default {
       this.$modal.confirm(`确认${text}"${row.configName}"吗？`).then(() => {
         return updateSmsConfig({ configId: row.configId, status: row.status });
       }).then(() => {
-        this.$modal.msgSuccess(text + "成功");
+        // U2：通道启停 30 秒内可撤销
+        const oldStatus = row.status === "1" ? "0" : "1";
+        this.$modal.undo({
+          message: '短信通道已' + text,
+          undoSuccessText: '已撤销，通道已' + (oldStatus === "1" ? "启用" : "停用"),
+          onUndo: () => updateSmsConfig({ configId: row.configId, status: oldStatus }).then(() => {
+            row.status = oldStatus;
+          })
+        });
       }).catch(() => {
         row.status = row.status === "1" ? "0" : "1";
       });

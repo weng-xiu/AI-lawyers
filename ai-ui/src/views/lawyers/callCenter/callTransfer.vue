@@ -252,7 +252,12 @@ export default {
     },
     handleDelete(row) {
       const transferIds = row.transferId || this.ids
-      this.$modal.confirm('是否确认删除转接记录编号为"' + transferIds + '"的数据项？').then(function() {
+      const count = row.transferId ? 1 : (this.ids || []).length
+      this.$modal.dangerConfirm({
+        content: '将删除选中的转接记录',
+        count: count,
+        countNoun: '条转接记录'
+      }).then(function() {
         return delTransfer(transferIds)
       }).then(() => {
         this.getList()

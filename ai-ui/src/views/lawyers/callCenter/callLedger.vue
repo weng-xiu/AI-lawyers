@@ -643,8 +643,10 @@ export default {
       })
     },
     handleDelete(row) {
-      this.$confirm('是否确认删除登记编号为"' + row.ledgerNo + '"的数据项？', '警告', {
-        confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning'
+      this.$modal.dangerConfirm({
+        content: '将删除通话登记记录「' + row.ledgerNo + '」',
+        count: 1,
+        countNoun: '条记录'
       }).then(() => {
         delLedger(row.ledgerId).then(() => {
           this.$message.success('删除成功')
