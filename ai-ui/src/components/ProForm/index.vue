@@ -17,10 +17,22 @@
       <!-- 栅格模式：schema 字段 + 默认插槽（自定义 ProFormItem 可混入同一行） -->
       <el-row v-if="grid && !inline" :gutter="gutter">
         <template v-for="item in fields">
+          <!-- 分组标题：item.type === 'divider'，占满一行，不参与校验 -->
+          <el-col
+            v-if="item.type === 'divider' && isItemVisible(item)"
+            :key="item.prop"
+            :span="24"
+            class="pro-form__divider-col"
+          >
+            <div class="pro-form__divider">
+              <span v-if="item.label">{{ item.label }}</span>
+            </div>
+          </el-col>
           <pro-form-item
-            v-if="isItemVisible(item)"
+            v-else-if="isItemVisible(item)"
             :key="item.prop"
             :label="item.label"
+            :label-tip="item.labelTip"
             :prop="item.prop"
             :rules="fieldRulesMap[item.prop]"
             :span="item.span || defaultSpan"
@@ -44,7 +56,7 @@
                 :placeholder="item.placeholder || ('请输入' + item.label)"
                 :maxlength="item.max"
                 :show-word-limit="item.showWordLimit || !!item.max"
-                :clearable="item.clearable"
+                :clearable="item.clearable !== false"
                 :disabled="resolveDisabled(item)"
                 :readonly="resolveReadonly(item)"
                 :style="controlStyle(item)"
@@ -73,7 +85,7 @@
                 show-password
                 :placeholder="item.placeholder || ('请输入' + item.label)"
                 :maxlength="item.max"
-                :clearable="item.clearable"
+                :clearable="item.clearable !== false"
                 :disabled="resolveDisabled(item)"
                 :readonly="resolveReadonly(item)"
                 :style="controlStyle(item)"
@@ -244,7 +256,7 @@ const DEFAULT_DATE_FORMAT = {
 /** 选择类控件（必填提示与触发器随此分类） */
 const OPTION_TYPES = ['select', 'radio', 'radio-button']
 const SELECT_LIKE = OPTION_TYPES.concat(['switch', 'checkbox']).concat(DATE_TYPES)
-const KNOWN_TYPES = ['input', 'textarea', 'password', 'number', 'switch']
+const KNOWN_TYPES = ['input', 'textarea', 'password', 'number', 'switch', 'divider']
   .concat(OPTION_TYPES).concat(['checkbox']).concat(DATE_TYPES)
 
 /** 字典在途请求去重（多个 ProForm 实例/快速联动时避免重复 getDicts） */
@@ -290,7 +302,8 @@ const dictInflight = {}
  *       / field-change(prop, value, item)
  *
  * 对外方法（经 ref 调用）：
- * validate / validateField / resetFields / clearValidate / scrollToField / getDefaultModel
+ * validate / validateField / resetFields / clearValidate
+ * scrollToField / focusField / focusFirstField / getDefaultModel / reloadField
  */
 export default {
   name: 'ProForm',
@@ -320,6 +333,8 @@ export default {
     loading: { type: Boolean, default: false },
     /** 校验失败时自动滚动到第一个错误字段（Element 2.15 无内置能力，ProForm 自行实现） */
     scrollToError: { type: Boolean, default: true },
+    /** 挂载后自动聚焦第一个可见可输入字段（弹窗录入体验） */
+    autofocus: { type: Boolean, default: false },
     // 底部按钮（独立页表单使用）
     showFooter: { type: Boolean, default: false },
     footerSize: { type: String, default: 'small' },
@@ -379,6 +394,11 @@ export default {
     resolveReadonly(item) {
       return typeof item.readonly === 'function' ? !!item.readonly(this.model) : !!item.readonly
     },
+    /** 必填支持联动函数：required: true | (model)=>boolean；fieldRulesMap 依赖 model 自动响应 */
+    resolveRequired(item) {
+      if (typeof item.required === 'function') return !!item.required(this.model)
+      return !!item.required
+    },
     isKnownType(type) {
       return !type || KNOWN_TYPES.indexOf(type) !== -1
     },
@@ -418,6 +438,19 @@ export default {
         })
       })
     },
+    /** 加载某个字段的远程选项（支持级联：reloadOn 依赖字段变化时由 watch 触发重跑） */
+    loadOptions(item) {
+      if (!item.optionsLoader) return
+      this.$set(this.loaderState, item.prop, 'loading')
+      Promise.resolve(item.optionsLoader(this.model)).then(res => {
+        // 兼容 数组 / {rows} 分页响应 / {data} 三种返回形态
+        const list = Array.isArray(res) ? res : (res.rows || res.data || [])
+        this.$set(this.loaderOptions, item.prop, list.map(this.normalizeOption))
+        this.$set(this.loaderState, item.prop, 'done')
+      }).catch(() => {
+        this.$set(this.loaderState, item.prop, 'error')
+      })
+    },
     /** 加载远程选项；trigger: mounted 立即加载，visible 字段首次可见时加载 */
     ensureLoaders(trigger) {
       this.fields.forEach(item => {
@@ -426,15 +459,7 @@ export default {
         if (when !== trigger) return
         if (this.loaderState[item.prop]) return
         if (trigger === 'visible' && !this.isItemVisible(item)) return
-        this.$set(this.loaderState, item.prop, 'loading')
-        Promise.resolve(item.optionsLoader(this.model)).then(res => {
-          // 兼容 数组 / {rows} 分页响应 / {data} 三种返回形态
-          const list = Array.isArray(res) ? res : (res.rows || res.data || [])
-          this.$set(this.loaderOptions, item.prop, list.map(this.normalizeOption))
-          this.$set(this.loaderState, item.prop, 'done')
-        }).catch(() => {
-          this.$set(this.loaderState, item.prop, 'error')
-        })
+        this.loadOptions(item)
       })
     },
     normalizeOption(opt) {
@@ -450,7 +475,7 @@ export default {
     /** 组装字段级规则：必填自动规则 + 正则 + 页面补充规则 */
     buildItemRules(item) {
       const rules = []
-      if (item.required) {
+      if (this.resolveRequired(item)) {
         rules.push({
           required: true,
           message: item.message || ((SELECT_LIKE.indexOf(item.type) !== -1 ? '请选择' : '请输入') + item.label),
@@ -470,11 +495,24 @@ export default {
       return rules.length ? rules : undefined
     },
     onFieldChange(item, value) {
+      const prop = item.prop
       // visible 型 loader：字段首次因联动变为可见时补加载
-      if (item.optionsLoader && (item.loadOn === 'visible') && !this.loaderState[item.prop] && this.isItemVisible(item)) {
+      if (item.optionsLoader && (item.loadOn === 'visible') && !this.loaderState[prop] && this.isItemVisible(item)) {
         this.ensureLoaders('visible')
       }
-      this.$emit('field-change', item.prop, value, item)
+      // 级联重载：依赖字段变化时重跑声明了 reloadOn 的字段远程选项
+      this.fields.forEach(target => {
+        if (!target.optionsLoader || !Array.isArray(target.reloadOn)) return
+        if (target.reloadOn.indexOf(prop) !== -1) {
+          this.loadOptions(target)
+        }
+      })
+      this.$emit('field-change', prop, value, item)
+    },
+    /** 外部触发某字段远程选项重载（脚本改 model 后可手动调用） */
+    reloadField(prop) {
+      const target = this.fields.find(f => f.prop === prop)
+      if (target) this.loadOptions(target)
     },
     /** 文本框回车：独立页表单直接提交；弹窗表单抛 enter 由页面接 submitForm */
     handleEnter() {
@@ -503,6 +541,7 @@ export default {
     getDefaultModel() {
       const obj = {}
       this.fields.forEach(item => {
+        if (item.type === 'divider') return
         if (item.default !== undefined) {
           obj[item.prop] = typeof item.default === 'object'
             ? JSON.parse(JSON.stringify(item.default))
@@ -536,7 +575,10 @@ export default {
           } else {
             if (this.scrollToError) {
               const firstProp = invalidFields && Object.keys(invalidFields)[0]
-              if (firstProp) this.scrollToField(firstProp)
+              if (firstProp) {
+                this.scrollToField(firstProp)
+                this.focusField(firstProp)
+              }
             }
             reject(new Error('validation failed'))
           }
@@ -561,6 +603,27 @@ export default {
       if (field && field.$el && field.$el.scrollIntoView) {
         field.$el.scrollIntoView({ behavior: 'smooth', block: 'center' })
       }
+    },
+    /** 聚焦指定字段的输入控件（input/password/number/select/textarea 均落到 input 元素） */
+    focusField(prop) {
+      const field = (this.$refs.elForm.fields || []).find(f => f.prop === prop)
+      if (!field || !field.$el) return
+      const input = field.$el.querySelector('input, textarea')
+      if (input && typeof input.focus === 'function') {
+        setTimeout(() => input.focus(), 300) // 等 scrollIntoView 动画
+      }
+    },
+    /** 聚焦第一个可见可输入字段（弹窗打开自动聚焦，提升录入效率） */
+    focusFirstField() {
+      const first = (this.fields || []).find(f => this.isItemVisible(f) &&
+        f.type !== 'divider' && f.type !== 'switch' && f.type !== 'radio' &&
+        f.type !== 'radio-button' && f.type !== 'checkbox' && this.resolveDisabled(f) === false)
+      if (first) this.focusField(first.prop)
+    }
+  },
+  mounted() {
+    if (this.autofocus) {
+      this.$nextTick(() => this.focusFirstField())
     }
   }
 }
@@ -585,6 +648,26 @@ export default {
   line-height: 32px;
   white-space: nowrap;
 }
+
+// 分组标题：分割线 + 加粗文字，长表单分区
+.pro-form__divider-col {
+  margin-top: 8px;
+}
+.pro-form__divider {
+  display: flex;
+  align-items: center;
+  padding: 6px 0 2px;
+  border-bottom: 1px solid #ebeef5;
+  color: #303133;
+  font-size: 14px;
+  font-weight: 600;
+  &::after {
+    content: '';
+    flex: 1;
+  }
+}
+
+// label 右侧问号提示（实现在 ProFormItem.vue 内，scoped 作用域一致）
 
 .pro-form__unsupported {
   color: #f56c6c;

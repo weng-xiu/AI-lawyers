@@ -144,6 +144,7 @@
         :fields="formFields"
         label-width="80px"
         size="medium"
+        autofocus
         @enter="submitForm"
       />
       <div slot="footer" class="dialog-footer">
@@ -191,19 +192,21 @@ export default {
       form: {},
       // V3 ProForm：新增/修改弹窗 schema（校验规则、字典、数字精度均随字段声明）
       formFields: [
+        { prop: '__g1', label: '基本信息', type: 'divider' },
         { prop: 'modelType', label: '模型类型', type: 'select', dict: 'ai_model_type', required: true, message: '模型类型不能为空' },
         { prop: 'modelName', label: '模型名称', type: 'input', required: true, message: '模型名称不能为空' },
         { prop: 'apiUrl', label: 'API地址', type: 'input', required: true, message: 'API地址不能为空' },
         { prop: 'apiKey', label: 'API密钥', type: 'password', required: true, message: 'API密钥不能为空' },
+        { prop: '__g2', label: '计费与参数', type: 'divider' },
         { prop: 'maxTokens', label: '最大Token数', type: 'number', min: 100, max: 8192, required: true, message: '最大Token数不能为空' },
         {
           prop: 'inputPrice', label: '输入单价', type: 'number', min: 0, step: 0.001, precision: 6,
-          width: 200, tip: '元/千Token，留空不计费',
+          width: 200, tip: '元/千Token，留空不计费', labelTip: '按输入 Token 数计费，留空则不计收输入费用',
           attrs: { controls: false, valueOnClear: null, placeholder: '元/千Token，可空' }
         },
         {
           prop: 'outputPrice', label: '输出单价', type: 'number', min: 0, step: 0.001, precision: 6,
-          width: 200, tip: '元/千Token，留空不计费',
+          width: 200, tip: '元/千Token，留空不计费', labelTip: '按输出 Token 数计费，留空则不计收输出费用',
           attrs: { controls: false, valueOnClear: null, placeholder: '元/千Token，可空' }
         },
         { prop: 'temperature', label: '温度', type: 'number', min: 0, max: 2, step: 0.1, precision: 1, required: true, message: '温度不能为空' },

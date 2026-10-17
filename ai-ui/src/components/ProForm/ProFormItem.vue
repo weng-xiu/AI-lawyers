@@ -21,6 +21,12 @@
       :inline-message="inlineMessage"
       :size="size"
     >
+      <template #label v-if="label">
+        <span>{{ label }}</span>
+        <el-tooltip v-if="labelTip" :content="labelTip" placement="top" effect="dark">
+          <i class="el-icon-question pro-form-item__tip" />
+        </el-tooltip>
+      </template>
       <slot />
     </el-form-item>
   </el-col>
@@ -60,6 +66,8 @@ export default {
     xl: { type: [Number, Object], default: undefined },
     // el-form-item
     label: { type: String, default: '' },
+    /** label 右侧悬浮提示文案（问号图标） */
+    labelTip: { type: String, default: '' },
     prop: { type: String, default: '' },
     rules: { type: [Object, Array], default: null },
     labelWidth: { type: String, default: undefined },
@@ -72,3 +80,14 @@ export default {
   }
 }
 </script>
+
+<style lang="scss" scoped>
+.pro-form-item__tip {
+  margin-left: 4px;
+  color: #c0c4cc;
+  cursor: help;
+  font-size: 14px;
+  vertical-align: middle;
+  &:hover { color: #409eff; }
+}
+</style>
