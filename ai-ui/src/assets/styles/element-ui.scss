@@ -159,3 +159,130 @@
     }
   }
 }
+
+// ==================== V7 视觉细节打磨（配色.md 设计 token，最小增量） ====================
+// 色值唯一来源：深邃法蓝 #1A3C6E / 明亮法蓝 #255A99 / 法治金 #C9A96E / 悬停金 #D9BF8A
+// 状态色：绿 #2B8C6E / 信息蓝 #2B6BB0 / 橙 #E8923A / 红 #C63D4A / 灰 #8C8C8C
+// 中性：#1F2A3A 主文本 / #5A6A7E 次文本 / #B0BCCA 占位禁用 / #DCE2EB 边框
+
+// ---- 按钮体系：次要（Default）按钮 hover/focus/active 收敛到司法蓝 ----
+// 基础色（文字 #5A6A7E、边框 #B0BCCA）主题变量层已设，此处显式声明确保即时生效；
+// Element 默认 hover 是颜色加白混合，规范要求 hover 文字+边框均为品牌蓝。
+.el-button.el-button--default {
+  color: #5A6A7E;
+  border-color: #B0BCCA;
+
+  &:hover,
+  &:focus {
+    color: #1A3C6E;
+    border-color: #1A3C6E;
+    background-color: #FFFFFF;
+  }
+
+  &:active {
+    color: #255A99;
+    border-color: #255A99;
+    background-color: #FFFFFF;
+  }
+
+  // 禁用态保持 Element 规范（浅灰），不被上面的 hover 染色
+  &.is-disabled,
+  &.is-disabled:hover,
+  &.is-disabled:focus,
+  &.is-disabled:active {
+    color: #C0C4CC;
+    border-color: #EBEEF5;
+    background-color: #FFFFFF;
+  }
+}
+
+// ---- 按钮体系：强调按钮（CTA）——法治金底 + 深色字，用于「一键转办」等权威操作 ----
+// 用法：<el-button class="el-button--cta">（不与 type 同用；尺寸由 size 决定）
+.el-button.el-button--cta {
+  color: #1F2A3A;
+  background-color: #C9A96E;
+  border-color: #C9A96E;
+
+  &:hover,
+  &:focus {
+    color: #1F2A3A;
+    background-color: #D9BF8A;
+    border-color: #D9BF8A;
+  }
+
+  &:active {
+    color: #1F2A3A;
+    background-color: #B8935C;
+    border-color: #B8935C;
+  }
+
+  &.is-disabled,
+  &.is-disabled:hover,
+  &.is-disabled:focus {
+    color: rgba(31, 42, 58, 0.45);
+    background-color: #E7DCC8;
+    border-color: #E7DCC8;
+  }
+}
+
+// ---- 表格：表头字重 + 斑马纹 #FAFBFD（配色.md 工单列表规范） ----
+// 表头底色在主题变量层设置（#EDF0F5）；文字色与字重在此显式声明
+// （$--table-header-font-color 变量改动需整包重编主题，显式规则即时生效）。
+.el-table th.el-table__cell {
+  color: #1F2A3A;
+  font-weight: 600;
+}
+
+// stripe 属性表格：Element 条纹底色硬编码 #FAFAFA，统一覆盖为规范 #FAFBFD；
+// 选择器含 .el-table--striped 祖先，固定列克隆表同样生效。
+.el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+  background: #FAFBFD;
+}
+
+// 悬停行必须压过条纹色（Element 悬停选择器特异性低于条纹规则，需显式补一条）
+.el-table--striped .el-table__body tr:hover > td.el-table__cell,
+.el-table--striped .el-table__body tr.hover-row > td.el-table__cell {
+  background-color: #F5F7FA;
+}
+
+// 存量未开 stripe 的表格：偶数行补同款斑马纹（根容器无 striped 类时，
+// 主表与固定列克隆表同为后代，着色保持一致）
+.el-table:not(.el-table--striped) .el-table__body tbody > tr.el-table__row:nth-child(even) > td.el-table__cell {
+  background-color: #FAFBFD;
+}
+
+.el-table:not(.el-table--striped) .el-table__body tr:hover > td.el-table__cell,
+.el-table:not(.el-table--striped) .el-table__body tr.hover-row > td.el-table__cell {
+  background-color: #F5F7FA;
+}
+
+// ---- 状态标签语义色：进行中=信息蓝 #2B6BB0 ----
+// 其余四态（已完成=success 绿 / 待处理=warning 橙 / 超时=danger 红 / 挂起归档=info 灰）
+// 已由主题变量与 el-tag 内置 type 承载；用法：<el-tag class="tag-status--processing">
+.el-tag.tag-status--processing {
+  color: #2B6BB0;
+  background-color: #ECF2F9;
+  border-color: #C3D6EC;
+
+  &:hover,
+  &:focus {
+    background-color: #E3EDF7;
+  }
+
+  .el-tag__close {
+    color: #2B6BB0;
+
+    &:hover {
+      background-color: #2B6BB0;
+      color: #FFFFFF;
+    }
+  }
+}
+
+// ---- 间距规范：表格操作列按钮组统一 8px 间隔（Element 默认 12px 偏松） ----
+.el-table .cell {
+  > .el-button--mini + .el-button--mini,
+  > .el-button--mini + .el-dropdown {
+    margin-left: 8px;
+  }
+}

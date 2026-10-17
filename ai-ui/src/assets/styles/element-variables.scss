@@ -26,6 +26,11 @@ $--background-color-base: #F5F7FA;
 
 $--table-border: 1px solid #DCE2EB;
 $--table-header-background-color: #EDF0F5;
+// V7：表头使用主文本色（默认是中灰），强化数据层级
+$--table-header-font-color: #1F2A3A;
+// V7：次要按钮规范——文字中灰、边框浅灰（hover 态在 element-ui.scss 覆盖为司法蓝）
+$--button-default-font-color: #5A6A7E;
+$--button-default-border-color: #B0BCCA;
 
 /* icon font path, required */
 $--font-path: '~element-ui/lib/theme-chalk/fonts';

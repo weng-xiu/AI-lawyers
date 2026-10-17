@@ -96,6 +96,7 @@
     <!-- 表格主体：loading / 空态内建，列由 columns 驱动，自定义渲染走 #column-{prop} 插槽 -->
     <el-table
       ref="table"
+      :stripe="stripe"
       v-bind="tableAttrs"
       v-loading="loading"
       :size="tableSize"
@@ -201,8 +202,10 @@ export default {
     emptyText: { type: String, default: '暂无数据' },
     /** 内建空态提示 */
     emptyHint: { type: String, default: '' },
-    /** 透传 el-table 原生属性（border/stripe/size/max-height 等） */
+    /** 透传 el-table 原生属性（border/stripe/size/max-height 等）；stripe 在其中可覆盖此默认值 */
     tableAttrs: { type: Object, default: () => ({}) },
+    /** V7：默认斑马纹（#FAFBFD，配色.md 工单列表规范）；:stripe="false" 或 tableAttrs.stripe 可关 */
+    stripe: { type: Boolean, default: true },
     /** U5 持久化标识：列设置/密度/筛选存档的 key，默认取当前路由路径 */
     persistKey: { type: String, default: '' },
     /** U5 筛选条件保存开关：开启后查询参数（除分页）自动持久化并在下次进入时恢复 */

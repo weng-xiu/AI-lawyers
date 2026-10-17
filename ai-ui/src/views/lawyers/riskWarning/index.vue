@@ -293,7 +293,7 @@
           <div slot="footer" class="dialog-footer">
             <el-button
               v-if="detailForm.suggestTransferType && !detailForm.transferId"
-              type="primary"
+              class="el-button--cta"
               icon="el-icon-promotion"
               @click="handleTransfer(detailForm)"
               v-hasPermi="['lawyers:ticketTransfer:add']"
@@ -330,7 +330,7 @@
             </el-form-item>
           </el-form>
           <div slot="footer" class="dialog-footer">
-            <el-button type="primary" :loading="transferSubmitting" @click="submitTransfer">确认转办</el-button>
+            <el-button class="el-button--cta" :loading="transferSubmitting" @click="submitTransfer">确认转办</el-button>
             <el-button @click="transferOpen = false">取 消</el-button>
           </div>
         </el-dialog>

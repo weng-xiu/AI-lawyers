@@ -102,7 +102,7 @@
         </el-form-item>
       </el-form>
       <div slot="footer">
-        <el-button type="primary" size="small" :loading="submitLoading" @click="submitTransfer">确认转办</el-button>
+        <el-button class="el-button--cta" size="small" :loading="submitLoading" @click="submitTransfer">确认转办</el-button>
         <el-button size="small" @click="transferOpen = false">取 消</el-button>
       </div>
     </el-dialog>

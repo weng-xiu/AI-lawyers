@@ -99,7 +99,8 @@ $cc-danger: #C63D4A;
 
     th {
       background: #f8f9fb;
-      color: $cc-text-secondary;
+      // V7：表头使用主文本色，强化数据层级（原为 text-secondary 偏灰显弱）
+      color: $cc-text-primary;
       font-weight: 600;
     }
     td {

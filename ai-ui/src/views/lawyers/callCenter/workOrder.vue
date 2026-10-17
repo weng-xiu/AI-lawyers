@@ -103,7 +103,7 @@
           <el-tag :type="getPriorityTag(row.priority)" size="mini">{{ getPriorityLabel(row.priority) }}</el-tag>
         </template>
         <template #column-status="{ row }">
-          <el-tag :type="getStatusTag(row.status)" size="mini">{{ getStatusLabel(row.status) }}</el-tag>
+          <el-tag :type="getStatusTag(row.status)" :class="getStatusClass(row.status)" size="mini">{{ getStatusLabel(row.status) }}</el-tag>
         </template>
         <template #column-action="{ row }">
           <el-button type="text" size="mini" icon="el-icon-view" @click="handleView(row)">查看</el-button>
@@ -141,7 +141,7 @@
       <div class="drawer-header">
         <div class="drawer-title">
           <span class="order-no">{{ currentOrder.ticketNo }}</span>
-          <el-tag :type="getStatusTag(currentOrder.status)" size="small">{{ getStatusLabel(currentOrder.status) }}</el-tag>
+          <el-tag :type="getStatusTag(currentOrder.status)" :class="getStatusClass(currentOrder.status)" size="small">{{ getStatusLabel(currentOrder.status) }}</el-tag>
         </div>
         <el-button type="text" icon="el-icon-close" class="close-btn" @click="drawerVisible = false"></el-button>
       </div>
@@ -289,7 +289,7 @@
         </el-form-item>
       </el-form>
       <div slot="footer">
-        <el-button type="primary" @click="confirmExternalTransfer">确认外派</el-button>
+        <el-button class="el-button--cta" @click="confirmExternalTransfer">确认外派</el-button>
         <el-button @click="transferOrgVisible = false">取消</el-button>
       </div>
     </el-dialog>
@@ -540,6 +540,10 @@ export default {
         '3': 'info'
       }
       return tags[String(status)] || 'info'
+    },
+    // V7：处理中=信息蓝 #2B6BB0（与品牌主蓝区分，配色.md 工单状态语义色）
+    getStatusClass(status) {
+      return String(status) === '1' ? 'tag-status--processing' : ''
     },
     handleQuery() {
       this.queryParams.pageNum = 1
