@@ -164,6 +164,26 @@ export default {
     dirtyTip: {
       type: String,
       default: '当前内容尚未保存，确认关闭吗？'
+    },
+    /**
+     * 自动校验：点击确定时自动调用内部注册的 ProForm.validate()，
+     * 校验通过才 emit confirm；校验失败自动 scrollToError + focusField（ProForm 内置）。
+     * 页面有自定义校验流程时设 false。
+     */
+    autoValidate: {
+      type: Boolean,
+      default: true
+    },
+    /** 自动聚焦：弹窗打开动画完成后自动聚焦内部 ProForm 第一个可输入字段 */
+    autoFocus: {
+      type: Boolean,
+      default: true
+    }
+  },
+  data() {
+    return {
+      /** 已注册的 ProForm 实例（ProForm mounted 时自动注册） */
+      formRef: null
     }
   },
   methods: {
@@ -172,9 +192,16 @@ export default {
     },
     onOpened() {
       this.$emit('opened')
+      // 弹窗打开动画完成后聚焦内部 ProForm 第一个可输入字段
+      if (this.autoFocus && this.formRef) {
+        this.formRef.focusFirstField()
+      }
     },
     onClosed() {
-      // el-dialog 关闭动画结束，页面在此 reset 表单/快照
+      // el-dialog 关闭动画结束：自动清理 ProForm 校验状态
+      if (this.formRef) {
+        this.formRef.clearValidate()
+      }
       this.$emit('closed')
     },
     /** el-dialog 自身的显隐同步（before-close 调 done 后触发） */
@@ -184,6 +211,13 @@ export default {
     },
     handleConfirm() {
       if (this.confirmLoading || this.confirmDisabled) return
+      // 有 ProForm 且自动校验：先走 validate，通过才抛 confirm；失败由 ProForm 自动定位
+      if (this.autoValidate && this.formRef) {
+        this.formRef.validate().then(() => {
+          this.$emit('confirm')
+        }).catch(() => {})
+        return
+      }
       this.$emit('confirm')
     },
     /** 底部「取消」按钮：不经 el-dialog before-close，自行执行同一套拦截 */
@@ -232,6 +266,16 @@ export default {
       this.$emit('cancel')
       this.$emit('update:visible', false)
       this.$emit('input', false)
+    },
+    /** ProForm 挂载时自动注册（ProForm 沿 $parent 链找 ProDialog 并调用此方法） */
+    registerForm(vm) {
+      this.formRef = vm
+    },
+    /** ProForm 卸载时注销 */
+    unregisterForm(vm) {
+      if (this.formRef === vm) {
+        this.formRef = null
+      }
     }
   }
 }

@@ -121,7 +121,6 @@
         :model="form"
         :fields="formFields"
         label-width="110px"
-        @enter="submitForm"
       />
     </pro-dialog>
 
@@ -319,17 +318,15 @@ export default {
       })
     },
     submitForm() {
-      this.$refs.form.validate(valid => {
-        if (!valid || this.submitting) return
-        this.submitting = true
-        const api = this.form.suppressId != null ? updateHotspot : addHotspot
-        api(this.form).then(() => {
-          this.$modal.msgSuccess('保存成功')
-          this.open = false
-          this.getList()
-        }).finally(() => {
-          this.submitting = false
-        })
+      if (this.submitting) return
+      this.submitting = true
+      const api = this.form.suppressId != null ? updateHotspot : addHotspot
+      api(this.form).then(() => {
+        this.$modal.msgSuccess('保存成功')
+        this.open = false
+        this.getList()
+      }).finally(() => {
+        this.submitting = false
       })
     },
     handleStatusChange(row) {

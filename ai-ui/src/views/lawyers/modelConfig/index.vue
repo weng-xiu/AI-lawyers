@@ -135,23 +135,24 @@
       @pagination="getList"
     />
 
-    <!-- 添加或修改AI模型参数配置对话框 -->
-    <el-dialog :title="title" :visible.sync="open" width="500px" append-to-body>
-      <!-- V3 ProForm：字典 select/radio 走 item.dict（复用本页 dicts 已预热的 Vuex 缓存） -->
+    <!-- 添加或修改AI模型参数配置对话框（V3 ProDialog + ProForm 集成） -->
+    <pro-dialog
+      v-model="open"
+      :title="title"
+      width="500px"
+      :confirm-loading="submitting"
+      @confirm="handleSave"
+      @closed="reset"
+    >
+      <!-- 字典 select/radio 走 item.dict（复用本页 dicts 已预热的 Vuex 缓存） -->
       <pro-form
         ref="form"
         :model="form"
         :fields="formFields"
         label-width="80px"
         size="medium"
-        autofocus
-        @enter="submitForm"
       />
-      <div slot="footer" class="dialog-footer">
-        <el-button type="primary" @click="submitForm">确 定</el-button>
-        <el-button @click="cancel">取 消</el-button>
-      </div>
-    </el-dialog>
+    </pro-dialog>
   </div>
 </template>
 
@@ -181,6 +182,8 @@ export default {
       title: "",
       // 是否显示弹出层
       open: false,
+      // 提交 loading（ProDialog confirm 按钮）
+      submitting: false,
       // 查询参数
       queryParams: {
         pageNum: 1,
@@ -230,10 +233,6 @@ export default {
       });
     },
     // 取消按钮
-    cancel() {
-      this.open = false;
-      this.reset();
-    },
     // 表单重置
     reset() {
       this.form = {
@@ -250,7 +249,7 @@ export default {
         status: "0",
         remark: null
       };
-      this.resetForm("form");
+      // 校验状态由 ProDialog closed 时自动 clearValidate
     },
     /** 搜索按钮操作 */
     handleQuery() {
@@ -284,24 +283,18 @@ export default {
         this.title = "修改AI模型参数配置";
       });
     },
-    /** 提交按钮 */
-    submitForm() {
-      this.$refs["form"].validate(valid => {
-        if (valid) {
-          if (this.form.configId != null) {
-            updateModelConfig(this.form).then(response => {
-              this.$modal.msgSuccess("修改成功");
-              this.open = false;
-              this.getList();
-            });
-          } else {
-            addModelConfig(this.form).then(response => {
-              this.$modal.msgSuccess("新增成功");
-              this.open = false;
-              this.getList();
-            });
-          }
-        }
+    /** 提交按钮（ProDialog 已自动校验通过） */
+    handleSave() {
+      this.submitting = true;
+      const promise = this.form.configId != null
+        ? updateModelConfig(this.form)
+        : addModelConfig(this.form);
+      promise.then(response => {
+        this.$modal.msgSuccess(this.form.configId != null ? "修改成功" : "新增成功");
+        this.open = false;
+        this.getList();
+      }).finally(() => {
+        this.submitting = false;
       });
     },
     /** 删除按钮操作 */

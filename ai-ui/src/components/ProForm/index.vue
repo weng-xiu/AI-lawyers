@@ -298,7 +298,8 @@ const dictInflight = {}
  * }
  * </pre>
  *
- * 事件：submit(model) / reset(model) / cancel / enter（文本框回车，弹窗页可接 @enter="submitForm"）
+ * 事件：submit(model) / reset(model) / cancel / enter（文本框回车；
+ *       ProDialog 内自动接管为确定按钮，其他场景页面可接 @enter）
  *       / field-change(prop, value, item)
  *
  * 对外方法（经 ref 调用）：
@@ -351,7 +352,9 @@ export default {
       /** optionsLoader 远程选项结果：{ [prop]: array } */
       loaderOptions: {},
       /** optionsLoader 状态：{ [prop]: 'loading'|'done'|'error' } */
-      loaderState: {}
+      loaderState: {},
+      /** 所在 ProDialog 实例（mounted 时沿 $parent 链查找注册） */
+      dialogParent: null
     }
   },
   computed: {
@@ -514,10 +517,13 @@ export default {
       const target = this.fields.find(f => f.prop === prop)
       if (target) this.loadOptions(target)
     },
-    /** 文本框回车：独立页表单直接提交；弹窗表单抛 enter 由页面接 submitForm */
+    /** 文本框回车：独立页 showFooter 直接提交；ProDialog 内自动触发确定；其他抛 enter */
     handleEnter() {
       if (this.showFooter) {
         this.handleSubmit()
+      } else if (this.dialogParent) {
+        // 在 ProDialog 内，回车等价于点击确定按钮（走自动校验）
+        this.dialogParent.handleConfirm()
       } else {
         this.$emit('enter')
       }
@@ -622,8 +628,25 @@ export default {
     }
   },
   mounted() {
-    if (this.autofocus) {
+    // 沿 $parent 链查找 ProDialog 并自动注册，实现弹窗集成
+    let parent = this.$parent
+    while (parent) {
+      if (parent.$options && parent.$options.name === 'ProDialog') {
+        this.dialogParent = parent
+        parent.registerForm(this)
+        break
+      }
+      parent = parent.$parent
+    }
+    // autofocus 仅在独立页（无 ProDialog 托管）时由 ProForm 自行处理
+    if (this.autofocus && !this.dialogParent) {
       this.$nextTick(() => this.focusFirstField())
+    }
+  },
+  beforeDestroy() {
+    if (this.dialogParent) {
+      this.dialogParent.unregisterForm(this)
+      this.dialogParent = null
     }
   }
 }

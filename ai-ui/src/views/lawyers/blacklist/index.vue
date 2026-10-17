@@ -105,7 +105,6 @@
         :model="form"
         :fields="formFields"
         label-width="100px"
-        @enter="submitForm"
       />
     </pro-dialog>
 
@@ -264,17 +263,15 @@ export default {
       })
     },
     submitForm() {
-      this.$refs.form.validate(valid => {
-        if (!valid || this.submitting) return
-        this.submitting = true
-        const api = this.form.id != null ? updateBlacklist : addBlacklist
-        api(this.form).then(() => {
-          this.$modal.msgSuccess('保存成功')
-          this.open = false
-          this.getList()
-        }).finally(() => {
-          this.submitting = false
-        })
+      if (this.submitting) return
+      this.submitting = true
+      const api = this.form.id != null ? updateBlacklist : addBlacklist
+      api(this.form).then(() => {
+        this.$modal.msgSuccess('保存成功')
+        this.open = false
+        this.getList()
+      }).finally(() => {
+        this.submitting = false
       })
     },
     handleStatusChange(row) {
