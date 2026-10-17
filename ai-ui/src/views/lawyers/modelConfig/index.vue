@@ -137,80 +137,15 @@
 
     <!-- 添加或修改AI模型参数配置对话框 -->
     <el-dialog :title="title" :visible.sync="open" width="500px" append-to-body>
-      <el-form ref="form" :model="form" :rules="rules" label-width="80px">
-        <el-form-item label="模型类型" prop="modelType">
-          <el-select v-model="form.modelType" placeholder="请选择模型类型">
-            <el-option
-              v-for="dict in dict.type.ai_model_type"
-              :key="dict.value"
-              :label="dict.label"
-              :value="dict.value"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="模型名称" prop="modelName">
-          <el-input v-model="form.modelName" placeholder="请输入模型名称" />
-        </el-form-item>
-        <el-form-item label="API地址" prop="apiUrl">
-          <el-input v-model="form.apiUrl" placeholder="请输入API地址" />
-        </el-form-item>
-        <el-form-item label="API密钥" prop="apiKey">
-          <el-input v-model="form.apiKey" placeholder="请输入API密钥" type="password" show-password />
-        </el-form-item>
-        <el-form-item label="最大Token数" prop="maxTokens">
-          <el-input-number v-model="form.maxTokens" :min="100" :max="8192" />
-        </el-form-item>
-        <el-form-item label="输入单价" prop="inputPrice">
-          <el-input-number
-            v-model="form.inputPrice"
-            :min="0"
-            :step="0.001"
-            :precision="6"
-            :controls="false"
-            value-on-clear="null"
-            placeholder="元/千Token，可空"
-            style="width: 200px"
-          />
-          <span style="color: #999; margin-left: 8px">元/千Token，留空不计费</span>
-        </el-form-item>
-        <el-form-item label="输出单价" prop="outputPrice">
-          <el-input-number
-            v-model="form.outputPrice"
-            :min="0"
-            :step="0.001"
-            :precision="6"
-            :controls="false"
-            value-on-clear="null"
-            placeholder="元/千Token，可空"
-            style="width: 200px"
-          />
-          <span style="color: #999; margin-left: 8px">元/千Token，留空不计费</span>
-        </el-form-item>
-        <el-form-item label="温度" prop="temperature">
-          <el-input-number v-model="form.temperature" :min="0" :max="2" :step="0.1" :precision="1" />
-        </el-form-item>
-        <el-form-item label="默认配置" prop="isDefault">
-          <el-radio-group v-model="form.isDefault">
-            <el-radio
-              v-for="dict in dict.type.sys_yes_no"
-              :key="dict.value"
-              :label="dict.value"
-            >{{dict.label}}</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="状态" prop="status">
-          <el-radio-group v-model="form.status">
-            <el-radio
-              v-for="dict in dict.type.sys_normal_disable"
-              :key="dict.value"
-              :label="dict.value"
-            >{{dict.label}}</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="备注" prop="remark">
-          <el-input v-model="form.remark" type="textarea" placeholder="请输入内容" />
-        </el-form-item>
-      </el-form>
+      <!-- V3 ProForm：字典 select/radio 走 item.dict（复用本页 dicts 已预热的 Vuex 缓存） -->
+      <pro-form
+        ref="form"
+        :model="form"
+        :fields="formFields"
+        label-width="80px"
+        size="medium"
+        @enter="submitForm"
+      />
       <div slot="footer" class="dialog-footer">
         <el-button type="primary" @click="submitForm">确 定</el-button>
         <el-button @click="cancel">取 消</el-button>
@@ -254,30 +189,28 @@ export default {
       },
       // 表单参数
       form: {},
-      // 表单校验
-      rules: {
-        modelType: [
-          { required: true, message: "模型类型不能为空", trigger: "change" }
-        ],
-        modelName: [
-          { required: true, message: "模型名称不能为空", trigger: "blur" }
-        ],
-        apiUrl: [
-          { required: true, message: "API地址不能为空", trigger: "blur" }
-        ],
-        apiKey: [
-          { required: true, message: "API密钥不能为空", trigger: "blur" }
-        ],
-        maxTokens: [
-          { required: true, message: "最大Token数不能为空", trigger: "blur" }
-        ],
-        temperature: [
-          { required: true, message: "温度不能为空", trigger: "blur" }
-        ],
-        status: [
-          { required: true, message: "状态不能为空", trigger: "change" }
-        ]
-      }
+      // V3 ProForm：新增/修改弹窗 schema（校验规则、字典、数字精度均随字段声明）
+      formFields: [
+        { prop: 'modelType', label: '模型类型', type: 'select', dict: 'ai_model_type', required: true, message: '模型类型不能为空' },
+        { prop: 'modelName', label: '模型名称', type: 'input', required: true, message: '模型名称不能为空' },
+        { prop: 'apiUrl', label: 'API地址', type: 'input', required: true, message: 'API地址不能为空' },
+        { prop: 'apiKey', label: 'API密钥', type: 'password', required: true, message: 'API密钥不能为空' },
+        { prop: 'maxTokens', label: '最大Token数', type: 'number', min: 100, max: 8192, required: true, message: '最大Token数不能为空' },
+        {
+          prop: 'inputPrice', label: '输入单价', type: 'number', min: 0, step: 0.001, precision: 6,
+          width: 200, tip: '元/千Token，留空不计费',
+          attrs: { controls: false, valueOnClear: null, placeholder: '元/千Token，可空' }
+        },
+        {
+          prop: 'outputPrice', label: '输出单价', type: 'number', min: 0, step: 0.001, precision: 6,
+          width: 200, tip: '元/千Token，留空不计费',
+          attrs: { controls: false, valueOnClear: null, placeholder: '元/千Token，可空' }
+        },
+        { prop: 'temperature', label: '温度', type: 'number', min: 0, max: 2, step: 0.1, precision: 1, required: true, message: '温度不能为空' },
+        { prop: 'isDefault', label: '默认配置', type: 'radio', dict: 'sys_yes_no' },
+        { prop: 'status', label: '状态', type: 'radio', dict: 'sys_normal_disable', required: true, message: '状态不能为空' },
+        { prop: 'remark', label: '备注', type: 'textarea', rows: 2 }
+      ]
     };
   },
   created() {

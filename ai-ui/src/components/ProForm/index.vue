@@ -22,7 +22,7 @@
             :key="item.prop"
             :label="item.label"
             :prop="item.prop"
-            :rules="buildItemRules(item)"
+            :rules="fieldRulesMap[item.prop]"
             :span="item.span || defaultSpan"
             :xs="item.xs || 24"
             :sm="item.sm"
@@ -45,19 +45,24 @@
                 :maxlength="item.max"
                 :show-word-limit="item.showWordLimit || !!item.max"
                 :clearable="item.clearable"
-                :disabled="item.disabled"
+                :disabled="resolveDisabled(item)"
+                :readonly="resolveReadonly(item)"
+                :style="controlStyle(item)"
                 v-bind="item.attrs"
                 @input="val => onFieldChange(item, val)"
+                @keyup.enter.native="handleEnter"
               />
               <el-input
                 v-else-if="item.type === 'textarea'"
                 v-model="model[item.prop]"
                 type="textarea"
                 :rows="item.rows || 3"
+                :autosize="item.autosize"
                 :placeholder="item.placeholder || ('请输入' + item.label)"
                 :maxlength="item.max"
                 :show-word-limit="item.showWordLimit || !!item.max"
-                :disabled="item.disabled"
+                :disabled="resolveDisabled(item)"
+                :readonly="resolveReadonly(item)"
                 v-bind="item.attrs"
                 @input="val => onFieldChange(item, val)"
               />
@@ -69,8 +74,11 @@
                 :placeholder="item.placeholder || ('请输入' + item.label)"
                 :maxlength="item.max"
                 :clearable="item.clearable"
-                :disabled="item.disabled"
+                :disabled="resolveDisabled(item)"
+                :readonly="resolveReadonly(item)"
+                :style="controlStyle(item)"
                 v-bind="item.attrs"
+                @keyup.enter.native="handleEnter"
               />
               <el-input-number
                 v-else-if="item.type === 'number'"
@@ -80,10 +88,12 @@
                 :max="item.max"
                 :step="item.step"
                 :precision="item.precision"
-                :disabled="item.disabled"
+                :disabled="resolveDisabled(item)"
                 controls-position="right"
+                :style="controlStyle(item)"
                 v-bind="item.attrs"
                 @change="val => onFieldChange(item, val)"
+                @keyup.enter.native="handleEnter"
               />
               <el-select
                 v-else-if="item.type === 'select'"
@@ -92,14 +102,15 @@
                 :multiple="item.multiple"
                 :filterable="item.filterable"
                 :clearable="item.clearable !== false"
-                :disabled="item.disabled"
+                :disabled="resolveDisabled(item)"
                 :collapse-tags="item.collapseTags !== false"
-                style="width: 100%"
+                :loading="loaderState[item.prop] === 'loading'"
+                :style="controlStyle(item, true)"
                 v-bind="item.attrs"
                 @change="val => onFieldChange(item, val)"
               >
                 <el-option
-                  v-for="opt in item.options || []"
+                  v-for="opt in getFieldOptions(item)"
                   :key="opt.value"
                   :label="opt.label"
                   :value="opt.value"
@@ -109,40 +120,43 @@
               <el-radio-group
                 v-else-if="item.type === 'radio'"
                 v-model="model[item.prop]"
-                :disabled="item.disabled"
+                :disabled="resolveDisabled(item)"
                 v-bind="item.attrs"
                 @change="val => onFieldChange(item, val)"
               >
                 <el-radio
-                  v-for="opt in item.options || []"
+                  v-for="opt in getFieldOptions(item)"
                   :key="opt.value"
                   :label="opt.value"
+                  :disabled="opt.disabled"
                 >{{ opt.label }}</el-radio>
               </el-radio-group>
               <el-radio-group
                 v-else-if="item.type === 'radio-button'"
                 v-model="model[item.prop]"
-                :disabled="item.disabled"
+                :disabled="resolveDisabled(item)"
                 v-bind="item.attrs"
                 @change="val => onFieldChange(item, val)"
               >
                 <el-radio-button
-                  v-for="opt in item.options || []"
+                  v-for="opt in getFieldOptions(item)"
                   :key="opt.value"
                   :label="opt.value"
+                  :disabled="opt.disabled"
                 >{{ opt.label }}</el-radio-button>
               </el-radio-group>
               <el-checkbox-group
                 v-else-if="item.type === 'checkbox'"
                 v-model="model[item.prop]"
-                :disabled="item.disabled"
+                :disabled="resolveDisabled(item)"
                 v-bind="item.attrs"
                 @change="val => onFieldChange(item, val)"
               >
                 <el-checkbox
-                  v-for="opt in item.options || []"
+                  v-for="opt in getFieldOptions(item)"
                   :key="opt.value"
                   :label="opt.value"
+                  :disabled="opt.disabled"
                 >{{ opt.label }}</el-checkbox>
               </el-checkbox-group>
               <el-switch
@@ -152,7 +166,7 @@
                 :inactive-value="item.inactiveValue"
                 :active-text="item.activeText"
                 :inactive-text="item.inactiveText"
-                :disabled="item.disabled"
+                :disabled="resolveDisabled(item)"
                 v-bind="item.attrs"
                 @change="val => onFieldChange(item, val)"
               />
@@ -165,8 +179,8 @@
                 :start-placeholder="item.startPlaceholder || '开始日期'"
                 :end-placeholder="item.endPlaceholder || '结束日期'"
                 :placeholder="item.type === 'month' ? '选择月份' : (item.placeholder || ('请选择' + item.label))"
-                :disabled="item.disabled"
-                style="width: 100%"
+                :disabled="resolveDisabled(item)"
+                :style="controlStyle(item, true)"
                 v-bind="item.attrs"
                 @change="val => onFieldChange(item, val)"
               />
@@ -214,6 +228,8 @@
 </template>
 
 <script>
+import store from '@/store'
+import { getDicts } from '@/api/system/dict/data'
 import ProFormItem from './ProFormItem.vue'
 
 /** 支持的日期类控件 type */
@@ -225,8 +241,14 @@ const DEFAULT_DATE_FORMAT = {
   datetimerange: 'yyyy-MM-dd HH:mm:ss',
   month: 'yyyy-MM'
 }
-/** 选择类控件的必填提示与校验触发器 */
-const SELECT_LIKE = ['select', 'radio', 'radio-button', 'switch', 'date', 'datetime', 'daterange', 'datetimerange', 'month']
+/** 选择类控件（必填提示与触发器随此分类） */
+const OPTION_TYPES = ['select', 'radio', 'radio-button']
+const SELECT_LIKE = OPTION_TYPES.concat(['switch', 'checkbox']).concat(DATE_TYPES)
+const KNOWN_TYPES = ['input', 'textarea', 'password', 'number', 'switch']
+  .concat(OPTION_TYPES).concat(['checkbox']).concat(DATE_TYPES)
+
+/** 字典在途请求去重（多个 ProForm 实例/快速联动时避免重复 getDicts） */
+const dictInflight = {}
 
 /**
  * V3 ProForm：录入/编辑表单（栅格 + 校验 + 提交 loading）。
@@ -242,21 +264,33 @@ const SELECT_LIKE = ['select', 'radio', 'radio-button', 'switch', 'date', 'datet
  *   type: 'input|textarea|password|number|select|radio|radio-button|checkbox|switch|date|datetime|daterange|datetimerange|month',
  *   span: 12, xs: 24, sm: 12, md: 12, lg: 8,  // 24 栅格，同 el-col
  *   required: true,                            // 自动生成必填规则与星号
- *   max: 20, rows: 3,                         // 输入长度/文本域行数（max 自动开字数统计）
- *   options: [{ label, value, disabled }],    // select/radio/checkbox
- *   multiple/filterable/clearable/disabled,   // 控件常用开关
- *   activeValue/inactiveValue/activeText,     // switch
- *   min/max/step/precision,                   // number
- *   placeholder/startPlaceholder/endPlaceholder,
+ *   message: '电话号码不能为空',                 // 覆盖必填默认提示
+ *   max: 20, rows: 3, autosize: {min:2,max:6}, // 输入长度/文本域
+ *   width: 200,                                // 控件宽度（数字按 px，也可传 '60%'；select/date 默认 100%）
+ *   // 选项三选一：静态数组 / RuoYi 字典 / 远程加载
+ *   options: [{ label, value, disabled }],
+ *   dict: 'ai_model_type',                     // RuoYi 字典 type，自动走 Vuex 字典缓存
+ *   optionsLoader: (model) => listApi(),       // 返回 Promise<数组|{rows}|{data}>
+ *   loadOn: 'mounted'|'visible',               // 远程选项加载时机，默认 mounted
+ *   multiple/filterable/clearable/disabled,    // 控件常用开关
+ *   disabled: m => m.id != null,               // disabled/visible/readonly 均可传函数做联动
+ *   visible: m => m.type === 'X',
+ *   activeValue/inactiveValue/activeText,      // switch
+ *   min/max/step/precision,                    // number
+ *   placeholder/startPlaceholder/endPlaceholder/tip,
  *   pattern: /^1\d{10}$/, patternMessage: '手机号格式不正确',
  *   rules: [],                                // 额外 async-validator 规则
  *   trigger: 'blur',                          // 覆盖必填规则默认触发器
+ *   default: '',                              // getDefaultModel() 使用
  *   attrs: {}                                 // 其余原生/组件属性透传
  * }
  * </pre>
  *
- * 对外方法（经 ref 调用，与 el-form API 一致）：
- * validate / validateField / resetFields / clearValidate / scrollToField
+ * 事件：submit(model) / reset(model) / cancel / enter（文本框回车，弹窗页可接 @enter="submitForm"）
+ *       / field-change(prop, value, item)
+ *
+ * 对外方法（经 ref 调用）：
+ * validate / validateField / resetFields / clearValidate / scrollToField / getDefaultModel
  */
 export default {
   name: 'ProForm',
@@ -266,7 +300,7 @@ export default {
     model: { type: Object, required: true },
     /** 表单级校验规则（自由模式/非 schema 字段使用；schema 字段规则自动挂在 item 上） */
     rules: { type: Object, default: () => ({}) },
-    /** schema 字段定义 */
+    /** schema 字段定义（支持 computed 数组，联动场景直接重建） */
     fields: { type: Array, default: () => [] },
     labelWidth: { type: String, default: '100px' },
     labelPosition: { type: String, default: undefined },
@@ -284,6 +318,8 @@ export default {
     defaultSpan: { type: Number, default: 24 },
     /** 数据加载遮罩（编辑回显等异步场景） */
     loading: { type: Boolean, default: false },
+    /** 校验失败时自动滚动到第一个错误字段（Element 2.15 无内置能力，ProForm 自行实现） */
+    scrollToError: { type: Boolean, default: true },
     // 底部按钮（独立页表单使用）
     showFooter: { type: Boolean, default: false },
     footerSize: { type: String, default: 'small' },
@@ -295,20 +331,122 @@ export default {
     submitLoading: { type: Boolean, default: false },
     submitDisabled: { type: Boolean, default: false }
   },
+  data() {
+    return {
+      /** optionsLoader 远程选项结果：{ [prop]: array } */
+      loaderOptions: {},
+      /** optionsLoader 状态：{ [prop]: 'loading'|'done'|'error' } */
+      loaderState: {}
+    }
+  },
+  computed: {
+    /** 访问 Vuex 字典表（响应式：字典异步拉取后自动驱动选项重渲染） */
+    dictMap() {
+      return store.getters.dict || {}
+    },
+    /** 字段规则映射：随 fields 重建一次，避免每次 render 重新生成数组引用 */
+    fieldRulesMap() {
+      const map = {}
+      this.fields.forEach(item => {
+        const rules = this.buildItemRules(item)
+        if (rules) map[item.prop] = rules
+      })
+      return map
+    }
+  },
+  watch: {
+    fields: {
+      immediate: true,
+      handler() {
+        this.ensureDicts()
+        this.ensureLoaders('mounted')
+      }
+    }
+  },
   created() {
     this.DATE_TYPES = DATE_TYPES
     this.DEFAULT_DATE_FORMAT = DEFAULT_DATE_FORMAT
   },
   methods: {
-    /** 字段可见性：支持 visible:false 或 visible(model) 条件函数（联动显隐） */
+    // ---- 字段状态：布尔值或 (model) => boolean 联动函数 ----
     isItemVisible(item) {
       if (typeof item.visible === 'function') return item.visible(this.model)
       return item.visible !== false
     },
-    isKnownType(type) {
-      return !type || ['input', 'textarea', 'password', 'number', 'select', 'radio', 'radio-button', 'checkbox', 'switch']
-        .concat(DATE_TYPES).indexOf(type) !== -1
+    resolveDisabled(item) {
+      return typeof item.disabled === 'function' ? !!item.disabled(this.model) : !!item.disabled
     },
+    resolveReadonly(item) {
+      return typeof item.readonly === 'function' ? !!item.readonly(this.model) : !!item.readonly
+    },
+    isKnownType(type) {
+      return !type || KNOWN_TYPES.indexOf(type) !== -1
+    },
+    /** 控件宽度：item.width 数字按 px；select/date 默认撑满列宽 */
+    controlStyle(item, fullByDefault) {
+      const style = {}
+      if (item.width) style.width = typeof item.width === 'number' ? item.width + 'px' : item.width
+      else if (fullByDefault) style.width = '100%'
+      return Object.keys(style).length ? style : null
+    },
+
+    // ---- 选项：静态 options > RuoYi 字典 > optionsLoader ----
+    getFieldOptions(item) {
+      if (Array.isArray(item.options)) return item.options
+      if (item.dict) {
+        const dictList = this.dictMap[item.dict]
+        if (Array.isArray(dictList)) {
+          // RuoYi 字典项为 {dictLabel, dictValue, ...}，统一映射成 {label, value}
+          return dictList.map(d => ({ label: d.dictLabel, value: d.dictValue, listClass: d.listClass, raw: d }))
+        }
+        return []
+      }
+      if (item.optionsLoader) return this.loaderOptions[item.prop] || []
+      return []
+    },
+    /** 收集 schema 声明的字典 type，未命中 Vuex 缓存的走 getDicts 并回填缓存 */
+    ensureDicts() {
+      const types = Array.from(new Set(
+        this.fields.filter(f => f.dict).map(f => f.dict)
+      ))
+      types.forEach(type => {
+        if (this.dictMap[type] || dictInflight[type]) return
+        dictInflight[type] = getDicts(type).then(res => {
+          store.dispatch('dict/setDict', { key: type, value: res.data })
+        }).catch(() => {}).then(() => {
+          delete dictInflight[type]
+        })
+      })
+    },
+    /** 加载远程选项；trigger: mounted 立即加载，visible 字段首次可见时加载 */
+    ensureLoaders(trigger) {
+      this.fields.forEach(item => {
+        if (!item.optionsLoader) return
+        const when = item.loadOn || 'mounted'
+        if (when !== trigger) return
+        if (this.loaderState[item.prop]) return
+        if (trigger === 'visible' && !this.isItemVisible(item)) return
+        this.$set(this.loaderState, item.prop, 'loading')
+        Promise.resolve(item.optionsLoader(this.model)).then(res => {
+          // 兼容 数组 / {rows} 分页响应 / {data} 三种返回形态
+          const list = Array.isArray(res) ? res : (res.rows || res.data || [])
+          this.$set(this.loaderOptions, item.prop, list.map(this.normalizeOption))
+          this.$set(this.loaderState, item.prop, 'done')
+        }).catch(() => {
+          this.$set(this.loaderState, item.prop, 'error')
+        })
+      })
+    },
+    normalizeOption(opt) {
+      // 已是 {label,value} 形态直接透传；实体对象（如机构/坐席）常用 name/id
+      if (opt.label !== undefined && opt.value !== undefined) return opt
+      return {
+        label: opt.label != null ? opt.label : (opt.name || opt.agentName || opt.orgName),
+        value: opt.value != null ? opt.value : (opt.id != null ? opt.id : (opt.agentId || opt.orgId)),
+        raw: opt
+      }
+    },
+
     /** 组装字段级规则：必填自动规则 + 正则 + 页面补充规则 */
     buildItemRules(item) {
       const rules = []
@@ -332,7 +470,19 @@ export default {
       return rules.length ? rules : undefined
     },
     onFieldChange(item, value) {
+      // visible 型 loader：字段首次因联动变为可见时补加载
+      if (item.optionsLoader && (item.loadOn === 'visible') && !this.loaderState[item.prop] && this.isItemVisible(item)) {
+        this.ensureLoaders('visible')
+      }
       this.$emit('field-change', item.prop, value, item)
+    },
+    /** 文本框回车：独立页表单直接提交；弹窗表单抛 enter 由页面接 submitForm */
+    handleEnter() {
+      if (this.showFooter) {
+        this.handleSubmit()
+      } else {
+        this.$emit('enter')
+      }
     },
     /** 底部提交按钮：校验通过后抛 submit（弹窗表单由 ProDialog 直接调 validate） */
     handleSubmit() {
@@ -345,16 +495,52 @@ export default {
       this.resetFields()
       this.$emit('reset', this.model)
     },
-    // ---- el-form 方法代理（保持 this.$refs.form.xxx 调用习惯） ----
+    /**
+     * 按 schema 生成默认数据对象（供页面 reset() 收敛样板）：
+     * default 优先；多选/checkbox=[]；switch=inactiveValue；number=undefined；
+     * 单选/radio=null；其余输入类=''。不覆盖页面已有的额外字段。
+     */
+    getDefaultModel() {
+      const obj = {}
+      this.fields.forEach(item => {
+        if (item.default !== undefined) {
+          obj[item.prop] = typeof item.default === 'object'
+            ? JSON.parse(JSON.stringify(item.default))
+            : item.default
+        } else if (item.multiple || item.type === 'checkbox') {
+          obj[item.prop] = []
+        } else if (item.type === 'switch') {
+          obj[item.prop] = item.inactiveValue !== undefined ? item.inactiveValue : false
+        } else if (item.type === 'number') {
+          obj[item.prop] = undefined
+        } else if (item.type === 'radio' || item.type === 'radio-button' ||
+          (item.type === 'select' && !item.multiple) || DATE_TYPES.indexOf(item.type) !== -1) {
+          obj[item.prop] = null
+        } else {
+          obj[item.prop] = ''
+        }
+      })
+      return obj
+    },
+    // ---- el-form 方法代理 ----
     validate(callback) {
-      // 兼容 callback 与 Promise 两种用法
       const form = this.$refs.elForm
       if (typeof callback === 'function') {
         return form.validate(callback)
       }
-      // Element 2.x validate 无 callback 时返回 Promise（部分小版本不返回，统一兜底）
+      // Element 2.15 validate 无 callback 返回 Promise；统一以 callback 形式拿到 invalidFields
       return new Promise((resolve, reject) => {
-        form.validate(valid => (valid ? resolve(valid) : reject(new Error('validation failed'))))
+        form.validate((valid, invalidFields) => {
+          if (valid) {
+            resolve(true)
+          } else {
+            if (this.scrollToError) {
+              const firstProp = invalidFields && Object.keys(invalidFields)[0]
+              if (firstProp) this.scrollToField(firstProp)
+            }
+            reject(new Error('validation failed'))
+          }
+        })
       })
     },
     validateField(props, cb) {
@@ -366,8 +552,15 @@ export default {
     clearValidate(props) {
       return this.$refs.elForm.clearValidate(props)
     },
+    /**
+     * 滚动到指定字段。Element 2.15 的 el-form 未提供此方法，
+     * 通过内部 fields 注册列表（el-form-item 实例）定位 $el 后滚动。
+     */
     scrollToField(prop) {
-      return this.$refs.elForm.scrollToField(prop)
+      const field = (this.$refs.elForm.fields || []).find(f => f.prop === prop)
+      if (field && field.$el && field.$el.scrollIntoView) {
+        field.$el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
     }
   }
 }
@@ -384,7 +577,7 @@ export default {
   margin-top: 4px;
 }
 
-// 字段旁灰色提示（数字阈值/秒数等说明），与控件同排
+// 字段旁灰色提示（数字阈值/计费单位等说明），与控件同排
 .pro-form__tip {
   margin-left: 8px;
   color: #909399;

@@ -105,6 +105,7 @@
         :model="form"
         :fields="formFields"
         label-width="100px"
+        @enter="submitForm"
       />
     </pro-dialog>
 
