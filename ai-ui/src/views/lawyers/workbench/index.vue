@@ -81,6 +81,9 @@
                   </div>
                   <div class="wb-record-name">{{ item.callerName || '未知' }} · {{ item.categoryName || '未分类' }}</div>
                   <div class="wb-record-time">{{ item.callTime }} · {{ formatDuration(item.duration) }}</div>
+                  <div class="wb-record-actions">
+                    <el-button type="text" size="mini" icon="el-icon-document-add" @click="handleCreateTicket(item)">生成工单</el-button>
+                  </div>
                 </div>
               </div>
             </el-card>
@@ -96,11 +99,46 @@
         <notice-panel />
       </el-tab-pane>
     </el-tabs>
+
+    <!-- F7：通话一键生成工单（预填来电要素） -->
+    <el-dialog title="生成工单" :visible.sync="ticketOpen" width="600px" append-to-body>
+      <el-form ref="ticketForm" :model="ticketForm" :rules="ticketRules" label-width="90px">
+        <el-form-item label="工单标题" prop="title">
+          <el-input v-model="ticketForm.title" placeholder="请输入工单标题" />
+        </el-form-item>
+        <el-form-item label="关联来电" prop="recordId">
+          <el-input v-model="ticketForm.recordId" disabled>
+            <template slot="prepend">来电ID</template>
+          </el-input>
+        </el-form-item>
+        <el-form-item label="来电人" prop="callerName">
+          <el-input v-model="ticketForm.callerName" disabled />
+        </el-form-item>
+        <el-form-item label="工单内容" prop="content">
+          <el-input v-model="ticketForm.content" type="textarea" :rows="4" placeholder="请输入工单内容" />
+        </el-form-item>
+        <el-form-item label="优先级" prop="priority">
+          <el-radio-group v-model="ticketForm.priority">
+            <el-radio label="0">低</el-radio>
+            <el-radio label="1">中</el-radio>
+            <el-radio label="2">高</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="备注" prop="remark">
+          <el-input v-model="ticketForm.remark" type="textarea" :rows="2" placeholder="可填写补充说明" />
+        </el-form-item>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button type="primary" :loading="ticketSubmitting" @click="submitTicket">确 定</el-button>
+        <el-button @click="ticketOpen = false">取 消</el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
 import { getWorkbenchStats, getWorkbenchTodos, getWorkbenchRecentCalls } from "@/api/lawyers/workbench"
+import { addTicket } from "@/api/lawyers/callCenter"
 import TodoPanel from './todo'
 import NoticePanel from './notice'
 
@@ -124,6 +162,21 @@ export default {
       todoList: [],
       recentRecords: [],
       calendarValue: new Date(),
+      // F7：通话一键生成工单
+      ticketOpen: false,
+      ticketSubmitting: false,
+      ticketForm: {
+        title: undefined,
+        recordId: undefined,
+        callerName: undefined,
+        content: undefined,
+        priority: '1',
+        remark: undefined
+      },
+      ticketRules: {
+        title: [{ required: true, message: '工单标题不能为空', trigger: 'blur' }],
+        content: [{ required: true, message: '工单内容不能为空', trigger: 'blur' }]
+      },
       quickList: [
         { name: '来电弹屏', icon: 'el-icon-phone', type: 'blue', path: '/inbound/callPopup' },
         { name: '图文服务', icon: 'el-icon-chat-dot-square', type: 'teal', path: '/workbench/chat' },
@@ -205,6 +258,43 @@ export default {
       const m = Math.floor((seconds % 3600) / 60)
       if (h > 0) return h + '小时' + m + '分'
       return m + '分'
+    },
+    // F7：从通话记录一键生成工单（预填来电要素）
+    handleCreateTicket(record) {
+      const caller = record.callerName || record.callerNumber || '未知来电'
+      const category = record.categoryName || '未分类'
+      this.ticketForm = {
+        title: `${caller} · ${category}咨询`,
+        recordId: record.recordId,
+        callerName: record.callerName || record.callerNumber || '',
+        content: `来电人：${record.callerName || '未知'}\n来电号码：${record.callerNumber || '-'}\n咨询类别：${record.categoryName || '未分类'}\n通话时长：${this.formatDuration(record.duration)}\n`,
+        priority: '1',
+        remark: undefined
+      }
+      this.ticketOpen = true
+      this.$nextTick(() => {
+        if (this.$refs.ticketForm) this.$refs.ticketForm.clearValidate()
+      })
+    },
+    submitTicket() {
+      this.$refs.ticketForm.validate(valid => {
+        if (!valid) return
+        this.ticketSubmitting = true
+        const payload = {
+          title: this.ticketForm.title,
+          recordId: this.ticketForm.recordId,
+          content: this.ticketForm.content,
+          priority: this.ticketForm.priority,
+          remark: this.ticketForm.remark
+        }
+        addTicket(payload).then(() => {
+          this.$modal.msgSuccess('工单创建成功')
+          this.ticketOpen = false
+          this.ticketSubmitting = false
+        }).catch(() => {
+          this.ticketSubmitting = false
+        })
+      })
     }
   }
 }
@@ -360,6 +450,7 @@ export default {
   .wb-record-phone { font-size: 14px; font-weight: 600; color: #1F2A3A; }
   .wb-record-name { font-size: 12px; color: #5A6A7E; margin-top: 6px; }
   .wb-record-time { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+  .wb-record-actions { margin-top: 6px; text-align: right; }
 }
 
 .wb-tabs {

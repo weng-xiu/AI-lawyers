@@ -38,6 +38,7 @@
             <el-menu-item index="/channels">渠道绑定</el-menu-item>
             <el-menu-item index="/services">服务导航</el-menu-item>
             <el-menu-item index="/consultation/history">咨询历史</el-menu-item>
+            <el-menu-item index="/elderly" class="elderly-entry">长辈专区</el-menu-item>
           </el-menu>
 
           <!-- F2 适老化快捷控制 -->
@@ -286,6 +287,11 @@ button:focus-visible,
 }
 .el-menu--horizontal > .el-menu-item.is-active {
   border-bottom: 3px solid var(--color-brand-gold, #C9A96E) !important;
+}
+/* V6 长辈专区入口：法治金高亮，与普通菜单区分 */
+.el-menu--horizontal > .el-menu-item.elderly-entry {
+  color: var(--color-brand-gold, #C9A96E) !important;
+  font-weight: 600;
 }
 
 .care-bar {

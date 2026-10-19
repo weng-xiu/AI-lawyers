@@ -25,9 +25,15 @@ export const FONT_SCALES = [
   { value: 'xlarge', label: '超大', size: '22px' }
 ]
 
+export const THEMES = [
+  { value: 'light', label: '浅色' },
+  { value: 'dark', label: '暗色' }
+]
+
 export const state = Vue.observable({
   fontScale: 'normal',
   highContrast: false,
+  theme: 'light',
   ready: false
 })
 
@@ -38,6 +44,7 @@ function readLocal() {
       const obj = JSON.parse(raw)
       if (FONT_SCALES.some(f => f.value === obj.fontScale)) state.fontScale = obj.fontScale
       state.highContrast = !!obj.highContrast
+      if (THEMES.some(t => t.value === obj.theme)) state.theme = obj.theme
     }
   } catch (e) { /* 忽略损坏的本地配置 */ }
 }
@@ -45,19 +52,22 @@ function readLocal() {
 function persist() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({
     fontScale: state.fontScale,
-    highContrast: state.highContrast
+    highContrast: state.highContrast,
+    theme: state.theme
   }))
 }
 
-/** 将关怀模式应用到 <html> 根节点，全局 CSS（care-mode.scss）据此放大 ElementUI 组件 */
+/** 将关怀模式 + 主题应用到 <html> 根节点，全局 CSS 据此渲染 */
 export function applyCareMode() {
   const el = document.documentElement
-  el.classList.remove('care-large', 'care-xlarge', 'care-high-contrast')
+  el.classList.remove('care-large', 'care-xlarge', 'care-high-contrast', 'theme-dark')
   if (state.fontScale === 'large') el.classList.add('care-large')
   if (state.fontScale === 'xlarge') el.classList.add('care-xlarge')
   if (state.highContrast) el.classList.add('care-high-contrast')
+  if (state.theme === 'dark') el.classList.add('theme-dark')
   el.setAttribute('data-font-scale', state.fontScale)
   el.setAttribute('data-high-contrast', String(state.highContrast))
+  el.setAttribute('data-theme', state.theme)
 }
 
 export function setFontScale(value) {
@@ -69,6 +79,13 @@ export function setFontScale(value) {
 
 export function setHighContrast(enabled) {
   state.highContrast = !!enabled
+  persist()
+  applyCareMode()
+}
+
+export function setTheme(value) {
+  if (!THEMES.some(t => t.value === value)) return
+  state.theme = value
   persist()
   applyCareMode()
 }
@@ -86,8 +103,10 @@ export default {
     VueInstance.prototype.$care = {
       state,
       fontScales: FONT_SCALES,
+      themes: THEMES,
       setFontScale,
-      setHighContrast
+      setHighContrast,
+      setTheme
     }
   }
 }

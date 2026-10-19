@@ -7,6 +7,7 @@ import './assets/styles/element-variables.scss'
 
 import '@/assets/styles/index.scss' // global css
 import '@/assets/styles/ruoyi.scss' // ruoyi css
+import '@/assets/styles/dark-mode.scss' // V5 暗色/夜间值班模式（配色.md 第七部分）
 import '@/assets/styles/care-mode.scss' // F2 坐席端关怀模式（字号/高对比，最后引入覆盖）
 import App from './App'
 import store from './store'

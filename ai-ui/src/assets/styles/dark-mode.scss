@@ -1,0 +1,961 @@
+/**
+ * V5 暗色/夜间值班模式（配色.md 第七部分）
+ *
+ * 由 utils/careMode.js 在 <html> 上切换 .theme-dark 根类驱动。
+ * 色值映射：
+ *   - 页面背景 #0D1626（替代白色 #FFFFFF / 霜灰 #F5F7FA）
+ *   - 卡片背景 #18243B（带微弱蓝底）
+ *   - 主文本 #E6EDF5、次文本 #99A9C4
+ *   - 法治金提亮至 #DCC28A（深色背景下保证可见度）
+ *   - 边框 #2A3A54、分割线 #1F2C42
+ *
+ * 加载顺序（main.js）：element-variables → index → ruoyi → dark-mode → care-mode
+ * 关怀模式（尤其高对比 care-high-contrast）后加载，在"暗色+高对比"组合下以高对比为准；
+ * 字号档（care-large/care-xlarge）与暗色可叠加，不冲突。
+ *
+ * 覆盖边界：Element UI 组件库 + 本项目全局样式（index/ruoyi/sidebar/element-ui）。
+ * 业务页面内联硬编码色值不在此文件覆盖范围，后续按域逐步迁移到 CSS 变量。
+ */
+
+/* ======================================================================
+ * 0. 全局背景与文本
+ * ==================================================================== */
+html.theme-dark {
+  color-scheme: dark;
+}
+
+html.theme-dark body,
+html.theme-dark #app,
+html.theme-dark .app-main,
+html.theme-dark .app-container,
+html.theme-dark .main-container {
+  background-color: #0D1626 !important;
+  color: #E6EDF5;
+}
+
+html.theme-dark .main-container {
+  background-color: #0D1626;
+}
+
+/* 文本层级 */
+html.theme-dark {
+  --text-primary: #E6EDF5;
+  --text-secondary: #99A9C4;
+  --text-muted: #6B7A93;
+  --border-color: #2A3A54;
+  --border-light: #1F2C42;
+  --bg-card: #18243B;
+  --bg-hover: #1E2D47;
+  --bg-active: #253A5C;
+  --brand-gold: #DCC28A;
+}
+
+html.theme-dark ::selection {
+  background: #255A99;
+  color: #FFFFFF;
+}
+
+/* ======================================================================
+ * 1. 卡片与面板
+ * ==================================================================== */
+html.theme-dark .el-card {
+  background-color: #18243B;
+  border-color: #2A3A54;
+  color: #E6EDF5;
+
+  .el-card__header {
+    border-bottom-color: #2A3A54;
+    color: #E6EDF5;
+  }
+
+  .el-card__body {
+    color: #E6EDF5;
+  }
+}
+
+html.theme-dark .el-panel,
+html.theme-dark .panel-group {
+  background-color: #18243B;
+  border-color: #2A3A54;
+}
+
+/* ======================================================================
+ * 2. 表格
+ * ==================================================================== */
+html.theme-dark .el-table {
+  background-color: #18243B;
+  color: #E6EDF5;
+
+  &::before {
+    background-color: #2A3A54;
+  }
+
+  th.el-table__cell {
+    background-color: #142033 !important;
+    color: #E6EDF5 !important;
+    border-bottom-color: #2A3A54;
+  }
+
+  td.el-table__cell {
+    border-bottom-color: #1F2C42;
+  }
+
+  tr {
+    background-color: #18243B;
+  }
+
+  .el-table__body tr:hover > td.el-table__cell,
+  .el-table__body tr.hover-row > td.el-table__cell {
+    background-color: #1E2D47 !important;
+  }
+}
+
+/* 斑马纹：深色下用更暗一档区分 */
+html.theme-dark .el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+  background: #152035 !important;
+}
+
+html.theme-dark .el-table:not(.el-table--striped) .el-table__body tbody > tr.el-table__row:nth-child(even) > td.el-table__cell {
+  background-color: #152035;
+}
+
+html.theme-dark .el-table:not(.el-table--striped) .el-table__body tr:hover > td.el-table__cell,
+html.theme-dark .el-table:not(.el-table--striped) .el-table__body tr.hover-row > td.el-table__cell {
+  background-color: #1E2D47;
+}
+
+/* 边框表 */
+html.theme-dark .el-table--border .el-table__cell,
+html.theme-dark .el-table--group .el-table__cell {
+  border-right-color: #1F2C42;
+}
+
+html.theme-dark .el-table__empty-block {
+  background: #18243B;
+  color: #99A9C4;
+}
+
+html.theme-dark .el-table__empty-text {
+  color: #99A9C4;
+}
+
+/* ======================================================================
+ * 3. 输入控件
+ * ==================================================================== */
+html.theme-dark .el-input__inner,
+html.theme-dark .el-textarea__inner {
+  background-color: #142033;
+  border-color: #2A3A54;
+  color: #E6EDF5;
+
+  &::placeholder {
+    color: #6B7A93;
+  }
+
+  &:focus {
+    border-color: #255A99;
+  }
+
+  &:hover {
+    border-color: #3A4F70;
+  }
+}
+
+html.theme-dark .el-input.is-disabled .el-input__inner,
+html.theme-dark .el-textarea.is-disabled .el-textarea__inner {
+  background-color: #0F1828;
+  color: #6B7A93;
+  border-color: #1F2C42;
+}
+
+html.theme-dark .el-input__suffix,
+html.theme-dark .el-input__prefix {
+  color: #99A9C4;
+}
+
+html.theme-dark .el-select .el-input__inner {
+  background-color: #142033;
+}
+
+/* 下拉选项面板 */
+html.theme-dark .el-select-dropdown,
+html.theme-dark .el-dropdown-menu,
+html.theme-dark .el-cascader__dropdown,
+html.theme-dark .el-autocomplete-suggestion {
+  background-color: #18243B;
+  border-color: #2A3A54;
+
+  .el-select-dropdown__item,
+  .el-dropdown-menu__item,
+  .el-cascader-node__label,
+  .el-autocomplete-suggestion__list li {
+    color: #E6EDF5;
+
+    &.hover,
+    &:hover,
+    &:focus {
+      background-color: #1E2D47;
+      color: #E6EDF5;
+    }
+
+    &.selected {
+      color: #DCC28A;
+      font-weight: 600;
+    }
+
+    &.is-disabled {
+      color: #6B7A93;
+    }
+  }
+}
+
+html.theme-dark .popper__arrow {
+  border-bottom-color: #2A3A54 !important;
+}
+
+/* 单/复选 */
+html.theme-dark .el-checkbox__inner,
+html.theme-dark .el-radio__inner {
+  background-color: #142033;
+  border-color: #3A4F70;
+}
+
+html.theme-dark .el-checkbox__input.is-checked .el-checkbox__inner,
+html.theme-dark .el-radio__input.is-checked .el-radio__inner {
+  background-color: #1A3C6E;
+  border-color: #1A3C6E;
+}
+
+html.theme-dark .el-checkbox__input.is-checked + .el-checkbox__label,
+html.theme-dark .el-radio__input.is-checked + .el-radio__label {
+  color: #E6EDF5;
+}
+
+html.theme-dark .el-checkbox__label,
+html.theme-dark .el-radio__label {
+  color: #E6EDF5;
+}
+
+/* 开关 */
+html.theme-dark .el-switch__core {
+  background-color: #3A4F70;
+  border-color: #3A4F70;
+}
+
+html.theme-dark .el-switch.is-checked .el-switch__core {
+  background-color: #1A3C6E;
+  border-color: #1A3C6E;
+}
+
+/* 日期选择器 */
+html.theme-dark .el-picker-panel {
+  background-color: #18243B;
+  border-color: #2A3A54;
+  color: #E6EDF5;
+
+  .el-picker-panel__sidebar,
+  .el-picker-panel__body {
+    background-color: #18243B;
+  }
+
+  .el-date-picker__header-label,
+  .el-month-table td .cell,
+  .el-year-table td .cell {
+    color: #E6EDF5;
+  }
+
+  .el-date-table th {
+    color: #99A9C4;
+    border-bottom-color: #2A3A54;
+  }
+
+  .el-date-table td .el-date-table-cell__text {
+    color: #E6EDF5;
+
+    &.available:hover {
+      background-color: #1E2D47;
+    }
+  }
+
+  .el-date-table td.current:not(.disabled) .el-date-table-cell__text {
+    background-color: #1A3C6E;
+    color: #FFFFFF;
+  }
+}
+
+/* ======================================================================
+ * 4. 按钮
+ * ==================================================================== */
+html.theme-dark .el-button--default {
+  background-color: #18243B;
+  border-color: #2A3A54;
+  color: #E6EDF5;
+
+  &:hover,
+  &:focus {
+    background-color: #1E2D47;
+    border-color: #255A99;
+    color: #FFFFFF;
+  }
+
+  &:active {
+    background-color: #253A5C;
+    border-color: #255A99;
+    color: #FFFFFF;
+  }
+
+  &.is-disabled,
+  &.is-disabled:hover {
+    background-color: #0F1828;
+    border-color: #1F2C42;
+    color: #6B7A93;
+  }
+}
+
+html.theme-dark .el-button--primary {
+  background-color: #1A3C6E;
+  border-color: #1A3C6E;
+  color: #FFFFFF;
+
+  &:hover,
+  &:focus {
+    background-color: #255A99;
+    border-color: #255A99;
+  }
+}
+
+html.theme-dark .el-button--success {
+  background-color: #2B8C6E;
+  border-color: #2B8C6E;
+  color: #FFFFFF;
+}
+
+html.theme-dark .el-button--warning {
+  background-color: #E8923A;
+  border-color: #E8923A;
+  color: #FFFFFF;
+}
+
+html.theme-dark .el-button--danger {
+  background-color: #C63D4A;
+  border-color: #C63D4A;
+  color: #FFFFFF;
+}
+
+html.theme-dark .el-button--info {
+  background-color: #3A4F70;
+  border-color: #3A4F70;
+  color: #E6EDF5;
+}
+
+html.theme-dark .el-button--text {
+  color: #6A9FD8;
+}
+
+/* CTA 金按钮：深色背景下法治金提亮 */
+html.theme-dark .el-button.el-button--cta {
+  color: #0D1626;
+  background-color: #DCC28A;
+  border-color: #DCC28A;
+
+  &:hover,
+  &:focus {
+    background-color: #E6D2A0;
+    border-color: #E6D2A0;
+  }
+}
+
+/* ======================================================================
+ * 5. 弹窗与消息
+ * ==================================================================== */
+html.theme-dark .el-dialog {
+  background-color: #18243B;
+  border-color: #2A3A54;
+
+  .el-dialog__title {
+    color: #E6EDF5;
+  }
+
+  .el-dialog__headerbtn .el-dialog__close {
+    color: #99A9C4;
+
+    &:hover {
+      color: #FFFFFF;
+    }
+  }
+
+  .el-dialog__body {
+    color: #E6EDF5;
+  }
+
+  .el-dialog__footer {
+    border-top-color: #2A3A54;
+  }
+}
+
+html.theme-dark .el-message-box {
+  background-color: #18243B;
+  border-color: #2A3A54;
+
+  .el-message-box__title {
+    color: #E6EDF5;
+  }
+
+  .el-message-box__message {
+    color: #E6EDF5;
+
+    p {
+      color: #E6EDF5;
+    }
+  }
+
+  .el-message-box__headerbtn .el-message-box__close {
+    color: #99A9C4;
+  }
+}
+
+html.theme-dark .el-message {
+  background-color: #18243B;
+  border-color: #2A3A54;
+
+  &.el-message--success {
+    background-color: #16332A;
+    border-color: #2B8C6E;
+    color: #6FD4A8;
+  }
+
+  &.el-message--warning {
+    background-color: #3D2B14;
+    border-color: #E8923A;
+    color: #F0B878;
+  }
+
+  &.el-message--error {
+    background-color: #3D1A20;
+    border-color: #C63D4A;
+    color: #F08893;
+  }
+
+  &.el-message--info {
+    background-color: #18243B;
+    border-color: #2A3A54;
+    color: #E6EDF5;
+  }
+}
+
+html.theme-dark .el-notification {
+  background-color: #18243B;
+  border-color: #2A3A54;
+
+  .el-notification__title {
+    color: #E6EDF5;
+  }
+
+  .el-notification__content {
+    color: #99A9C4;
+  }
+
+  .el-notification__closeBtn {
+    color: #99A9C4;
+  }
+}
+
+html.theme-dark .v-modal {
+  background-color: rgba(0, 0, 0, 0.6);
+}
+
+/* ======================================================================
+ * 6. 标签
+ * ==================================================================== */
+html.theme-dark .el-tag {
+  background-color: #1E2D47;
+  border-color: #2A3A54;
+  color: #E6EDF5;
+
+  .el-tag__close {
+    color: #99A9C4;
+
+    &:hover {
+      background-color: #3A4F70;
+      color: #FFFFFF;
+    }
+  }
+}
+
+html.theme-dark .el-tag--success {
+  background-color: #16332A;
+  border-color: #2B8C6E;
+  color: #6FD4A8;
+}
+
+html.theme-dark .el-tag--warning {
+  background-color: #3D2B14;
+  border-color: #E8923A;
+  color: #F0B878;
+}
+
+html.theme-dark .el-tag--danger {
+  background-color: #3D1A20;
+  border-color: #C63D4A;
+  color: #F08893;
+}
+
+html.theme-dark .el-tag--info {
+  background-color: #1E2D47;
+  border-color: #3A4F70;
+  color: #99A9C4;
+}
+
+/* 工单进行中标签：暗色下加亮 */
+html.theme-dark .el-tag.tag-status--processing {
+  background-color: #1A2B45;
+  border-color: #2B6BB0;
+  color: #6A9FD8;
+}
+
+/* ======================================================================
+ * 7. 页签与分页
+ * ==================================================================== */
+html.theme-dark .el-tabs__item {
+  color: #99A9C4;
+
+  &:hover {
+    color: #E6EDF5;
+  }
+
+  &.is-active {
+    color: #DCC28A;
+  }
+}
+
+html.theme-dark .el-tabs__active-bar {
+  background-color: #DCC28A;
+}
+
+html.theme-dark .el-tabs__nav-wrap::after {
+  background-color: #2A3A54;
+}
+
+html.theme-dark .el-pagination {
+  color: #99A9C4;
+
+  button,
+  .el-pager li {
+    background-color: #18243B;
+    color: #E6EDF5;
+
+    &:hover {
+      color: #DCC28A;
+    }
+  }
+
+  .el-pager li.active {
+    background-color: #1A3C6E;
+    color: #FFFFFF;
+  }
+
+  .el-pager li.btn-quickprev,
+  .el-pager li.btn-quicknext {
+    color: #99A9C4;
+  }
+
+  .el-pagination__sizes .el-input .el-input__inner {
+    background-color: #142033;
+    border-color: #2A3A54;
+    color: #E6EDF5;
+  }
+}
+
+/* ======================================================================
+ * 8. 描述列表
+ * ==================================================================== */
+html.theme-dark .el-descriptions {
+  color: #E6EDF5;
+
+  .el-descriptions__body {
+    background-color: #18243B;
+  }
+
+  &.el-descriptions--bordered {
+    .el-descriptions__cell {
+      border-color: #2A3A54;
+    }
+
+    .el-descriptions__label.is-bordered-label,
+    .el-descriptions__cell.is-bordered-label {
+      background-color: #142033;
+      color: #E6EDF5;
+    }
+  }
+}
+
+/* ======================================================================
+ * 9. 表单
+ * ==================================================================== */
+html.theme-dark .el-form-item__label {
+  color: #E6EDF5;
+}
+
+html.theme-dark .el-form-item__error {
+  color: #F08893;
+}
+
+html.theme-dark .el-form-item.is-required .el-form-item__label:before {
+  color: #F08893;
+}
+
+/* ======================================================================
+ * 10. 标签栏（TagsView）
+ * ==================================================================== */
+html.theme-dark .tags-view-container {
+  background-color: #142033;
+  border-bottom-color: #2A3A54;
+
+  .tags-view-item {
+    background-color: #18243B;
+    color: #99A9C4;
+    border-color: #2A3A54;
+
+    &:hover {
+      color: #E6EDF5;
+    }
+
+    &.active {
+      background-color: #1A3C6E;
+      color: #FFFFFF;
+      border-color: #1A3C6E;
+
+      .el-icon-close {
+        color: #FFFFFF;
+      }
+    }
+  }
+}
+
+/* ======================================================================
+ * 11. 侧栏（已为深司法蓝，暗色下微调子菜单底色与选中态金色）
+ * ==================================================================== */
+html.theme-dark .sidebar-container {
+  border-right-color: #0D1626;
+
+  .el-submenu .el-menu-item,
+  .nest-menu .el-submenu > .el-submenu__title {
+    background-color: #16335C !important;
+  }
+
+  .el-menu-item.is-active,
+  .theme-dark .is-active > .el-submenu__title {
+    border-left-color: #DCC28A !important;
+  }
+}
+
+/* ======================================================================
+ * 12. 顶部导航栏（保持司法蓝，暗色下文字提亮）
+ * ==================================================================== */
+html.theme-dark .navbar {
+  background: #142033;
+  border-bottom-color: #2A3A54;
+
+  .right-menu-item,
+  .hamburger-container {
+    color: #E6EDF5;
+  }
+}
+
+/* ======================================================================
+ * 13. 面包屑
+ * ==================================================================== */
+html.theme-dark .app-breadcrumb.el-breadcrumb,
+html.theme-dark .app-breadcrumb.el-breadcrumb a {
+  color: #99A9C4;
+
+  .no-redirect {
+    color: #E6EDF5;
+  }
+}
+
+/* ======================================================================
+ * 14. 抽屉
+ * ==================================================================== */
+html.theme-dark .el-drawer {
+  background-color: #18243B;
+
+  .el-drawer__title {
+    color: #E6EDF5;
+  }
+}
+
+/* ======================================================================
+ * 15. 滚动条
+ * ==================================================================== */
+html.theme-dark ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+html.theme-dark ::-webkit-scrollbar-track {
+  background: #0D1626;
+}
+
+html.theme-dark ::-webkit-scrollbar-thumb {
+  background: #2A3A54;
+  border-radius: 4px;
+
+  &:hover {
+    background: #3A4F70;
+  }
+}
+
+/* ======================================================================
+ * 16. 全局工具类文本色覆盖
+ * ==================================================================== */
+html.theme-dark .text-muted,
+html.theme-dark .el-form-item__label + .el-form-item__content .el-input__inner::placeholder {
+  color: #6B7A93 !important;
+}
+
+html.theme-dark .el-divider {
+  background-color: #2A3A54;
+
+  .el-divider__text {
+    background-color: #18243B;
+    color: #99A9C4;
+  }
+}
+
+html.theme-dark .el-loading-mask {
+  background-color: rgba(13, 22, 38, 0.8);
+
+  .el-loading-text {
+    color: #DCC28A;
+  }
+}
+
+html.theme-dark .el-loading-spinner .circular {
+  .path {
+    stroke: #DCC28A;
+  }
+}
+
+/* ======================================================================
+ * 17. 空状态组件（TableEmpty）文字适配
+ * ==================================================================== */
+html.theme-dark .el-empty__description p {
+  color: #99A9C4;
+}
+
+/* ======================================================================
+ * 18. 步骤条
+ * ==================================================================== */
+html.theme-dark .el-step__title.is-process,
+html.theme-dark .el-step__title.is-finish {
+  color: #E6EDF5;
+}
+
+html.theme-dark .el-step__description.is-process,
+html.theme-dark .el-step__description.is-finish {
+  color: #99A9C4;
+}
+
+/* ======================================================================
+ * 19. 时间线
+ * ==================================================================== */
+html.theme-dark .el-timeline-item__content {
+  color: #E6EDF5;
+}
+
+html.theme-dark .el-timeline-item__timestamp {
+  color: #99A9C4;
+}
+
+/* ======================================================================
+ * 20. 上传
+ * ==================================================================== */
+html.theme-dark .el-upload-dragger {
+  background-color: #142033;
+  border-color: #2A3A54;
+
+  &:hover {
+    border-color: #255A99;
+  }
+
+  .el-upload__text {
+    color: #99A9C4;
+
+    em {
+      color: #6A9FD8;
+    }
+  }
+}
+
+/* ======================================================================
+ * 21. 进度条
+ * ==================================================================== */
+html.theme-dark .el-progress-bar__outer {
+  background-color: #1F2C42;
+}
+
+/* ======================================================================
+ * 22. 树形控件
+ * ==================================================================== */
+html.theme-dark .el-tree {
+  background-color: #18243B;
+  color: #E6EDF5;
+
+  .el-tree-node__content:hover {
+    background-color: #1E2D47;
+  }
+
+  .el-tree-node.is-current > .el-tree-node__content {
+    background-color: #253A5C;
+  }
+}
+
+/* ======================================================================
+ * 23. 工作台（workbench）自定义区块
+ * ==================================================================== */
+html.theme-dark .workbench {
+  background: #0D1626;
+}
+
+html.theme-dark .wb-stat-card {
+  background: #18243B;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+
+  .wb-stat-value { color: #E6EDF5; }
+  .wb-stat-title { color: #99A9C4; }
+}
+
+html.theme-dark .wb-card {
+  border-color: #2A3A54;
+  background: #18243B;
+
+  .wb-card-header {
+    color: #E6EDF5;
+
+    i { color: #6A9FD8; }
+  }
+}
+
+html.theme-dark .wb-empty {
+  color: #6B7A93;
+}
+
+html.theme-dark .wb-cal-today {
+  background: #1E2D47;
+  color: #6A9FD8;
+}
+
+html.theme-dark .wb-quick-item {
+  &:hover { background: #1E2D47; }
+  span { color: #99A9C4; }
+}
+
+html.theme-dark .wb-qicon-blue { background: #1A2B45; color: #6A9FD8; }
+html.theme-dark .wb-qicon-green { background: #16332A; color: #6FD4A8; }
+html.theme-dark .wb-qicon-blue2 { background: #1A2240; color: #8B8CF0; }
+html.theme-dark .wb-qicon-teal { background: #0F2A2A; color: #5BC0BE; }
+
+html.theme-dark .wb-record-item {
+  border-bottom-color: #1F2C42;
+
+  .wb-record-phone { color: #E6EDF5; }
+  .wb-record-name { color: #99A9C4; }
+  .wb-record-time { color: #6B7A93; }
+}
+
+/* ======================================================================
+ * 24. 大屏看板（dashboard）自定义区块
+ * ==================================================================== */
+html.theme-dark .dashboard-container {
+  background: #0D1626;
+}
+
+html.theme-dark .filter-bar .title {
+  color: #E6EDF5;
+}
+
+html.theme-dark .filter-bar .auto-tip {
+  color: #6B7A93;
+}
+
+html.theme-dark .care-num {
+  color: #DCC28A;
+}
+
+html.theme-dark .care-sub {
+  color: #E6EDF5;
+}
+
+html.theme-dark .care-label {
+  color: #99A9C4;
+}
+
+/* ======================================================================
+ * 25. 话务台（callWorkbench）自定义区块——夜间值班核心页面
+ * ==================================================================== */
+html.theme-dark .call-workbench {
+  background: #0D1626;
+}
+
+html.theme-dark .wb-kpi-card {
+  background: #18243B;
+
+  .wb-kpi-title { color: #99A9C4; }
+  .wb-kpi-value { color: #E6EDF5; }
+  .wb-kpi-sub { color: #6B7A93; }
+}
+
+html.theme-dark .wb-todo-card {
+  background: #18243B;
+
+  .wb-card-title { color: #E6EDF5; }
+  .wb-todo-title { color: #E6EDF5; }
+  .wb-todo-due { color: #99A9C4; }
+}
+
+html.theme-dark .wb-quick-item {
+  background: #18243B;
+
+  &:hover { background: #1E2D47; }
+  span { color: #99A9C4; }
+}
+
+html.theme-dark .wb-table {
+  th { background: #142033 !important; color: #99A9C4 !important; }
+  td { border-color: #1F2C42 !important; }
+  .wb-phone { color: #E6EDF5; }
+}
+
+html.theme-dark .wb-notice-item {
+  background: #18243B;
+
+  &:hover { background: #1E2D47; }
+  .wb-nc-title { color: #E6EDF5; }
+}
+
+html.theme-dark .wb-cal-table th { color: #99A9C4; }
+html.theme-dark .wb-cal-cell { color: #E6EDF5; }
+html.theme-dark .wb-cal-cell:hover { background: #1E2D47; }
+html.theme-dark .wb-cal-cell.is-today { background: #1A3C6E; }
+
+/* ======================================================================
+ * 26. 登录页
+ * ==================================================================== */
+html.theme-dark .login {
+  background-image: none !important;
+  background-color: #0D1626 !important;
+}
+
+html.theme-dark .login-form {
+  background: #18243B;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+html.theme-dark .login .title {
+  color: #E6EDF5;
+}
+
+html.theme-dark .el-login-footer span {
+  color: #6B7A93;
+}

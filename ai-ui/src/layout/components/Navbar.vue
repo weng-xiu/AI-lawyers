@@ -47,14 +47,25 @@
                 aria-labelledby="careContrastLabel"
                 @change="onHighContrast" />
             </div>
-            <div class="care-panel-tip">标准14px / 大字18px / 超大22px；高对比主题正文对比度≥4.5:1。设置仅保存在当前工位浏览器，适用于视障坐席与投屏场景。</div>
+            <div class="care-panel-row">
+              <span class="care-panel-label" id="careThemeLabel">主题</span>
+              <el-radio-group
+                :value="care.theme"
+                size="small"
+                aria-labelledby="careThemeLabel"
+                @input="onTheme">
+                <el-radio-button label="light">浅色</el-radio-button>
+                <el-radio-button label="dark">暗色</el-radio-button>
+              </el-radio-group>
+            </div>
+            <div class="care-panel-tip">标准14px / 大字18px / 超大22px；高对比主题正文对比度≥4.5:1；暗色模式适合 7×24 夜间值班护眼。设置仅保存在当前工位浏览器。</div>
           </div>
           <button
             slot="reference"
             type="button"
             id="care-settings"
             class="right-menu-item hover-effect care-entry"
-            :class="{ 'is-active': care.fontScale !== 'normal' || care.highContrast }"
+            :class="{ 'is-active': care.fontScale !== 'normal' || care.highContrast || care.theme === 'dark' }"
             aria-label="显示设置：字号与高对比度">
             <span class="care-glyph" aria-hidden="true">A<sup class="care-glyph-plus">+</sup></span>
           </button>
@@ -205,6 +216,9 @@ export default {
     },
     onHighContrast(val) {
       this.$care.setHighContrast(val)
+    },
+    onTheme(val) {
+      this.$care.setTheme(val)
     },
     fetchUnread() {
       unreadCount().then(res => {

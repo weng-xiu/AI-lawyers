@@ -14,6 +14,7 @@ const Register = () => import('@/views/Register')
 const MyTickets = () => import('@/views/MyTickets')
 const ServiceNav = () => import('@/views/ServiceNav')
 const MyChannels = () => import('@/views/MyChannels')
+const ElderlyZone = () => import('@/views/ElderlyZone')
 
 const routes = [
   {
@@ -50,6 +51,13 @@ const routes = [
     component: ServiceNav,
     // 服务机构目录为匿名只读接口，未登录也可浏览
     meta: { title: '服务导航', requiresAuth: false }
+  },
+  {
+    path: '/elderly',
+    name: 'ElderlyZone',
+    component: ElderlyZone,
+    // V6 长辈服务专区：匿名可浏览，登录态在点击登录态入口时由守卫带 redirect 处理
+    meta: { title: '长辈服务专区', requiresAuth: false }
   },
   {
     path: '/consultation',
