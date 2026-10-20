@@ -50,6 +50,7 @@ nbdist/
 !*/build/*.html
 !*/build/*.xml
 /aiuser-ui/node_modules/
+/aiuser-ui/test-results/
 /node_modules/
 /third_party/
 /.m2-repo/

@@ -126,11 +126,12 @@
         :show-overflow-tooltip="col.showOverflowTooltip === true"
         :class-name="col.className"
       >
-        <template v-if="col.slot" slot-scope="scope">
-          <slot :name="'column-' + col.prop" v-bind="scope"></slot>
-        </template>
-        <template v-else-if="col.formatter" slot-scope="scope">
-          {{ col.formatter(scope.row, scope.column, scope.row[col.prop], scope.$index) }}
+        <!-- P8 单测回归：slot-scope 模板合并后 $scopedSlots.default 恒存在，
+             会抑制 el-table-column 默认文本渲染，普通列必须自带兜底（否则单元格空白） -->
+        <template slot-scope="scope">
+          <slot v-if="col.slot" :name="'column-' + col.prop" v-bind="scope"></slot>
+          <span v-else-if="col.formatter">{{ col.formatter(scope.row, scope.column, scope.row[col.prop], scope.$index) }}</span>
+          <span v-else>{{ scope.row[col.prop] }}</span>
         </template>
       </el-table-column>
     </el-table>

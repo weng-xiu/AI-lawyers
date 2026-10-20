@@ -1,6 +1,6 @@
 # 公众端（aiuser-ui）无障碍 axe 扫描回归报告
 
-- 扫描日期：2026-10-11
+- 扫描日期：2026-10-20
 - 工具：Playwright + @axe-core/playwright（axe-core）
 - 规则标签：WCAG 2.0/2.1 Level A、AA
 - 环境：dev server http://localhost:8091（vue-cli 自动分配，避开已被旧项目占用的 81/8081），后端接口由测试统一 mock（空态），不影响 DOM 违规判定
