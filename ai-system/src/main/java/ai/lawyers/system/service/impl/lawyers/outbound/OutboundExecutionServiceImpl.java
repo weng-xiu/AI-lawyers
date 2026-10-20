@@ -3,7 +3,6 @@ package ai.lawyers.system.service.impl.lawyers.outbound;
 import java.time.Duration;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -18,45 +17,24 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import ai.lawyers.common.core.domain.entity.SysUser;
 import ai.lawyers.common.utils.StringUtils;
-import ai.lawyers.system.domain.lawyers.AiCallRecord;
-import ai.lawyers.system.domain.lawyers.AiCallTicket;
-import ai.lawyers.system.domain.lawyers.AiHotspotSuppress;
 import ai.lawyers.system.domain.lawyers.outbound.AiOutboundCallee;
-import ai.lawyers.system.domain.lawyers.outbound.AiOutboundResult;
 import ai.lawyers.system.domain.lawyers.outbound.AiOutboundTask;
-import ai.lawyers.system.domain.lawyers.trunk.AiCallDialLog;
-import ai.lawyers.system.domain.lawyers.trunk.DialRequest;
-import ai.lawyers.system.domain.lawyers.trunk.DialResult;
-import ai.lawyers.system.domain.lawyers.ivr.IvrExecuteRequest;
-import ai.lawyers.system.domain.lawyers.ivr.IvrExecuteResult;
 import ai.lawyers.system.mapper.lawyers.outbound.AiOutboundCalleeMapper;
 import ai.lawyers.system.mapper.lawyers.outbound.AiOutboundTaskMapper;
-import ai.lawyers.system.mapper.lawyers.trunk.AiCallDialLogMapper;
 import ai.lawyers.system.service.ISysUserService;
 import ai.lawyers.system.service.lawyers.cluster.RedisLeaderLock;
 import ai.lawyers.system.service.lawyers.cluster.InstanceDrainState;
 import ai.lawyers.system.service.lawyers.concurrent.ExecutorRegistry;
-import ai.lawyers.system.service.lawyers.IAiCallRecordService;
-import ai.lawyers.system.service.lawyers.IAiCallTicketService;
-import ai.lawyers.system.service.lawyers.IAiHotspotSuppressService;
-import ai.lawyers.system.service.lawyers.outbound.IAiOutboundResultService;
 import ai.lawyers.system.service.lawyers.outbound.IAiOutboundTaskService;
 import ai.lawyers.system.service.lawyers.outbound.IOutboundExecutionService;
-import ai.lawyers.system.service.lawyers.queue.CallEventDispatcher;
 import ai.lawyers.system.service.lawyers.queue.MessageNotifyDispatcher;
-import ai.lawyers.system.service.lawyers.trunk.ICallDispatchService;
-import ai.lawyers.system.service.lawyers.ivr.engine.IIvrEngineService;
-import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
+import ai.lawyers.system.service.lawyers.compliance.ComplianceGuard;
 
 /**
- * 智能外呼执行引擎实现。
+ * 智能外呼执行引擎实现（调度门面）。
  *
  * 双模式：
  *  - 模拟模式（call.outbound.simulateAnswer=true，默认）：下发成功后直接模拟接通，
@@ -65,31 +43,19 @@ import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
  *
  * 重试策略：可重试失败（无可用线路/线路忙/网关错误等）在 retryCount 内自动回拨，
  * 重试次数用尽或永久失败后计入失败统计。
+ *
+ * <p>P5 超大类拆分：本类只保留"调度编排"职责——任务扫描/并发拨号编排/对账/完成判定/通知；
+ * 单号码拨号执行下沉 {@link OutboundDialer}，落库收尾下沉 {@link OutboundCallFinalizer}，
+ * 网关事件处理下沉 {@link OutboundEventCallback}，重试纯逻辑见 {@link OutboundRetryPolicy}。
+ * 协作类均不反向依赖门面，无循环依赖。</p>
  */
 @Service
 public class OutboundExecutionServiceImpl implements IOutboundExecutionService
 {
     private static final Logger log = LoggerFactory.getLogger(OutboundExecutionServiceImpl.class);
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-
     @Autowired
     private IAiOutboundTaskService taskService;
-
-    @Autowired
-    private IAiOutboundResultService resultService;
-
-    @Autowired
-    private IAiCallRecordService callRecordService;
-
-    @Autowired
-    private IAiCallTicketService callTicketService;
-
-    @Autowired
-    private ICallDispatchService callDispatchService;
-
-    @Autowired
-    private IIvrEngineService ivrEngineService;
 
     @Autowired
     private AiOutboundTaskMapper taskMapper;
@@ -98,68 +64,43 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
     private AiOutboundCalleeMapper calleeMapper;
 
     @Autowired
-    private AiCallDialLogMapper dialLogMapper;
-
-    @Autowired
     private Environment environment;
-
-    @Autowired
-    private PlatformTransactionManager transactionManager;
-
-    /** T5-1：外呼指标（未引入 micrometer 时内部静默） */
-    @Autowired(required = false)
-    private HotlineMetrics metrics;
 
     /** T5-3 消息中心：任务完成站内信投递（队列不可用时内部降级，不影响外呼主流程） */
     @Autowired(required = false)
     private MessageNotifyDispatcher messageNotifyDispatcher;
 
-    @Autowired
-    private CallEventDispatcher callEventDispatcher;
-
-    @Autowired(required = false)
-    private ai.lawyers.system.service.lawyers.compliance.ComplianceGuard complianceGuard;
-
     /** P3-C6：实例排空状态，排空中外呼扫描停领新任务 */
     @Autowired(required = false)
     private InstanceDrainState drainState;
 
-    /** P3-D1 高频置底：外呼拨号前号码规则判定（REJECT 跳过 / PRIORITY 沉底） */
+    /** W4：合规守卫（扫描时段判定；拨号侧拦截见 Dialer） */
+    @Autowired(required = false)
+    private ComplianceGuard complianceGuard;
+
+    /** P5：拨号执行协作类（合规拦截/高频置底/下发/模拟接通/失败重试） */
     @Autowired
-    private IAiHotspotSuppressService hotspotSuppressService;
+    private OutboundDialer dialer;
 
-    /** 高频置底总开关（与入站共用） */
-    @Value("${hotspot.suppress.enabled:true}")
-    private boolean hotspotEnabled;
+    /** P5：落库收尾协作类（号码状态/结果/计数/话单/工单） */
+    @Autowired
+    private OutboundCallFinalizer finalizer;
 
-    /**
-     * 外呼置底沉底偏移量：外呼内存队列按 priority 升序（越小越优先），与入站 ACD desc 相反，
-     * 沉底=抬高数值；加固定偏移而非取极大值，保持同批被压制号码间仍按任务原优先级有序。
-     */
-    private static final int HOTSPOT_SINK_OFFSET = 10000;
+    /** P5：网关事件回调协作类（ANSWERED/HANGUP/FAILED 幂等终态化） */
+    @Autowired
+    private OutboundEventCallback eventCallback;
 
     /** createBy（登录名）反查 userId，用于确定站内信接收人 */
     @Autowired
     private ISysUserService userService;
 
-    /** 多步写库（号码状态 + 结果 + 任务计数）统一在此事务模板内提交，保证一致性 */
-    private TransactionTemplate transactionTemplate;
-
-    /** 模拟接通：无真实网关时直接完成全链路 */
+    /** 模拟接通：无真实网关时直接完成全链路（仅用于启动期风险告警判定） */
     @Value("${call.outbound.simulateAnswer:true}")
     private boolean simulateAnswer;
-
-    /** 模拟接通后的通话时长（秒），仅模拟模式使用 */
-    @Value("${call.outbound.simulateTalkSeconds:45}")
-    private int simulateTalkSeconds;
 
     /** 是否启用定时扫描执行 */
     @Value("${call.outbound.scanEnabled:true}")
     private boolean scanEnabled;
-
-    /** 回访/转人工类外呼接通后自动创建工单（融合点：外呼可触发工单创建） */
-    @Value("${call.outbound.autoCreateTicket:false}")
-    private boolean autoCreateTicket;
 
     /** T2-2 单任务并发拨号线程数（=1 时退化为串行，兼容旧行为） */
     @Value("${call.outbound.dial.concurrent:8}")
@@ -204,7 +145,6 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
     @PostConstruct
     public void checkSimulateSwitch()
     {
-        transactionTemplate = new TransactionTemplate(transactionManager);
         // T2-2 并发拨号线程池：P2 改由 ExecutorRegistry 统一创建——
         // 有界队列（原实现为无界 LinkedBlockingQueue）+ CallerRuns 回压 + Micrometer 指标 + 30s 水位巡检
         int poolSize = Math.max(1, Math.min(dialConcurrent, 64));
@@ -278,12 +218,12 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
                 callee.setCallTime(new Date());
                 try
                 {
-                    dialCallee(task, callee);
+                    dialer.dialCallee(task, callee);
                 }
                 catch (Exception e)
                 {
                     log.error("外呼号码执行异常 taskId={} calleeId={}", taskId, callee.getCalleeId(), e);
-                    markCalleeFailed(task, callee, "执行异常：" + e.getMessage());
+                    finalizer.markCalleeFailed(task, callee, "执行异常：" + e.getMessage());
                 }
             });
         }
@@ -411,7 +351,7 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
                     // 已有话单（曾接通）按已完成收尾，否则按失败计入，保证任务可终态
                     if (callee.getRecordId() != null)
                     {
-                        finalizeCallee(task.getTaskId(), callee, true, 0, "RECONCILE");
+                        finalizer.finalizeCallee(task.getTaskId(), callee, true, 0, "RECONCILE");
                     }
                     else
                     {
@@ -429,11 +369,12 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
                             upd.setUpdateBy("outbound-reconcile");
                             calleeMapper.updateCalleeStatus(upd);
                             calleeMapper.updateNextRetryTime(callee.getCalleeId(),
-                                    backoffRetryTime(retryTimes + 1), "outbound-reconcile");
+                                    OutboundRetryPolicy.backoffRetryTime(retryTimes + 1, retryBackoffBaseMs),
+                                    "outbound-reconcile");
                         }
                         else
                         {
-                            markCalleeFailed(task, callee, "呼叫超时未收到网关事件，对账判定失败");
+                            finalizer.markCalleeFailed(task, callee, "呼叫超时未收到网关事件，对账判定失败");
                         }
                     }
                 }
@@ -447,17 +388,6 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
         {
             log.error("外呼对账任务异常", e);
         }
-    }
-
-    /** T2-2 指数退避：base * 2^(retryTimes-1)，上限 10 分钟 */
-    private Date backoffRetryTime(int retryTimes)
-    {
-        long backoff = retryBackoffBaseMs;
-        for (int i = 1; i < Math.min(retryTimes, 8); i++)
-        {
-            backoff = Math.min(backoff * 2, 10L * 60 * 1000);
-        }
-        return new Date(System.currentTimeMillis() + backoff);
     }
 
     @PreDestroy
@@ -482,522 +412,10 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
     }
 
     @Override
-    public void onCallEvent(String callUuid, String eventType, Map<String, Object> params)
+    public void onCallEvent(String callUuid, String eventType, java.util.Map<String, Object> params)
     {
-        if (callUuid == null || eventType == null)
-        {
-            return;
-        }
-        AiCallDialLog dialLog = dialLogMapper.selectByCallUuid(callUuid);
-        if (dialLog == null || dialLog.getTaskId() == null)
-        {
-            return;
-        }
-        Long taskId = dialLog.getTaskId();
-        String event = eventType.toUpperCase();
-
-        // C5：按 callUuid → dialLog → calleeId 精确定位被叫，避免任务内按状态猜号码导致错配；
-        // dialLog 无 calleeId（历史数据或人工外呼）时，回退按 recordId/号码匹配。
-        AiOutboundCallee target = null;
-        if (dialLog.getCalleeId() != null)
-        {
-            target = calleeMapper.selectAiOutboundCalleeByCalleeId(dialLog.getCalleeId());
-        }
-        if (target == null)
-        {
-            List<AiOutboundCallee> callees = calleeMapper.selectAiOutboundCalleeByTaskId(taskId);
-            target = findCallee(callees, dialLog, event);
-        }
-        if (target == null)
-        {
-            return;
-        }
-
-        if ("ANSWERED".equals(event))
-        {
-            // 幂等：仅呼叫中(1)的号码处理接通，已接通/已终态的重复事件直接跳过
-            if (!"1".equals(target.getCallStatus()))
-            {
-                log.debug("ANSWERED事件忽略：号码不在呼叫中 taskId={} calleeId={} status={}",
-                        taskId, target.getCalleeId(), target.getCallStatus());
-                return;
-            }
-            AiCallRecord record = createCallRecord(taskId, target);
-            AiOutboundCallee upd = new AiOutboundCallee();
-            upd.setCalleeId(target.getCalleeId());
-            upd.setCallStatus("2");
-            upd.setRecordId(record.getRecordId());
-            upd.setUpdateBy("outbound-event");
-            calleeMapper.updateCalleeStatus(upd);
-            // 回写 dialLog.recordId/calleeId，保证后续 HANGUP/FAILED 事件可按 recordId 精确关联
-            AiCallDialLog logUpd = new AiCallDialLog();
-            logUpd.setLogId(dialLog.getLogId());
-            logUpd.setRecordId(record.getRecordId());
-            logUpd.setCalleeId(target.getCalleeId());
-            logUpd.setUpdateBy("outbound-event");
-            dialLogMapper.updateAiCallDialLog(logUpd);
-            maybeCreateTicket(taskService.selectAiOutboundTaskByTaskId(taskId), target,
-                    record.getRecordId(), null);
-            // T5-1：外呼接通计数（网关模式，ANSWERED 事件）
-            if (metrics != null)
-            {
-                metrics.incrementOutbound("answer");
-            }
-            log.info("外呼接通 taskId={} calleeId={} recordId={}", taskId, target.getCalleeId(), record.getRecordId());
-            return;
-        }
-
-        if ("HANGUP".equals(event) || "FAILED".equals(event))
-        {
-            // 幂等：已达终态(3未接/4失败/5完成)的号码不再重复处理
-            if ("3".equals(target.getCallStatus()) || "4".equals(target.getCallStatus())
-                    || "5".equals(target.getCallStatus()))
-            {
-                log.debug("HANGUP/FAILED事件忽略：号码已终态 taskId={} calleeId={} status={}",
-                        taskId, target.getCalleeId(), target.getCallStatus());
-                return;
-            }
-            boolean connected = isConnected(params, dialLog);
-            finalizeCallee(taskId, target, connected, getTalkSeconds(params, dialLog), event);
-        }
-    }
-
-    // ------------------------------------------------------------------ 内部实现
-
-    /**
-     * W4：合规拦截（退订/非时段）时标记被叫为已跳过，不重试、不计失败，仅计入完成数避免任务卡死。
-     */
-    private void markCalleeSkipped(AiOutboundCallee callee, String reason)
-    {
-        try
-        {
-            AiOutboundCallee upd = new AiOutboundCallee();
-            upd.setCalleeId(callee.getCalleeId());
-            upd.setCallStatus("4");
-            upd.setCallTime(new Date());
-            upd.setFailReason(truncate("合规拦截:" + reason, 500));
-            upd.setUpdateBy("outbound-executor");
-            calleeMapper.updateCalleeStatus(upd);
-            taskMapper.incrementCompletedCount(callee.getTaskId());
-        }
-        catch (Exception e)
-        {
-            log.warn("标记被叫跳过失败 calleeId={} reason={}: {}", callee.getCalleeId(), reason, e.getMessage());
-        }
-    }
-
-    private void dialCallee(AiOutboundTask task, AiOutboundCallee callee)
-    {
-        // W4：退订号码拦截（已回复"T"退订的号码禁止外呼）
-        if (complianceGuard != null && complianceGuard.isUnsubscribed(callee.getCalleeNumber()))
-        {
-            log.info("外呼号码已退订，跳过拨号 taskId={} calleeId={}", task.getTaskId(), callee.getCalleeId());
-            markCalleeSkipped(callee, "UNSUBSCRIBED");
-            return;
-        }
-        // P3-D1：高频置底外呼侧判定——命中 REJECT 跳过拨号（状态4跳过、不计失败、计入完成防任务卡死）；
-        // 命中 PRIORITY 抬高排队优先级数值沉底（外呼队列升序，方向与入站相反）
-        AiHotspotSuppress suppress = null;
-        if (hotspotEnabled)
-        {
-            suppress = hotspotSuppressService.matchOutbound(callee.getCalleeNumber(), task.getTaskId());
-        }
-        if (suppress != null && "REJECT".equals(suppress.getAction()))
-        {
-            log.info("外呼号码命中高频置底规则[{}]，跳过拨号 taskId={} calleeId={}",
-                    suppress.getRuleName(), task.getTaskId(), callee.getCalleeId());
-            markCalleeSkipped(callee, "高频置底拦截:" + suppress.getRuleName());
-            return;
-        }
-        Date dialTime = new Date();
-        // 号码已由 executeTask 通过 claimCallee 原子置为呼叫中(1)，此处不再重复置状态
-
-        DialRequest request = new DialRequest();
-        request.setCalleeNumber(callee.getCalleeNumber());
-        request.setCallerNumber(task.getCallerNumber());
-        request.setTaskId(task.getTaskId());
-        // C5：把被叫ID透传到 dial_log，回调事件按 callUuid→dialLog→calleeId 精确定位
-        request.setCalleeId(callee.getCalleeId());
-        int dialPriority = task.getPriority() == null ? 100 : task.getPriority();
-        if (suppress != null && "PRIORITY".equals(suppress.getAction()))
-        {
-            log.info("外呼号码命中置底降权规则[{}]，排队优先级 {} -> {} taskId={} calleeId={}",
-                    suppress.getRuleName(), dialPriority, dialPriority + HOTSPOT_SINK_OFFSET,
-                    task.getTaskId(), callee.getCalleeId());
-            dialPriority += HOTSPOT_SINK_OFFSET;
-        }
-        request.setPriority(dialPriority);
-        request.setAnswerAction(task.getIvrFlowId() == null ? "BRIDGE_AGENT" : "IVR");
-        request.setIvrFlowId(task.getIvrFlowId());
-        request.setEnableRecord(true);
-        request.setCreateBy(task.getCreateBy() == null ? "outbound-executor" : task.getCreateBy());
-        request.setRemark("外呼任务:" + task.getTaskNo());
-
-        DialResult result = callDispatchService.dialWithQueue(request);
-        // T5-1：外呼下发计数（含重试再拨，每次成功下发计 1）
-        if (metrics != null && result.isSuccess())
-        {
-            metrics.incrementOutbound("dial");
-        }
-        if (!result.isSuccess())
-        {
-            handleDialFailed(task, callee, result);
-            return;
-        }
-
-        if (simulateAnswer)
-        {
-            handleSimulatedAnswered(task, callee, dialTime);
-        }
-        else
-        {
-            log.info("外呼已下发，等待网关事件 taskId={} calleeId={} uuid={}",
-                    task.getTaskId(), callee.getCalleeId(), result.getCallUuid());
-        }
-    }
-
-    private void handleSimulatedAnswered(AiOutboundTask task, AiOutboundCallee callee, Date dialTime)
-    {
-        AiCallRecord record = createCallRecord(task.getTaskId(), callee);
-        // IVR 流程为模型/远程调用，放在事务外执行，避免长事务占用数据库连接
-        IvrExecuteResult flowResult = runIvrFlow(task, callee, record.getRecordId());
-
-        final int talkSeconds = simulateTalkSeconds > 0 ? simulateTalkSeconds : 0;
-        final AiOutboundTask fTask = task;
-        final AiOutboundCallee fCallee = callee;
-        final AiCallRecord fRecord = record;
-        final IvrExecuteResult fFlowResult = flowResult;
-        final Date fDialTime = dialTime;
-        // C4：号码状态、外呼结果、任务计数多步写库放在同一事务内，失败整体回滚，保证计数一致
-        transactionTemplate.executeWithoutResult(status ->
-        {
-            AiOutboundCallee upd = new AiOutboundCallee();
-            upd.setCalleeId(fCallee.getCalleeId());
-            upd.setCallStatus("5");
-            upd.setRecordId(fRecord.getRecordId());
-            upd.setCallDuration(talkSeconds);
-            upd.setUpdateBy("outbound-executor");
-            calleeMapper.updateCalleeStatus(upd);
-
-            createOutboundResult(fTask, fCallee, fRecord.getRecordId(), "1", fDialTime, new Date(),
-                    talkSeconds, fFlowResult);
-            taskMapper.incrementAnsweredCount(fTask.getTaskId());
-            taskMapper.incrementCompletedCount(fTask.getTaskId());
-        });
-
-        if (flowResult != null)
-        {
-            updateRecordWithFlow(record.getRecordId(), flowResult);
-        }
-        maybeCreateTicket(task, callee, record.getRecordId(), flowResult);
-        // T5-1：外呼接通计数（模拟模式）
-        if (metrics != null)
-        {
-            metrics.incrementOutbound("answer");
-        }
-        log.info("外呼模拟接通完成 taskId={} calleeId={} recordId={} 意图={}",
-                task.getTaskId(), callee.getCalleeId(), record.getRecordId(),
-                flowResult == null ? null : flowResult.getMatchedIntentionName());
-    }
-
-    private IvrExecuteResult runIvrFlow(AiOutboundTask task, AiOutboundCallee callee, Long recordId)
-    {
-        if (task.getIvrFlowId() == null)
-        {
-            return null;
-        }
-        IvrExecuteRequest req = new IvrExecuteRequest();
-        req.setFlowId(task.getIvrFlowId());
-        req.setRecordId(recordId);
-        req.setCallerNumber(task.getCallerNumber());
-        req.setCalleeNumber(callee.getCalleeNumber());
-        String sampleInput = sampleInput(callee);
-        req.getInputs().add(sampleInput);
-        req.getVariables().put("taskId", task.getTaskId());
-        req.getVariables().put("taskNo", task.getTaskNo());
-        req.getVariables().put("taskName", task.getTaskName());
-        req.getVariables().put("calleeName", callee.getCalleeName());
-        req.getVariables().put("calleeNumber", callee.getCalleeNumber());
-        try
-        {
-            return ivrEngineService.executeFlow(req);
-        }
-        catch (Exception e)
-        {
-            log.warn("外呼IVR流程执行异常 taskId={} calleeId={} error={}",
-                    task.getTaskId(), callee.getCalleeId(), e.getMessage());
-            return null;
-        }
-    }
-
-    /** 演示用输入：优先取号码附加参数中的 input 字段，其次姓名，最后默认法律咨询话术 */
-    private String sampleInput(AiOutboundCallee callee)
-    {
-        if (StringUtils.isNotEmpty(callee.getCalleeParams()))
-        {
-            try
-            {
-                Map<String, Object> params = MAPPER.readValue(callee.getCalleeParams(),
-                        MAPPER.getTypeFactory().constructMapType(Map.class, String.class, Object.class));
-                if (params.get("input") != null && StringUtils.isNotEmpty(params.get("input").toString()))
-                {
-                    return params.get("input").toString();
-                }
-            }
-            catch (Exception ignored)
-            {
-            }
-        }
-        if (StringUtils.isNotEmpty(callee.getCalleeName()))
-        {
-            return "我想咨询" + callee.getCalleeName() + "相关的法律问题";
-        }
-        return "我想咨询一下法律问题，比如合同纠纷";
-    }
-
-    private void handleDialFailed(AiOutboundTask task, AiOutboundCallee callee, DialResult result)
-    {
-        String reason = result == null ? "未知错误" : result.getMessage();
-        int retryTimes = callee.getRetryTimes() == null ? 0 : callee.getRetryTimes();
-        int retryCount = task.getRetryCount() == null ? 0 : task.getRetryCount();
-
-        if (retryTimes < retryCount && isRetryableError(result))
-        {
-            // 重试：号码回到待呼叫队列，等待下一轮扫描
-            AiOutboundCallee upd = new AiOutboundCallee();
-            upd.setCalleeId(callee.getCalleeId());
-            upd.setCallStatus("0");
-            upd.setRetryTimes(retryTimes + 1);
-            upd.setLastRetryTime(new Date());
-            upd.setFailReason(truncate(reason, 500));
-            upd.setUpdateBy("outbound-executor");
-            calleeMapper.updateCalleeStatus(upd);
-            // T2-2 指数退避：记录下次可重试时间，未到期号码扫描时不捞出，避免失败号码被每 15s 反复重拨
-            calleeMapper.updateNextRetryTime(callee.getCalleeId(),
-                    backoffRetryTime(retryTimes + 1), "outbound-executor");
-            // T5-1：外呼重试计数
-            if (metrics != null)
-            {
-                metrics.incrementOutbound("retry");
-            }
-            log.info("外呼失败进入重试 taskId={} calleeId={} 第{}次 reason={}",
-                    task.getTaskId(), callee.getCalleeId(), retryTimes + 1, reason);
-            return;
-        }
-
-        markCalleeFailed(task, callee, reason);
-    }
-
-    private void markCalleeFailed(final AiOutboundTask task, final AiOutboundCallee callee, final String reason)
-    {
-        // C4：号码失败状态、外呼结果、任务失败/完成计数同事务提交
-        transactionTemplate.executeWithoutResult(status ->
-        {
-            AiOutboundCallee upd = new AiOutboundCallee();
-            upd.setCalleeId(callee.getCalleeId());
-            upd.setCallStatus("4");
-            upd.setCallTime(new Date());
-            upd.setFailReason(truncate(reason, 500));
-            upd.setUpdateBy("outbound-executor");
-            calleeMapper.updateCalleeStatus(upd);
-
-            createOutboundResult(task, callee, null, "7", new Date(), new Date(), 0, null);
-            taskMapper.incrementFailedCount(task.getTaskId());
-            taskMapper.incrementCompletedCount(task.getTaskId());
-        });
-        // T5-1：外呼终态失败计数（重试耗尽/永久失败；未接不计入此口径）
-        if (metrics != null)
-        {
-            metrics.incrementOutbound("fail");
-        }
-    }
-
-    private AiCallRecord createCallRecord(Long taskId, AiOutboundCallee callee)
-    {
-        AiOutboundTask task = taskService.selectAiOutboundTaskByTaskId(taskId);
-        AiCallRecord record = new AiCallRecord();
-        record.setCallerNumber(task == null ? null : task.getCallerNumber());
-        record.setCallerName(callee.getCalleeName());
-        record.setCallerAddress(callee.getCalleeAddress());
-        record.setCallTime(new Date());
-        record.setStatus("1");
-        record.setContent("外呼任务[" + (task == null ? "" : task.getTaskNo())
-                + "] 被叫号码:" + callee.getCalleeNumber());
-        record.setRemark("智能外呼接通，任务:" + (task == null ? "" : task.getTaskNo()));
-        record.setCreateBy(task == null ? "outbound-executor" : task.getCreateBy());
-        callRecordService.insertAiCallRecord(record);
-        return record;
-    }
-
-    private void updateRecordWithFlow(Long recordId, IvrExecuteResult flowResult)
-    {
-        try
-        {
-            AiCallRecord update = new AiCallRecord();
-            update.setRecordId(recordId);
-            if (flowResult.getCategoryId() != null)
-            {
-                update.setCategoryId(flowResult.getCategoryId());
-            }
-            if (StringUtils.isNotEmpty(flowResult.getTransferTarget()))
-            {
-                update.setStatus("2");
-            }
-            update.setRemark("【IVR】流程[" + flowResult.getFlowName() + "] 意图="
-                    + flowResult.getMatchedIntentionName() + "(" + flowResult.getMatchedIntention() + ")"
-                    + " 分类=" + flowResult.getCategoryName());
-            callEventDispatcher.updateCallRecordAsync(update);
-        }
-        catch (Exception e)
-        {
-            log.warn("外呼话单回写IVR结果失败 recordId={} error={}", recordId, e.getMessage());
-        }
-    }
-
-    /**
-     * 融合点 3.5.3：外呼任务与工单集成——回访类任务或转人工类外呼接通后自动创建工单。
-     */
-    private void maybeCreateTicket(AiOutboundTask task, AiOutboundCallee callee,
-                                   Long recordId, IvrExecuteResult flowResult)
-    {
-        if (!autoCreateTicket || task == null || recordId == null)
-        {
-            return;
-        }
-        boolean visitTask = "2".equals(task.getTaskType());
-        boolean transferNeeded = flowResult != null && StringUtils.isNotEmpty(flowResult.getTransferTarget());
-        if (!visitTask && !transferNeeded)
-        {
-            return;
-        }
-        try
-        {
-            AiCallTicket ticket = new AiCallTicket();
-            ticket.setRecordId(recordId);
-            ticket.setTitle((visitTask ? "回访工单" : "跟进工单") + "：" + task.getTaskName());
-            ticket.setContent("外呼任务[" + task.getTaskNo() + "] 被叫号码:" + callee.getCalleeNumber()
-                    + " 被叫姓名:" + (callee.getCalleeName() == null ? "" : callee.getCalleeName())
-                    + (flowResult != null && StringUtils.isNotEmpty(flowResult.getMatchedIntentionName())
-                            ? " 识别意图:" + flowResult.getMatchedIntentionName() : "")
-                    + "。请及时跟进处理。");
-            ticket.setPriority("2");
-            ticket.setStatus("0");
-            ticket.setAssignUserName(task.getCallerName());
-            ticket.setCreateBy(task.getCreateBy() == null ? "outbound-executor" : task.getCreateBy());
-            callTicketService.insertAiCallTicket(ticket);
-            log.info("外呼自动创建工单 taskId={} calleeId={} ticketNo={}",
-                    task.getTaskId(), callee.getCalleeId(), ticket.getTicketNo());
-        }
-        catch (Exception e)
-        {
-            log.warn("外呼自动创建工单失败: {}", e.getMessage());
-        }
-    }
-
-    private void createOutboundResult(AiOutboundTask task, AiOutboundCallee callee, Long recordId,
-                                      String callResult, Date startTime, Date endTime,
-                                      int duration, IvrExecuteResult flowResult)
-    {
-        AiOutboundResult result = new AiOutboundResult();
-        result.setTaskId(task.getTaskId());
-        result.setCalleeId(callee.getCalleeId());
-        result.setCalleeNumber(callee.getCalleeNumber());
-        result.setCalleeName(callee.getCalleeName());
-        result.setRecordId(recordId);
-        result.setCallResult(callResult);
-        result.setStartTime(startTime);
-        result.setEndTime(endTime);
-        result.setCallDuration(duration);
-        if (flowResult != null)
-        {
-            result.setIntentionCode(flowResult.getMatchedIntention());
-            result.setIntentionName(flowResult.getMatchedIntentionName());
-            result.setSummary("IVR流程[" + flowResult.getFlowName() + "]执行完成，共"
-                    + (flowResult.getSteps() == null ? 0 : flowResult.getSteps().size()) + "个节点");
-            try
-            {
-                result.setFlowData(MAPPER.writeValueAsString(flowResult));
-            }
-            catch (Exception ignored)
-            {
-            }
-        }
-        else
-        {
-            result.setSummary("外呼完成（无IVR流程）");
-        }
-        result.setCreateBy(task.getCreateBy());
-        resultService.insertAiOutboundResult(result);
-    }
-
-    /** 网关事件：最终化号码（接通/未接/失败）并生成结果 */
-    private void finalizeCallee(final Long taskId, final AiOutboundCallee callee, final boolean connected,
-                                final int talkSeconds, final String event)
-    {
-        final AiOutboundTask task = taskService.selectAiOutboundTaskByTaskId(taskId);
-        if (task == null)
-        {
-            return;
-        }
-        final int retryTimes = callee.getRetryTimes() == null ? 0 : callee.getRetryTimes();
-        final int retryCount = task.getRetryCount() == null ? 0 : task.getRetryCount();
-
-        // C4：号码状态流转、外呼结果、任务计数在同一事务内提交，避免中途失败导致计数与状态不一致
-        transactionTemplate.executeWithoutResult(status ->
-        {
-            if (connected)
-            {
-                AiOutboundCallee upd = new AiOutboundCallee();
-                upd.setCalleeId(callee.getCalleeId());
-                upd.setCallStatus("5");
-                upd.setCallDuration(talkSeconds);
-                upd.setUpdateBy("outbound-event");
-                calleeMapper.updateCalleeStatus(upd);
-
-                createOutboundResult(task, callee, callee.getRecordId(), "1",
-                        callee.getCallTime(), new Date(), talkSeconds, null);
-                taskMapper.incrementAnsweredCount(taskId);
-                taskMapper.incrementCompletedCount(taskId);
-                return;
-            }
-
-            if (retryTimes < retryCount && !"FAILED".equalsIgnoreCase(event))
-            {
-                AiOutboundCallee upd = new AiOutboundCallee();
-                upd.setCalleeId(callee.getCalleeId());
-                upd.setCallStatus("0");
-                upd.setRetryTimes(retryTimes + 1);
-                upd.setLastRetryTime(new Date());
-                upd.setUpdateBy("outbound-event");
-                calleeMapper.updateCalleeStatus(upd);
-                // T2-2 指数退避：网关事件判定未接通的重试同样设置下次重试窗口
-                calleeMapper.updateNextRetryTime(callee.getCalleeId(),
-                        backoffRetryTime(retryTimes + 1), "outbound-event");
-                log.info("外呼未接通进入重试 taskId={} calleeId={} 第{}次", taskId, callee.getCalleeId(), retryTimes + 1);
-                return;
-            }
-
-            String callResult = "FAILED".equalsIgnoreCase(event) ? "4" : "2";
-            AiOutboundCallee upd = new AiOutboundCallee();
-            upd.setCalleeId(callee.getCalleeId());
-            upd.setCallStatus("FAILED".equalsIgnoreCase(event) ? "4" : "3");
-            upd.setCallDuration(0);
-            upd.setFailReason("网关事件:" + event);
-            upd.setUpdateBy("outbound-event");
-            calleeMapper.updateCalleeStatus(upd);
-
-            createOutboundResult(task, callee, callee.getRecordId(), callResult,
-                    callee.getCallTime(), new Date(), 0, null);
-            if ("FAILED".equalsIgnoreCase(event))
-            {
-                taskMapper.incrementFailedCount(taskId);
-            }
-            else
-            {
-                taskMapper.incrementNoAnswerCount(taskId);
-            }
-            taskMapper.incrementCompletedCount(taskId);
-        });
+        // P5：网关事件处理下沉 OutboundEventCallback，门面只做路由
+        eventCallback.handle(callUuid, eventType, params);
     }
 
     private void checkTaskCompletion(Long taskId)
@@ -1053,130 +471,5 @@ public class OutboundExecutionServiceImpl implements IOutboundExecutionService
         {
             log.warn("外呼任务完成站内信投递失败, taskId={}", task.getTaskId(), e);
         }
-    }
-
-    /**
-     * 回退匹配（dialLog 无 calleeId 时使用）：优先 recordId 精确匹配，其次被叫号码精确匹配，
-     * 最后按事件类型选择状态匹配（ANSWERED→呼叫中1/已接通2，HANGUP/FAILED→已接通2）。
-     */
-    private AiOutboundCallee findCallee(List<AiOutboundCallee> callees, AiCallDialLog dialLog, String event)
-    {
-        if (callees == null || callees.isEmpty())
-        {
-            return null;
-        }
-        if (dialLog != null && dialLog.getRecordId() != null)
-        {
-            for (AiOutboundCallee c : callees)
-            {
-                if (dialLog.getRecordId().equals(c.getRecordId()))
-                {
-                    return c;
-                }
-            }
-        }
-        if (dialLog != null && StringUtils.isNotEmpty(dialLog.getCalleeNumber()))
-        {
-            for (AiOutboundCallee c : callees)
-            {
-                if (dialLog.getCalleeNumber().equals(c.getCalleeNumber()))
-                {
-                    return c;
-                }
-            }
-        }
-        String[] prefer = "ANSWERED".equals(event) ? new String[]{"1", "2"} : new String[]{"2", "1"};
-        for (String status : prefer)
-        {
-            for (AiOutboundCallee c : callees)
-            {
-                if (status.equals(c.getCallStatus()))
-                {
-                    return c;
-                }
-            }
-        }
-        return null;
-    }
-
-    private boolean isConnected(Map<String, Object> params, AiCallDialLog dialLog)
-    {
-        if (dialLog != null && ("1".equals(dialLog.getIsConnected()) || dialLog.getAnswerTime() != null))
-        {
-            return true;
-        }
-        if (params == null)
-        {
-            return false;
-        }
-        Object connected = params.get("isConnected");
-        if (connected != null)
-        {
-            return "1".equals(connected.toString());
-        }
-        Object talk = params.get("talkDuration");
-        if (talk == null)
-        {
-            return false;
-        }
-        // R12：回调参数可能为非数字，parseInt 需防护，避免异常中断事件处理
-        try
-        {
-            return Integer.parseInt(talk.toString()) > 0;
-        }
-        catch (NumberFormatException e)
-        {
-            log.warn("talkDuration 参数非数字，按未接通处理 value={}", talk);
-            return false;
-        }
-    }
-
-    private int getTalkSeconds(Map<String, Object> params, AiCallDialLog dialLog)
-    {
-        if (params != null && params.get("talkDuration") != null)
-        {
-            try
-            {
-                return Integer.parseInt(params.get("talkDuration").toString());
-            }
-            catch (Exception ignored)
-            {
-            }
-        }
-        if (dialLog != null && dialLog.getTalkDuration() != null)
-        {
-            return dialLog.getTalkDuration();
-        }
-        return 0;
-    }
-
-    private boolean isRetryableError(DialResult result)
-    {
-        if (result == null || result.getErrorCode() == null)
-        {
-            return false;
-        }
-        switch (result.getErrorCode())
-        {
-            case "NO_AVAILABLE_TRUNK":
-            case "TRUNK_BUSY":
-            case "CPS_LIMIT":
-            case "QUEUE_FULL":
-            case "GATEWAY_ERROR":
-            case "GATEWAY_REJECT":
-            case "DIAL_FAILED":
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    private String truncate(String s, int max)
-    {
-        if (s == null)
-        {
-            return null;
-        }
-        return s.length() > max ? s.substring(0, max) : s;
     }
 }

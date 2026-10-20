@@ -19,7 +19,6 @@ import ai.lawyers.system.domain.lawyers.outbound.AiOutboundTask;
 import ai.lawyers.system.domain.lawyers.trunk.DialResult;
 import ai.lawyers.system.mapper.lawyers.outbound.AiOutboundCalleeMapper;
 import ai.lawyers.system.mapper.lawyers.outbound.AiOutboundTaskMapper;
-import ai.lawyers.system.service.lawyers.IAiCallTicketService;
 import ai.lawyers.system.service.lawyers.outbound.IAiOutboundTaskService;
 import ai.lawyers.system.service.lawyers.trunk.ICallDispatchService;
 
@@ -108,15 +107,25 @@ class OutboundClaimCalleeConcurrencyTest
         when(taskService.selectAiOutboundTaskByTaskId(TASK_ID)).thenReturn(task);
 
         AiOutboundTaskMapper taskMapper = mock(AiOutboundTaskMapper.class);
-        IAiCallTicketService ticketService = mock(IAiCallTicketService.class);
+
+        // P5 拆分后：门面 → dialer → finalizer 协作链，按生产装配顺序组装
+        OutboundCallFinalizer finalizer = new OutboundCallFinalizer();
+        setField(finalizer, "taskService", taskService);
+        setField(finalizer, "calleeMapper", calleeMapper);
+        setField(finalizer, "taskMapper", taskMapper);
+
+        OutboundDialer dialer = new OutboundDialer();
+        setField(dialer, "callDispatchService", callDispatchService);
+        setField(dialer, "finalizer", finalizer);
+        setField(dialer, "simulateAnswer", false);   // 下发即止，免 transactionTemplate/IVR 旁路
+        setField(dialer, "hotspotEnabled", false);   // 免高频置底查询旁路
 
         setField(service, "taskService", taskService);
         setField(service, "calleeMapper", calleeMapper);
         setField(service, "taskMapper", taskMapper);
-        setField(service, "callDispatchService", callDispatchService);
-        setField(service, "callTicketService", ticketService);
-        setField(service, "dialConcurrent", 1);       // 串行执行 job，免 dialPool（未初始化）
-        setField(service, "simulateAnswer", false);   // 下发即止，免 transactionTemplate/IVR 旁路
+        setField(service, "dialer", dialer);
+        setField(service, "finalizer", finalizer);
+        setField(service, "dialConcurrent", 1);      // 串行执行 job，免 dialPool（未初始化）
         return service;
     }
 
@@ -242,13 +251,13 @@ class OutboundClaimCalleeConcurrencyTest
     {
         try
         {
-            Field f = OutboundExecutionServiceImpl.class.getDeclaredField(name);
+            Field f = target.getClass().getDeclaredField(name);
             f.setAccessible(true);
             f.set(target, value);
         }
         catch (Exception e)
         {
-            throw new IllegalStateException("注入字段失败: " + name, e);
+            throw new IllegalStateException("注入字段失败: " + target.getClass().getSimpleName() + "." + name, e);
         }
     }
 }
