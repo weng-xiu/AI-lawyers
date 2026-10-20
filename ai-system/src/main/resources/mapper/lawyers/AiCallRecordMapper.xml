@@ -89,6 +89,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="categoryId != null"> and cr.category_id = #{categoryId}</if>
             <if test="status != null and status != ''"> and cr.status = #{status}</if>
             <if test="callTime != null"> and date(cr.call_time) = date(#{callTime})</if>
+            <!-- F6 报表自助分析下钻：时间范围（半开区间）/未分类/语种过滤，经 params 传入 -->
+            <if test="params.beginCallTime != null and params.beginCallTime != ''"> and cr.call_time &gt;= #{params.beginCallTime}</if>
+            <if test="params.endCallTime != null and params.endCallTime != ''"> and cr.call_time &lt; #{params.endCallTime}</if>
+            <if test="params.categoryNull != null and params.categoryNull"> and cr.category_id is null</if>
+            <if test="params.language != null and params.language != ''">
+                and ifnull((select cp.language_preference from ai_caller_profile cp
+                            where cp.caller_number = cr.caller_number limit 1), 'zh-CN') = #{params.language}
+            </if>
         </where>
         order by cr.call_time desc
     </select>

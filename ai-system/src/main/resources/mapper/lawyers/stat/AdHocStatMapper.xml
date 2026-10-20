@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.stat.AdHocStatMapper">
+
+    <!-- F6 自助分析：ai_stat_minute 按周期（+可选维度值）透视。
+         指标别名 m0..mN 由 foreach index 生成，Service 按 metricKeys 下标映射回指标键。
+         dimensionPrefix 为空 = 仅全局 ALL 行；非空 = 该维度前缀行（值取前缀之后的部分）。 -->
+    <select id="selectAdHocAgg" resultType="map">
+        select date_format(stat_time, #{periodFmt}) as period,
+        <choose>
+            <when test="dimensionPrefix != null and dimensionPrefix != ''">
+                substring(dimension, length(#{dimensionPrefix}) + 1) as dim_value,
+            </when>
+            <otherwise>
+                'ALL' as dim_value,
+            </otherwise>
+        </choose>
+        <foreach collection="metricKeys" item="m" index="i" separator=",">
+            sum(case when metric_key = #{m} then metric_value else 0 end) as m${i}
+        </foreach>
+        from ai_stat_minute
+        where stat_time &gt;= #{beginTime} and stat_time &lt; #{endTime}
+        <choose>
+            <when test="dimensionPrefix != null and dimensionPrefix != ''">
+                and dimension like concat(#{dimensionPrefix}, '%')
+            </when>
+            <otherwise>
+                and dimension = 'ALL'
+            </otherwise>
+        </choose>
+        group by period, dim_value
+        order by period, dim_value
+        limit #{limitRows}
+    </select>
+
+    <!-- F6 自助分析：跨维度组合实时聚合（口径与 StatMinuteScheduleTask 的呼叫指标一致）。
+         dimKeys 仅允许 agent/category/lang（Service 白名单校验后传入）。 -->
+    <select id="selectCallCrossDim" resultType="map">
+        select date_format(cr.call_time, #{periodFmt}) as period,
+        <foreach collection="dimKeys" item="d" separator=",">
+            <choose>
+                <when test="d == 'agent'">
+                    cr.agent_id as dim_agent, a.agent_name as dim_agent_name,
+                </when>
+                <when test="d == 'category'">
+                    ifnull(cr.category_id, -1) as dim_category, c.category_name as dim_category_name,
+                </when>
+                <otherwise>
+                    ifnull(p.language_preference, 'zh-CN') as dim_lang,
+                </otherwise>
+            </choose>
+        </foreach>
+        count(*) as call_total,
+        sum(case when cr.status = '1' then 1 else 0 end) as call_answered,
+        sum(case when cr.status = '3' then 1 else 0 end) as call_missed,
+        sum(case when cr.status = '2' then 1 else 0 end) as call_transferred,
+        sum(case when cr.status = '1' then ifnull(cr.duration, 0) else 0 end) as answered_duration_sum
+        from ai_call_record cr
+        left join ai_caller_profile p on p.caller_number = cr.caller_number
+        left join ai_call_agent_status a on cr.agent_id = a.agent_id
+        left join ai_consultation_category c on cr.category_id = c.category_id
+        where cr.call_time &gt;= #{beginTime} and cr.call_time &lt; #{endTime}
+        group by period,
+        <foreach collection="dimKeys" item="d" separator=",">
+            <choose>
+                <when test="d == 'agent'">cr.agent_id</when>
+                <when test="d == 'category'">ifnull(cr.category_id, -1)</when>
+                <otherwise>ifnull(p.language_preference, 'zh-CN')</otherwise>
+            </choose>
+        </foreach>
+        order by period
+        limit #{limitRows}
+    </select>
+
+    <select id="selectAgentNames" resultType="map">
+        select agent_id, agent_name
+        from ai_call_agent_status
+        where agent_id in
+        <foreach collection="agentIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
+    <select id="selectCategoryNames" resultType="map">
+        select category_id, category_name
+        from ai_consultation_category
+        where category_id in
+        <foreach collection="categoryIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
+</mapper>

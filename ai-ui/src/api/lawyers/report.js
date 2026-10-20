@@ -53,3 +53,29 @@ export function statBackfillProgress(taskId) {
     params: { taskId }
   })
 }
+
+// F6 自助分析：指标/维度目录
+export function getAdhocCatalog() {
+  return request({
+    url: '/lawyers/report/adhoc/catalog',
+    method: 'get'
+  })
+}
+
+// F6 自助分析：自定义指标+维度查询
+export function queryAdhoc(query) {
+  return request({
+    url: '/lawyers/report/adhoc/query',
+    method: 'get',
+    params: query
+  })
+}
+
+// F6 自助分析：下钻话单明细分页
+export function drillAdhoc(query) {
+  return request({
+    url: '/lawyers/report/adhoc/drill',
+    method: 'get',
+    params: query
+  })
+}

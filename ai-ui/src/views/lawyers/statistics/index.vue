@@ -78,6 +78,11 @@
           <el-table-column label="平均办结时长(分钟)" prop="avgCloseMinutes" align="right" />
         </el-table>
       </el-tab-pane>
+
+      <!-- F6 报表自助分析：自定义指标 + 维度选择器 + 下钻话单明细 -->
+      <el-tab-pane label="自助分析" name="adhoc" lazy>
+        <adhoc-analysis v-if="activeTab === 'adhoc'" />
+      </el-tab-pane>
     </el-tabs>
 
     <!-- 分钟物化数据回填弹窗 -->
@@ -125,6 +130,7 @@
 
 <script>
 import { getCallReport, getServiceReport, getQualityReport, getBusinessReport, statBackfill, statBackfillProgress } from '@/api/lawyers/report'
+import AdhocAnalysis from './AdhocAnalysis'
 
 const REPORT_API = {
   call: getCallReport,
@@ -141,6 +147,7 @@ const REPORT_NAME = {
 
 export default {
   name: 'StatisticsReport',
+  components: { AdhocAnalysis },
   data() {
     return {
       loading: false,
@@ -183,6 +190,8 @@ export default {
       return `${d.getFullYear()}-${m}-${day}`
     },
     loadData() {
+      // F6 自助分析 Tab 数据由子组件自行加载
+      if (this.activeTab === 'adhoc') return
       if (!this.dateRange || this.dateRange.length !== 2) return
       this.loading = true
       const params = {
