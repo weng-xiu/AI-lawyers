@@ -5,6 +5,7 @@ import java.math.RoundingMode;
 import java.util.Date;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -22,6 +23,7 @@ import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.system.domain.lawyers.AiModelConfig;
 import ai.lawyers.system.domain.lawyers.stat.AiModelCallLog;
 import ai.lawyers.system.mapper.lawyers.stat.AiModelCallLogMapper;
+import ai.lawyers.system.service.lawyers.concurrent.ExecutorRegistry;
 
 /**
  * 大模型调用日志记录器（P3-E5）。
@@ -76,6 +78,10 @@ public class AiModelCallLogRecorder
     @Autowired
     private AiModelCallLogMapper mapper;
 
+    /** P2：线程池统一注册（可选注入；缺省时回退自建同规格池，单测环境不受影响） */
+    @Autowired(required = false)
+    private ExecutorRegistry registry;
+
     private ExecutorService executor;
     private final AtomicLong droppedCount = new AtomicLong(0);
     private volatile long lastInsertWarn = 0L;
@@ -85,32 +91,43 @@ public class AiModelCallLogRecorder
     public void init()
     {
         // 队列满不阻塞业务线程：拒绝时丢弃当前任务，由记录器计数并限频 WARN 暴露
-        this.executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
-                new LinkedBlockingQueue<>(QUEUE_CAPACITY),
-                new ThreadFactory()
-                {
-                    private final AtomicInteger n = new AtomicInteger(1);
+        RejectedExecutionHandler dropHandler = (r, e) ->
+        {
+            long d = droppedCount.incrementAndGet();
+            long now = System.currentTimeMillis();
+            if (now - lastDropWarn > WARN_INTERVAL_MS)
+            {
+                lastDropWarn = now;
+                log.warn("大模型调用日志队列已满（{}），累计丢弃 {} 条，请检查 ai_model_call_log 落库性能或扩容",
+                        QUEUE_CAPACITY, d);
+            }
+        };
+        // P2：优先经 ExecutorRegistry 纳管（有界队列/命名线程/micrometer 指标/水位告警/统一停机），
+        // 缺省时回退自建同规格池（单测环境无 Registry）
+        if (registry != null)
+        {
+            this.executor = registry.create("ai-model-call-log", 1, 1, QUEUE_CAPACITY, dropHandler);
+        }
+        else
+        {
+            this.executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
+                    new LinkedBlockingQueue<>(QUEUE_CAPACITY),
+                    new ThreadFactory()
+                    {
+                        private final AtomicInteger n = new AtomicInteger(1);
 
-                    @Override
-                    public Thread newThread(Runnable r)
-                    {
-                        Thread t = new Thread(r, "ai-model-call-log-" + n.getAndIncrement());
-                        t.setDaemon(true);
-                        return t;
-                    }
-                },
-                (r, e) ->
-                {
-                    long d = droppedCount.incrementAndGet();
-                    long now = System.currentTimeMillis();
-                    if (now - lastDropWarn > WARN_INTERVAL_MS)
-                    {
-                        lastDropWarn = now;
-                        log.warn("大模型调用日志队列已满（{}），累计丢弃 {} 条，请检查 ai_model_call_log 落库性能或扩容",
-                                QUEUE_CAPACITY, d);
-                    }
-                });
-        log.info("大模型调用日志记录器初始化 enabled={} queueCapacity={}", enabled, QUEUE_CAPACITY);
+                        @Override
+                        public Thread newThread(Runnable r)
+                        {
+                            Thread t = new Thread(r, "ai-model-call-log-" + n.getAndIncrement());
+                            t.setDaemon(true);
+                            return t;
+                        }
+                    },
+                    dropHandler);
+        }
+        log.info("大模型调用日志记录器初始化 enabled={} queueCapacity={} managedByRegistry={}",
+                enabled, QUEUE_CAPACITY, registry != null);
     }
 
     @PreDestroy
