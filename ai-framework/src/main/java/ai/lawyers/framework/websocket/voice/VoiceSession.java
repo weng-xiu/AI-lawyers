@@ -1,11 +1,6 @@
 package ai.lawyers.framework.websocket.voice;
 
-import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Base64;
-import java.util.List;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import jakarta.websocket.Session;
@@ -28,6 +23,13 @@ import ai.lawyers.system.service.lawyers.voice.vad.VoiceActivityDetector;
  * interrupted tts_end 供客户端复位播放状态。{@link #shutdown()} 幂等，
  * 供 {@code @OnClose} 释放全部引擎句柄与线程。</p>
  *
+ * <p>P5 超大类拆分：本类只保留"会话编排"职责——帧路由、ASR/TTS/VAD 链路、
+ * 下行防抖、延迟埋点与生命周期。保序发送队列下沉 {@link VoiceSendQueue}，
+ * E3 机器人回合下沉 {@link VoiceRobotTurnRunner}，F4 坐席辅助下沉
+ * {@link VoiceCopilotAssistant}，E4 情绪联动下沉 {@link VoiceEmotionWatcher}。
+ * 协作类经 {@link HostBridge} 回调下发帧/启动 TTS/读取 robot 模式，
+ * 均不反向依赖门面，无循环依赖。</p>
+ *
  * @author ai-lawyers
  */
 public class VoiceSession
@@ -36,18 +38,6 @@ public class VoiceSession
 
     /** TTS 文本上限（防超长合成拖垮 Mock/真实引擎） */
     static final int TTS_TEXT_MAX = 2000;
-
-    /** 发送队列满时入队等待上限（ms） */
-    private static final long ENQUEUE_TIMEOUT_MS = 200L;
-
-    /** F4：Copilot 辅助触发最小间隔（ms，节流控制 LLM 调用频次） */
-    static final long COPILOT_INTERVAL_MS = 8000L;
-
-    /** F4：触发辅助的滚动缓冲最小字符数（短确认话术不触发） */
-    static final int COPILOT_MIN_CHARS = 30;
-
-    /** F4：送辅助服务的文本滚动窗口上限（字，防超 token） */
-    static final int COPILOT_TEXT_MAX = 3000;
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -59,15 +49,9 @@ public class VoiceSession
 
     private final String role;
 
-    private final LinkedBlockingQueue<Entry> sendQueue;
-
-    private final Thread sender;
-
     private final AtomicBoolean shutdown = new AtomicBoolean();
 
     private final AtomicLong asrSeq = new AtomicLong();
-
-    private final AtomicLong droppedFrames = new AtomicLong();
 
     private volatile boolean asrActive;
 
@@ -97,53 +81,21 @@ public class VoiceSession
     /** A5：指标门面（null 时埋点静默跳过，不抛异常） */
     private final HotlineMetrics metrics;
 
-    /* ---- E3：语音机器人（RAG+LLM 对话引擎） ---- */
-    /** E3：对话引擎服务（null 时 ask/robot 回 ROBOT_UNAVAILABLE） */
-    private final ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotService robotService;
     /** E3：start 帧 "robot":true 开启 ASR final 自动应答 */
     private volatile boolean robotMode;
-    /**
-     * G6：服务端锚定的话单ID（仅 PBX 媒体 fork 桥接时由服务端设置）。
-     * 机器人凭此查本人工单/进度；浏览器侧恒为 null，禁止由前端透传，防伪造越权。
-     */
-    private volatile Long anchoredRecordId;
-    /** E3：机器人回合单线程执行器（回合串行，不阻塞 WS/ASR 回调线程） */
-    private final java.util.concurrent.ExecutorService robotExecutor;
-    /** E3：回合号发号器 */
-    private final java.util.concurrent.atomic.AtomicLong robotTurnSeq = new java.util.concurrent.atomic.AtomicLong();
-    /** E3：当前有效回合号（新回合/新 final/stop/shutdown 时递增作废旧回合） */
-    private final java.util.concurrent.atomic.AtomicLong activeRobotTurn = new java.util.concurrent.atomic.AtomicLong();
-    /** E3：本回合问题就绪时刻（ASR final / ask 受理，robot E2E 起点） */
-    private volatile long robotQuestionNanos;
-    /** E3：本回合 E2E 已埋点标记（新回合重置） */
-    private final AtomicBoolean robotE2eMarked = new AtomicBoolean(true);
 
-    /* ---- E4：情绪/意图实时识别与联动 ---- */
-    /** E4：联动动作服务（null 时不执行预警/提优，识别不挂钩） */
-    private final ai.lawyers.system.service.lawyers.voice.emotion.VoiceRiskActionService emotionAction;
-    /** E4：纯词库识别器（无状态、微秒级） */
-    private final ai.lawyers.system.service.lawyers.voice.emotion.EmotionIntentDetector emotionDetector =
-            new ai.lawyers.system.service.lawyers.voice.emotion.EmotionIntentDetector();
-    /** E4：本会话 urgent 已动作（每通话只发一次高级预警） */
-    private final AtomicBoolean urgentEmotionActed = new AtomicBoolean();
-    /** E4：本会话 negative 已动作（urgent 命中后不再发 negative） */
-    private final AtomicBoolean negativeEmotionActed = new AtomicBoolean();
+    /* ---- P5 协作类（同包，经 HostBridge 回调，不反向依赖门面） ---- */
+    /** P5：保序发送队列（所有下发帧经此入队，单线程写出） */
+    private final VoiceSendQueue sendQueue;
 
-    /* ---- F4：坐席 Copilot 实时辅助（要素/法条/相似工单） ---- */
-    /** F4：Copilot 辅助服务（null 时 final 文本不触发辅助） */
-    private final ai.lawyers.system.service.lawyers.voice.copilot.CopilotAssistService copilotService;
-    /** P1-8：坐席用户 ID（用于话术个性化画像，null 时不注入画像） */
-    private final Long agentId;
-    /** F4：辅助回合单线程执行器（LLM/RAG 调用不阻塞 ASR 回调） */
-    private final java.util.concurrent.ExecutorService copilotExecutor;
-    /** F4：辅助回合肥号器 */
-    private final java.util.concurrent.atomic.AtomicLong copilotTurnSeq = new java.util.concurrent.atomic.AtomicLong();
-    /** F4：当前有效回合号（stop/shutdown 递增作废迟到结果） */
-    private final java.util.concurrent.atomic.AtomicLong activeCopilotSeq = new java.util.concurrent.atomic.AtomicLong();
-    /** F4：final 文本滚动累计缓冲（rolling window） */
-    private final StringBuilder copilotBuffer = new StringBuilder();
-    /** F4：上次辅助触发时间（节流，最小间隔 COPILOT_INTERVAL_MS） */
-    private volatile long lastCopilotMs;
+    /** P5：E3 机器人回合执行器（回合串行，迟到结果按 turnId 丢弃） */
+    private final VoiceRobotTurnRunner robot;
+
+    /** P5：F4 坐席 Copilot 辅助执行器（滚动缓冲 + 节流 + 单线程） */
+    private final VoiceCopilotAssistant copilot;
+
+    /** P5：E4 情绪/意图联动（null=联动服务未装配，静默跳过） */
+    private final VoiceEmotionWatcher emotion;
 
     /* ---- A5 时间戳/一次性标记（纳秒，System.nanoTime） ---- */
     /** start 帧受理时刻（ASR 首包/E2E 首响起点） */
@@ -156,8 +108,6 @@ public class VoiceSession
     private final AtomicBoolean ttsFirstMarked = new AtomicBoolean();
     /** start 后首包 TTS 音频已上报标记（E2E 只记一次） */
     private final AtomicBoolean e2eFirstMarked = new AtomicBoolean();
-    /** 本次 VAD 起始判定起点（首个有声帧进入时刻） */
-    private volatile long vadSpeechBeginNanos;
 
     /* ---- #1 下行媒体预留（PBX 侧空实现；媒体桥接就绪后替换 sink 即可） ---- */
     /** 下行防抖缓冲（attach 时创建，内含 sink 引用；可空=未挂下行） */
@@ -238,26 +188,43 @@ public class VoiceSession
         this.engineRegistry = engineRegistry != null ? engineRegistry : new VoiceEngineRegistry();
         this.vadEnabled = vadEnabled;
         this.metrics = metrics;
-        this.robotService = robotService;
-        this.emotionAction = emotionAction;
-        this.copilotService = copilotService;
         this.vadShadowService = vadShadowService;
-        this.agentId = agentId;
         int cap = queueCapacity > 0 ? queueCapacity : 1000;
-        this.sendQueue = new LinkedBlockingQueue<>(cap);
-        this.sender = new Thread(this::runSender, "voice-sender-" + connId);
-        this.sender.setDaemon(true);
-        this.sender.start();
-        this.robotExecutor = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
-            Thread t = new Thread(r, "voice-robot-" + connId);
-            t.setDaemon(true);
-            return t;
-        });
-        this.copilotExecutor = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
-            Thread t = new Thread(r, "voice-copilot-" + connId);
-            t.setDaemon(true);
-            return t;
-        });
+        // P5：组装协作类——HostBridge 持有隐式 VoiceSession 引用，协作类构造期不调用 host，
+        // 实际回调（send/startTts/robotMode）发生在首个回合提交时，彼时字段已全部就绪
+        this.sendQueue = new VoiceSendQueue(wsSession, connId, cap);
+        HostBridge host = new HostBridge();
+        this.robot = new VoiceRobotTurnRunner(robotService, host, connId, sessionId, metrics);
+        this.copilot = new VoiceCopilotAssistant(copilotService, host, connId, sessionId, agentId);
+        this.emotion = emotionAction == null ? null
+                : new VoiceEmotionWatcher(emotionAction, host, sessionId, role);
+    }
+
+    /**
+     * P5：协作类宿主桥——下发帧经会话保序队列、启动 TTS 经会话合成链路、
+     * robot 模式读取会话 volatile 状态。内部类隐式持有 VoiceSession 引用，
+     * 不暴露给协作类之外的组件。
+     */
+    private final class HostBridge
+            implements VoiceRobotTurnRunner.Host, VoiceCopilotAssistant.Host, VoiceEmotionWatcher.Host
+    {
+        @Override
+        public void send(String frame)
+        {
+            sendQueue.send(VoiceSendQueue.Entry.Kind.OTHER, frame);
+        }
+
+        @Override
+        public void startTts(String text)
+        {
+            VoiceSession.this.startTts(text, null);
+        }
+
+        @Override
+        public boolean robotMode()
+        {
+            return VoiceSession.this.robotMode;
+        }
     }
 
     /* ================= 生命周期 ================= */
@@ -297,11 +264,11 @@ public class VoiceSession
 
     void sendConnected()
     {
-        enqueue(Entry.Kind.OTHER, VoiceFrames.connected(sessionId, role));
+        enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.connected(sessionId, role));
     }
 
     /**
-     * 处理一帧文本控制消息（start/audio/tts/bargein/stop）。
+     * 处理一帧文本控制消息（start/audio/tts/ask/bargein/stop）。
      * 任何异常不外抛到容器，统一回 error 帧。
      */
     public void handleText(String raw)
@@ -317,7 +284,7 @@ public class VoiceSession
         }
         catch (Exception e)
         {
-            enqueue(Entry.Kind.OTHER, VoiceFrames.error("BAD_FRAME", "帧不是合法 JSON"));
+            enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.error("BAD_FRAME", "帧不是合法 JSON"));
             return;
         }
         String type = node.path("type").asText("");
@@ -344,14 +311,14 @@ public class VoiceSession
                     handleStop();
                     break;
                 default:
-                    enqueue(Entry.Kind.OTHER,
+                    enqueue(VoiceSendQueue.Entry.Kind.OTHER,
                             VoiceFrames.error("UNKNOWN_TYPE", "未知帧类型: " + type));
             }
         }
         catch (Exception e)
         {
             log.warn("VoiceWS 帧处理异常 conn={}, type={}: {}", connId, type, e.getMessage());
-            enqueue(Entry.Kind.OTHER, VoiceFrames.error("FRAME_ERROR", e.getMessage()));
+            enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.error("FRAME_ERROR", e.getMessage()));
         }
     }
 
@@ -364,7 +331,7 @@ public class VoiceSession
         }
         if (!asrActive || asrEngine == null)
         {
-            enqueue(Entry.Kind.OTHER, VoiceFrames.error("NOT_STARTED", "请先发送 start 帧再传音频"));
+            enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.error("NOT_STARTED", "请先发送 start 帧再传音频"));
             return;
         }
         feedVad(pcm);
@@ -408,20 +375,18 @@ public class VoiceSession
             vadShadowPair = null;
         }
         // E3：作废旧回合并停回合执行器（阻塞中的 LLM 调用结果产出时被 turnId 校验丢弃）
-        activeRobotTurn.incrementAndGet();
-        robotExecutor.shutdownNow();
+        robot.shutdown();
         // F4：作废迟到 Copilot 回合并停辅助执行器
-        activeCopilotSeq.incrementAndGet();
-        copilotExecutor.shutdownNow();
+        copilot.shutdown();
         StreamSynthesis tts = currentTts;
         if (tts != null)
         {
             tts.cancel();
         }
         discardDownlink();
-        sendQueue.offer(Entry.POISON);
+        sendQueue.poison();
         releaseDownlink();
-        long dropped = droppedFrames.get();
+        long dropped = sendQueue.getDroppedFrames();
         log.info("VoiceWS session shutdown conn={}, sessionId={}, droppedFrames={}", connId, sessionId, dropped);
     }
 
@@ -431,7 +396,7 @@ public class VoiceSession
     {
         if (asrActive)
         {
-            enqueue(Entry.Kind.OTHER, VoiceFrames.error("ALREADY_STARTED", "识别流已开启，请先 stop"));
+            enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.error("ALREADY_STARTED", "识别流已开启，请先 stop"));
             return;
         }
         String reqEngine = node.path("engine").asText(MockStreamAsrEngine.ENGINE_CODE);
@@ -439,19 +404,19 @@ public class VoiceSession
         int rate = node.path("sampleRate").asInt(16000);
         if (!"pcm".equalsIgnoreCase(format))
         {
-            enqueue(Entry.Kind.OTHER, VoiceFrames.error("BAD_FORMAT", "A1 仅支持 PCM(S16LE 单声道) 音频格式: " + format));
+            enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.error("BAD_FORMAT", "A1 仅支持 PCM(S16LE 单声道) 音频格式: " + format));
             return;
         }
         if (rate != 8000 && rate != 16000)
         {
-            enqueue(Entry.Kind.OTHER, VoiceFrames.error("BAD_SAMPLE_RATE", "采样率仅支持 8000/16000: " + rate));
+            enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.error("BAD_SAMPLE_RATE", "采样率仅支持 8000/16000: " + rate));
             return;
         }
         StreamAsrEngine engineInstance = engineRegistry.createAsr(reqEngine);
         if (engineInstance == null)
         {
             // 显式拒绝，禁止静默降级成 Mock 造成"假成功"（L4 教训）
-            enqueue(Entry.Kind.OTHER, VoiceFrames.error("ENGINE_UNAVAILABLE",
+            enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.error("ENGINE_UNAVAILABLE",
                     "流式引擎 " + reqEngine + " 不可用（未注册或凭证缺失），当前支持 mock/dashscope"));
             return;
         }
@@ -459,7 +424,7 @@ public class VoiceSession
         this.sampleRate = rate;
         // E3：start 帧可声明 robot:true 开启 ASR final 自动应答（服务未装配时仅记日志，ask 仍会明确报错）
         this.robotMode = node.path("robot").asBoolean(false);
-        if (this.robotMode && this.robotService == null)
+        if (this.robotMode && !robot.isAvailable())
         {
             log.warn("VoiceWS robot 模式已请求但对话引擎未装配 sessionId={}，ASR final 不会触发应答", sessionId);
         }
@@ -517,7 +482,7 @@ public class VoiceSession
                     {
                         metrics.recordVoiceAsrFirstMs(nanosToMs(System.nanoTime() - startNanos), sessionId);
                     }
-                    enqueue(Entry.Kind.OTHER, VoiceFrames.asr(VoiceFrames.T_ASR_PARTIAL, asrSeq.incrementAndGet(), text));
+                    enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.asr(VoiceFrames.T_ASR_PARTIAL, asrSeq.incrementAndGet(), text));
                     // E4：partial 仅做 urgent 早预警（negative 等 final，防部分转写噪声误报）
                     detectEmotion(text, false);
                 }
@@ -528,28 +493,28 @@ public class VoiceSession
             {
                 if (!shutdown.get())
                 {
-                    enqueue(Entry.Kind.OTHER, VoiceFrames.asr(VoiceFrames.T_ASR_FINAL, asrSeq.incrementAndGet(), text));
+                    enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.asr(VoiceFrames.T_ASR_FINAL, asrSeq.incrementAndGet(), text));
                     // E4：final 完整识别（urgent/negative）
                     detectEmotion(text, true);
                     // E3：robot 模式下 ASR final 自动触发对话引擎回合（空文本不触发）
                     if (robotMode && text != null && !text.trim().isEmpty())
                     {
-                        submitRobotTurn(text.trim());
+                        robot.submitTurn(text.trim());
                     }
                     // F4：final 文本滚动入缓冲，满足节流窗口时触发 Copilot 辅助（服务坐席，不区分角色）
-                    queueCopilot(text);
+                    copilot.queue(text);
                 }
             }
 
             @Override
             public void onError(String code, String message)
             {
-                enqueue(Entry.Kind.OTHER, VoiceFrames.error(code, message));
+                enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.error(code, message));
             }
         });
         this.asrEngine = engineInstance;
         this.asrActive = true;
-        enqueue(Entry.Kind.OTHER, VoiceFrames.started(sessionId, role, this.engine, "pcm", rate));
+        enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.started(sessionId, role, this.engine, "pcm", rate));
     }
 
     /* ================= audio ================= */
@@ -558,13 +523,13 @@ public class VoiceSession
     {
         if (!asrActive || asrEngine == null)
         {
-            enqueue(Entry.Kind.OTHER, VoiceFrames.error("NOT_STARTED", "请先发送 start 帧再传音频"));
+            enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.error("NOT_STARTED", "请先发送 start 帧再传音频"));
             return;
         }
         String b64 = node.path("data").asText("");
         if (b64.isEmpty())
         {
-            enqueue(Entry.Kind.OTHER, VoiceFrames.error("BAD_AUDIO", "audio 帧缺少 data(base64 PCM)"));
+            enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.error("BAD_AUDIO", "audio 帧缺少 data(base64 PCM)"));
             return;
         }
         final byte[] pcm;
@@ -574,12 +539,12 @@ public class VoiceSession
         }
         catch (IllegalArgumentException e)
         {
-            enqueue(Entry.Kind.OTHER, VoiceFrames.error("BAD_AUDIO", "data 不是合法 base64"));
+            enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.error("BAD_AUDIO", "data 不是合法 base64"));
             return;
         }
         if (pcm.length == 0)
         {
-            enqueue(Entry.Kind.OTHER, VoiceFrames.error("BAD_AUDIO", "音频帧为空"));
+            enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.error("BAD_AUDIO", "音频帧为空"));
             return;
         }
         feedVad(pcm);
@@ -594,12 +559,12 @@ public class VoiceSession
         String voice = node.path("voice").asText(null);
         if (text.trim().isEmpty())
         {
-            enqueue(Entry.Kind.OTHER, VoiceFrames.error("INVALID_PARAM", "tts 帧缺少 text"));
+            enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.error("INVALID_PARAM", "tts 帧缺少 text"));
             return;
         }
         if (text.length() > TTS_TEXT_MAX)
         {
-            enqueue(Entry.Kind.OTHER, VoiceFrames.error("TEXT_TOO_LONG",
+            enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.error("TEXT_TOO_LONG",
                     "tts 文本上限 " + TTS_TEXT_MAX + " 字符，当前 " + text.length()));
             return;
         }
@@ -627,7 +592,7 @@ public class VoiceSession
         StreamTtsEngine ttsEngine = engineRegistry.createTts(this.engine);
         if (ttsEngine == null)
         {
-            enqueue(Entry.Kind.OTHER, VoiceFrames.error("ENGINE_UNAVAILABLE",
+            enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.error("ENGINE_UNAVAILABLE",
                     "流式 TTS 引擎 " + this.engine + " 不可用（未注册或凭证缺失）"));
             return;
         }
@@ -651,13 +616,9 @@ public class VoiceSession
                         {
                             metrics.recordVoiceE2eFirstMs(nanosToMs(System.nanoTime() - startNanos), sessionId);
                         }
-                        // E3：机器人回合 E2E（问题就绪→应答首个音频分片）
-                        if (metrics != null && robotQuestionNanos > 0 && robotE2eMarked.compareAndSet(false, true))
-                        {
-                            metrics.recordVoiceE2eFirstMs(nanosToMs(System.nanoTime() - robotQuestionNanos),
-                                    "robot", sessionId);
-                        }
-                        enqueue(Entry.Kind.TTS, VoiceFrames.ttsAudio(seq, chunkCount, ttsRate, pcm));
+                        // E3：机器人回合 E2E（问题就绪→应答首个音频分片，仅记一次）
+                        robot.markE2eIfNeeded();
+                        enqueue(VoiceSendQueue.Entry.Kind.TTS, VoiceFrames.ttsAudio(seq, chunkCount, ttsRate, pcm));
                         // #1：下行双路分发——浏览器侧已入发送队列，PBX 侧经防抖缓冲合片写 sink
                         DownlinkDebouncer downlink = downlinkDebouncer;
                         if (downlink != null)
@@ -680,7 +641,7 @@ public class VoiceSession
                         {
                             downlink.flush();
                         }
-                        enqueue(Entry.Kind.OTHER, VoiceFrames.ttsEnd(false, null));
+                        enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.ttsEnd(false, null));
                     }
 
                     @Override
@@ -692,7 +653,7 @@ public class VoiceSession
                         {
                             downlink.flush();
                         }
-                        enqueue(Entry.Kind.OTHER, VoiceFrames.error(code, message));
+                        enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.error(code, message));
                     }
                 });
         this.currentTts = handle;
@@ -706,72 +667,21 @@ public class VoiceSession
         String question = node.path("text").asText("").trim();
         if (question.isEmpty())
         {
-            enqueue(Entry.Kind.OTHER, VoiceFrames.error("INVALID_PARAM", "ask 帧缺少 text"));
+            enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.error("INVALID_PARAM", "ask 帧缺少 text"));
             return;
         }
         if (question.length() > 500)
         {
-            enqueue(Entry.Kind.OTHER, VoiceFrames.error("TEXT_TOO_LONG",
+            enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.error("TEXT_TOO_LONG",
                     "ask 问题上限 500 字符，当前 " + question.length()));
             return;
         }
-        if (robotService == null)
+        if (!robot.isAvailable())
         {
-            enqueue(Entry.Kind.OTHER, VoiceFrames.error("ROBOT_UNAVAILABLE", "对话引擎未装配"));
+            enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.error("ROBOT_UNAVAILABLE", "对话引擎未装配"));
             return;
         }
-        submitRobotTurn(question);
-    }
-
-    /**
-     * E3：提交一个机器人回合（最新回合取代旧回合——旧回合结果产出前发现 turnId
-     * 已失效即丢弃，保证"新问题就是新回合"，迟到应答不下发、不播报）。
-     */
-    private void submitRobotTurn(String question)
-    {
-        if (shutdown.get() || robotService == null)
-        {
-            return;
-        }
-        final long turnId = robotTurnSeq.incrementAndGet();
-        activeRobotTurn.set(turnId);
-        final long questionNanos = System.nanoTime();
-        try
-        {
-            robotExecutor.execute(() -> runRobotTurn(turnId, question, questionNanos));
-        }
-        catch (java.util.concurrent.RejectedExecutionException e)
-        {
-            log.warn("VoiceWS robot 回合提交失败（已关闭）conn={}", connId);
-        }
-    }
-
-    /** E3：执行机器人回合：RAG+LLM → answer_delta/done 帧 → 自动 TTS 播报 */
-    private void runRobotTurn(long turnId, String question, long questionNanos)
-    {
-        ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotResult result;
-        try
-        {
-            result = robotService.answer(question, sessionId, anchoredRecordId);
-        }
-        catch (Exception e)
-        {
-            // 服务自身已兜底，这里仅防御性兜底
-            log.warn("VoiceWS robot 回合异常 conn={}, turn={}: {}", connId, turnId, e.getMessage());
-            return;
-        }
-        // 迟到回合丢弃（新问题/打断/停机已取代）
-        if (shutdown.get() || turnId != activeRobotTurn.get())
-        {
-            return;
-        }
-        enqueue(Entry.Kind.OTHER, VoiceFrames.answerDelta(turnId, 0, result.getAnswer()));
-        enqueue(Entry.Kind.OTHER, VoiceFrames.answerDone(turnId, result.getRagHits(),
-                result.getSources(), result.isDegraded()));
-        // 自动播报：机器人 E2E 起点=问题就绪时刻
-        this.robotQuestionNanos = questionNanos;
-        this.robotE2eMarked.set(false);
-        startTts(result.getAnswer(), null);
+        robot.submitTurn(question);
     }
 
     /**
@@ -780,209 +690,24 @@ public class VoiceSession
      */
     void anchorRecordId(Long recordId)
     {
-        if (recordId != null && this.anchoredRecordId == null)
-        {
-            this.anchoredRecordId = recordId;
-        }
-    }
-
-    /* ================= F4：Copilot 实时辅助 ================= */
-
-    /**
-     * final 文本滚动入缓冲；缓冲达最小字数且距上次触发 ≥ 节流间隔时提交辅助。
-     *
-     * <p>与 E4 不同，Copilot 服务对象是坐席，不做 caller 门禁——当前生产链路
-     * 为坐席麦克风（role=agent），坐席语音本身含案情复述。</p>
-     */
-    private void queueCopilot(String text)
-    {
-        if (copilotService == null || text == null)
-        {
-            return;
-        }
-        String t = text.trim();
-        if (t.isEmpty())
-        {
-            return;
-        }
-        boolean fire;
-        long now = System.currentTimeMillis();
-        synchronized (copilotBuffer)
-        {
-            if (copilotBuffer.length() > 0)
-            {
-                copilotBuffer.append('\n');
-            }
-            copilotBuffer.append(t);
-            fire = copilotBuffer.length() >= COPILOT_MIN_CHARS
-                    && now - lastCopilotMs >= COPILOT_INTERVAL_MS;
-        }
-        if (fire)
-        {
-            submitCopilot(false);
-        }
-    }
-
-    /**
-     * 提交一个 Copilot 辅助回合（单线程执行，迟到结果按 seq 丢弃）。
-     *
-     * @param force true=stop 前强制（忽略间隔/最小字数）
-     */
-    private void submitCopilot(boolean force)
-    {
-        if (shutdown.get() || copilotService == null)
-        {
-            return;
-        }
-        final long seq;
-        final String payload;
-        synchronized (copilotBuffer)
-        {
-            if (copilotBuffer.length() == 0)
-            {
-                return;
-            }
-            if (!force && copilotBuffer.length() < COPILOT_MIN_CHARS)
-            {
-                return;
-            }
-            // 滚动窗口：超长按尾部截取，并把窗口保留进下一回合
-            String all = copilotBuffer.toString();
-            payload = all.length() > COPILOT_TEXT_MAX
-                    ? all.substring(all.length() - COPILOT_TEXT_MAX) : all;
-            copilotBuffer.setLength(0);
-            copilotBuffer.append(payload);
-            lastCopilotMs = System.currentTimeMillis();
-            seq = copilotTurnSeq.incrementAndGet();
-            activeCopilotSeq.set(seq);
-        }
-        try
-        {
-            copilotExecutor.execute(() -> runCopilotTurn(seq, payload));
-        }
-        catch (java.util.concurrent.RejectedExecutionException e)
-        {
-            log.warn("VoiceWS Copilot 回合提交失败（已关闭）conn={}", connId);
-        }
-    }
-
-    /** 执行辅助：要素/法条/工单三帧下发；服务自身全兜底，此处仅防御性兜底 */
-    private void runCopilotTurn(long seq, String payload)
-    {
-        ai.lawyers.system.service.lawyers.voice.copilot.CopilotAssistResult result;
-        try
-        {
-            result = copilotService.assist(payload, sessionId, agentId);
-        }
-        catch (Exception e)
-        {
-            log.warn("VoiceWS Copilot 回合异常 conn={}, seq={}: {}", connId, seq, e.getMessage());
-            return;
-        }
-        // 迟到回合丢弃（stop/shutdown 已作废）
-        if (shutdown.get() || seq != activeCopilotSeq.get())
-        {
-            return;
-        }
-        enqueue(Entry.Kind.OTHER, VoiceFrames.copilotElement(seq, result.getDisputeType(),
-                result.getClaims(), result.getUrgency(), result.getKeyFacts(),
-                result.isElementDegraded()));
-
-        List<java.util.Map<String, Object>> laws = new ArrayList<>();
-        for (ai.lawyers.system.service.lawyers.voice.copilot.CopilotLaw law : result.getLaws())
-        {
-            java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
-            m.put("chunkId", law.getChunkId());
-            m.put("title", law.getTitle());
-            m.put("lawArticle", law.getLawArticle());
-            m.put("source", law.getSource());
-            laws.add(m);
-        }
-        enqueue(Entry.Kind.OTHER, VoiceFrames.copilotLaws(seq, laws));
-
-        List<java.util.Map<String, Object>> tickets = new ArrayList<>();
-        for (ai.lawyers.system.service.lawyers.voice.copilot.CopilotTicket ticket : result.getTickets())
-        {
-            java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
-            m.put("ticketId", ticket.getTicketId());
-            m.put("ticketNo", ticket.getTicketNo());
-            m.put("title", ticket.getTitle());
-            m.put("status", ticket.getStatus());
-            m.put("contentSnippet", ticket.getContentSnippet());
-            tickets.add(m);
-        }
-        enqueue(Entry.Kind.OTHER, VoiceFrames.copilotTickets(seq, tickets));
-
-        List<java.util.Map<String, Object>> actions = new ArrayList<>();
-        for (ai.lawyers.system.service.lawyers.voice.copilot.CopilotAssistResult.SuggestedAction act : result.getActions())
-        {
-            java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
-            m.put("action", act.getAction());
-            m.put("label", act.getLabel());
-            m.put("payload", act.getPayload());
-            actions.add(m);
-        }
-        enqueue(Entry.Kind.OTHER, VoiceFrames.copilotActions(seq, actions));
-
-        // P1-8：对客口播话术（空串表示未生成/已降级，客户端据此隐藏话术区）
-        enqueue(Entry.Kind.OTHER, VoiceFrames.copilotScript(seq, result.getSuggestedScript()));
+        robot.anchorRecordId(recordId);
     }
 
     /* ================= E4：情绪/意图识别联动 ================= */
 
     /**
-     * 对一段 ASR 文本执行情绪/意图联动。
-     *
-     * <p>门禁：仅"说话人=来电者"的通道（role=caller 或 robot 模式）挂钩——
-     * 坐席自身语音不作为风险来源。去重：urgent 每通话动作一次；negative
-     * 每通话一次且 urgent 已命中后不再动作；urgent 可覆盖在先的 negative
-     * （紧急高级预警优先，宁错报不遗漏）。</p>
+     * 对一段 ASR 文本执行情绪/意图联动（未装配联动服务时静默跳过）。
      *
      * @param text    ASR 文本
      * @param isFinal true=final（urgent/negative 均可）；false=partial（仅 urgent）
      */
     private void detectEmotion(String text, boolean isFinal)
     {
-        if (emotionAction == null || text == null || text.trim().isEmpty())
+        if (emotion == null)
         {
             return;
         }
-        if (!emotionChannel())
-        {
-            return;
-        }
-        ai.lawyers.system.service.lawyers.voice.emotion.EmotionIntentResult r = emotionDetector.analyze(text);
-        if (r.isUrgent())
-        {
-            if (!urgentEmotionActed.compareAndSet(false, true))
-            {
-                return;
-            }
-            fireEmotion(r, text);
-        }
-        else if (isFinal && r.isNegative())
-        {
-            if (urgentEmotionActed.get() || !negativeEmotionActed.compareAndSet(false, true))
-            {
-                return;
-            }
-            fireEmotion(r, text);
-        }
-    }
-
-    /** 来电者通道判定：caller 角色或 robot 模式（robot ASR 即来电者语音） */
-    private boolean emotionChannel()
-    {
-        return "caller".equalsIgnoreCase(role) || robotMode;
-    }
-
-    /** 执行联动动作（预警+提优+计数）并下发 emotion 帧；动作服务内部全兜底 */
-    private void fireEmotion(ai.lawyers.system.service.lawyers.voice.emotion.EmotionIntentResult r, String hitText)
-    {
-        Long warningId = emotionAction.handleEmotion(r.getEmotion(), r.getIntent(),
-                hitText, r.getEmotionKeywords(), sessionId);
-        enqueue(Entry.Kind.OTHER,
-                VoiceFrames.emotion(r.getEmotion(), r.getIntent(), r.getEmotionKeywords(), warningId));
+        emotion.detect(text, isFinal);
     }
 
     /* ================= bargein / stop ================= */
@@ -1035,7 +760,7 @@ public class VoiceSession
         {
             metrics.recordVoiceVadMs(detector.getLastDetectionMs(), sessionId);
         }
-        enqueue(Entry.Kind.OTHER, VoiceFrames.vad(VoiceFrames.T_VAD_SPEECH_START));
+        enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.vad(VoiceFrames.T_VAD_SPEECH_START));
         StreamSynthesis tts = currentTts;
         if (tts != null && !tts.isCancelled())
         {
@@ -1043,7 +768,7 @@ public class VoiceSession
             tts.cancel();
             drainPendingTts();
             discardDownlink();
-            enqueue(Entry.Kind.OTHER, VoiceFrames.ttsEnd(true, "vad_speech_start"));
+            enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.ttsEnd(true, "vad_speech_start"));
             // A5：VAD 触发的打断停止耗时
             if (metrics != null)
             {
@@ -1057,7 +782,7 @@ public class VoiceSession
     {
         if (!shutdown.get())
         {
-            enqueue(Entry.Kind.OTHER, VoiceFrames.vad(VoiceFrames.T_VAD_SPEECH_END));
+            enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.vad(VoiceFrames.T_VAD_SPEECH_END));
         }
     }
 
@@ -1072,7 +797,7 @@ public class VoiceSession
         drainPendingTts();
         discardDownlink();
         // 明确发一帧 interrupted tts_end，客户端复位 AudioContext 播放队列
-        enqueue(Entry.Kind.OTHER, VoiceFrames.ttsEnd(true, "bargein"));
+        enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.ttsEnd(true, "bargein"));
         // A5：客户端主动打断停止耗时
         if (metrics != null)
         {
@@ -1085,7 +810,7 @@ public class VoiceSession
         StreamAsrEngine engineRef = asrEngine;
         if (!asrActive || engineRef == null)
         {
-            enqueue(Entry.Kind.OTHER, VoiceFrames.error("NOT_STARTED", "无进行中的识别流"));
+            enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.error("NOT_STARTED", "无进行中的识别流"));
             return;
         }
         asrActive = false;
@@ -1107,19 +832,19 @@ public class VoiceSession
         }
         robotMode = false;
         // E3：停止识别即作废机器人回合（在途 LLM 结果产出时丢弃）
-        activeRobotTurn.incrementAndGet();
+        robot.invalidateTurn();
         // F4：作废在途 Copilot 回合（close 内部 final 仍会入缓冲，随后强制补最后一回合）
-        activeCopilotSeq.incrementAndGet();
+        copilot.invalidate();
         try
         {
             engineRef.close();
         }
         catch (Exception e)
         {
-            enqueue(Entry.Kind.OTHER, VoiceFrames.error("ASR_CLOSE_ERROR", e.getMessage()));
+            enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.error("ASR_CLOSE_ERROR", e.getMessage()));
         }
         // F4：停止前以累计缓冲强制辅助一次（不受间隔/最小字数限制），让挂断前要素完整
-        submitCopilot(true);
+        copilot.forceFlush();
     }
 
     /** A5：纳秒差转毫秒（System.nanoTime 差值 → ms，截断取整） */
@@ -1128,82 +853,20 @@ public class VoiceSession
         return nanos / 1_000_000L;
     }
 
-    /* ================= 发送队列 ================= */
+    /* ================= 发送队列（委托 VoiceSendQueue） ================= */
 
     private void drainPendingTts()
     {
-        List<Entry> kept = new ArrayList<>();
-        sendQueue.drainTo(kept);
-        for (Entry e : kept)
-        {
-            if (e.kind != Entry.Kind.TTS)
-            {
-                sendQueue.offer(e);
-            }
-        }
+        sendQueue.drainTts();
     }
 
-    private void enqueue(Entry.Kind kind, String payload)
+    private void enqueue(VoiceSendQueue.Entry.Kind kind, String payload)
     {
-        if (shutdown.get() && kind != Entry.Kind.POISON)
+        if (shutdown.get() && kind != VoiceSendQueue.Entry.Kind.POISON)
         {
             return;
         }
-        try
-        {
-            if (sendQueue.offer(new Entry(kind, payload), ENQUEUE_TIMEOUT_MS, TimeUnit.MILLISECONDS))
-            {
-                return;
-            }
-        }
-        catch (InterruptedException e)
-        {
-            Thread.currentThread().interrupt();
-        }
-        long n = droppedFrames.incrementAndGet();
-        if (n == 1 || n % 100 == 0)
-        {
-            log.warn("VoiceWS 发送队列满，丢帧 conn={}, 累计丢弃={}", connId, n);
-        }
-    }
-
-    private void runSender()
-    {
-        while (true)
-        {
-            try
-            {
-                Entry e = sendQueue.take();
-                if (e == Entry.POISON)
-                {
-                    return;
-                }
-                if (wsSession.isOpen())
-                {
-                    // 单线程 + BasicRemote：天然保序且线程安全
-                    wsSession.getBasicRemote().sendText(e.payload);
-                }
-            }
-            catch (InterruptedException e)
-            {
-                Thread.currentThread().interrupt();
-                return;
-            }
-            catch (IOException e)
-            {
-                // 对端断开期间 @OnClose 会随后触发并 shutdown，这里不重复关闭
-                log.debug("VoiceWS send fail conn={}: {}", connId, e.getMessage());
-            }
-            catch (Exception e)
-            {
-                log.error("VoiceWS sender 异常 conn={}", connId, e);
-            }
-        }
-    }
-
-    String getConnId()
-    {
-        return connId;
+        sendQueue.send(kind, payload);
     }
 
     String getSessionId()
@@ -1219,31 +882,5 @@ public class VoiceSession
     boolean isAsrActive()
     {
         return asrActive;
-    }
-
-    long getDroppedFrames()
-    {
-        return droppedFrames.get();
-    }
-
-    /** 发送队列条目：区分 TTS 分片以便 barge-in 整批丢弃，POISON 终止 sender */
-    static final class Entry
-    {
-        static final Entry POISON = new Entry(Kind.POISON, "");
-
-        enum Kind
-        {
-            TTS, OTHER, POISON
-        }
-
-        final Kind kind;
-
-        final String payload;
-
-        Entry(Kind kind, String payload)
-        {
-            this.kind = kind;
-            this.payload = payload;
-        }
     }
 }
