@@ -84,6 +84,7 @@
 import { listQueue, listQueuing, assignManually, kickQueue } from '@/api/lawyers/skill'
 import { listEnabledGroups } from '@/api/lawyers/skill'
 import { listAgent } from '@/api/lawyers/callCenter'
+import { createPoller } from '@/utils/polling'
 
 export default {
   name: 'SkillQueue',
@@ -103,9 +104,11 @@ export default {
   created() {
     this.loadGroups()
     this.getList()
-    this.timer = setInterval(this.refreshStat, 10000)
+    // P6：统一轮询——页面不可见暂停、恢复可见立即补拉
+    this.poller = createPoller(() => this.refreshStat(), 10000)
+    this.poller.start()
   },
-  beforeDestroy() { clearInterval(this.timer) },
+  beforeDestroy() { if (this.poller) this.poller.stop() },
   methods: {
     loadGroups() {
       listEnabledGroups().then(res => { this.groupList = res.data || [] })

@@ -160,6 +160,7 @@ import {
   closeChatSession, transferChatSession, markRead
 } from "@/api/lawyers/chat"
 import { getToken } from "@/utils/auth"
+import { createPoller } from "@/utils/polling"
 
 export default {
   name: "Chat",
@@ -177,7 +178,6 @@ export default {
       transferOpen: false,
       transferUserId: null,
       transferUserName: '',
-      pollTimer: null,
       // P3-D4：会话房间 WS 连接（实时收推，轮询降级为兜底）
       chatWs: null,
       chatWsDead: false
@@ -199,22 +199,26 @@ export default {
   },
   mounted() {
     // P3-D4：WS 存活时跳过消息轮询（实时推送覆盖）；会话列表仍低频轮询刷新最后消息
-    this.pollTimer = setInterval(() => {
+    // P6：统一轮询——页面不可见暂停、在途防重入、恢复可见立即补拉
+    this.poller = createPoller(() => {
+      const jobs = []
       const wsAlive = this.chatWs && this.chatWs.readyState === WebSocket.OPEN
       if (this.currentSession && !wsAlive) {
-        this.loadMessages()
+        jobs.push(this.loadMessages())
       }
-      this.loadSessions(true)
+      jobs.push(this.loadSessions(true))
+      return Promise.all(jobs)
     }, 5000)
+    this.poller.start()
   },
   beforeDestroy() {
-    if (this.pollTimer) clearInterval(this.pollTimer)
+    if (this.poller) this.poller.stop()
     this.closeChatWs()
   },
   methods: {
     loadSessions(silent) {
       if (!silent) this.sessionLoading = true
-      listChatSession({ pageNum: 1, pageSize: 50 }).then(res => {
+      return listChatSession({ pageNum: 1, pageSize: 50 }).then(res => {
         this.sessionList = res.rows || []
         if (!silent) this.sessionLoading = false
       }).catch(() => { if (!silent) this.sessionLoading = false })
@@ -277,9 +281,9 @@ export default {
       }
     },
     loadMessages() {
-      if (!this.currentSession) return
+      if (!this.currentSession) return Promise.resolve()
       this.msgLoading = true
-      listChatMessage(this.currentSession.sessionId).then(res => {
+      return listChatMessage(this.currentSession.sessionId).then(res => {
         this.messageList = res.rows || []
         this.msgLoading = false
         this.$nextTick(() => { this.scrollToBottom() })

@@ -74,6 +74,7 @@
 
 <script>
 import { listQueue, listDeadLetter, replayDeadLetter, removeDeadLetter } from '@/api/lawyers/queueMonitor'
+import { createPoller } from '@/utils/polling'
 
 export default {
   name: 'QueueMonitor',
@@ -81,7 +82,6 @@ export default {
     return {
       loading: false,
       queueList: [],
-      timer: null,
       deadOpen: false,
       deadLoading: false,
       currentQueue: '',
@@ -92,15 +92,17 @@ export default {
   },
   created() {
     this.getList()
-    this.timer = setInterval(() => {
+    // P6：统一轮询——页面不可见暂停、在途防重入、恢复可见立即补拉；死信弹窗打开期间跳过
+    this.poller = createPoller(() => {
       if (!this.deadOpen) {
         this.getList(true)
       }
     }, 10000)
+    this.poller.start()
   },
   beforeDestroy() {
-    if (this.timer) {
-      clearInterval(this.timer)
+    if (this.poller) {
+      this.poller.stop()
     }
   },
   methods: {
@@ -108,7 +110,7 @@ export default {
       if (!silent) {
         this.loading = true
       }
-      listQueue().then(response => {
+      return listQueue().then(response => {
         this.queueList = response.data || []
         this.loading = false
       }).catch(() => {

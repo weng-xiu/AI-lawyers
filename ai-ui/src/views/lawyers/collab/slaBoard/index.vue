@@ -146,6 +146,7 @@
 <script>
 import * as echarts from 'echarts';
 import { slaBoardData } from '@/api/lawyers/slaPolicy';
+import { createPoller } from '@/utils/polling';
 
 export default {
   name: 'CollabSlaBoard',
@@ -160,7 +161,6 @@ export default {
       overtimeTop: [],
       dueSoon: [],
       transferStat: [],
-      timer: null,
       bizChart: null
     };
   },
@@ -180,11 +180,12 @@ export default {
     }
   },
   created() {
-    this.loadData();
-    this.timer = setInterval(this.loadData, 60000);
+    // P6：统一轮询——页面不可见暂停、在途防重入、恢复可见立即补拉
+    this.poller = createPoller(() => this.loadData(), 60000, { immediate: true });
+    this.poller.start();
   },
   beforeDestroy() {
-    if (this.timer) clearInterval(this.timer);
+    if (this.poller) this.poller.stop();
     if (this.bizChart && this.bizChart.dispose) this.bizChart.dispose();
     window.removeEventListener('resize', this.resizeChart);
   },
@@ -196,7 +197,7 @@ export default {
         params.beginTime = this.rangeTime[0];
         params.endTime = this.rangeTime[1];
       }
-      slaBoardData(params).then(res => {
+      return slaBoardData(params).then(res => {
         const d = res.data || {};
         this.overview = d.overview || {};
         this.achieveByBizType = d.achieveByBizType || [];

@@ -69,6 +69,7 @@
 import { mapGetters } from 'vuex'
 import { getMyAgent } from '@/api/lawyers/callCenter'
 import callSocket from '@/utils/callSocket'
+import { createPoller } from '@/utils/polling'
 
 export default {
   name: 'AgentStatusBar',
@@ -177,7 +178,7 @@ export default {
   },
   beforeDestroy() {
     if (this.timer) clearInterval(this.timer)
-    if (this.pollTimer) clearInterval(this.pollTimer)
+    if (this.poller) this.poller.stop()
     this.unregisterCallSocket()
   },
   methods: {
@@ -269,12 +270,15 @@ export default {
       this.$store.dispatch('agent/refresh').then(agent => this.syncCallState(agent)).catch(() => {})
     },
     startPolling() {
-      if (this.pollTimer) clearInterval(this.pollTimer)
-      this.pollTimer = setInterval(() => this.refreshAgent(), 5000)
+      // P6：统一轮询——页面不可见暂停、在途防重入、恢复可见立即补拉（start 幂等）
+      if (!this.poller) {
+        this.poller = createPoller(() => this.refreshAgent(), 5000)
+      }
+      this.poller.start()
     },
     refreshAgent() {
       if (this.$store.state.agent.agentId == null) return
-      this.$store.dispatch('agent/refresh').then(agent => {
+      return this.$store.dispatch('agent/refresh').then(agent => {
         this.syncCallState(agent)
       })
     },

@@ -153,6 +153,7 @@ import {
   submitRobotSimulation,
   getRobotSimulationProgress
 } from '@/api/lawyers/simulation'
+import { createPoller } from '@/utils/polling'
 
 export default {
   name: 'Simulation',
@@ -162,8 +163,7 @@ export default {
       casesJson: '',
       submitting: false,
       task: null,
-      report: null,
-      pollTimer: null
+      report: null
     }
   },
   computed: {
@@ -234,12 +234,14 @@ export default {
     },
     startPolling() {
       this.stopPolling()
-      this.pollTimer = setInterval(this.loadProgress, 2000)
+      // P6：统一轮询——页面不可见暂停、在途防重入、恢复可见立即补拉
+      this.poller = createPoller(() => this.loadProgress(), 2000)
+      this.poller.start()
     },
     stopPolling() {
-      if (this.pollTimer) {
-        clearInterval(this.pollTimer)
-        this.pollTimer = null
+      if (this.poller) {
+        this.poller.stop()
+        this.poller = null
       }
     },
     loadProgress() {
@@ -249,7 +251,7 @@ export default {
       const get = this.kind === 'copilot'
         ? getCopilotSimulationProgress
         : getRobotSimulationProgress
-      get(this.task.taskId).then(res => {
+      return get(this.task.taskId).then(res => {
         this.task = res.data
         if (this.task.status === 'SUCCESS') {
           this.report = this.task.report

@@ -130,6 +130,7 @@
 
 <script>
 import { getCallReport, getServiceReport, getQualityReport, getBusinessReport, statBackfill, statBackfillProgress } from '@/api/lawyers/report'
+import { createPoller } from '@/utils/polling'
 import AdhocAnalysis from './AdhocAnalysis'
 
 const REPORT_API = {
@@ -164,8 +165,7 @@ export default {
       backfillProcessed: 0,
       backfillTotal: 0,
       backfillRows: 0,
-      backfillError: '',
-      backfillTimer: null
+      backfillError: ''
     }
   },
   computed: {
@@ -262,17 +262,18 @@ export default {
     },
     startPolling() {
       this.stopPolling()
-      this.pollProgress()
-      this.backfillTimer = setInterval(this.pollProgress, 3000)
+      // P6：统一轮询——页面不可见暂停、在途防重入、恢复可见立即补拉（immediate 立即首查）
+      this.poller = createPoller(() => this.pollProgress(), 3000, { immediate: true })
+      this.poller.start()
     },
     stopPolling() {
-      if (this.backfillTimer) {
-        clearInterval(this.backfillTimer)
-        this.backfillTimer = null
+      if (this.poller) {
+        this.poller.stop()
+        this.poller = null
       }
     },
     pollProgress() {
-      statBackfillProgress(this.backfillTaskId).then(res => {
+      return statBackfillProgress(this.backfillTaskId).then(res => {
         const d = res.data || {}
         this.backfillStatus = d.status
         this.backfillPercent = d.percent || 0

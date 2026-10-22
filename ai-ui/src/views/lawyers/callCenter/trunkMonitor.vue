@@ -171,6 +171,7 @@ import {
   pjsipEndpoints, pjsipQueues, pjsipSummary, pjsipRegistrations
 } from '@/api/lawyers/trunk'
 import * as echarts from 'echarts'
+import { createPoller } from '@/utils/polling'
 
 export default {
   name: 'TrunkMonitor',
@@ -207,47 +208,53 @@ export default {
     }
   },
   created() {
-    this.refreshAll()
-    this.timer = setInterval(this.refreshAll, 15000)
+    // P6：统一轮询——页面不可见暂停、在途防重入、恢复可见立即补拉
+    this.poller = createPoller(() => this.refreshAll(), 15000, { immediate: true })
+    this.poller.start()
   },
   beforeDestroy() {
-    if (this.timer) clearInterval(this.timer)
+    if (this.poller) this.poller.stop()
     if (this.chart && this.chart.dispose) this.chart.dispose()
   },
   methods: {
     refreshAll() {
-      this.loadOverview()
-      this.loadTrunkStatus()
-      this.loadCarrier()
-      this.loadTrend()
-      this.loadAlarms()
-      this.loadPjsip()
+      // 返回 Promise.all 供统一轮询在途防重入
+      return Promise.all([
+        this.loadOverview(),
+        this.loadTrunkStatus(),
+        this.loadCarrier(),
+        this.loadTrend(),
+        this.loadAlarms(),
+        this.loadPjsip()
+      ])
     },
     loadPjsip() {
-      pjsipSummary().then(res => { this.pjsipSummary = res.data || {} })
-      pjsipEndpoints().then(res => { this.pjsipEndpoints = res.data || [] })
-      pjsipQueues().then(res => { this.pjsipQueues = res.data || [] })
-      pjsipRegistrations().then(res => {
-        this.pjsipRegInfo = res.data || {}
-        this.pjsipRegs = this.pjsipRegInfo.registrations || []
-      })
+      return Promise.all([
+        pjsipSummary().then(res => { this.pjsipSummary = res.data || {} }),
+        pjsipEndpoints().then(res => { this.pjsipEndpoints = res.data || [] }),
+        pjsipQueues().then(res => { this.pjsipQueues = res.data || [] }),
+        pjsipRegistrations().then(res => {
+          this.pjsipRegInfo = res.data || {}
+          this.pjsipRegs = this.pjsipRegInfo.registrations || []
+        })
+      ])
     },
     loadOverview() {
-      trunkOverview().then(res => { this.overview = res.data || {} })
+      return trunkOverview().then(res => { this.overview = res.data || {} })
     },
     loadTrunkStatus() {
-      trunkStatusList().then(res => { this.trunkStatus = res.data || [] })
+      return trunkStatusList().then(res => { this.trunkStatus = res.data || [] })
     },
     loadCarrier() {
-      carrierStatApi().then(res => { this.carrierStat = res.data || [] })
+      return carrierStatApi().then(res => { this.carrierStat = res.data || [] })
     },
     loadTrend() {
-      trunkTrend({ trunkId: this.trendTrunkId, dimension: 'CONNECT_RATE', limit: 30 }).then(res => {
+      return trunkTrend({ trunkId: this.trendTrunkId, dimension: 'CONNECT_RATE', limit: 30 }).then(res => {
         this.renderTrend(res.data || [])
       })
     },
     loadAlarms() {
-      trunkAlarmList({ status: '0', pageSize: 20 }).then(res => {
+      return trunkAlarmList({ status: '0', pageSize: 20 }).then(res => {
         this.alarms = (res.rows || res.data || [])
       })
     },

@@ -270,6 +270,7 @@ import AiAssistPanel from "./AiAssistPanel.vue"
 import VoiceCaption from "./VoiceCaption.vue"
 import callSocket from "@/utils/callSocket"
 import { getSipPhone } from "@/utils/webrtcSipPhone"
+import { createPoller } from "@/utils/polling"
 
 export default {
   name: "CallPopup",
@@ -285,7 +286,6 @@ export default {
       callDuration: '00:00:00',
       seconds: 0,
       timer: null,
-      pollTimer: null,
       transferOpen: false,
       transferTargetId: null,
       onlineAgentOptions: [],
@@ -392,7 +392,7 @@ export default {
   beforeDestroy() {
     document.removeEventListener('keydown', this.handleKeydown)
     this.clearTimer()
-    if (this.pollTimer) clearInterval(this.pollTimer)
+    if (this.poller) this.poller.stop()
     this.unregisterCallSocket()
     if (this.sipPhone) {
       this.sipPhone.off('sessionEnded', this.onSipHangup)
@@ -520,12 +520,15 @@ export default {
       if (!this.isMyEvent(data)) return
     },
     startSyncTimer() {
-      if (this.pollTimer) clearInterval(this.pollTimer)
-      this.pollTimer = setInterval(() => this.syncFromAgent(), 5000)
+      // P6：统一轮询——页面不可见暂停、在途防重入、恢复可见立即补拉（start 幂等）
+      if (!this.poller) {
+        this.poller = createPoller(() => this.syncFromAgent(), 5000)
+      }
+      this.poller.start()
     },
     syncFromAgent() {
       if (this.agentId == null) return
-      this.$store.dispatch('agent/refresh').then(agent => {
+      return this.$store.dispatch('agent/refresh').then(agent => {
         if (!agent) return
         this.callStatus = agent.callStatus || '0'
         const active = this.callStatus !== '0'

@@ -159,6 +159,7 @@
 <script>
 import * as echarts from 'echarts';
 import { dashboardData } from "@/api/lawyers/stat";
+import { createPoller } from "@/utils/polling";
 
 export default {
   name: "LawyerDashboard",
@@ -175,7 +176,6 @@ export default {
       queueNow: [],
       outboundProgress: [],
       bizMetrics: {},
-      timer: null,
       trendChart: null,
       categoryChart: null,
       aiChart: null,
@@ -205,11 +205,12 @@ export default {
     }
   },
   created() {
-    this.loadData();
-    this.timer = setInterval(this.loadData, 30000);
+    // P6：统一轮询——页面不可见暂停、在途防重入、恢复可见立即补拉
+    this.poller = createPoller(() => this.loadData(), 30000, { immediate: true });
+    this.poller.start();
   },
   beforeDestroy() {
-    if (this.timer) clearInterval(this.timer);
+    if (this.poller) this.poller.stop();
     [this.trendChart, this.categoryChart, this.aiChart, this.langChart, this.channelChart].forEach(c => {
       if (c && c.dispose) c.dispose();
     });
@@ -221,7 +222,7 @@ export default {
         params.beginTime = this.rangeTime[0];
         params.endTime = this.rangeTime[1];
       }
-      dashboardData(params).then(res => {
+      return dashboardData(params).then(res => {
         const d = res.data || {};
         this.callSummary = d.callSummary || {};
         this.agentStatusSummary = d.agentStatusSummary || {};

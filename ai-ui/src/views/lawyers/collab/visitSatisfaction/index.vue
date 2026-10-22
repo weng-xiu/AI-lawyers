@@ -171,6 +171,7 @@
 <script>
 import * as echarts from 'echarts';
 import { visitSatisfactionBoard } from '@/api/lawyers/visitSatisfaction';
+import { createPoller } from '@/utils/polling';
 
 export default {
   name: 'CollabVisitSatisfactionBoard',
@@ -187,7 +188,6 @@ export default {
       taskOverview: {},
       overdueSummary: {},
       overdueTasks: [],
-      timer: null,
       charts: { trend: null, sentiment: null, reason: null }
     };
   },
@@ -223,11 +223,12 @@ export default {
     }
   },
   created() {
-    this.loadData();
-    this.timer = setInterval(this.loadData, 60000);
+    // P6：统一轮询——页面不可见暂停、在途防重入、恢复可见立即补拉
+    this.poller = createPoller(() => this.loadData(), 60000, { immediate: true });
+    this.poller.start();
   },
   beforeDestroy() {
-    if (this.timer) clearInterval(this.timer);
+    if (this.poller) this.poller.stop();
     Object.values(this.charts).forEach(c => c && c.dispose && c.dispose());
     window.removeEventListener('resize', this.resizeCharts);
   },
@@ -239,7 +240,7 @@ export default {
         params.beginTime = this.rangeTime[0] + ' 00:00:00';
         params.endTime = this.rangeTime[1] + ' 23:59:59';
       }
-      visitSatisfactionBoard(params).then(res => {
+      return visitSatisfactionBoard(params).then(res => {
         const d = res.data || {};
         this.callbackOverview = d.callbackOverview || {};
         this.callbackTrend = d.callbackTrend || [];
