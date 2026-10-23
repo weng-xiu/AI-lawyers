@@ -199,7 +199,7 @@
           <el-table-column label="处理人" prop="assignUserName" width="100" align="center" />
           <el-table-column label="状态" width="90" align="center">
             <template slot-scope="scope">
-              <el-tag size="mini" :type="ticketStatusType(scope.row.status)">{{ ticketStatusLabel(scope.row.status) }}</el-tag>
+              <el-tag size="mini" :type="ticketStatusType(scope.row.status)" :class="ticketStatusClass(scope.row.status)">{{ ticketStatusLabel(scope.row.status) }}</el-tag>
             </template>
           </el-table-column>
         </el-table>
@@ -330,6 +330,7 @@
 <script>
 import { listRecord, getRecord, addRecord, updateRecord, delRecord, getCallStatistics, getCallStatisticsByCategory, getCallStatisticsByDate, addTicket, generateTicketNo, listTicket, getTransfersByRecordId, listAgent, generateAiSummary } from "@/api/lawyers/callCenter"
 import * as echarts from 'echarts'
+import * as statusTag from '@/utils/statusTag'
 
 export default {
   name: "CallRecord",
@@ -550,10 +551,14 @@ export default {
       }).catch(() => {})
     },
     ticketStatusLabel(s) {
-      return { '0': '待处理', '1': '处理中', '2': '已完成', '3': '已归档' }[s] || '-'
+      // V7：工单状态语义色统一由 utils/statusTag 承载
+      return statusTag.ticketStatusLabel(s)
     },
     ticketStatusType(s) {
-      return { '0': 'warning', '1': 'primary', '2': 'success', '3': 'info' }[s] || 'info'
+      return statusTag.ticketStatusType(s)
+    },
+    ticketStatusClass(s) {
+      return statusTag.ticketStatusClass(s)
     },
     handleCreateTicket(row) {
       getRecord(row.recordId).then(res => {

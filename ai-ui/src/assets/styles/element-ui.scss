@@ -279,6 +279,36 @@
   }
 }
 
+// ---- 标签默认色：Element 默认标签硬编码旧版蓝 #409EFF，统一收敛到品牌主蓝 ----
+// 限定“未指定语义 type”的标签（含历史代码误写的 type="primary"——Element 无该类型
+// 样式，会回落到默认蓝）；语义 type 继续由 .el-tag--success/warning/danger/info 承载。
+$tag-default-selector: ':not(.el-tag--success):not(.el-tag--warning):not(.el-tag--danger):not(.el-tag--info)';
+
+.el-tag#{$tag-default-selector} {
+  color: #1A3C6E;
+  background-color: #E9EFF7;
+  border-color: #C9D8EA;
+
+  .el-tag__close {
+    color: #1A3C6E;
+
+    &:hover {
+      background-color: #1A3C6E;
+      color: #FFFFFF;
+    }
+  }
+}
+
+.el-tag.el-tag--dark#{$tag-default-selector} {
+  color: #FFFFFF;
+  background-color: #1A3C6E;
+  border-color: #1A3C6E;
+
+  .el-tag__close {
+    color: #FFFFFF;
+  }
+}
+
 // ---- 间距规范：表格操作列按钮组统一 8px 间隔（Element 默认 12px 偏松） ----
 .el-table .cell {
   > .el-button--mini + .el-button--mini,

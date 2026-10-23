@@ -77,7 +77,7 @@
                 <div class="wb-record-item" v-for="item in recentRecords" :key="item.recordId">
                   <div class="wb-record-top">
                     <span class="wb-record-phone">{{ item.callerNumber || '-' }}</span>
-                    <el-tag size="mini" :type="recordStatusTag(item.status)" effect="plain">{{ recordStatusLabel(item.status) }}</el-tag>
+                    <el-tag size="mini" :type="recordStatusTag(item.status)" :class="recordStatusClass(item.status)" effect="plain">{{ recordStatusLabel(item.status) }}</el-tag>
                   </div>
                   <div class="wb-record-name">{{ item.callerName || '未知' }} · {{ item.categoryName || '未分类' }}</div>
                   <div class="wb-record-time">{{ item.callTime }} · {{ formatDuration(item.duration) }}</div>
@@ -141,6 +141,7 @@ import { getWorkbenchStats, getWorkbenchTodos, getWorkbenchRecentCalls } from "@
 import { addTicket } from "@/api/lawyers/callCenter"
 import TodoPanel from './todo'
 import NoticePanel from './notice'
+import * as statusTag from '@/utils/statusTag'
 
 export default {
   name: "Workbench",
@@ -244,11 +245,15 @@ export default {
         this.$message.info(item.name + ' 敬请期待')
       }
     },
+    // V7：通话状态语义色统一由 utils/statusTag 承载（修复原 type="primary" 非法值）
     recordStatusLabel(s) {
-      return { '0': '接通中', '1': '已完成', '2': '已转接', '3': '未接' }[s] || '未知'
+      return statusTag.callRecordStatusLabel(s)
     },
     recordStatusTag(s) {
-      return { '0': 'primary', '1': 'success', '2': 'warning', '3': 'danger' }[s] || 'info'
+      return statusTag.callRecordStatusType(s)
+    },
+    recordStatusClass(s) {
+      return statusTag.callRecordStatusClass(s)
     },
     formatDuration(seconds) {
       seconds = parseInt(seconds) || 0

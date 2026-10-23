@@ -67,7 +67,7 @@
               <div class="cp-sub-title"><i class="el-icon-tickets"></i> 相似工单（已办结）</div>
               <div v-for="ticket in copilot.tickets" :key="ticket.ticketId" class="cp-ticket">
                 <div class="cp-ticket-head">
-                  <el-tag size="mini" :type="ticketStatusTag(ticket.status)" effect="plain">
+                  <el-tag size="mini" :type="ticketStatusTag(ticket.status)" :class="ticketStatusClass(ticket.status)" effect="plain">
                     {{ ticketStatusLabel(ticket.status) }}
                   </el-tag>
                   <span class="cp-ticket-title">{{ ticket.title || ticket.ticketNo }}</span>
@@ -214,6 +214,7 @@
 <script>
 import { getAiAssistByRecord, analyzeAiAssist, summarizeAiAssist } from '@/api/lawyers/aiAssist'
 import { copilotFeedback, getCopilotChunk, createCopilotTicket, queryCopilotTicket } from '@/api/lawyers/copilot'
+import * as statusTag from '@/utils/statusTag'
 
 export default {
   name: 'AiAssistPanel',
@@ -368,10 +369,14 @@ export default {
     },
 
     ticketStatusLabel(s) {
-      return { '0': '待处理', '1': '处理中', '2': '已完成', '3': '已归档' }[s] || '待处理'
+      // V7：工单状态语义色统一由 utils/statusTag 承载
+      return statusTag.ticketStatusLabel(s)
     },
     ticketStatusTag(s) {
-      return { '0': 'info', '1': 'warning', '2': 'success', '3': '' }[s] || 'info'
+      return statusTag.ticketStatusType(s)
+    },
+    ticketStatusClass(s) {
+      return statusTag.ticketStatusClass(s)
     },
 
     /* ================= P1-8：代执行（确认建单 / 查工单进度） ================= */

@@ -141,7 +141,7 @@
                 <div class="cp-call-main">
                   <div class="cp-call-header">
                     <span class="cp-call-title">{{ item.categoryName || '通话记录' }}</span>
-                    <el-tag size="mini" :type="recordStatusTag(item.status)" effect="plain">{{ recordStatusLabel(item.status) }}</el-tag>
+                    <el-tag size="mini" :type="recordStatusTag(item.status)" :class="recordStatusClass(item.status)" effect="plain">{{ recordStatusLabel(item.status) }}</el-tag>
                     <span class="cp-call-time">{{ item.callTime }}</span>
                   </div>
                   <div class="cp-call-footer">
@@ -161,7 +161,7 @@
                   <template slot-scope="scope">{{ priorityLabel(scope.row.priority) }}</template>
                 </el-table-column>
                 <el-table-column label="状态" align="center" width="90">
-                  <template slot-scope="scope"><el-tag size="mini" :type="ticketStatusTag(scope.row.status)">{{ ticketStatusLabel(scope.row.status) }}</el-tag></template>
+                  <template slot-scope="scope"><el-tag size="mini" :type="ticketStatusTag(scope.row.status)" :class="ticketStatusClass(scope.row.status)">{{ ticketStatusLabel(scope.row.status) }}</el-tag></template>
                 </el-table-column>
                 <el-table-column label="创建时间" prop="createTime" width="160" />
               </el-table>
@@ -271,6 +271,7 @@ import VoiceCaption from "./VoiceCaption.vue"
 import callSocket from "@/utils/callSocket"
 import { getSipPhone } from "@/utils/webrtcSipPhone"
 import { createPoller } from "@/utils/polling"
+import * as statusTag from '@/utils/statusTag'
 
 export default {
   name: "CallPopup",
@@ -701,11 +702,14 @@ export default {
     },
     genderLabel(g) { return { '0': '男', '1': '女', '2': '未知' }[g] || '未知' },
     riskLabel(r) { return { '0': '低风险', '1': '中风险', '2': '高风险' }[r] || '低风险' },
-    recordStatusLabel(s) { return { '0': '接通中', '1': '已完成', '2': '已转接', '3': '未接' }[s] || '未知' },
-    recordStatusTag(s) { return { '0': 'primary', '1': 'success', '2': 'warning', '3': 'danger' }[s] || 'info' },
+    // V7：状态语义色统一由 utils/statusTag 承载（修复原 type="primary" 非法值）
+    recordStatusLabel(s) { return statusTag.callRecordStatusLabel(s) },
+    recordStatusTag(s) { return statusTag.callRecordStatusType(s) },
+    recordStatusClass(s) { return statusTag.callRecordStatusClass(s) },
     priorityLabel(p) { return { '1': '紧急', '2': '普通', '3': '低' }[p] || '普通' },
-    ticketStatusLabel(s) { return { '0': '待处理', '1': '处理中', '2': '已完成', '3': '已归档' }[s] || '待处理' },
-    ticketStatusTag(s) { return { '0': 'info', '1': 'warning', '2': 'success', '3': '' }[s] || 'info' },
+    ticketStatusLabel(s) { return statusTag.ticketStatusLabel(s) },
+    ticketStatusTag(s) { return statusTag.ticketStatusType(s) },
+    ticketStatusClass(s) { return statusTag.ticketStatusClass(s) },
     tagType(idx) { return ['warning', '', 'success', 'danger'][idx % 4] },
     formatDuration(seconds) {
       seconds = parseInt(seconds) || 0

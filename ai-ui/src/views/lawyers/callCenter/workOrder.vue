@@ -301,6 +301,7 @@ import { listTicket, getTicket, addTicket, updateTicket, delTicket, processTicke
 import { listExternalOrg } from "@/api/lawyers/externalOrg"
 import request from '@/utils/request'
 import { createDraftMixin } from '@/utils/draft'
+import * as statusTag from '@/utils/statusTag'
 
 // 查询工单流转记录（若后端接口存在）
 export function getTicketTimeline(ticketId) {
@@ -524,26 +525,15 @@ export default {
       return tags[priority] || 'info'
     },
     getStatusLabel(status) {
-      const labels = {
-        '0': '待处理',
-        '1': '处理中',
-        '2': '已完成',
-        '3': '已归档'
-      }
-      return labels[String(status)] || status
+      // V7：状态语义色统一由 utils/statusTag 承载，避免各页面映射漂移
+      return statusTag.ticketStatusLabel(status)
     },
     getStatusTag(status) {
-      const tags = {
-        '0': 'warning',
-        '1': '',
-        '2': 'success',
-        '3': 'info'
-      }
-      return tags[String(status)] || 'info'
+      return statusTag.ticketStatusType(status)
     },
     // V7：处理中=信息蓝 #2B6BB0（与品牌主蓝区分，配色.md 工单状态语义色）
     getStatusClass(status) {
-      return String(status) === '1' ? 'tag-status--processing' : ''
+      return statusTag.ticketStatusClass(status)
     },
     handleQuery() {
       this.queryParams.pageNum = 1

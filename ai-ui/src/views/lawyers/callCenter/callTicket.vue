@@ -60,7 +60,7 @@
         >删除</el-button>
       </template>
       <template #column-status="{ row }">
-        <el-tag :type="getStatusType(row.status)">{{ getStatusLabel(row.status) }}</el-tag>
+        <el-tag :type="getStatusType(row.status)" :class="getStatusClass(row.status)">{{ getStatusLabel(row.status) }}</el-tag>
       </template>
       <template #column-priority="{ row }">
         <el-tag :type="getPriorityType(row.priority)">{{ getPriorityLabel(row.priority) }}</el-tag>
@@ -153,7 +153,7 @@
         <el-descriptions-item label="工单号">{{ detailForm.ticketNo }}</el-descriptions-item>
         <el-descriptions-item label="工单标题">{{ detailForm.title }}</el-descriptions-item>
         <el-descriptions-item label="工单状态">
-          <el-tag :type="getStatusType(detailForm.status)">{{ getStatusLabel(detailForm.status) }}</el-tag>
+          <el-tag :type="getStatusType(detailForm.status)" :class="getStatusClass(detailForm.status)">{{ getStatusLabel(detailForm.status) }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="优先级">
           <el-tag :type="getPriorityType(detailForm.priority)">{{ getPriorityLabel(detailForm.priority) }}</el-tag>
@@ -188,6 +188,7 @@
 
 <script>
 import { listTicket, getTicket, addTicket, updateTicket, delTicket, processTicket, completeTicket, archiveTicket } from "@/api/lawyers/callCenter"
+import * as statusTag from '@/utils/statusTag'
 
 export default {
   name: "CallTicket",
@@ -289,12 +290,14 @@ export default {
       })
     },
     getStatusType(status) {
-      const types = { '0': 'danger', '1': 'warning', '2': 'success', '3': 'info' }
-      return types[status] || 'info'
+      // V7：与工单列表/来电弹屏/AI 辅助统一语义色
+      return statusTag.ticketStatusType(status)
     },
     getStatusLabel(status) {
-      const labels = { '0': '待处理', '1': '处理中', '2': '已完成', '3': '已归档' }
-      return labels[status] || '未知'
+      return statusTag.ticketStatusLabel(status)
+    },
+    getStatusClass(status) {
+      return statusTag.ticketStatusClass(status)
     },
     getPriorityType(priority) {
       const types = { '0': 'info', '1': 'warning', '2': 'danger' }
