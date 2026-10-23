@@ -12,8 +12,13 @@ import ai.lawyers.system.domain.lawyers.ivr.AiIvrNode;
 import ai.lawyers.system.domain.lawyers.ivr.IvrExecuteRequest;
 import ai.lawyers.system.domain.lawyers.ivr.IvrExecuteResult;
 import ai.lawyers.system.service.impl.lawyers.ivr.engine.IvrEngineServiceImpl;
-import ai.lawyers.system.service.impl.lawyers.ivr.engine.IvrHttpClient;
 import ai.lawyers.system.service.impl.lawyers.ivr.engine.IvrTemplateRenderer;
+import ai.lawyers.system.service.impl.lawyers.ivr.engine.node.ChildNodeExecutor;
+import ai.lawyers.system.service.impl.lawyers.ivr.engine.node.HangupNodeExecutor;
+import ai.lawyers.system.service.impl.lawyers.ivr.engine.node.MenuNodeExecutor;
+import ai.lawyers.system.service.impl.lawyers.ivr.engine.node.SayNodeExecutor;
+import ai.lawyers.system.service.impl.lawyers.ivr.engine.node.StartNodeExecutor;
+import ai.lawyers.system.service.impl.lawyers.ivr.engine.node.TransferNodeExecutor;
 import ai.lawyers.system.service.lawyers.ivr.IAiIvrEdgeService;
 import ai.lawyers.system.service.lawyers.ivr.IAiIvrExecutionLogService;
 import ai.lawyers.system.service.lawyers.ivr.IAiIvrFlowService;
@@ -49,9 +54,18 @@ abstract class IvrEngineTestBase
         setField("nodeService", nodeService);
         setField("edgeService", edgeService);
         setField("executionLogService", executionLogService);
-        setField("ivrHttpClient", new IvrHttpClient());
-        setField("ivrTemplateRenderer", new IvrTemplateRenderer());
         setField("flowTimeoutMs", 180000L);
+        // P5 NodeExecutor 注册表：无 Spring 容器时手动装配测试覆盖到的节点执行器
+        // （生产由 Spring 自动注入全部执行器；未注册的节点类型与原 switch default 一样报 UNSUPPORTED_NODE）。
+        // say 未配置 voiceEngine 不会触达 VoiceEngineManager、transfer 静态模式不触达坐席分配，依赖传 null 安全。
+        IvrTemplateRenderer templateRenderer = new IvrTemplateRenderer();
+        setField("nodeExecutors", java.util.Arrays.asList(
+                new StartNodeExecutor(),
+                new SayNodeExecutor(templateRenderer, null),
+                new MenuNodeExecutor(),
+                new HangupNodeExecutor(),
+                new TransferNodeExecutor(null),
+                new ChildNodeExecutor(flowService)));
     }
 
     /** 注册一个流程及其节点/连线（子流程按 flowId 各自注册） */

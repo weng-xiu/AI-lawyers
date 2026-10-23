@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Deque;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,13 +13,8 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.expression.MapAccessor;
-import org.springframework.expression.Expression;
-import org.springframework.expression.spel.standard.SpelExpressionParser;
-import org.springframework.expression.spel.support.SimpleEvaluationContext;
 import org.springframework.stereotype.Service;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import ai.lawyers.common.utils.StringUtils;
@@ -29,27 +23,27 @@ import ai.lawyers.system.domain.lawyers.ivr.AiIvrEdge;
 import ai.lawyers.system.domain.lawyers.ivr.AiIvrExecutionLog;
 import ai.lawyers.system.domain.lawyers.ivr.AiIvrFlow;
 import ai.lawyers.system.domain.lawyers.ivr.AiIvrNode;
-import ai.lawyers.system.domain.lawyers.ivr.IntentionMatchResult;
 import ai.lawyers.system.domain.lawyers.ivr.IvrExecuteRequest;
 import ai.lawyers.system.domain.lawyers.ivr.IvrExecuteResult;
 import ai.lawyers.system.domain.lawyers.ivr.IvrNodeStep;
-import ai.lawyers.system.domain.lawyers.agent.AgentChatResult;
-import ai.lawyers.system.service.lawyers.agent.IAgentChatService;
+import ai.lawyers.system.service.impl.lawyers.ivr.engine.node.IvrNodeContext;
+import ai.lawyers.system.service.impl.lawyers.ivr.engine.node.IvrNodeExecutor;
 import ai.lawyers.system.service.lawyers.IAiCallRecordService;
-import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 import ai.lawyers.system.service.lawyers.ivr.IAiIvrEdgeService;
 import ai.lawyers.system.service.lawyers.ivr.IAiIvrExecutionLogService;
 import ai.lawyers.system.service.lawyers.ivr.IAiIvrFlowService;
 import ai.lawyers.system.service.lawyers.ivr.IAiIvrNodeService;
-import ai.lawyers.system.domain.lawyers.sms.SmsResult;
 import ai.lawyers.system.service.lawyers.ivr.engine.IIvrEngineService;
-import ai.lawyers.system.service.lawyers.ivr.engine.IntentionRecognitionService;
-import ai.lawyers.system.service.lawyers.sms.ISmsService;
-import ai.lawyers.system.service.lawyers.voice.VoiceEngineManager;
-import ai.lawyers.system.service.lawyers.voice.VoiceModelEnum;
+
+import jakarta.annotation.PostConstruct;
 
 /**
- * IVR 流程执行引擎实现。
+ * IVR 流程执行引擎实现（门面）：负责流程装载、主循环编排（总超时/步数上限）、
+ * 执行日志节流异步落库与结果回写。
+ *
+ * <p>P5 NodeExecutor 注册表改造：节点语义全部下沉到
+ * {@link ai.lawyers.system.service.impl.lawyers.ivr.engine.node} 包下的执行器，
+ * 主循环按节点类型（小写）查注册表分发；新增节点类型只需新增一个执行器组件。</p>
  *
  * 支持节点类型（与前端设计器画板对齐）：
  *  start / say / answer(ASR收声) / menu / received(DTMF收号) / intention / condition /
@@ -69,31 +63,8 @@ public class IvrEngineServiceImpl implements IIvrEngineService
     private static final int MAX_STEPS = 200;
 
     private static final String NODE_START = "start";
-    private static final String NODE_SAY = "say";
-    private static final String NODE_MENU = "menu";
-    private static final String NODE_DTMF = "dtmf";
-    private static final String NODE_ANSWER = "answer";
-    private static final String NODE_RECEIVED = "received";
-    private static final String NODE_INTENTION = "intention";
-    private static final String NODE_SENTIMENT = "sentiment";
-    private static final String NODE_EXTRACT = "extract";
-    private static final String NODE_SERVICE = "service";
-    private static final String NODE_SCRIPT = "script";
-    private static final String NODE_CHILD = "child";
-    private static final String NODE_CONDITION = "condition";
-    private static final String NODE_AGENT = "agent";
-    private static final String NODE_AGENT_CHAT = "agentchat";
-    private static final String NODE_TRANSFER = "transfer";
-    private static final String NODE_HANGUP = "hangup";
-    private static final String NODE_VARIABLE = "variable";
-    private static final String NODE_SMS = "sms";
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final SpelExpressionParser SPEL_PARSER = new SpelExpressionParser();
-
-    /** 子流程最大嵌套深度，防止循环引用 */
-    private static final int MAX_CHILD_DEPTH = 3;
-    private static final String CHILD_DEPTH_KEY = "__childDepth";
 
     /** T1-1 执行日志节流落库间隔（毫秒）：间隔内的节点只更新内存，到时或关键节点才落库 */
     @org.springframework.beans.factory.annotation.Value("${ivr.log.flush-ms:1000}")
@@ -126,38 +97,45 @@ public class IvrEngineServiceImpl implements IIvrEngineService
     @Autowired
     private IAiCallRecordService callRecordService;
 
-    @Autowired
-    private IntentionRecognitionService intentionRecognitionService;
+    /** P5 NodeExecutor 注册表：Spring 自动注入全部节点执行器组件；单测无容器时可手动装配同名字段 */
+    @Autowired(required = false)
+    private List<IvrNodeExecutor> nodeExecutors;
 
-    @Autowired
-    private IAiModelConfigService modelConfigService;
+    /** 节点类型（小写）→ 执行器 注册表，懒构建（@PostConstruct 预热并校验重复注册） */
+    private volatile Map<String, IvrNodeExecutor> executorRegistry;
 
-    @Autowired
-    private VoiceEngineManager voiceEngineManager;
+    @PostConstruct
+    void initExecutorRegistry()
+    {
+        executorRegistry();
+    }
 
-    @Autowired
-    private IAgentChatService agentChatService;
-
-    @Autowired
-    private ai.lawyers.system.service.lawyers.skill.IAgentDispatchService agentDispatchService;
-
-    @Autowired
-    private ISmsService smsService;
-
-    /** P3-D1 高频置底：IVR 识别文本关键词规则判定（REJECT 终止流程 / PRIORITY 转人工降权） */
-    @Autowired
-    private ai.lawyers.system.service.lawyers.IAiHotspotSuppressService hotspotSuppressService;
-
-    /** 高频置底总开关（与入站/外呼共用） */
-    @org.springframework.beans.factory.annotation.Value("${hotspot.suppress.enabled:true}")
-    private boolean hotspotEnabled;
-
-    /** P2-14：抽出的叶子工具——SSRF 安全 HTTP 客户端、SpEL 模板渲染器 */
-    @Autowired
-    private IvrHttpClient ivrHttpClient;
-
-    @Autowired
-    private IvrTemplateRenderer ivrTemplateRenderer;
+    private Map<String, IvrNodeExecutor> executorRegistry()
+    {
+        Map<String, IvrNodeExecutor> registry = executorRegistry;
+        if (registry == null)
+        {
+            registry = new HashMap<>();
+            if (nodeExecutors != null)
+            {
+                for (IvrNodeExecutor executor : nodeExecutors)
+                {
+                    for (String type : executor.supportedTypes())
+                    {
+                        IvrNodeExecutor prev = registry.put(type.toLowerCase(), executor);
+                        if (prev != null)
+                        {
+                            throw new IllegalStateException("IVR节点类型重复注册: " + type
+                                    + "（" + prev.getClass().getSimpleName() + " / "
+                                    + executor.getClass().getSimpleName() + "）");
+                        }
+                    }
+                }
+            }
+            executorRegistry = registry;
+        }
+        return registry;
+    }
 
     @Override
     public IvrExecuteResult executeFlow(IvrExecuteRequest request)
@@ -226,6 +204,10 @@ public class IvrEngineServiceImpl implements IIvrEngineService
         result.setStatus("1");
         result.setVariables(variables);
 
+        // 节点执行上下文：执行器就地修改 variables/result/inputs；子流程经 flowRunner 递归（避免 Bean 成环）
+        IvrNodeContext nodeContext = new IvrNodeContext(nodeMap, edges, variables, inputs,
+                request, sessionId, flow, result, this::executeFlow);
+
         AiIvrNode current = startNode;
         int stepCount = 0;
         // T1-2 流程总超时截止时间
@@ -249,289 +231,27 @@ public class IvrEngineServiceImpl implements IIvrEngineService
             String type = current.getNodeType() == null ? "" : current.getNodeType().toLowerCase();
             IvrNodeStep step = new IvrNodeStep(current.getNodeId(), type, current.getNodeName(), "", "");
 
-            switch (type)
+            IvrNodeExecutor executor = executorRegistry().get(type);
+            if (executor == null)
             {
-                case NODE_START:
-                    step.setAction("START");
-                    step.setDetail("流程开始");
-                    result.getSteps().add(step);
-                    current = nextNode(current, nodeMap, edges, variables, null);
-                    break;
-
-                case NODE_SAY:
-                    String text = render(configText(current, "text"), variables);
-                    if (StringUtils.isEmpty(text) && current.getNodeConfig() != null
-                            && current.getNodeConfig().contains("\"play\""))
-                    {
-                        text = render(configText(current, "play"), variables);
-                    }
-                    if (StringUtils.isEmpty(text))
-                    {
-                        text = current.getNodeName();
-                    }
-                    text = render(text, variables);
-                    variables.put("lastSay", text);
-                    step.setAction("PLAY");
-                    String ttsNote = synthSay(current, text, variables);
-                    step.setDetail("语音播报：" + text + ttsNote);
-                    result.getSteps().add(step);
-                    current = nextNode(current, nodeMap, edges, variables, null);
-                    break;
-
-                case NODE_MENU:
-                case NODE_DTMF:
-                    String rawInput = pollInput(inputs, variables);
-                    String dtmf = rawInput == null ? "" : rawInput.trim();
-                    // T1-4 menu/dtmf 支持多位按键（maxDigits 默认 1 保持旧行为；endKey 结束键默认 #）
-                    JsonNode menuCfg = config(current);
-                    String menuEndKey = menuCfg.path("endKey").asText(menuCfg.path("end").asText("#"));
-                    if (StringUtils.isNotEmpty(menuEndKey) && dtmf.endsWith(menuEndKey))
-                    {
-                        dtmf = dtmf.substring(0, dtmf.length() - menuEndKey.length());
-                    }
-                    int menuMaxDigits = menuCfg.path("maxDigits").asInt(1);
-                    if (menuMaxDigits > 1)
-                    {
-                        if (dtmf.length() > menuMaxDigits)
-                        {
-                            dtmf = dtmf.substring(0, menuMaxDigits);
-                        }
-                    }
-                    else if (dtmf.length() > 1)
-                    {
-                        dtmf = dtmf.substring(0, 1);
-                    }
-                    variables.put("dtmf", dtmf);
-                    variables.put("lastInput", rawInput == null ? "" : rawInput);
-                    step.setAction("INPUT");
-                    step.setDetail("按键/语音输入：" + dtmf);
-                    result.getSteps().add(step);
-                    current = nextNode(current, nodeMap, edges, variables, dtmf);
-                    break;
-
-                case NODE_ANSWER:
-                    String askText = render(configText(current, "jqrask"), variables);
-                    if (StringUtils.isEmpty(askText))
-                    {
-                        askText = render(configText(current, "prompt"), variables);
-                    }
-                    if (StringUtils.isNotEmpty(askText))
-                    {
-                        variables.put("lastSay", askText);
-                    }
-                    String voiceInput = pollInput(inputs, variables);
-                    variables.put("dtmf", voiceInput == null ? "" : voiceInput.trim());
-                    variables.put("lastInput", voiceInput == null ? "" : voiceInput);
-                    step.setAction("ASR_INPUT");
-                    step.setDetail((StringUtils.isEmpty(askText) ? "" : "询问语：" + askText + "；")
-                            + "语音输入：" + (voiceInput == null ? "" : voiceInput));
-                    result.getSteps().add(step);
-                    current = nextNode(current, nodeMap, edges, variables,
-                            voiceInput == null ? null : voiceInput.trim());
-                    break;
-
-                case NODE_RECEIVED:
-                    String receivedPrompt = render(configText(current, "jqrask"), variables);
-                    if (StringUtils.isEmpty(receivedPrompt))
-                    {
-                        receivedPrompt = render(configText(current, "prompt"), variables);
-                    }
-                    if (StringUtils.isNotEmpty(receivedPrompt))
-                    {
-                        variables.put("lastSay", receivedPrompt);
-                    }
-                    String receivedInput = pollInput(inputs, variables);
-                    String digits = receivedInput == null ? "" : receivedInput.trim();
-                    JsonNode receivedConfig = config(current);
-                    String endKey = receivedConfig.path("endKey").asText(
-                            receivedConfig.path("end").asText("#"));
-                    if (StringUtils.isNotEmpty(endKey) && digits.endsWith(endKey))
-                    {
-                        digits = digits.substring(0, digits.length() - endKey.length());
-                    }
-                    int maxDigits = receivedConfig.path("maxDigits").asInt(-1);
-                    if (maxDigits > 0 && digits.length() > maxDigits)
-                    {
-                        digits = digits.substring(0, maxDigits);
-                    }
-                    variables.put("dtmf", digits);
-                    variables.put("receivedDigits", digits);
-                    variables.put("lastInput", digits);
-                    step.setAction("DTMF_INPUT");
-                    step.setDetail((StringUtils.isEmpty(receivedPrompt) ? "" : "收号语：" + receivedPrompt + "；")
-                            + "按键输入：" + digits);
-                    result.getSteps().add(step);
-                    current = nextNode(current, nodeMap, edges, variables, digits);
-                    break;
-
-                case NODE_INTENTION:
-                    String intentText = render(configText(current, "question"), variables);
-                    if (StringUtils.isEmpty(intentText))
-                    {
-                        intentText = pollInput(inputs, variables);
-                    }
-                    if (StringUtils.isEmpty(intentText))
-                    {
-                        Object lastInputValue = variables.get("lastInput");
-                        intentText = lastInputValue == null ? "" : lastInputValue.toString();
-                    }
-                    // P3-D1：高频置底关键词拦截——识别文本命中 REJECT 规则即终止流程（挂断语义，复用 hangup 终止标记）；
-                    // 命中 PRIORITY 规则写入 dispatchPriority 变量，后续转人工节点 dispatchAgent 自动读取降权沉底
-                    if (hotspotEnabled && StringUtils.isNotEmpty(intentText))
-                    {
-                        String hotspotDirection = StringUtils.isNotEmpty(request.getCalleeNumber()) ? "OUTBOUND" : "INBOUND";
-                        ai.lawyers.system.domain.lawyers.AiHotspotSuppress kwSuppress =
-                                hotspotSuppressService.matchKeyword(intentText, request.getCallerNumber(), sessionId, hotspotDirection);
-                        if (kwSuppress != null && "REJECT".equals(kwSuppress.getAction()))
-                        {
-                            log.warn("[IVR] 命中高频置底关键词规则[{}]，流程终止（拦截挂断） sessionId={}",
-                                    kwSuppress.getRuleName(), sessionId);
-                            step.setAction("HANGUP");
-                            step.setDetail("命中高频置底关键词规则[" + kwSuppress.getRuleName() + "]，拦截挂断");
-                            result.getSteps().add(step);
-                            variables.put("__terminated", "hangup");
-                            current = null;
-                            break;
-                        }
-                        if (kwSuppress != null && "PRIORITY".equals(kwSuppress.getAction()))
-                        {
-                            int kwPriority = kwSuppress.getPriorityLevel() != null ? kwSuppress.getPriorityLevel() : -100;
-                            variables.put("dispatchPriority", kwPriority);
-                            log.info("[IVR] 命中置底降权关键词规则[{}]，转人工降权 priority={} sessionId={}",
-                                    kwSuppress.getRuleName(), kwPriority, sessionId);
-                        }
-                    }
-                    IntentionMatchResult match = intentionRecognitionService.recognize(intentText,
-                            request.getRecordId(), sessionId, flow.getFlowId(), current.getNodeId());
-                    variables.put("matchedIntention", match == null || !match.isMatched() ? "" : match.getIntentionCode());
-                    variables.put("matchedIntentionName", match == null || !match.isMatched() ? "" : match.getIntentionName());
-                    if (match != null && match.isMatched())
-                    {
-                        result.setMatchedIntention(match.getIntentionCode());
-                        result.setMatchedIntentionName(match.getIntentionName());
-                        result.setMatchMethod(match.getMatchMethod());
-                        result.setCategoryId(match.getCategoryId());
-                        result.setCategoryName(match.getCategoryName());
-                        if (match.getCategoryId() != null)
-                        {
-                            variables.put("matchedCategoryId", match.getCategoryId());
-                            variables.put("matchedCategoryName", match.getCategoryName());
-                        }
-                        step.setAction("INTENTION");
-                        step.setDetail("意图识别[" + match.getMatchMethod() + "]：" + match.getIntentionName()
-                                + "(" + match.getIntentionCode() + ")");
-                    }
-                    else
-                    {
-                        step.setAction("INTENTION");
-                        step.setDetail("意图识别：未命中");
-                    }
-                    result.getSteps().add(step);
-                    current = nextNode(current, nodeMap, edges, variables, null);
-                    break;
-
-                case NODE_SENTIMENT:
-                    current = executeSentiment(current, nodeMap, edges, variables, step, result);
-                    break;
-
-                case NODE_CONDITION:
-                    AiIvrEdge chosen = routeEdge(current, edges, variables, null);
-                    String chosenLabel = chosen == null ? "无命中(默认/无连线)" : labelOf(chosen);
-                    step.setAction("CONDITION");
-                    step.setDetail("条件分支：" + chosenLabel);
-                    result.getSteps().add(step);
-                    current = chosen == null ? null : nodeMap.get(chosen.getTargetNodeId());
-                    break;
-
-                case NODE_AGENT_CHAT:
-                    current = executeAgentChat(current, nodeMap, edges, variables, inputs,
-                            request, sessionId, flow, step, result);
-                    break;
-
-                case NODE_AGENT:
-                case NODE_TRANSFER:
-                    String target;
-                    JsonNode tcfg = config(current);
-                    String dispatchMode = tcfg.has("dispatchMode") ? tcfg.get("dispatchMode").asText() : "static";
-                    if ("dispatch".equals(dispatchMode))
-                    {
-                        // B5 智能队列分配：按 groupId 或 B1 写入的 agentCategoryId 动态选坐席
-                        target = dispatchAgent(tcfg, variables, request, sessionId, step, result, NODE_AGENT.equals(type));
-                        if (target == null)
-                        {
-                            // 排队中：沿排队连线（变量 dispatchQueued=true）继续，不终止流程
-                            variables.put("dispatchQueued", true);
-                            result.getSteps().add(step);
-                            current = nextNode(current, nodeMap, edges, variables, null);
-                            break;
-                        }
-                        variables.put("dispatchQueued", false);
-                    }
-                    else
-                    {
-                        target = transferTarget(current, variables);
-                    }
-                    result.setTransferTarget(target);
-                    step.setAction("TRANSFER");
-                    step.setDetail((NODE_AGENT.equals(type) ? "转人工坐席：" : "转外线：") + target);
-                    result.getSteps().add(step);
-                    // T1-3 标记终止原因，供子流程冒泡判断
-                    variables.put("__terminated", "transfer");
-                    current = null;
-                    break;
-
-                case NODE_HANGUP:
-                    step.setAction("HANGUP");
-                    step.setDetail("挂断" + (StringUtils.isNotEmpty(current.getNodeName()) ? "（" + current.getNodeName() + "）" : ""));
-                    result.getSteps().add(step);
-                    // T1-3 标记终止原因，供子流程冒泡判断
-                    variables.put("__terminated", "hangup");
-                    current = null;
-                    break;
-
-                case NODE_VARIABLE:
-                    assignVariable(current, variables);
-                    step.setAction("VARIABLE");
-                    step.setDetail("变量赋值：" + current.getNodeName());
-                    result.getSteps().add(step);
-                    current = nextNode(current, nodeMap, edges, variables, null);
-                    break;
-
-                case NODE_SMS:
-                    current = executeSms(current, nodeMap, edges, variables, request, sessionId, step, result);
-                    break;
-
-                case NODE_EXTRACT:
-                    current = executeExtract(current, nodeMap, edges, variables, step, result);
-                    break;
-
-                case NODE_SERVICE:
-                    current = executeService(current, nodeMap, edges, variables, step, result);
-                    break;
-
-                case NODE_SCRIPT:
-                    current = executeScript(current, nodeMap, edges, variables, step, result);
-                    break;
-
-                case NODE_CHILD:
-                    current = executeChild(current, nodeMap, edges, variables, inputs, request, step, result);
-                    break;
-
-                default:
-                    step.setAction("ERROR");
-                    step.setDetail("未知节点类型：" + type);
-                    result.getSteps().add(step);
-                    finishLog(execLog, result, "2", "未知节点类型：" + type);
-                    result.setSuccess(false);
-                    result.setCode("UNSUPPORTED_NODE");
-                    result.setMessage("流程包含不支持节点类型：" + type);
-                    result.setStatus("2");
-                    result.setCurrentNodeId(current.getNodeId());
-                    result.setCurrentNodeType(type);
-                    result.setCurrentNodeName(current.getNodeName());
-                    updateRecord(flow, result);
-                    return result;
+                step.setAction("ERROR");
+                step.setDetail("未知节点类型：" + type);
+                result.getSteps().add(step);
+                finishLog(execLog, result, "2", "未知节点类型：" + type);
+                result.setSuccess(false);
+                result.setCode("UNSUPPORTED_NODE");
+                result.setMessage("流程包含不支持节点类型：" + type);
+                result.setStatus("2");
+                result.setCurrentNodeId(current.getNodeId());
+                result.setCurrentNodeType(type);
+                result.setCurrentNodeName(current.getNodeName());
+                updateRecord(flow, result);
+                return result;
             }
+
+            nodeContext.setCurrent(current);
+            nodeContext.setStep(step);
+            current = executor.execute(nodeContext);
 
             result.setCurrentNodeId(current == null ? null : current.getNodeId());
             result.setCurrentNodeType(current == null ? null : current.getNodeType());
@@ -669,639 +389,6 @@ public class IvrEngineServiceImpl implements IIvrEngineService
         return flowService.selectDefaultFlow();
     }
 
-    // ------------------------------------------------------------------ SmartCall 节点实现
-
-    /**
-     * say 节点可选的 TTS 合成：节点配置 voiceEngine 时按所选引擎合成音频，
-     * 未配置时保持纯文本播报（由语音网关执行），避免无密钥环境产生网络调用。
-     */
-    private String synthSay(AiIvrNode node, String text, Map<String, Object> variables)
-    {
-        JsonNode json = config(node);
-        String engineCode = json.has("voiceEngine") ? json.get("voiceEngine").asText() : null;
-        if (StringUtils.isEmpty(engineCode))
-        {
-            return "";
-        }
-        Map<String, Object> options = new HashMap<>();
-        JsonNode tts = json.path("tts");
-        if (tts.isObject())
-        {
-            Iterator<Map.Entry<String, JsonNode>> fields = tts.fields();
-            while (fields.hasNext())
-            {
-                Map.Entry<String, JsonNode> entry = fields.next();
-                options.put(entry.getKey(), entry.getValue().asText());
-            }
-        }
-        String format = json.path("format").asText("wav");
-        int sampleRate = json.path("sampleRate").asInt(8000);
-        byte[] audio = voiceEngineManager.synthesize(VoiceModelEnum.of(engineCode), text,
-                format, sampleRate, options);
-        if (audio != null && audio.length > 0)
-        {
-            variables.put("lastSayAudioLength", audio.length);
-            return "（TTS已合成" + audio.length + "字节音频）";
-        }
-        return "";
-    }
-
-    private AiIvrNode executeAgentChat(AiIvrNode current, Map<Long, AiIvrNode> nodeMap,
-                                       List<AiIvrEdge> edges, Map<String, Object> variables,
-                                       Deque<String> inputs, IvrExecuteRequest request,
-                                       String sessionId, AiIvrFlow flow,
-                                       IvrNodeStep step, IvrExecuteResult result)
-    {
-        JsonNode json = config(current);
-        long agentId = json.path("agentId").asLong(0L);
-        String welcome = render(json.path("welcome").asText(""), variables);
-        int maxTurns = json.path("maxTurns").asInt(5);
-        String resultVar = json.path("resultVar").asText("agentReply");
-        String handoffVar = json.path("handoffVar").asText("agentHandoff");
-
-        // 累计本轮会话在该流程中的对话轮数，达到上限强制转人工
-        int turnCount = variables.get("agentTurnCount") instanceof Number
-                ? ((Number) variables.get("agentTurnCount")).intValue() : 0;
-
-        String reply;
-        boolean handoff;
-        String reason;
-
-        if (agentId <= 0L)
-        {
-            reply = "智能体未正确配置，为您转接人工。";
-            handoff = true;
-            reason = "节点未配置agentId";
-        }
-        else if (turnCount >= maxTurns)
-        {
-            reply = "已达最大对话轮数，为您转接人工坐席。";
-            handoff = true;
-            reason = "达到最大轮数(" + maxTurns + ")";
-        }
-        else
-        {
-            // 取用户输入：优先消费输入队列，兜底取上一个 answer 节点写入的 lastInput
-            String userInput = pollInput(inputs, variables);
-            if (StringUtils.isEmpty(userInput) && variables.get("lastInput") != null)
-            {
-                userInput = String.valueOf(variables.get("lastInput"));
-            }
-            // 首轮无输入时直接播报欢迎语，不调用模型
-            if (StringUtils.isEmpty(userInput) && StringUtils.isNotEmpty(welcome))
-            {
-                reply = welcome;
-                handoff = false;
-                reason = null;
-            }
-            else
-            {
-                turnCount++;
-                AgentChatResult chatResult = agentChatService.chat(agentId, sessionId, userInput,
-                        request.getRecordId(), flow == null ? null : flow.getFlowId(),
-                        current.getNodeId(), request.getCallerNumber());
-                reply = chatResult.getReply();
-                handoff = chatResult.isHandoff();
-                reason = chatResult.getReason();
-                if (chatResult.getCategoryId() != null)
-                {
-                    variables.put("agentCategoryId", chatResult.getCategoryId());
-                }
-            }
-        }
-
-        variables.put(resultVar, reply);
-        variables.put(handoffVar, handoff);
-        variables.put("agentTurnCount", turnCount);
-        if (handoff)
-        {
-            result.setTransferTarget("人工坐席");
-        }
-
-        step.setAction("AGENT_CHAT");
-        String detail = "智能体回复（第" + turnCount + "轮）：" + truncate(reply, 200);
-        if (handoff)
-        {
-            detail += " [转人工" + (StringUtils.isNotEmpty(reason) ? "：" + reason : "") + "]";
-        }
-        step.setDetail(detail);
-        result.getSteps().add(step);
-        return nextNode(current, nodeMap, edges, variables, null);
-    }
-
-    /**
-     * B6 短信通知节点：给来电者发送短信（排队告知 / 工单编号 / 文书链接等）。
-     *
-     * <p>节点配置支持：templateId（短信模板ID）、phoneVar（收件号码变量，默认 callerNumber，
-     * 若流程变量取不到则视为字面号码）、params（模板变量，支持 ${表达式} 渲染）。
-     * 短信失败不阻断流程，写入 smsStatus/smsError 后沿下一节点继续。</p>
-     */
-    private AiIvrNode executeSms(AiIvrNode current, Map<Long, AiIvrNode> nodeMap,
-                                 List<AiIvrEdge> edges, Map<String, Object> variables,
-                                 IvrExecuteRequest request, String sessionId,
-                                 IvrNodeStep step, IvrExecuteResult result)
-    {
-        JsonNode json = config(current);
-        long templateId = json.path("templateId").asLong(0L);
-        String phoneVar = json.path("phoneVar").asText("callerNumber");
-
-        Object phoneObj = variables.get(phoneVar);
-        String phone = phoneObj == null ? phoneVar : String.valueOf(phoneObj);
-        if (StringUtils.isEmpty(phone))
-        {
-            phone = request.getCallerNumber();
-        }
-
-        Map<String, String> params = new LinkedHashMap<>();
-        JsonNode paramsNode = json.path("params");
-        if (paramsNode.isTextual() && StringUtils.isNotEmpty(paramsNode.asText()))
-        {
-            try
-            {
-                paramsNode = MAPPER.readTree(paramsNode.asText());
-            }
-            catch (Exception e)
-            {
-                paramsNode = MAPPER.createObjectNode();
-            }
-        }
-        if (paramsNode.isObject())
-        {
-            Iterator<String> names = paramsNode.fieldNames();
-            while (names.hasNext())
-            {
-                String name = names.next();
-                params.put(name, render(paramsNode.path(name).asText(""), variables));
-            }
-        }
-
-        step.setAction("SMS");
-        if (templateId <= 0L)
-        {
-            variables.put("smsStatus", "fail");
-            variables.put("smsError", "未配置短信模板");
-            step.setDetail("短信节点未配置templateId");
-            result.getSteps().add(step);
-            return nextNode(current, nodeMap, edges, variables, null);
-        }
-
-        try
-        {
-            SmsResult smsResult = smsService.send(phone, templateId, params, sessionId, request.getRecordId());
-            variables.put("smsStatus", smsResult.isSuccess() ? "success" : "fail");
-            variables.put("smsMsgId", smsResult.getMsgId());
-            variables.put("smsContent", smsResult.getContent());
-            variables.put("smsError", smsResult.isSuccess() ? "" : smsResult.getMessage());
-            step.setDetail("发送短信至 " + phone + "：" + (smsResult.isSuccess()
-                    ? "成功（" + smsResult.getMsgId() + "）" : "失败（" + smsResult.getMessage() + "）"));
-        }
-        catch (Exception e)
-        {
-            variables.put("smsStatus", "fail");
-            variables.put("smsError", e.getMessage());
-            step.setDetail("短信发送异常：" + e.getMessage());
-        }
-        result.getSteps().add(step);
-        return nextNode(current, nodeMap, edges, variables, null);
-    }
-
-    private AiIvrNode executeSentiment(AiIvrNode current, Map<Long, AiIvrNode> nodeMap,
-                                       List<AiIvrEdge> edges, Map<String, Object> variables,
-                                       IvrNodeStep step, IvrExecuteResult result)
-    {
-        String text = render(configText(current, "text"), variables);
-        if (StringUtils.isEmpty(text))
-        {
-            text = render(configText(current, "message"), variables);
-        }
-        if (StringUtils.isEmpty(text) && variables.get("lastInput") != null)
-        {
-            text = String.valueOf(variables.get("lastInput"));
-        }
-        String sentiment = detectSentiment(text);
-        variables.put("sentiment", sentiment);
-        step.setAction("SENTIMENT");
-        step.setDetail("情绪分析：" + sentiment + "（文本：" + truncate(text, 100) + "）");
-        result.getSteps().add(step);
-        return nextNode(current, nodeMap, edges, variables, null);
-    }
-
-    private String detectSentiment(String text)
-    {
-        if (StringUtils.isEmpty(text))
-        {
-            return "neutral";
-        }
-        try
-        {
-            String system = "你是情绪分析助手。请判断用户话语的情绪，仅返回JSON对象："
-                    + "{\"sentiment\":\"positive|negative|neutral\",\"confidence\":0.0-1.0}";
-            String user = "用户话语：" + text;
-            String raw = modelConfigService.chatJson(system, user,
-                    ai.lawyers.system.service.lawyers.stat.AiModelCallLogRecorder.SCENE_EMOTION);
-            JsonNode node = MAPPER.readTree(cleanJson(raw));
-            String value = node.path("sentiment").asText(node.path("emotion").asText("neutral"));
-            return normalizeSentiment(value);
-        }
-        catch (Exception e)
-        {
-            log.debug("情绪模型识别失败，使用关键词兜底: {}", e.getMessage());
-            return keywordSentiment(text);
-        }
-    }
-
-    private String keywordSentiment(String text)
-    {
-        String[] negative = { "投诉", "不满意", "很差", "恶劣", "威胁", "辱骂", "举报", "要命", "告你们",
-                "太差", "垃圾", "混蛋", "气死", "崩溃" };
-        String[] positive = { "谢谢", "感谢", "满意", "很好", "太好了", "点赞", "表扬" };
-        for (String word : negative)
-        {
-            if (text.contains(word))
-            {
-                return "negative";
-            }
-        }
-        for (String word : positive)
-        {
-            if (text.contains(word))
-            {
-                return "positive";
-            }
-        }
-        return "neutral";
-    }
-
-    private String normalizeSentiment(String value)
-    {
-        if (StringUtils.isEmpty(value))
-        {
-            return "neutral";
-        }
-        String v = value.trim();
-        if ("正面".equals(v) || "积极".equals(v) || "front".equalsIgnoreCase(v)
-                || "positive".equalsIgnoreCase(v))
-        {
-            return "positive";
-        }
-        if ("负面".equals(v) || "消极".equals(v) || "negative".equalsIgnoreCase(v))
-        {
-            return "negative";
-        }
-        return "neutral";
-    }
-
-    private AiIvrNode executeExtract(AiIvrNode current, Map<Long, AiIvrNode> nodeMap,
-                                     List<AiIvrEdge> edges, Map<String, Object> variables,
-                                     IvrNodeStep step, IvrExecuteResult result)
-    {
-        String text = render(configText(current, "text"), variables);
-        if (StringUtils.isEmpty(text))
-        {
-            text = render(configText(current, "message"), variables);
-        }
-        if (StringUtils.isEmpty(text) && variables.get("lastInput") != null)
-        {
-            text = String.valueOf(variables.get("lastInput"));
-        }
-        JsonNode json = config(current);
-        JsonNode fields = json.path("fields");
-        if (!fields.isObject())
-        {
-            fields = json.path("keys");
-        }
-        JsonNode fieldArray = null;
-        if (fields.isArray())
-        {
-            fieldArray = fields;
-            fields = null;
-        }
-        step.setAction("EXTRACT");
-        if ((!isObject(fields) || fields.size() == 0)
-                && (fieldArray == null || fieldArray.size() == 0))
-        {
-            step.setDetail("信息抽取节点未配置fields/keys，跳过");
-            result.getSteps().add(step);
-            return nextNode(current, nodeMap, edges, variables, null);
-        }
-        try
-        {
-            StringBuilder fieldDesc = new StringBuilder();
-            List<String> fieldNames = new ArrayList<>();
-            if (isObject(fields))
-            {
-                Iterator<String> names = fields.fieldNames();
-                while (names.hasNext())
-                {
-                    String name = names.next();
-                    fieldNames.add(name);
-                    fieldDesc.append(" - ").append(name).append("：")
-                            .append(fields.path(name).asText("")).append("\n");
-                }
-            }
-            else
-            {
-                for (JsonNode item : fieldArray)
-                {
-                    String name = item.path("name").asText("");
-                    fieldNames.add(name);
-                    fieldDesc.append(" - ").append(name).append("：")
-                            .append(item.path("desc").asText(item.path("description").asText("")))
-                            .append("\n");
-                }
-            }
-            String system = "你是信息抽取助手。请从用户提供的文本中提取字段，仅返回JSON对象，"
-                    + "字段值缺失时使用空字符串，不要输出任何多余内容。";
-            String user = "需要提取的字段：\n" + fieldDesc + "\n原始文本：" + text;
-            String raw = modelConfigService.chatJson(system, user,
-                    ai.lawyers.system.service.lawyers.stat.AiModelCallLogRecorder.SCENE_EXTRACT);
-            JsonNode extracted = MAPPER.readTree(cleanJson(raw));
-            int count = 0;
-            for (String name : fieldNames)
-            {
-                JsonNode value = extracted.path(name);
-                variables.put(name, value.isMissingNode() || value.isNull() ? ""
-                        : value.isValueNode() ? value.asText() : value.toString());
-                count++;
-            }
-            String resultVar = json.path("resultVar").asText("extractResult");
-            variables.put(resultVar, extracted.toString());
-            step.setDetail("信息抽取成功，共提取" + count + "个字段：" + extracted);
-        }
-        catch (Exception e)
-        {
-            variables.put("extractError", e.getMessage());
-            step.setDetail("信息抽取失败：" + e.getMessage());
-        }
-        result.getSteps().add(step);
-        return nextNode(current, nodeMap, edges, variables, null);
-    }
-
-    private AiIvrNode executeService(AiIvrNode current, Map<Long, AiIvrNode> nodeMap,
-                                     List<AiIvrEdge> edges, Map<String, Object> variables,
-                                     IvrNodeStep step, IvrExecuteResult result)
-    {
-        JsonNode json = config(current);
-        String url = render(json.path("url").asText(""), variables);
-        String method = json.path("method").asText("GET").trim().toUpperCase();
-        if (StringUtils.isEmpty(method))
-        {
-            method = "GET";
-        }
-        int timeoutMs = json.path("timeoutMs").asInt(10000);
-        String resultPath = json.path("result").asText("");
-        String resultVar = json.path("resultVar").asText("serviceResult");
-        Map<String, String> headers = new LinkedHashMap<>();
-        JsonNode headerNode = json.path("headers");
-        if (headerNode.isTextual() && StringUtils.isNotEmpty(headerNode.asText()))
-        {
-            try
-            {
-                headerNode = MAPPER.readTree(headerNode.asText());
-            }
-            catch (Exception e)
-            {
-                headerNode = MAPPER.createObjectNode();
-            }
-        }
-        if (headerNode.isObject())
-        {
-            Iterator<String> names = headerNode.fieldNames();
-            while (names.hasNext())
-            {
-                String name = names.next();
-                headers.put(name, render(headerNode.path(name).asText(""), variables));
-            }
-        }
-        String body = null;
-        if (json.path("body").isTextual())
-        {
-            body = render(json.path("body").asText(), variables);
-        }
-        else if (json.path("body").isObject() || json.path("body").isArray())
-        {
-            body = render(json.path("body").toString(), variables);
-        }
-
-        step.setAction("SERVICE");
-        if (StringUtils.isEmpty(url))
-        {
-            variables.put("serviceError", "未配置请求地址");
-            step.setDetail("HTTP调用节点未配置url");
-            result.getSteps().add(step);
-            return nextNode(current, nodeMap, edges, variables, null);
-        }
-        // 安全收口(S5)：SSRF 防护，仅允许 http/https 且目标不得为内网/回环/保留地址
-        String ssrfError = ivrHttpClient.checkUrlAllowed(url);
-        if (ssrfError != null)
-        {
-            variables.put("serviceError", ssrfError);
-            step.setDetail("HTTP调用被安全策略拦截：" + ssrfError);
-            result.getSteps().add(step);
-            return nextNode(current, nodeMap, edges, variables, null);
-        }
-        try
-        {
-            String responseText = ivrHttpClient.httpCall(url, method, headers, body, timeoutMs);
-            variables.put(resultVar, responseText);
-            if (StringUtils.isNotEmpty(resultPath))
-            {
-                Object value = ivrHttpClient.jsonPath(responseText, resultPath);
-                variables.put("serviceValue", value == null ? "" : String.valueOf(value));
-            }
-            step.setDetail("HTTP调用成功：" + method + " " + url
-                    + "，响应" + responseText.length() + "字节"
-                    + (StringUtils.isEmpty(resultPath) ? "" : "，取值路径=" + resultPath));
-        }
-        catch (Exception e)
-        {
-            variables.put("serviceError", e.getMessage());
-            step.setDetail("HTTP调用失败：" + method + " " + url + "，错误=" + e.getMessage());
-        }
-        result.getSteps().add(step);
-        return nextNode(current, nodeMap, edges, variables, null);
-    }
-
-    private AiIvrNode executeScript(AiIvrNode current, Map<Long, AiIvrNode> nodeMap,
-                                    List<AiIvrEdge> edges, Map<String, Object> variables,
-                                    IvrNodeStep step, IvrExecuteResult result)
-    {
-        JsonNode json = config(current);
-        String language = json.path("scriptType").asText(json.path("language").asText("js"));
-        String script = json.path("script").asText("");
-        String resultVar = json.path("resultVar").asText("scriptResult");
-        step.setAction("SCRIPT");
-        if (StringUtils.isEmpty(script))
-        {
-            step.setDetail("脚本节点未配置脚本内容");
-            result.getSteps().add(step);
-            return nextNode(current, nodeMap, edges, variables, null);
-        }
-        if ("groovy".equalsIgnoreCase(language))
-        {
-            variables.put("scriptError", "当前环境不支持Groovy，请使用SpEL表达式");
-            step.setDetail("脚本执行失败：当前环境不支持Groovy，请使用SpEL表达式");
-            result.getSteps().add(step);
-            return nextNode(current, nodeMap, edges, variables, null);
-        }
-        try
-        {
-            // JDK 17 迁移：Nashorn 已删除，改用 SpEL 表达式（与条件节点一致，复用现有安全沙箱）
-            Expression expression = SPEL_PARSER.parseExpression(script);
-            SimpleEvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding()
-                    .withRootObject(variables == null ? new HashMap<>() : variables)
-                    .build();
-            context.getPropertyAccessors().add(0, new MapAccessor());
-            if (variables != null)
-            {
-                variables.forEach(context::setVariable);
-            }
-            Object value = expression.getValue(context);
-            variables.put(resultVar, value == null ? "" : String.valueOf(value));
-            step.setDetail("脚本执行成功，结果已写入变量" + resultVar);
-        }
-        catch (Exception e)
-        {
-            variables.put("scriptError", e.getMessage());
-            step.setDetail("脚本执行失败：" + e.getMessage());
-        }
-        result.getSteps().add(step);
-        return nextNode(current, nodeMap, edges, variables, null);
-    }
-
-    private AiIvrNode executeChild(AiIvrNode current, Map<Long, AiIvrNode> nodeMap,
-                                   List<AiIvrEdge> edges, Map<String, Object> variables,
-                                   Deque<String> inputs, IvrExecuteRequest parentRequest,
-                                   IvrNodeStep step, IvrExecuteResult result)
-    {
-        JsonNode json = config(current);
-        int depth = parseInt(variables.get(CHILD_DEPTH_KEY), 0);
-        step.setAction("CHILD");
-        if (depth >= MAX_CHILD_DEPTH)
-        {
-            step.setDetail("子流程嵌套深度超过" + MAX_CHILD_DEPTH + "层，跳过执行");
-            result.getSteps().add(step);
-            return nextNode(current, nodeMap, edges, variables, null);
-        }
-        Long childFlowId = json.path("flowId").asLong(0L);
-        String childFlowCode = json.path("flowCode").asText("");
-        AiIvrFlow childFlow = null;
-        if (childFlowId != null && childFlowId > 0)
-        {
-            childFlow = flowService.selectAiIvrFlowByFlowId(childFlowId);
-        }
-        else if (StringUtils.isNotEmpty(childFlowCode))
-        {
-            AiIvrFlow query = new AiIvrFlow();
-            query.setFlowCode(childFlowCode);
-            List<AiIvrFlow> flows = flowService.selectAiIvrFlowList(query);
-            childFlow = flows == null || flows.isEmpty() ? null : flows.get(0);
-        }
-        if (childFlow == null)
-        {
-            step.setDetail("未找到子流程（flowId=" + childFlowId + ", flowCode=" + childFlowCode + "）");
-            result.getSteps().add(step);
-            return nextNode(current, nodeMap, edges, variables, null);
-        }
-        try
-        {
-            IvrExecuteRequest subRequest = new IvrExecuteRequest();
-            subRequest.setFlowId(childFlow.getFlowId());
-            subRequest.setSessionId(parentRequest.getSessionId());
-            subRequest.setRecordId(parentRequest.getRecordId());
-            subRequest.setCallerNumber(parentRequest.getCallerNumber());
-            subRequest.setCalleeNumber(parentRequest.getCalleeNumber());
-            subRequest.setInputs(new ArrayList<>(inputs));
-            Map<String, Object> subVariables = new LinkedHashMap<>(variables);
-            subVariables.remove(CHILD_DEPTH_KEY);
-            subVariables.put(CHILD_DEPTH_KEY, depth + 1);
-            subRequest.setVariables(subVariables);
-            IvrExecuteResult subResult = executeFlow(subRequest);
-            if (subResult.getVariables() != null)
-            {
-                // T1-3 子流程冒泡：先取回终止标记，合并变量后清除内部标记，再决定是否终止父流程
-                Object subTerminated = subResult.getVariables().get("__terminated");
-                variables.putAll(subResult.getVariables());
-                variables.remove("__terminated");
-                if (subResult.getTransferTarget() != null)
-                {
-                    result.setTransferTarget(subResult.getTransferTarget());
-                }
-                if (subResult.getMatchedIntention() != null)
-                {
-                    result.setMatchedIntention(subResult.getMatchedIntention());
-                    result.setMatchedIntentionName(subResult.getMatchedIntentionName());
-                    result.setMatchMethod(subResult.getMatchMethod());
-                    result.setCategoryId(subResult.getCategoryId());
-                    result.setCategoryName(subResult.getCategoryName());
-                }
-                variables.remove(CHILD_DEPTH_KEY);
-                variables.put("childResult", "flowName=" + subResult.getFlowName()
-                        + ",success=" + subResult.isSuccess()
-                        + ",terminated=" + (subTerminated == null ? "" : subTerminated)
-                        + ",intention=" + (subResult.getMatchedIntention() == null
-                        ? "" : subResult.getMatchedIntention()));
-                step.setDetail("子流程[" + childFlow.getFlowName() + "]执行"
-                        + (subResult.isSuccess() ? "成功" : "失败：" + subResult.getMessage())
-                        + (subTerminated != null ? "；子流程" + ("hangup".equals(subTerminated) ? "挂断" : "转接") + "，冒泡终止父流程" : ""));
-                result.getSteps().add(step);
-                // 子流程以挂断/转接结束时，父流程必须立即终止并上抛语义（L1 修复）
-                if (subTerminated != null)
-                {
-                    return null;
-                }
-                return nextNode(current, nodeMap, edges, variables, null);
-            }
-        }
-        catch (Exception e)
-        {
-            variables.put("childError", e.getMessage());
-            step.setDetail("子流程[" + childFlow.getFlowName() + "]执行异常：" + e.getMessage());
-        }
-        result.getSteps().add(step);
-        return nextNode(current, nodeMap, edges, variables, null);
-    }
-
-    /**
-     * 渲染 ${表达式} 模板，表达式按 SpEL 在流程变量上下文中求值。
-     */
-    private String render(String template, Map<String, Object> variables)
-    {
-        return ivrTemplateRenderer.render(template, variables);
-    }
-
-    private String cleanJson(String raw)
-    {
-        if (StringUtils.isEmpty(raw))
-        {
-            return "{}";
-        }
-        String text = raw.trim();
-        int start = text.indexOf('{');
-        int end = text.lastIndexOf('}');
-        if (start >= 0 && end > start)
-        {
-            text = text.substring(start, end + 1);
-        }
-        return text;
-    }
-
-    private int parseInt(Object value, int fallback)
-    {
-        if (value == null)
-        {
-            return fallback;
-        }
-        try
-        {
-            return Integer.parseInt(String.valueOf(value));
-        }
-        catch (Exception e)
-        {
-            return fallback;
-        }
-    }
-
     private IvrExecuteResult failResult(IvrExecuteResult result, String code, String message)
     {
         result.setSuccess(false);
@@ -1309,275 +396,6 @@ public class IvrEngineServiceImpl implements IIvrEngineService
         result.setMessage(message);
         result.setStatus("2");
         return result;
-    }
-
-    private AiIvrNode nextNode(AiIvrNode current, Map<Long, AiIvrNode> nodeMap,
-                               List<AiIvrEdge> edges, Map<String, Object> variables, String inputValue)
-    {
-        AiIvrEdge edge = routeEdge(current, edges, variables, inputValue);
-        return edge == null ? null : nodeMap.get(edge.getTargetNodeId());
-    }
-
-    /**
-     * 条件路由：SpEL 表达式优先，其次按键/语音节点按标签匹配，最后默认连线（无表达式、无标签）。
-     */
-    private AiIvrEdge routeEdge(AiIvrNode current, List<AiIvrEdge> edges,
-                                Map<String, Object> variables, String inputValue)
-    {
-        List<AiIvrEdge> outgoing = new ArrayList<>();
-        for (AiIvrEdge e : edges)
-        {
-            if (current.getNodeId().equals(e.getSourceNodeId()))
-            {
-                outgoing.add(e);
-            }
-        }
-        outgoing.sort((a, b) -> Integer.compare(
-                a.getSortOrder() == null ? 0 : a.getSortOrder(),
-                b.getSortOrder() == null ? 0 : b.getSortOrder()));
-
-        for (AiIvrEdge edge : outgoing)
-        {
-            if (StringUtils.isNotEmpty(edge.getConditionExpr()))
-            {
-                if (evalCondition(edge.getConditionExpr(), variables))
-                {
-                    return edge;
-                }
-            }
-        }
-        if (inputValue != null)
-        {
-            for (AiIvrEdge edge : outgoing)
-            {
-                if (StringUtils.isEmpty(edge.getConditionExpr()) && inputValue.equals(edge.getEdgeLabel()))
-                {
-                    return edge;
-                }
-            }
-        }
-        for (AiIvrEdge edge : outgoing)
-        {
-            if (StringUtils.isEmpty(edge.getConditionExpr()) && StringUtils.isEmpty(edge.getEdgeLabel()))
-            {
-                return edge;
-            }
-        }
-        return null;
-    }
-
-    private boolean evalCondition(String expr, Map<String, Object> variables)
-    {
-        try
-        {
-            Expression expression = SPEL_PARSER.parseExpression(expr);
-            // 安全收口(S3)：只读数据绑定上下文，禁止 T(...) 类型表达式与任意方法调用；
-            // 追加 MapAccessor 并以变量 Map 为根对象，支持 root 键属性式访问。
-            // Spring 5.2.x 的 SimpleEvaluationContext 无 setRootObject，根对象须在 builder 阶段 withRootObject 传入
-            SimpleEvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding()
-                    .withRootObject(variables == null ? new HashMap<>() : variables)
-                    .build();
-            context.getPropertyAccessors().add(0, new MapAccessor());
-            if (variables != null)
-            {
-                variables.forEach(context::setVariable);
-            }
-            Object value = expression.getValue(context);
-            return value != null && (Boolean.TRUE.equals(value)
-                    || "true".equalsIgnoreCase(String.valueOf(value)));
-        }
-        catch (Exception e)
-        {
-            log.debug("SpEL表达式解析失败 expr={} error={}", expr, e.getMessage());
-            return false;
-        }
-    }
-
-    private String pollInput(Deque<String> inputs, Map<String, Object> variables)
-    {
-        if (inputs == null || inputs.isEmpty())
-        {
-            return null;
-        }
-        return inputs.poll();
-    }
-
-    private JsonNode config(AiIvrNode node)
-    {
-        if (node == null || StringUtils.isEmpty(node.getNodeConfig()))
-        {
-            return MAPPER.createObjectNode();
-        }
-        try
-        {
-            return MAPPER.readTree(node.getNodeConfig());
-        }
-        catch (Exception e)
-        {
-            return MAPPER.createObjectNode();
-        }
-    }
-
-    private String configText(AiIvrNode node, String key)
-    {
-        JsonNode json = config(node);
-        JsonNode value = json.get(key);
-        if (value == null)
-        {
-            value = json.get("value");
-        }
-        return value == null ? null : value.asText();
-    }
-
-    /**
-     * B5 智能队列分配：按技能组动态选择坐席。
-     *
-     * <p>节点配置支持：groupId（固定技能组）、categoryVar（从流程变量取咨询分类ID，默认
-     * agentCategoryId，承接 B1 agentChat 结果）、enqueueIfNoAgent（无空闲是否排队，默认 true）。
-     * 分配成功返回坐席标识；若排队中返回 null（调用方沿排队连线继续）。</p>
-     */
-    private String dispatchAgent(JsonNode cfg, Map<String, Object> variables,
-                                 IvrExecuteRequest request, String sessionId,
-                                 IvrNodeStep step, IvrExecuteResult result, boolean isAgentNode)
-    {
-        Long groupId = cfg.has("groupId") && !cfg.get("groupId").isNull() ? cfg.get("groupId").asLong() : null;
-        String categoryVar = cfg.has("categoryVar") && StringUtils.isNotEmpty(cfg.get("categoryVar").asText())
-                ? cfg.get("categoryVar").asText() : "agentCategoryId";
-        boolean enqueue = !cfg.has("enqueueIfNoAgent") || cfg.get("enqueueIfNoAgent").asBoolean(true);
-
-        ai.lawyers.system.domain.lawyers.skill.DispatchContext ctx =
-                ai.lawyers.system.domain.lawyers.skill.DispatchContext.of(
-                        sessionId, request.getRecordId(), request.getCallerNumber());
-        ctx.setEnqueueIfNoAgent(enqueue);
-        Object prio = variables.get("dispatchPriority");
-        if (prio instanceof Number)
-        {
-            ctx.setPriority(((Number) prio).intValue());
-        }
-
-        ai.lawyers.system.domain.lawyers.skill.DispatchResult dr;
-        if (groupId != null)
-        {
-            dr = agentDispatchService.dispatch(groupId, ctx);
-        }
-        else
-        {
-            Object catObj = variables.get(categoryVar);
-            Long categoryId = catObj instanceof Number ? ((Number) catObj).longValue() : null;
-            if (categoryId == null)
-            {
-                // 未指定技能组且无分类信息，回退到静态目标
-                String fallback = cfg.has("fallbackTarget") ? cfg.get("fallbackTarget").asText() : "人工坐席";
-                step.setAction("TRANSFER");
-                step.setDetail("智能分配未指定技能组/分类，回退到：" + fallback);
-                return fallback;
-            }
-            dr = agentDispatchService.dispatchByCategory(categoryId, ctx);
-        }
-
-        // 回写流程变量，供后续节点/SpEL 使用
-        variables.put("dispatchSuccess", dr.isSuccess());
-        variables.put("dispatchMessage", dr.getMessage());
-        if (dr.getGroupId() != null)
-        {
-            variables.put("dispatchGroupId", dr.getGroupId());
-            variables.put("dispatchGroupName", dr.getGroupName());
-        }
-        if (dr.isSuccess())
-        {
-            variables.put("dispatchAgentId", dr.getAgentId());
-            variables.put("dispatchAgentName", dr.getAgentName());
-            step.setAction("TRANSFER");
-            step.setDetail("智能分配坐席：" + dr.getAgentName()
-                    + "（" + dr.getGroupName() + "，策略：" + dr.getStrategy() + "）");
-            return "坐席ID " + dr.getAgentId();
-        }
-        else if (dr.getQueueId() != null)
-        {
-            variables.put("dispatchQueueId", dr.getQueueId());
-            variables.put("dispatchQueuePosition", dr.getQueuePosition());
-            step.setAction("QUEUE");
-            step.setDetail(dr.getMessage() + "（技能组：" + dr.getGroupName() + "）");
-            return null;
-        }
-        else
-        {
-            step.setAction("TRANSFER");
-            step.setDetail("智能分配失败：" + dr.getMessage());
-            return "人工坐席";
-        }
-    }
-
-    private String transferTarget(AiIvrNode node, Map<String, Object> variables) {
-        JsonNode json = config(node);
-        if (json.has("agentExtension"))
-        {
-            return "坐席分机 " + json.get("agentExtension").asText();
-        }
-        if (json.has("agentId"))
-        {
-            return "坐席ID " + json.get("agentId").asText();
-        }
-        if (json.has("number"))
-        {
-            return json.get("number").asText();
-        }
-        if (json.has("target"))
-        {
-            return json.get("target").asText();
-        }
-        return "人工坐席";
-    }
-
-    private void assignVariable(AiIvrNode node, Map<String, Object> variables)
-    {
-        JsonNode json = config(node);
-        JsonNode list = json.path("variables");
-        if (list.isArray() && list.size() > 0)
-        {
-            for (JsonNode item : list)
-            {
-                assignOne(item.path("key").asText(""), item.path("val").asText(""), variables);
-            }
-            return;
-        }
-        assignOne(json.path("name").asText(""), json.path("value").asText(""), variables);
-    }
-
-    private void assignOne(String name, String value, Map<String, Object> variables)
-    {
-        if (StringUtils.isEmpty(name))
-        {
-            return;
-        }
-        value = render(value, variables);
-        if (value.startsWith("${") && value.endsWith("}"))
-        {
-            String key = value.substring(2, value.length() - 1);
-            variables.put(name, variables.get(key));
-        }
-        else
-        {
-            variables.put(name, value);
-        }
-    }
-
-    private boolean isObject(JsonNode node)
-    {
-        return node != null && node.isObject();
-    }
-
-    private String labelOf(AiIvrEdge edge)
-    {
-        if (StringUtils.isNotEmpty(edge.getConditionExpr()))
-        {
-            return edge.getConditionExpr();
-        }
-        if (StringUtils.isNotEmpty(edge.getEdgeLabel()))
-        {
-            return edge.getEdgeLabel();
-        }
-        return "默认";
     }
 
     private void finishLog(AiIvrExecutionLog execLog, IvrExecuteResult result, String status, String errorMsg)
