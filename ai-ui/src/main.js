@@ -23,6 +23,8 @@ import { getConfigKey } from "@/api/system/config"
 import { parseTime, resetForm, addDateRange, selectDictLabel, selectDictLabels, handleTree } from "@/utils/ruoyi"
 // F2 坐席端关怀模式（三档字号/高对比，localStorage 工位级持久化）
 import careMode from '@/utils/careMode'
+// P9 前端可观测：错误 + Web Vitals 上报
+import { installFrontendMonitor } from '@/utils/frontendMonitor'
 // 分页组件
 import Pagination from "@/components/Pagination"
 // V2 三态组件：空态 / 骨架加载 / 错误重试
@@ -83,6 +85,9 @@ Vue.use(directive)
 Vue.use(plugins)
 Vue.use(careMode)
 DictData.install()
+
+// P9：安装全局错误捕获与 Web Vitals 采集（生产默认开启，开发需 VUE_APP_MONITOR_ENABLED=true）
+installFrontendMonitor(Vue, router)
 
 // V4：ECharts 司法蓝主题统一注册——所有图表 init 统一传 'judicial'（配色.md 数据可视化规范）
 import * as echarts from 'echarts'

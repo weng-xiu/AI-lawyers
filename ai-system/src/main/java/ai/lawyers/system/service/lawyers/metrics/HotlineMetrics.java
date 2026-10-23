@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
@@ -54,6 +55,8 @@ import io.micrometer.core.instrument.Timer;
  *   <li>hotline_pbx_fork_audio_silence_seconds M3-3：活跃 fork 最大音频静默年龄（gauge，断流/假活检测）</li>
  *   <li>hotline_gateway_cmdpool_down_total{proto}      B3：命令面池化连接断开翻转（esl/ami）</li>
  *   <li>hotline_gateway_cmdpool_circuit_open_total{proto} B3：命令面熔断器打开（esl/ami）</li>
+ *   <li>hotline_frontend_error_total{type,route}       P9：前端错误上报（type ∈ vue/window/promise/resource，route 已归一化）</li>
+ *   <li>hotline_frontend_web_vital{metric,unit}       P9：前端 Web Vitals 分布（lcp/fcp/ttfb/inp 单位 ms，cls 单位 score）</li>
  * </ul>
  *
  * <p>Prometheus 导出时 Timer 自动追加 {@code _seconds} 后缀（如
@@ -312,6 +315,36 @@ public class HotlineMetrics
     public void incrementGatewayCmdPoolCircuitOpen(String proto)
     {
         counter("gateway.cmdpool.circuit.open.total", "proto", proto).increment();
+    }
+
+    /* ================= P9：前端可观测（错误 + Web Vitals 上报） ================= */
+
+    /**
+     * 前端错误上报计数：type ∈ vue/window/promise/resource；route 为归一化路由
+     * （去查询串、数值段折叠为 *），避免 Prometheus 标签基数膨胀。
+     */
+    public void incrementFrontendError(String type, String route)
+    {
+        counter("frontend.error.total", "type", type, "route", route).increment();
+    }
+
+    /**
+     * 前端 Web Vitals 分布：metric ∈ lcp/fcp/ttfb/inp（单位 ms）/ cls（单位 score）。
+     *
+     * <p>用 DistributionSummary 暴露 count/sum/max 与 P50/P75/P95 分位，
+     * Grafana 据此出 Core Web Vitals 达标率（LCP ≤2500ms、INP ≤200ms、CLS ≤0.1）。</p>
+     */
+    public void recordFrontendWebVital(String metric, double value, String unit)
+    {
+        if (registry == null)
+        {
+            return;
+        }
+        DistributionSummary.builder(PREFIX + "_frontend_web_vital")
+                .tags("metric", metric, "unit", unit)
+                .publishPercentiles(0.5, 0.75, 0.95)
+                .register(registry)
+                .record(value);
     }
 
     /** 队列死信计数 */
