@@ -206,4 +206,10 @@ export default {
 .upload-demo {
   width: 100%;
 }
+
+/* U6 移动端：收窄页面留白，表单标签/控件改单列的规则见 App.vue 全局层 */
+@media (max-width: 768px) {
+  .submit-question { padding: 12px; }
+  .card-header { font-size: 17px; }
+}
 </style>

@@ -221,4 +221,13 @@ html.care-high-contrast .empty-tip a,
 html.care-high-contrast .portal-link { color: #0000EE; text-decoration: underline; }
 html.care-high-contrast .materials-box { background: #fff; border: 2px solid #000; }
 html.care-high-contrast .hotline-card { background: #000; border: 3px solid #ffd04b; }
+
+/* U6 移动端：热线卡纵向排布、机构卡片标题折行 */
+@media (max-width: 768px) {
+  .portal-page { padding: 12px 0 24px; }
+  .page-wrap { padding: 0 12px; }
+  .page-title { font-size: 20px; }
+  .hotline-card >>> .el-card__body { flex-direction: column; gap: 14px; padding: 18px 12px; }
+  .org-head { flex-wrap: wrap; }
+}
 </style>

@@ -245,4 +245,13 @@ html.care-high-contrast .process-box p { color: #000; }
 html.care-high-contrast .ticket-card { border: 2px solid #000; border-left: 6px solid #000; }
 html.care-high-contrast .process-box { background: #fff; border: 2px solid #000; }
 html.care-high-contrast .meta-label { color: #333; text-decoration: underline; }
+
+/* U6 移动端：单列大留白，工单元信息纵向紧凑排列 */
+@media (max-width: 768px) {
+  .portal-page { padding: 12px 0 24px; }
+  .page-wrap { padding: 0 12px; }
+  .page-title { font-size: 20px; }
+  .ticket-meta { gap: 4px 16px; }
+  .ticket-meta li { width: 100%; }
+}
 </style>

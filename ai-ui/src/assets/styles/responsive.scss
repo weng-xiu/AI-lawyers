@@ -1,0 +1,63 @@
+/**
+ * U6 响应式与移动端：管理端「只读巡场」平板适配
+ *
+ * 断点：1280（窄桌面屏）/ 1024（平板横屏）/ 768（平板竖屏）
+ * 覆盖：通用容器、弹窗、ProTable 列表骨架、侧边栏折叠补充。
+ * 页面级布局（大屏指标卡/图表堆叠、排队监控列宽）在各自组件内用 @media 处理。
+ */
+
+@media (max-width: 1024px) {
+  /* 巡场时优先保证内容区宽度：容器留白收敛 */
+  .app-container {
+    padding: 12px !important;
+  }
+
+  /* 弹窗不超出视口，避免平板下表单/详情被裁切 */
+  .el-dialog:not(.is-fullscreen) {
+    max-width: calc(100vw - 24px);
+    margin-top: 6vh !important;
+  }
+  .el-message-box {
+    max-width: calc(100vw - 32px);
+  }
+
+  /* ProTable 查询区允许折行，控件保持原宽度不挤压 */
+  .pro-table > .el-form--inline .el-form-item {
+    margin-right: 10px;
+    margin-bottom: 8px;
+  }
+
+  /* 巡场以读为主：表格字号与行高收紧，一屏容纳更多行 */
+  .pro-table .el-table {
+    font-size: 12px;
+  }
+  .pro-table .el-table th,
+  .pro-table .el-table td {
+    padding: 5px 0;
+  }
+
+  /* 工具条占满整行时不产生横向溢出 */
+  .pro-table > .el-row {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-container {
+    padding: 8px !important;
+  }
+
+  .el-dialog:not(.is-fullscreen) {
+    width: calc(100vw - 24px) !important;
+  }
+
+  /* 右侧抽屉在竖屏平板下占满大部分宽度 */
+  .el-drawer.rtl {
+    width: 82% !important;
+  }
+
+  .el-pagination {
+    white-space: normal;
+  }
+}

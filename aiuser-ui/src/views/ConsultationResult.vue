@@ -389,4 +389,13 @@ export default {
 .no-result .el-button {
   margin-top: 20px;
 }
+
+/* U6 移动端：收窄留白，评分控件折行避免溢出 */
+@media (max-width: 768px) {
+  .consultation-result { padding: 12px; }
+  .card-header { font-size: 17px; }
+  .answer-content { padding: 12px; font-size: 15px; }
+  .rating-container { flex-wrap: wrap; gap: 8px; }
+  .rating-container span { margin-right: 0; }
+}
 </style>

@@ -27,22 +27,21 @@
           <h1 class="logo">AI律师公众服务</h1>
           <el-menu
             :default-active="$route.path"
-            class="nav-menu"
+            class="nav-menu desktop-only"
             mode="horizontal"
             router
             background-color="#1A3C6E"
             text-color="#d7e2f3"
             active-text-color="#C9A96E">
-            <el-menu-item index="/consultation/submit">我要咨询</el-menu-item>
-            <el-menu-item index="/ticket">我的工单</el-menu-item>
-            <el-menu-item index="/channels">渠道绑定</el-menu-item>
-            <el-menu-item index="/services">服务导航</el-menu-item>
-            <el-menu-item index="/consultation/history">咨询历史</el-menu-item>
-            <el-menu-item index="/elderly" class="elderly-entry">长辈专区</el-menu-item>
+            <el-menu-item
+              v-for="item in navItems"
+              :key="item.path"
+              :index="item.path"
+              :class="{ 'elderly-entry': item.elderly }">{{ item.label }}</el-menu-item>
           </el-menu>
 
           <!-- F2 适老化快捷控制 -->
-          <div class="care-bar" role="group" aria-label="无障碍与语言设置">
+          <div class="care-bar desktop-only" role="group" aria-label="无障碍与语言设置">
             <el-radio-group
               :value="care.state.fontScale"
               size="mini"
@@ -84,8 +83,79 @@
             </el-dropdown>
             <el-button v-else type="text" class="login-link" @click="toLogin">登录</el-button>
           </div>
+
+          <!-- U6 移动端：折叠菜单入口（<=1080px 显示） -->
+          <button
+            type="button"
+            class="mobile-nav-toggle"
+            aria-label="打开导航与设置"
+            aria-controls="mobile-nav-panel"
+            :aria-expanded="mobileNavOpen ? 'true' : 'false'"
+            @click="toggleMobileNav">
+            <i :class="mobileNavOpen ? 'el-icon-close' : 'el-icon-menu'"></i>
+          </button>
         </div>
       </el-header>
+
+      <!-- U6 移动端导航抽屉：窄屏下收纳全部菜单与适老设置，避免顶部横向溢出 -->
+      <el-drawer
+        title="导航与设置"
+        :visible.sync="mobileNavOpen"
+        direction="rtl"
+        size="82%"
+        custom-class="mobile-nav-drawer">
+        <nav id="mobile-nav-panel" aria-label="移动端导航">
+          <el-menu
+            :default-active="$route.path"
+            mode="vertical"
+            router
+            background-color="#1A3C6E"
+            text-color="#d7e2f3"
+            active-text-color="#C9A96E"
+            @select="closeMobileNav">
+            <el-menu-item
+              v-for="item in navItems"
+              :key="item.path"
+              :index="item.path"
+              :class="{ 'elderly-entry': item.elderly }">{{ item.label }}</el-menu-item>
+          </el-menu>
+
+          <div class="mobile-care" role="group" aria-label="无障碍与语言设置">
+            <div class="mobile-care-row">
+              <span class="mobile-care-label">字号</span>
+              <el-radio-group :value="care.state.fontScale" size="mini" aria-label="字号大小" @input="onFontScale">
+                <el-radio-button label="normal">标准</el-radio-button>
+                <el-radio-button label="large">大字</el-radio-button>
+                <el-radio-button label="xlarge">超大</el-radio-button>
+              </el-radio-group>
+            </div>
+            <div class="mobile-care-row">
+              <span class="mobile-care-label">高对比度</span>
+              <el-switch
+                :value="care.state.highContrast"
+                active-color="#C9A96E"
+                inactive-color="#3a5a8c"
+                aria-label="高对比度模式"
+                @change="onHighContrast" />
+            </div>
+            <div class="mobile-care-row">
+              <span class="mobile-care-label">语种偏好</span>
+              <el-select :value="care.state.languagePreference" size="mini" aria-label="语种偏好" @change="onLanguageChange">
+                <el-option label="普通话" value="zh-CN" />
+                <el-option label="粤语" value="yue-CN" />
+              </el-select>
+            </div>
+            <div class="mobile-care-row">
+              <span class="mobile-care-label">账号</span>
+              <template v-if="isLoggedIn">
+                <span class="mobile-user">{{ userInfo && userInfo.nickName ? userInfo.nickName : '用户' }}</span>
+                <el-button type="text" @click="handleCommand('logout')">退出登录</el-button>
+              </template>
+              <el-button v-else type="text" class="login-link" @click="toLogin">登录</el-button>
+            </div>
+          </div>
+        </nav>
+      </el-drawer>
       <el-main>
         <main id="main-content" role="main" tabindex="-1" class="main-region">
           <router-view ref="mainView"/>
@@ -103,6 +173,20 @@ import { mapGetters } from 'vuex'
 
 export default {
   name: 'App',
+  data() {
+    return {
+      // U6 移动端：桌面横向菜单与抽屉菜单共用同一份导航配置
+      mobileNavOpen: false,
+      navItems: [
+        { path: '/consultation/submit', label: '我要咨询' },
+        { path: '/ticket', label: '我的工单' },
+        { path: '/channels', label: '渠道绑定' },
+        { path: '/services', label: '服务导航' },
+        { path: '/consultation/history', label: '咨询历史' },
+        { path: '/elderly', label: '长辈专区', elderly: true }
+      ]
+    }
+  },
   computed: {
     ...mapGetters(['isLoggedIn', 'userInfo']),
     care() {
@@ -115,12 +199,18 @@ export default {
       if (val && this.$care) {
         this.$care.syncPreferenceToServer()
       }
+    },
+    // 路由变化后收起移动端抽屉
+    $route() {
+      this.mobileNavOpen = false
     }
   },
   created() {
     // $care 已在 main.js 安装时初始化（localStorage 恢复 + 应用根类）
   },
   methods: {
+    toggleMobileNav() { this.mobileNavOpen = !this.mobileNavOpen },
+    closeMobileNav() { this.mobileNavOpen = false },
     onFontScale(val) { this.$care.setFontScale(val) },
     onHighContrast(val) { this.$care.setHighContrast(val) },
     onLanguageChange(val) { this.$care.setLanguage(val) },
@@ -417,5 +507,88 @@ html.care-high-contrast .el-tag--danger {
   background: #fff !important;
   color: #000 !important;
   border: 2px solid #000 !important;
+}
+
+/* =========================================================
+ * U6 响应式与移动端：公众端移动优先（断点 1080 / 768 / 480）
+ * 桌面导航在窄屏收纳进抽屉，页面表单/卡片改为单列大热区
+ * ========================================================= */
+.mobile-nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 6px;
+  background: transparent;
+  color: #fff;
+  font-size: 20px;
+  cursor: pointer;
+}
+.mobile-nav-toggle:focus-visible { outline: 3px solid #ffd04b; outline-offset: 2px; }
+
+.mobile-nav-drawer .el-drawer__body { padding: 0; }
+.mobile-nav-drawer .el-menu { border-right: none; }
+.mobile-nav-drawer .el-menu-item { height: 52px; line-height: 52px; font-size: 16px; }
+.mobile-care { padding: 16px 20px 24px; border-top: 1px solid #eef1f6; }
+.mobile-care-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; }
+.mobile-care-label { color: #5b6b84; font-size: 14px; }
+.mobile-care .el-select { width: 110px; }
+.mobile-user { color: #0b1f4a; font-size: 15px; margin-right: 8px; }
+
+@media (max-width: 1080px) {
+  .desktop-only { display: none !important; }
+  .mobile-nav-toggle { display: inline-flex; }
+  .header-content { padding: 0 12px; gap: 10px; }
+  .logo { font-size: 17px; overflow: hidden; text-overflow: ellipsis; }
+}
+
+@media (max-width: 768px) {
+  /* 弹窗/消息框占满可用宽度，避免百分比宽度在窄屏过窄 */
+  .el-dialog:not(.is-fullscreen) {
+    width: calc(100vw - 32px) !important;
+    max-width: 520px;
+    margin-top: 8vh !important;
+  }
+  .el-message-box { width: calc(100vw - 32px) !important; max-width: 420px; }
+
+  /* 行内查询表单竖排，控件占满整行 */
+  .el-form--inline .el-form-item { display: block; margin-right: 0; width: 100%; }
+  .el-form--inline .el-form-item__content { width: 100%; display: block; margin-left: 0 !important; }
+  .el-form--inline .el-form-item__content .el-input,
+  .el-form--inline .el-form-item__content .el-select,
+  .el-form--inline .el-form-item__content .el-date-editor { width: 100% !important; }
+
+  /* 咨询提交：标签改为顶部对齐，避免 100px 固定标签挤压输入区 */
+  .submit-question .el-form-item__label { width: auto !important; float: none; text-align: left; padding: 0 0 6px; line-height: 1.5; }
+  .submit-question .el-form-item__content { margin-left: 0 !important; }
+
+  /* 工单状态筛选：等分换行，保持 >=44px 热区 */
+  .status-tabs { display: flex; flex-wrap: wrap; }
+  .status-tabs .el-radio-button { flex: 1 0 auto; }
+  .status-tabs .el-radio-button__inner { width: 100%; min-height: 44px; padding: 10px 8px; }
+
+  /* 咨询历史筛选区：三列改为单列 */
+  .consultation-history .filter-container .el-col { width: 100% !important; margin-bottom: 8px; }
+
+  /* 渠道绑定：表单控件占满整行，渠道卡片纵向折行 */
+  .my-channels .bind-form-card .el-select,
+  .my-channels .bind-form-card .el-input { width: 100% !important; }
+  .my-channels .channel-row { flex-wrap: wrap; }
+  .my-channels .channel-info { flex: 1 1 180px; }
+
+  /* 分页在窄屏允许换行 */
+  .el-pagination { white-space: normal; }
+  .el-pagination .el-pagination__sizes .el-input { width: 90px; }
+
+  .el-footer { height: auto !important; line-height: 1.6 !important; padding: 10px 12px; }
+  .app-footer p { line-height: 1.6; }
+}
+
+@media (max-width: 480px) {
+  .logo { font-size: 15px; }
+  .voice-help { right: 14px; bottom: 70px; }
 }
 </style>

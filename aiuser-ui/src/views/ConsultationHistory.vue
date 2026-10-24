@@ -352,4 +352,12 @@ export default {
 .feedback-container {
   margin-bottom: 10px;
 }
+
+/* U6 移动端：收窄留白，筛选列/弹窗由 App.vue 全局层处理 */
+@media (max-width: 768px) {
+  .consultation-history { padding: 12px; }
+  .rating-container { flex-wrap: wrap; gap: 8px; }
+  .rating-container span { min-width: 0; margin-right: 0; }
+  .pagination-container { overflow-x: auto; }
+}
 </style>

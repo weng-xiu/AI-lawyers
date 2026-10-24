@@ -136,6 +136,17 @@ export default {
   .hotline-card .el-divider--vertical { display: none; }
 }
 
+/* U6 移动端：长辈专区保持大字大热区，卡片单列、热线纵向排布 */
+@media (max-width: 768px) {
+  .portal-page { padding: 14px 0 24px; }
+  .page-wrap { padding: 0 12px; }
+  .page-title { font-size: 24px; }
+  .zone-grid { gap: 12px; }
+  .zone-card { padding: 20px 18px; min-height: 0; }
+  .hotline-card >>> .el-card__body { flex-direction: column; gap: 16px; }
+  .hotline-number { font-size: 34px; }
+}
+
 /* ===== F2 适老档叠加（专区基线已大字，关怀模式再放大一档） ===== */
 html.care-large .page-title { font-size: 34px; }
 html.care-large .page-sub { font-size: 20px; }

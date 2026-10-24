@@ -192,4 +192,11 @@ export default {
   white-space: pre-wrap;
   word-break: break-all;
 }
+
+/* U6 平板只读巡场：收紧表格字号与行高，一屏展示更多队列 */
+@media (max-width: 1024px) {
+  .queue-monitor-page .el-table { font-size: 12px; }
+  .queue-monitor-page .el-table th,
+  .queue-monitor-page .el-table td { padding: 5px 0; }
+}
 </style>

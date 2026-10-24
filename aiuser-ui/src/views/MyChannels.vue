@@ -296,4 +296,12 @@ html.care-high-contrast .channel-card { border: 2px solid #000; border-left: 6px
 html.care-high-contrast .bind-form-card { border: 2px solid #000; }
 html.care-high-contrast .channel-icon { background: #fff; color: #000; border: 2px solid #000; }
 html.care-high-contrast .empty-tip { color: #333; }
+
+/* U6 移动端：收窄留白，渠道表单控件占满整行（见 App.vue 全局层） */
+@media (max-width: 768px) {
+  .portal-page { padding: 12px 0 24px; }
+  .page-wrap { padding: 0 12px; }
+  .page-title { font-size: 20px; }
+  .channel-row { gap: 10px; }
+}
 </style>

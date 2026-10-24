@@ -379,4 +379,23 @@ export default {
 .care-num { font-size: 34px; font-weight: bold; color: #1A3C6E; }
 .care-sub { font-size: 16px; font-weight: 600; color: #1F2A3A; margin-bottom: 6px; }
 .care-label { font-size: 12px; color: #8C8C8C; margin-top: 8px; }
+
+/* U6 平板只读巡场：指标卡按 4 → 3 → 2 列递进，图表/表格纵向堆叠铺满宽度 */
+@media (max-width: 1280px) {
+  .stat-row .el-col { width: 25% !important; }
+}
+@media (max-width: 1024px) {
+  .dashboard-container { padding: 12px; }
+  .filter-bar { flex-wrap: wrap; gap: 8px; }
+  .filter-bar .title { margin-right: 8px; }
+  .filter-bar .el-date-editor { width: 100% !important; }
+  .stat-row .el-col { width: 33.3333% !important; margin-bottom: 8px; }
+  .dashboard-container > .el-row:not(.stat-row) > .el-col { width: 100% !important; }
+  .panel-card { margin-bottom: 12px; }
+}
+@media (max-width: 768px) {
+  .stat-row .el-col { width: 50% !important; }
+  .stat-num { font-size: 20px; }
+  .care-box { height: auto; padding: 16px 0; }
+}
 </style>
