@@ -228,6 +228,7 @@
 <script>
 import { listTask, getTask, delTask, addTask, updateTask, generateTaskNo, startTask, pauseTask, stopTask, executeTask } from "@/api/lawyers/outboundTask"
 import { getPublishedFlows } from "@/api/lawyers/ivrFlow"
+import { createPoller } from "@/utils/polling"
 
 export default {
   name: "OutboundTask",
@@ -262,14 +263,58 @@ export default {
     this.getList()
     this.loadFlows()
   },
+  beforeDestroy() {
+    this.stopAutoRefresh()
+  },
   methods: {
     getList() {
       this.loading = true
-      listTask(this.queryParams).then(response => {
-        this.taskList = response.rows
-        this.total = response.total
+      return listTask(this.queryParams).then(response => {
+        this.applyRows(response)
+      }).finally(() => {
         this.loading = false
       })
+    },
+    // U8：列表数据统一落地；对比上次状态，进行中(1) 变为已完成(2)/已停止(4) 时发完成/停止通知
+    applyRows(response) {
+      const rows = response.rows || []
+      const prev = this.statusSnapshot
+      const next = {}
+      rows.forEach(r => {
+        next[r.taskId] = r.status
+        if (!prev) return
+        if (prev[r.taskId] === '1' && r.status === '2') {
+          this.$modal.notifyTaskDone('外呼任务完成', `任务「${r.taskName}」已完成`)
+        } else if (prev[r.taskId] === '1' && r.status === '4') {
+          this.$modal.notifyTaskFail('外呼任务已停止', `任务「${r.taskName}」已停止`)
+        }
+      })
+      this.statusSnapshot = next
+      this.taskList = rows
+      this.total = response.total
+      this.syncAutoRefresh()
+    },
+    // U8：有进行中任务时每 5 秒静默刷新列表，任务结束后自动停止轮询
+    syncAutoRefresh() {
+      const hasRunning = this.taskList.some(r => r.status === '1')
+      if (!hasRunning) {
+        this.stopAutoRefresh()
+        return
+      }
+      if (this.poller) return
+      this.poller = createPoller(() => this.refreshSilently(), 5000)
+      this.poller.start()
+    },
+    refreshSilently() {
+      return listTask(this.queryParams).then(response => {
+        this.applyRows(response)
+      })
+    },
+    stopAutoRefresh() {
+      if (this.poller) {
+        this.poller.stop()
+        this.poller = null
+      }
     },
     loadFlows() {
       getPublishedFlows().then(response => {
@@ -325,7 +370,7 @@ export default {
         return startTask(row.taskId)
       }).then(() => {
         this.getList()
-        this.$modal.msgSuccess("启动成功")
+        this.$modal.notifyTaskStart('外呼任务已启动', `任务「${row.taskName}」执行中，完成后将通知你`)
       }).catch(() => {})
     },
     handleExecute(row) {
@@ -341,7 +386,7 @@ export default {
         return executeTask(row.taskId)
       }).then(() => {
         this.getList()
-        this.$modal.msgSuccess("执行完成")
+        this.$modal.notifyTaskStart('外呼任务执行中', `任务「${row.taskName}」已下发执行，完成后将通知你`)
       }).catch(() => {})
     },
     handlePause(row) {

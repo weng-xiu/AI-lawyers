@@ -153,7 +153,7 @@ import {
   submitRobotSimulation,
   getRobotSimulationProgress
 } from '@/api/lawyers/simulation'
-import { createPoller } from '@/utils/polling'
+import { createLongTask } from '@/utils/longTask'
 
 export default {
   name: 'Simulation',
@@ -214,7 +214,7 @@ export default {
         try {
           JSON.parse(payload)
         } catch (e) {
-          this.$message.error('用例集不是合法 JSON：' + e.message)
+          this.$modal.msgError('用例集不是合法 JSON：' + e.message)
           return
         }
       } else {
@@ -226,7 +226,7 @@ export default {
       const submit = this.kind === 'copilot' ? submitCopilotSimulation : submitRobotSimulation
       submit(payload).then(res => {
         this.task = { taskId: res.taskId, status: 'RUNNING', percent: 0 }
-        this.$message.success(res.msg || '评测任务已提交')
+        this.$modal.notifyTaskStart('评测任务已提交', res.msg || '后台执行中，完成后将通知你')
         this.startPolling()
       }).finally(() => {
         this.submitting = false
@@ -234,30 +234,48 @@ export default {
     },
     startPolling() {
       this.stopPolling()
-      // P6：统一轮询——页面不可见暂停、在途防重入、恢复可见立即补拉
-      this.poller = createPoller(() => this.loadProgress(), 2000)
-      this.poller.start()
-    },
-    stopPolling() {
-      if (this.poller) {
-        this.poller.stop()
-        this.poller = null
-      }
-    },
-    loadProgress() {
-      if (!this.task || !this.task.taskId) {
-        return
-      }
+      // U8：统一长任务封装——复用 P6 轮询（不可见暂停/在途防重入）+ 终态只回调一次
       const get = this.kind === 'copilot'
         ? getCopilotSimulationProgress
         : getRobotSimulationProgress
+      const taskId = this.task.taskId
+      const label = this.kind === 'copilot' ? '坐席辅助' : '语音机器人'
+      this.longTask = createLongTask({
+        interval: 2000,
+        fetchProgress: () => get(taskId).then(res => res.data || {}),
+        onUpdate: d => {
+          this.task = d
+          if (d.status === 'SUCCESS') {
+            this.report = d.report
+          }
+        },
+        onDone: d => {
+          const r = d.report || {}
+          this.$modal.notifyTaskDone(
+            `${label}评测完成`,
+            `用例通过率 ${r.casePassRate || 0}%（${r.passedCases || 0}/${r.totalCases || 0}）`
+          )
+        },
+        onFail: d => {
+          this.$modal.notifyTaskFail(`${label}评测失败`, d.errorMsg || '任务执行失败，请稍后重试')
+        }
+      })
+      this.longTask.start()
+    },
+    stopPolling() {
+      if (this.longTask) {
+        this.longTask.stop()
+        this.longTask = null
+      }
+    },
+    // 报告页“刷新”：手动拉取一次最新进度/报告（不触发终态通知）
+    loadProgress() {
+      if (!this.task || !this.task.taskId) return
+      const get = this.kind === 'copilot' ? getCopilotSimulationProgress : getRobotSimulationProgress
       return get(this.task.taskId).then(res => {
-        this.task = res.data
+        this.task = res.data || {}
         if (this.task.status === 'SUCCESS') {
           this.report = this.task.report
-          this.stopPolling()
-        } else if (this.task.status === 'FAILED') {
-          this.stopPolling()
         }
       })
     },

@@ -107,6 +107,34 @@ export default {
   notifyWarning(content) {
     Notification.warning(content)
   },
+  /**
+   * U8：长任务统一通知（右下角通知，不打断当前操作；失败常驻需手动关闭）。
+   * 长任务（数据回填/仿真评测/外呼）统一走：开始 → 完成/失败 三段反馈。
+   */
+  notifyTaskStart(title, message) {
+    Notification.info({
+      title: title || '任务已开始',
+      message: message || '',
+      duration: 4500,
+      position: 'bottom-right'
+    })
+  },
+  notifyTaskDone(title, message) {
+    Notification.success({
+      title: title || '任务已完成',
+      message: message || '',
+      duration: 4500,
+      position: 'bottom-right'
+    })
+  },
+  notifyTaskFail(title, message) {
+    Notification.error({
+      title: title || '任务失败',
+      message: message || '',
+      duration: 0,
+      position: 'bottom-right'
+    })
+  },
   // 确认窗体
   confirm(content) {
     return MessageBox.confirm(content, "系统提示", {

@@ -130,7 +130,7 @@
 
 <script>
 import { getCallReport, getServiceReport, getQualityReport, getBusinessReport, statBackfill, statBackfillProgress } from '@/api/lawyers/report'
-import { createPoller } from '@/utils/polling'
+import { createLongTask } from '@/utils/longTask'
 import AdhocAnalysis from './AdhocAnalysis'
 
 const REPORT_API = {
@@ -235,26 +235,33 @@ export default {
     },
     handleBackfill() {
       if (!this.backfillRange || this.backfillRange.length !== 2) {
-        this.$message.warning('请选择回填区间')
+        this.$modal.msgWarning('请选择回填区间')
         return
       }
       const begin = new Date(this.backfillRange[0].replace(' ', 'T'))
       const end = new Date(this.backfillRange[1].replace(' ', 'T'))
       if (!(begin < end)) {
-        this.$message.warning('开始时间必须早于结束时间')
+        this.$modal.msgWarning('开始时间必须早于结束时间')
         return
       }
       if (begin < new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000)) {
-        this.$message.warning('回填区间不能超过 7 天')
+        this.$modal.msgWarning('回填区间不能超过 7 天')
         return
       }
-      this.$confirm(`确认回填 ${this.backfillRange[0]} 至 ${this.backfillRange[1]} 的分钟指标？`,
-        '回填确认', { type: 'warning' }).then(() => {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        title: '回填确认',
+        confirmText: '开始回填',
+        content: `确认回填 ${this.backfillRange[0]} 至 ${this.backfillRange[1]} 的分钟指标？`,
+        tip: '回填按分钟聚合并幂等覆盖写入，后台执行期间可关闭弹窗'
+      }).then(() => {
         this.backfillLoading = true
         statBackfill({ beginTime: this.backfillRange[0], endTime: this.backfillRange[1] }).then(res => {
           this.backfillTaskId = res.taskId
           this.backfillStatus = 'RUNNING'
           this.startPolling()
+          // U8：长任务统一通知，弹窗关闭后也能看到开始/完成/失败反馈
+          this.$modal.notifyTaskStart('数据回填已开始', '后台执行中，可关闭弹窗，完成后将通知你')
         }).finally(() => {
           this.backfillLoading = false
         })
@@ -262,32 +269,33 @@ export default {
     },
     startPolling() {
       this.stopPolling()
-      // P6：统一轮询——页面不可见暂停、在途防重入、恢复可见立即补拉（immediate 立即首查）
-      this.poller = createPoller(() => this.pollProgress(), 3000, { immediate: true })
-      this.poller.start()
-    },
-    stopPolling() {
-      if (this.poller) {
-        this.poller.stop()
-        this.poller = null
-      }
-    },
-    pollProgress() {
-      return statBackfillProgress(this.backfillTaskId).then(res => {
-        const d = res.data || {}
-        this.backfillStatus = d.status
-        this.backfillPercent = d.percent || 0
-        this.backfillProcessed = d.processedMinutes || 0
-        this.backfillTotal = d.totalMinutes || 0
-        this.backfillRows = d.rowsWritten || 0
-        this.backfillError = d.errorMsg || ''
-        if (d.status !== 'RUNNING') {
-          this.stopPolling()
-          if (d.status === 'SUCCESS') {
-            this.loadData()
-          }
+      // U8：统一长任务封装——复用 P6 轮询（不可见暂停/在途防重入）+ 终态只回调一次
+      this.longTask = createLongTask({
+        interval: 3000,
+        fetchProgress: () => statBackfillProgress(this.backfillTaskId).then(res => res.data || {}),
+        onUpdate: d => {
+          this.backfillStatus = d.status
+          this.backfillPercent = d.percent || 0
+          this.backfillProcessed = d.processedMinutes || 0
+          this.backfillTotal = d.totalMinutes || 0
+          this.backfillRows = d.rowsWritten || 0
+          this.backfillError = d.errorMsg || ''
+        },
+        onDone: d => {
+          this.loadData()
+          this.$modal.notifyTaskDone('数据回填完成', `已写入/更新 ${d.rowsWritten || 0} 条分钟指标`)
+        },
+        onFail: d => {
+          this.$modal.notifyTaskFail('数据回填失败', d.errorMsg || '任务执行失败，请稍后重试')
         }
       })
+      this.longTask.start()
+    },
+    stopPolling() {
+      if (this.longTask) {
+        this.longTask.stop()
+        this.longTask = null
+      }
     },
     resetBackfill() {
       this.backfillOpen = false
@@ -295,9 +303,9 @@ export default {
       this.backfillStatus = ''
     },
     onBackfillClosed() {
-      // 关弹窗不取消后台任务，仅停本地轮询
-      this.stopPolling()
+      // 关弹窗不取消后台任务；RUNNING 时继续轮询，任务结束统一发通知（离开页面才停止）
       if (this.backfillStatus !== 'RUNNING') {
+        this.stopPolling()
         this.backfillTaskId = null
       }
     },
