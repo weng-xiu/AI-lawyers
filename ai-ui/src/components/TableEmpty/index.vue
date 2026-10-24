@@ -3,6 +3,15 @@
     <i :class="icon" class="table-empty__icon" aria-hidden="true"></i>
     <p class="table-empty__text">{{ text }}</p>
     <p v-if="hint" class="table-empty__hint">{{ hint }}</p>
+    <!-- U7：空态直接给出下一步动作（如「新增知识」「新建外呼任务」） -->
+    <el-button
+      v-if="actionText"
+      type="primary"
+      plain
+      size="mini"
+      class="table-empty__action"
+      :icon="actionIcon"
+      @click="$emit('action')">{{ actionText }}</el-button>
     <el-button
       v-if="showRetry"
       type="text"
@@ -41,6 +50,16 @@ export default {
     icon: {
       type: String,
       default: 'el-icon-document'
+    },
+    // U7：空态主操作文案（为空则只展示文案与提示）
+    actionText: {
+      type: String,
+      default: ''
+    },
+    // U7：空态主操作图标
+    actionIcon: {
+      type: String,
+      default: 'el-icon-plus'
     },
     // 是否展示「重新加载」入口（查询失败后回退到空态时使用）
     showRetry: {
@@ -86,6 +105,9 @@ export default {
   margin: 4px 0 0;
   font-size: 12px;
   color: #b0bcca;
+}
+.table-empty__action {
+  margin-top: 12px;
 }
 .table-empty__retry {
   margin-top: 8px;

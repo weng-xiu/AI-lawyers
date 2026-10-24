@@ -100,6 +100,46 @@
 
       </template>
 
+      <!-- U7 常驻帮助入口：移动端也保留，可重看新手引导与直达巡场页 -->
+      <el-popover
+        ref="helpPopover"
+        placement="bottom-end"
+        width="300"
+        trigger="click"
+        popper-class="help-popover">
+        <div class="help-panel">
+          <div class="help-title">帮助与引导</div>
+          <button type="button" class="help-row" @click="openGuide">
+            <i class="el-icon-guide" aria-hidden="true"></i>
+            <span>
+              <strong>新手引导</strong>
+              <small>4 步了解工作台 / 工单 / 巡场 / 知识库</small>
+            </span>
+          </button>
+          <button type="button" class="help-row" @click="goPage('/lawyers/callCenter/callWorkbench')">
+            <i class="el-icon-s-home" aria-hidden="true"></i>
+            <span>
+              <strong>坐席工作台</strong>
+              <small>今日待办、未接来电与快捷建单</small>
+            </span>
+          </button>
+          <button type="button" class="help-row" @click="goPage('/lawyers/queueMonitor')">
+            <i class="el-icon-data-line" aria-hidden="true"></i>
+            <span>
+              <strong>队列监控</strong>
+              <small>积压与死信巡场、死信重投</small>
+            </span>
+          </button>
+          <div class="help-footer">快捷键 Ctrl+K 打开命令面板；紧急问题请联系 12348 值班席。</div>
+        </div>
+        <button
+          slot="reference"
+          type="button"
+          class="right-menu-item hover-effect help-entry"
+          aria-label="帮助与新手引导"
+          title="帮助与新手引导">?</button>
+      </el-popover>
+
       <el-dropdown class="avatar-container right-menu-item hover-effect" trigger="hover">
         <div class="avatar-wrapper">
           <img :src="avatar" class="user-avatar">
@@ -263,6 +303,18 @@ export default {
     goMessageCenter() {
       this.$router.push('/lawyers/message')
     },
+    /** U7：帮助入口 → 重看新手引导 */
+    openGuide() {
+      if (this.$refs.helpPopover) this.$refs.helpPopover.doClose()
+      this.$emit('open-guide')
+    },
+    /** U7：帮助入口 → 直达常用巡场页，路由不变时不重复跳转 */
+    goPage(path) {
+      if (this.$refs.helpPopover) this.$refs.helpPopover.doClose()
+      if (this.$route && this.$route.path !== path) {
+        this.$router.push(path).catch(() => {})
+      }
+    },
     toggleSideBar() {
       this.$store.dispatch('app/toggleSideBar')
     },
@@ -389,6 +441,31 @@ export default {
       }
     }
 
+    /* U7 常驻帮助入口：圆形问号按钮，移动端也展示 */
+    .help-entry {
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      margin: 16px 6px 0 2px;
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      border-radius: 50%;
+      background: transparent;
+      color: #DCE2EB;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 22px;
+      text-align: center;
+      cursor: pointer;
+
+      &:hover,
+      &:focus-visible {
+        color: #1A3C6E;
+        background: #FFD04B;
+        border-color: #FFD04B;
+        outline: none;
+      }
+    }
+
     .avatar-container {
       margin-right: 0px;
       padding-right: 0px;
@@ -460,6 +537,71 @@ export default {
       line-height: 1.6;
       color: #909399;
     }
+  }
+}
+
+/* U7 帮助与引导面板（el-popover 可能挂 body，故用全局样式） */
+.help-popover {
+  .help-panel {
+    padding: 2px;
+  }
+
+  .help-title {
+    padding: 4px 6px 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #0B1F4A;
+  }
+
+  .help-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 6px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      background: #F2F6FC;
+      outline: none;
+    }
+
+    i {
+      margin-top: 2px;
+      font-size: 16px;
+      color: #1A3C6E;
+    }
+
+    span {
+      display: flex;
+      flex-direction: column;
+    }
+
+    strong {
+      font-size: 13px;
+      font-weight: 600;
+      color: #0B1F4A;
+    }
+
+    small {
+      margin-top: 2px;
+      font-size: 12px;
+      color: #8C8C8C;
+    }
+  }
+
+  .help-footer {
+    margin-top: 6px;
+    padding: 8px 6px 4px;
+    border-top: 1px solid #EEF1F6;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #8C8C8C;
   }
 }
 

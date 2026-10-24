@@ -22,6 +22,8 @@
           <i class="el-icon-connection"></i>
           <p>暂未绑定任何渠道</p>
           <p class="empty-tip">绑定后可享受跨渠道统一服务</p>
+          <!-- U7 空态引导：直接跳到下方绑定表单，减少寻找成本 -->
+          <el-button type="primary" plain size="small" class="empty-action" @click="scrollToBindForm">去绑定渠道</el-button>
         </div>
 
         <el-card v-for="item in channelList" :key="item.id" class="channel-card" shadow="hover">
@@ -114,6 +116,19 @@ export default {
     this.loadChannels()
   },
   methods: {
+    /** U7 空态引导：滚动到「绑定新渠道」表单并聚焦渠道类型 */
+    scrollToBindForm() {
+      const el = this.$el && this.$el.querySelector('.bind-form-card')
+      if (el && el.scrollIntoView) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+      this.$nextTick(() => {
+        if (this.$refs.bindForm && this.$refs.bindForm.$el) {
+          const firstInput = this.$refs.bindForm.$el.querySelector('input')
+          if (firstInput) firstInput.focus()
+        }
+      })
+    },
     loadChannels() {
       this.loading = true
       myChannels().then(res => {
@@ -261,6 +276,7 @@ export default {
 .empty-box i { font-size: 56px; color: #c4cedd; }
 .empty-box p { margin: 12px 0 4px; font-size: 15px; }
 .empty-tip { font-size: 13px; color: #a8b3c5; }
+.empty-action { margin-top: 16px; }
 
 /* ===== F2 适老化：大字 / 超大 / 高对比 均由 html 根类驱动 ===== */
 html.care-large .page-title { font-size: 28px; }

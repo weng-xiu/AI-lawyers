@@ -14,7 +14,9 @@
       :show-search.sync="showSearch"
       has-selection
       empty-text="暂无工单"
-      empty-hint="调整筛选条件或时间范围后重试"
+      empty-hint="可新增工单，或调整筛选条件与时间范围后重试"
+      empty-action-text="新增工单"
+      @empty-action="handleAdd"
       @query="handleQuery"
       @reset="resetQuery"
       @pagination="getList"

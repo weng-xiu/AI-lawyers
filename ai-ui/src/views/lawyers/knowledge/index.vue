@@ -129,6 +129,14 @@
     </el-row>
 
     <el-table v-loading="loading" :data="knowledgeList" @selection-change="handleSelectionChange">
+      <!-- U7 空态引导：给出三条可立即执行的沉淀路径 -->
+      <template slot="empty">
+        <TableEmpty
+          text="知识库还没有内容"
+          hint="可直接新增，或用右上角「导入」批量导入文档，也可以用「AI 沉淀」从通话/工单自动生成草稿"
+          action-text="新增知识"
+          @action="handleAdd" />
+      </template>
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="知识ID" align="center" prop="knowledgeId" />
       <el-table-column label="知识标题" align="center" prop="title" :show-overflow-tooltip="true" />

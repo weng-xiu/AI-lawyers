@@ -59,6 +59,14 @@
     </el-row>
 
     <el-table v-loading="loading" :data="taskList">
+      <!-- U7 空态引导：从建任务到导入名单的下一步 -->
+      <template slot="empty">
+        <TableEmpty
+          text="还没有外呼任务"
+          hint="新建任务并导入号码名单后，即可按调度策略自动外呼"
+          action-text="新建外呼任务"
+          @action="handleAdd" />
+      </template>
       <el-table-column label="任务名称" prop="taskName" :show-overflow-tooltip="true" />
       <el-table-column label="任务编号" prop="taskNo" width="160" />
       <el-table-column label="任务类型" prop="taskType" width="100" align="center">

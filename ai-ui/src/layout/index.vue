@@ -4,7 +4,7 @@
     <sidebar v-if="!sidebar.hide" class="sidebar-container"/>
       <div :class="{hasTagsView:needTagsView,sidebarHide:sidebar.hide}" class="main-container">
       <div :class="{'fixed-header':fixedHeader}">
-        <navbar @setLayout="setLayout"/>
+        <navbar @setLayout="setLayout" @open-guide="openGuide"/>
         <agent-status-bar />
         <tags-view v-if="needTagsView"/>
       </div>
@@ -12,6 +12,12 @@
       <settings ref="settingRef"/>
       <!-- U3：全局命令面板（Ctrl+K 唤起） -->
       <command-palette />
+      <!-- U7：首次登录新手引导，帮助入口可随时重看 -->
+      <guide-tour
+        :visible.sync="guideVisible"
+        @done="finishGuide"
+        @skip="finishGuide"
+      />
       <draggable-dialer
         :visible="dialerVisible && !!agent"
         :agent="agent"
@@ -31,6 +37,10 @@ import variables from '@/assets/styles/variables.scss'
 import AgentStatusBar from '@/components/CallCenter/AgentStatusBar'
 import DraggableDialer from '@/components/CallCenter/DraggableDialer'
 import CommandPalette from '@/components/CommandPalette'
+import GuideTour from '@/components/GuideTour'
+
+/** U7：新手引导完成标记（按浏览器工位保存，换人换机器会重新引导） */
+const GUIDE_DONE_KEY = 'ai_lawyers_guide_done_v1'
 
 export default {
   name: 'Layout',
@@ -39,6 +49,7 @@ export default {
     AgentStatusBar,
     DraggableDialer,
     CommandPalette,
+    GuideTour,
     Navbar,
     Settings,
     Sidebar,
@@ -47,6 +58,8 @@ export default {
   mixins: [ResizeMixin],
   data() {
     return {
+      // U7：首登引导显隐；localStorage 无完成标记时自动打开
+      guideVisible: false,
       // 内置常用联系人示例（可替换为后端接口数据）
       dialerContacts: [
         { id: 1, name: '12348 法律服务热线', phone: '12348' },
@@ -86,7 +99,35 @@ export default {
       return this.$store.state.agent.dialerVisible
     }
   },
+  mounted() {
+    this.maybeShowGuide()
+  },
+  beforeDestroy() {
+    clearTimeout(this._guideTimer)
+  },
   methods: {
+    /** 首次进入且未完成引导时延迟弹出，等待菜单/路由渲染完成 */
+    maybeShowGuide() {
+      try {
+        if (localStorage.getItem(GUIDE_DONE_KEY)) return
+      } catch (e) {
+        return
+      }
+      this._guideTimer = setTimeout(() => {
+        this.guideVisible = true
+      }, 800)
+    },
+    openGuide() {
+      this.guideVisible = true
+    },
+    finishGuide() {
+      try {
+        localStorage.setItem(GUIDE_DONE_KEY, '1')
+      } catch (e) {
+        // 隐私模式下 localStorage 不可用：本次会话内不再重复弹窗即可
+      }
+      this.guideVisible = false
+    },
     handleClickOutside() {
       this.$store.dispatch('app/closeSideBar', { withoutAnimation: false })
     },

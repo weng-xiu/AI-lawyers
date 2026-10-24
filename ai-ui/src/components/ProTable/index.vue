@@ -108,7 +108,12 @@
     >
       <template slot="empty">
         <slot name="empty">
-          <TableEmpty :text="emptyText" :hint="emptyHint" />
+          <TableEmpty
+            :text="emptyText"
+            :hint="emptyHint"
+            :action-text="emptyActionText"
+            :action-icon="emptyActionIcon"
+            @action="$emit('empty-action')" />
         </slot>
       </template>
       <el-table-column v-if="hasSelection" type="selection" width="55" align="center" />
@@ -203,6 +208,10 @@ export default {
     emptyText: { type: String, default: '暂无数据' },
     /** 内建空态提示 */
     emptyHint: { type: String, default: '' },
+    /** U7：内建空态主操作文案（为空则只展示提示） */
+    emptyActionText: { type: String, default: '' },
+    /** U7：内建空态主操作图标 */
+    emptyActionIcon: { type: String, default: 'el-icon-plus' },
     /** 透传 el-table 原生属性（border/stripe/size/max-height 等）；stripe 在其中可覆盖此默认值 */
     tableAttrs: { type: Object, default: () => ({}) },
     /** V7：默认斑马纹（#FAFBFD，配色.md 工单列表规范）；:stripe="false" 或 tableAttrs.stripe 可关 */

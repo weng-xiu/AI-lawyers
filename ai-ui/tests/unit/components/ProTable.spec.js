@@ -18,7 +18,10 @@ const flushPromises = () => new Promise(resolve => setTimeout(resolve, 0))
 const globalStubs = {
   'right-toolbar': { template: '<div class="rt-stub"><slot name="toolbar-right" /></div>' },
   pagination: { template: '<div class="pg-stub" />' },
-  TableEmpty: { template: '<div class="empty-stub">{{ text }}</div>', props: ['text', 'hint'] }
+  TableEmpty: {
+    template: '<button class="empty-stub" @click="$emit(\'action\')">{{ text }}</button>',
+    props: ['text', 'hint', 'actionText', 'actionIcon']
+  }
 }
 
 const baseColumns = [
@@ -122,6 +125,12 @@ describe('ProTable', () => {
   it('空数据时渲染内建空态文案', () => {
     const wrapper = mountTable({ data: [], total: 0, emptyText: '没有查询到记录' })
     expect(wrapper.find('.empty-stub').text()).toBe('没有查询到记录')
+  })
+
+  it('U7：空态主操作事件透传为 empty-action', async () => {
+    const wrapper = mountTable({ data: [], total: 0, emptyActionText: '新增工单' })
+    await wrapper.find('.empty-stub').trigger('click')
+    expect(wrapper.emitted('empty-action')).toHaveLength(1)
   })
 
   it('U5：密度切换持久化到 localStorage', async () => {
