@@ -7,44 +7,47 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import ai.lawyers.system.domain.lawyers.AiCallAgentStatus;
 import ai.lawyers.system.domain.lawyers.AiCallRecord;
 import ai.lawyers.system.domain.lawyers.AiCallTicket;
 import ai.lawyers.system.domain.lawyers.trunk.AiCallDialLog;
+import ai.lawyers.system.mapper.lawyers.AiCallAgentStatusMapper;
 import ai.lawyers.system.mapper.lawyers.AiCallRecordMapper;
 import ai.lawyers.system.mapper.lawyers.AiCallTicketMapper;
 import ai.lawyers.system.mapper.lawyers.trunk.AiCallDialLogMapper;
 import ai.lawyers.system.service.lawyers.CallEventPublisher;
-import ai.lawyers.system.service.lawyers.IAiCallAgentStatusService;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
 import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
 import ai.lawyers.system.service.lawyers.queue.QualityTranscribeDispatcher;
-import ai.lawyers.system.service.lawyers.trunk.ICallDispatchService;
-import ai.lawyers.system.service.lawyers.trunk.gateway.esl.InboundCallHandler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** B2：统一事件处理器单测——各归一事件的消费语义与两侧桥原行为对齐 */
+/**
+ * B2 + P10/D1：统一事件处理器单测。
+ *
+ * <p>P10 后处理器不再直调调度/坐席状态/入站处理器，改为发布进程内事件；
+ * 本测试基线锁定「事件名 → 发布事件类型/字段」的契约，下游动作由
+ * {@link CallEventListenersTest} 覆盖。</p>
+ */
 class CallEventProcessorTest
 {
     private CallEventProcessor processor;
-    private ICallDispatchService callDispatchService;
-    private IAiCallAgentStatusService agentStatusService;
-    private InboundCallHandler inboundCallHandler;
+    private ApplicationEventPublisher eventPublisher;
     private CallEventPublisher callEventPublisher;
     private IAiCallTicketService callTicketService;
     private AiCallTicketMapper callTicketMapper;
     private AiCallRecordMapper callRecordMapper;
     private AiCallDialLogMapper dialLogMapper;
+    private AiCallAgentStatusMapper agentStatusMapper;
     private QualityTranscribeDispatcher qualityTranscribeDispatcher;
     private HotlineMetrics metrics;
 
@@ -52,57 +55,60 @@ class CallEventProcessorTest
     void setUp()
     {
         processor = new CallEventProcessor();
-        callDispatchService = mock(ICallDispatchService.class);
-        agentStatusService = mock(IAiCallAgentStatusService.class);
-        inboundCallHandler = mock(InboundCallHandler.class);
+        eventPublisher = mock(ApplicationEventPublisher.class);
         callEventPublisher = mock(CallEventPublisher.class);
         callTicketService = mock(IAiCallTicketService.class);
         callTicketMapper = mock(AiCallTicketMapper.class);
         callRecordMapper = mock(AiCallRecordMapper.class);
         dialLogMapper = mock(AiCallDialLogMapper.class);
+        agentStatusMapper = mock(AiCallAgentStatusMapper.class);
         qualityTranscribeDispatcher = mock(QualityTranscribeDispatcher.class);
         metrics = mock(HotlineMetrics.class);
 
-        ReflectionTestUtils.setField(processor, "callDispatchService", callDispatchService);
-        ReflectionTestUtils.setField(processor, "agentStatusService", agentStatusService);
-        ReflectionTestUtils.setField(processor, "inboundCallHandler", inboundCallHandler);
+        ReflectionTestUtils.setField(processor, "eventPublisher", eventPublisher);
         ReflectionTestUtils.setField(processor, "callEventPublisher", callEventPublisher);
         ReflectionTestUtils.setField(processor, "callTicketService", callTicketService);
         ReflectionTestUtils.setField(processor, "callTicketMapper", callTicketMapper);
         ReflectionTestUtils.setField(processor, "callRecordMapper", callRecordMapper);
         ReflectionTestUtils.setField(processor, "dialLogMapper", dialLogMapper);
+        ReflectionTestUtils.setField(processor, "agentStatusMapper", agentStatusMapper);
         ReflectionTestUtils.setField(processor, "qualityTranscribeDispatcher", qualityTranscribeDispatcher);
         ReflectionTestUtils.setField(processor, "metrics", metrics);
     }
 
     @Test
-    void inboundTriggersInboundHandlerWithContext()
+    void inboundPublishesInboundEventWithHostAndNumbers()
     {
         CallEvent event = CallEvent.of("ESL:10.0.0.1", CallEvent.INBOUND, "uuid-in");
         event.setCaller("13800138000");
         event.setCallee("12348");
         processor.handle(event);
 
-        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(inboundCallHandler).handleIncomingCall(captor.capture());
-        assertThat(captor.getValue().get("host")).isEqualTo("10.0.0.1");
-        assertThat(captor.getValue().get("uuid")).isEqualTo("uuid-in");
-        assertThat(captor.getValue().get("caller")).isEqualTo("13800138000");
-        assertThat(captor.getValue().get("dnis")).isEqualTo("12348");
-        verify(callDispatchService, never()).onCallEvent(anyString(), anyString(), any());
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue()).isInstanceOf(InboundCallEvent.class);
+        InboundCallEvent published = (InboundCallEvent) captor.getValue();
+        assertThat(published.getHost()).isEqualTo("10.0.0.1");
+        assertThat(published.getSessionId()).isEqualTo("uuid-in");
+        assertThat(published.getCaller()).isEqualTo("13800138000");
+        assertThat(published.getCallee()).isEqualTo("12348");
     }
 
     @Test
-    void ringingGoesToStateMachine()
+    void ringingPublishesStateChangeEvent()
     {
         processor.handle(CallEvent.of("AMI:10.0.0.8", CallEvent.RINGING, "uuid-r"));
-        verify(callDispatchService).onCallEvent(eq("uuid-r"), eq("RINGING"), any());
+
+        CallStateChangeEvent published = captureStateEvent();
+        assertThat(published.getSessionId()).isEqualTo("uuid-r");
+        assertThat(published.getState()).isEqualTo("RINGING");
+        assertThat(published.getParams()).isEmpty();
     }
 
     @Test
-    void answeredIncrementsMetricPushesAgentAndEntersStateMachine()
+    void answeredIncrementsMetricPushesAgentAndPublishesState()
     {
-        // 拨号日志反查到坐席 → 定向推送
+        // 拨号日志反查到坐席 → 定向推送（只读坐席信息走 Mapper，不再依赖坐席状态服务）
         AiCallDialLog dialLog = new AiCallDialLog();
         dialLog.setAgentId(7L);
         dialLog.setRecordId(11L);
@@ -110,14 +116,15 @@ class CallEventProcessorTest
         AiCallAgentStatus agent = new AiCallAgentStatus();
         agent.setAgentId(7L);
         agent.setUserId(99L);
-        when(agentStatusService.selectAiCallAgentStatusByAgentId(7L)).thenReturn(agent);
+        when(agentStatusMapper.selectAiCallAgentStatusByAgentId(7L)).thenReturn(agent);
 
         processor.handle(CallEvent.of("ESL:10.0.0.1", CallEvent.ANSWERED, "uuid-a"));
 
         verify(metrics).incrementCall("answered");
-        ArgumentCaptor<Map<String, Object>> params = ArgumentCaptor.forClass(Map.class);
-        verify(callDispatchService).onCallEvent(eq("uuid-a"), eq("ANSWERED"), params.capture());
-        assertThat(params.getValue().get("answerTime")).isNotNull();
+        CallStateChangeEvent published = captureStateEvent();
+        assertThat(published.getSessionId()).isEqualTo("uuid-a");
+        assertThat(published.getState()).isEqualTo("ANSWERED");
+        assertThat(published.getParams().get("answerTime")).isNotNull();
         verify(callEventPublisher).publishToUser(eq(99L), eq("ANSWERED"), any());
     }
 
@@ -131,10 +138,10 @@ class CallEventProcessorTest
         event.setPayload(payload);
         processor.handle(event);
 
-        ArgumentCaptor<Map<String, Object>> params = ArgumentCaptor.forClass(Map.class);
-        verify(callDispatchService).onCallEvent(eq("uuid-h"), eq("HANGUP"), params.capture());
-        assertThat(params.getValue().get("hangupCause")).isEqualTo("NORMAL_CLEARING");
-        assertThat(params.getValue().get("talkDuration")).isEqualTo(30);
+        CallStateChangeEvent published = captureStateEvent();
+        assertThat(published.getState()).isEqualTo("HANGUP");
+        assertThat(published.getParams().get("hangupCause")).isEqualTo("NORMAL_CLEARING");
+        assertThat(published.getParams().get("talkDuration")).isEqualTo(30);
         verify(callTicketService, never()).insertAiCallTicket(any());
         // 有通话时长 → 不计未接
         verify(metrics, never()).incrementCall("abandoned");
@@ -214,15 +221,8 @@ class CallEventProcessorTest
     }
 
     @Test
-    void agentStatusUpdatesOnlyOnChange()
+    void agentStatusPublishesSyncEvent()
     {
-        AiCallAgentStatus agent = new AiCallAgentStatus();
-        agent.setAgentId(7L);
-        agent.setSipExtension("1001");
-        agent.setStatus("1");
-        when(agentStatusService.selectAiCallAgentStatusList(any(AiCallAgentStatus.class)))
-                .thenReturn(Collections.singletonList(agent));
-
         Map<String, Object> payload = new HashMap<>();
         payload.put("ext", "1001");
         payload.put("targetStatus", "2");
@@ -230,26 +230,25 @@ class CallEventProcessorTest
         event.setPayload(payload);
         processor.handle(event);
 
-        verify(agentStatusService).updateAgentStatus(7L, "2");
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue()).isInstanceOf(AgentStatusSyncEvent.class);
+        AgentStatusSyncEvent published = (AgentStatusSyncEvent) captor.getValue();
+        assertThat(published.getExtension()).isEqualTo("1001");
+        assertThat(published.getTargetStatus()).isEqualTo("2");
     }
 
     @Test
-    void agentStatusSameStatusDoesNotUpdate()
+    void agentStatusWithoutExtOrTargetPublishesNothing()
     {
-        AiCallAgentStatus agent = new AiCallAgentStatus();
-        agent.setAgentId(7L);
-        agent.setStatus("2");
-        when(agentStatusService.selectAiCallAgentStatusList(any(AiCallAgentStatus.class)))
-                .thenReturn(Collections.singletonList(agent));
-
         Map<String, Object> payload = new HashMap<>();
-        payload.put("ext", "1001");
+        payload.put("ext", "");
         payload.put("targetStatus", "2");
         CallEvent event = CallEvent.of("AMI:10.0.0.8", CallEvent.AGENT_STATUS, null);
         event.setPayload(payload);
         processor.handle(event);
 
-        verify(agentStatusService, never()).updateAgentStatus(any(), anyString());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -282,5 +281,13 @@ class CallEventProcessorTest
 
         verify(callRecordMapper, never()).updateRecordingInfo(any());
         verify(qualityTranscribeDispatcher, never()).enqueue(any());
+    }
+
+    private CallStateChangeEvent captureStateEvent()
+    {
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue()).isInstanceOf(CallStateChangeEvent.class);
+        return (CallStateChangeEvent) captor.getValue();
     }
 }

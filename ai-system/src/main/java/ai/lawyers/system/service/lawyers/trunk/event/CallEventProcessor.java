@@ -9,7 +9,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import ai.lawyers.common.utils.StringUtils;
@@ -17,17 +17,15 @@ import ai.lawyers.system.domain.lawyers.AiCallAgentStatus;
 import ai.lawyers.system.domain.lawyers.AiCallRecord;
 import ai.lawyers.system.domain.lawyers.AiCallTicket;
 import ai.lawyers.system.domain.lawyers.trunk.AiCallDialLog;
+import ai.lawyers.system.mapper.lawyers.AiCallAgentStatusMapper;
 import ai.lawyers.system.mapper.lawyers.AiCallRecordMapper;
 import ai.lawyers.system.mapper.lawyers.AiCallTicketMapper;
 import ai.lawyers.system.mapper.lawyers.trunk.AiCallDialLogMapper;
 import ai.lawyers.system.service.impl.lawyers.storage.RecordingUploadService;
 import ai.lawyers.system.service.lawyers.CallEventPublisher;
-import ai.lawyers.system.service.lawyers.IAiCallAgentStatusService;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
 import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
 import ai.lawyers.system.service.lawyers.queue.QualityTranscribeDispatcher;
-import ai.lawyers.system.service.lawyers.trunk.ICallDispatchService;
-import ai.lawyers.system.service.lawyers.trunk.gateway.esl.InboundCallHandler;
 
 /**
  * P3-B2：统一呼叫事件处理器（Stream 消费侧 / 降级直调共用）。
@@ -50,28 +48,19 @@ import ai.lawyers.system.service.lawyers.trunk.gateway.esl.InboundCallHandler;
  * @author ai-lawyers
  */
 @Service
-public class CallEventProcessor
+public class CallEventProcessor implements ICallEventProcessor
 {
     private static final Logger log = LoggerFactory.getLogger(CallEventProcessor.class);
 
-    /** SB3 默认禁止循环依赖：CallDispatchServiceImpl→CallEventDispatcher→CallEventBus→本类→ICallDispatchService
-     *  构成环，用 @Lazy 在事件实际分发时才解析实现，打破构造期环 */
+    /** P10/D1：下游动作统一走进程内事件，避免反向依赖调度/坐席状态/入站处理器形成环 */
     @Autowired
-    @Lazy
-    private ICallDispatchService callDispatchService;
-
-    /** 同环：本类→IAiCallAgentStatusService→CallDispatchServiceImpl→…→本类，@Lazy 打破构造期环 */
-    @Autowired
-    @Lazy
-    private IAiCallAgentStatusService agentStatusService;
-
-    /** 同环：本类→InboundCallHandler→AiCallAgentStatusServiceImpl→…→本类，@Lazy 打破构造期环 */
-    @Autowired(required = false)
-    @Lazy
-    private InboundCallHandler inboundCallHandler;
+    private ApplicationEventPublisher eventPublisher;
 
     @Autowired(required = false)
     private CallEventPublisher callEventPublisher;
+
+    @Autowired
+    private AiCallAgentStatusMapper agentStatusMapper;
 
     @Autowired
     private IAiCallTicketService callTicketService;
@@ -148,17 +137,9 @@ public class CallEventProcessor
         String uuid = event.getSessionId();
         log.info("[CallEvent] 入站来话: source={} uuid={} {} -> {}",
                 event.getSource(), uuid, event.getCaller(), event.getCallee());
-        if (inboundCallHandler != null)
-        {
-            Map<String, Object> ctx = new HashMap<>();
-            // host 取 source 中 "ESL:/AMI:" 之后部分，保持与原 InboundCallHandler 入参一致
-            ctx.put("host", sourceHost(event.getSource()));
-            ctx.put("uuid", uuid);
-            ctx.put("caller", event.getCaller());
-            ctx.put("callee", event.getCallee());
-            ctx.put("dnis", event.getCallee());
-            inboundCallHandler.handleIncomingCall(ctx);
-        }
+        // P10/D1：host 取 source 中 "ESL:/AMI:" 之后部分，由监听器按原 InboundCallHandler 入参组装
+        eventPublisher.publishEvent(new InboundCallEvent(
+                sourceHost(event.getSource()), uuid, event.getCaller(), event.getCallee()));
     }
 
     /** 外呼振铃：进状态机（AMI Dial[Begin] 产生；ESL 侧振铃由调度服务自身写拨号日志） */
@@ -169,7 +150,7 @@ public class CallEventProcessor
             return;
         }
         log.info("[CallEvent] 外呼振铃: source={} uuid={}", event.getSource(), event.getSessionId());
-        callDispatchService.onCallEvent(event.getSessionId(), "RINGING", new HashMap<>());
+        eventPublisher.publishEvent(new CallStateChangeEvent(event.getSessionId(), "RINGING", new HashMap<>()));
     }
 
     /** 接通：指标 + 坐席推送 + 状态机 */
@@ -187,7 +168,7 @@ public class CallEventProcessor
         pushEventToAgent(event, "ANSWERED", null);
         Map<String, Object> params = new HashMap<>();
         params.put("answerTime", new Date(event.getTimestamp()));
-        callDispatchService.onCallEvent(event.getSessionId(), "ANSWERED", params);
+        eventPublisher.publishEvent(new CallStateChangeEvent(event.getSessionId(), "ANSWERED", params));
     }
 
     /** 桥接：坐席推送 */
@@ -217,7 +198,7 @@ public class CallEventProcessor
         Map<String, Object> params = new HashMap<>();
         params.put("hangupCause", cause);
         params.put("talkDuration", talkDuration);
-        callDispatchService.onCallEvent(uuid, "HANGUP", params);
+        eventPublisher.publishEvent(new CallStateChangeEvent(uuid, "HANGUP", params));
 
         // T5-1：未接/丢弃（无通话时长）计数
         if (metrics != null && talkDuration == 0)
@@ -323,7 +304,7 @@ public class CallEventProcessor
         }
     }
 
-    /** 队列成员设备态 → 同步坐席状态（仅变化时写库；同状态跳过） */
+    /** 队列成员设备态 → 发布同步事件（仅变化时写库的判定在监听器内完成） */
     private void onAgentStatus(CallEvent event)
     {
         String ext = event.payloadString("ext");
@@ -332,30 +313,7 @@ public class CallEventProcessor
         {
             return;
         }
-        try
-        {
-            AiCallAgentStatus query = new AiCallAgentStatus();
-            query.setSipExtension(ext);
-            List<AiCallAgentStatus> agents = agentStatusService.selectAiCallAgentStatusList(query);
-            if (agents == null)
-            {
-                return;
-            }
-            for (AiCallAgentStatus agent : agents)
-            {
-                if (agent == null || target.equals(agent.getStatus()))
-                {
-                    continue;
-                }
-                log.info("[CallEvent] 队列成员状态同步坐席: ext={} agentId={} {} -> {}",
-                        ext, agent.getAgentId(), agent.getStatus(), target);
-                agentStatusService.updateAgentStatus(agent.getAgentId(), target);
-            }
-        }
-        catch (Exception e)
-        {
-            log.warn("[CallEvent] 队列成员状态同步坐席失败 ext={} err={}", ext, e.getMessage());
-        }
+        eventPublisher.publishEvent(new AgentStatusSyncEvent(ext, target));
     }
 
     /**
@@ -491,7 +449,8 @@ public class CallEventProcessor
             {
                 if (agentId != null)
                 {
-                    AiCallAgentStatus agent = agentStatusService.selectAiCallAgentStatusByAgentId(agentId);
+                    // P10/D1：只读坐席信息走 Mapper，避免为一次查询依赖坐席状态服务（会重新引入环）
+                    AiCallAgentStatus agent = agentStatusMapper.selectAiCallAgentStatusByAgentId(agentId);
                     if (agent != null && agent.getUserId() != null)
                     {
                         callEventPublisher.publishToUser(agent.getUserId(), eventType, data);

@@ -50,8 +50,9 @@ public class CallEventBus
     @Autowired
     private StreamQueueService streamQueueService;
 
+    /** P10/D1：只依赖处理器接口，具体实现可替换，且不再形成总线→实现→调度的反向往返 */
     @Autowired
-    private CallEventProcessor processor;
+    private ICallEventProcessor processor;
 
     /**
      * 生产侧入口：投递统一事件。入队成功即返回；开关关闭/入队失败时同步降级处理。

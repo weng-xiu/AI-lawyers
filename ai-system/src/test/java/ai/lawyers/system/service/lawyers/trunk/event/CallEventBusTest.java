@@ -21,14 +21,14 @@ class CallEventBusTest
 {
     private CallEventBus bus;
     private StreamQueueService streamQueueService;
-    private CallEventProcessor processor;
+    private ICallEventProcessor processor;
 
     @BeforeEach
     void setUp()
     {
         bus = new CallEventBus();
         streamQueueService = mock(StreamQueueService.class);
-        processor = mock(CallEventProcessor.class);
+        processor = mock(ICallEventProcessor.class);
         ReflectionTestUtils.setField(bus, "streamQueueService", streamQueueService);
         ReflectionTestUtils.setField(bus, "processor", processor);
         ReflectionTestUtils.setField(bus, "streamEnabled", true);
