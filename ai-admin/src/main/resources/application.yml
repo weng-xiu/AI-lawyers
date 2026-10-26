@@ -105,10 +105,11 @@ user:
 
 # Spring配置
 spring:
-  # SB3：P10/D1+D2 两处已知循环依赖已消除（呼叫事件链、质检坐席反查）；
-  # 本开关暂保留作为存量兜底，待具备 MySQL/Redis/PBX 的完整环境以 false 启动验证后再移除
+  # P10：三处已知循环依赖已消除（D1 呼叫事件链、D2 质检坐席反查、D3 用户-坐席绑定同步），
+  # 已用 MySQL/Redis 完整环境以 false 启动验证通过（Started RuoYiApplication），
+  # 故显式关闭循环依赖兜底；新增成环会直接启动失败，由 CircularDependencyGovernanceTest 提前拦截
   main:
-    allow-circular-references: true
+    allow-circular-references: false
   # 资源信息
   messages:
     # 国际化资源文件路径

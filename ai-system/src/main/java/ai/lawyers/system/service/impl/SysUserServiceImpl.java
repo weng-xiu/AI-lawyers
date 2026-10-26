@@ -7,6 +7,7 @@ import jakarta.validation.Validator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -30,7 +31,8 @@ import ai.lawyers.system.mapper.SysUserRoleMapper;
 import ai.lawyers.system.service.ISysConfigService;
 import ai.lawyers.system.service.ISysDeptService;
 import ai.lawyers.system.service.ISysUserService;
-import ai.lawyers.system.service.lawyers.IAiCallAgentStatusService;
+import ai.lawyers.system.service.lawyers.agent.event.UserAgentReleaseEvent;
+import ai.lawyers.system.service.lawyers.agent.event.UserAgentSyncEvent;
 
 /**
  * 用户 业务层处理
@@ -63,8 +65,13 @@ public class SysUserServiceImpl implements ISysUserService
     @Autowired
     private ISysDeptService deptService;
 
+    /**
+     * P10/D3：坐席绑定同步/释放改为进程内事件发布，
+     * 由 {@code UserAgentBindingListener} 消费，避免与坐席状态服务形成循环依赖。
+     * 事件默认同步派发，仍在当前线程与事务内执行，原校验/回滚语义不变。
+     */
     @Autowired
-    private IAiCallAgentStatusService agentStatusService;
+    private ApplicationEventPublisher eventPublisher;
 
     @Autowired
     protected Validator validator;
@@ -270,11 +277,11 @@ public class SysUserServiceImpl implements ISysUserService
         insertUserPost(user);
         // 新增用户与角色管理
         insertUserRole(user);
-        // 同步坐席配置到 ai_call_agent_status
+        // 同步坐席配置到 ai_call_agent_status（P10/D3：发布事件，由监听器调用坐席状态服务）
         if (user.getAgentId() != null)
         {
-            agentStatusService.syncAgentFromUser(user.getUserId(), user.getAgentId(),
-                user.getNickName(), user.getSipExtension(), user.getCallMode(), user.getCreateBy());
+            eventPublisher.publishEvent(new UserAgentSyncEvent(user.getUserId(), user.getAgentId(),
+                user.getNickName(), user.getSipExtension(), user.getCallMode(), user.getCreateBy()));
         }
         return rows;
     }
@@ -313,9 +320,9 @@ public class SysUserServiceImpl implements ISysUserService
         int rows = userMapper.updateUser(user);
         // 单独维护坐席配置（允许置空解绑），并同步 ai_call_agent_status
         userMapper.updateUserAgentConfig(user);
-        agentStatusService.syncAgentFromUser(userId, user.getAgentId(),
+        eventPublisher.publishEvent(new UserAgentSyncEvent(userId, user.getAgentId(),
             user.getNickName(), user.getSipExtension(), user.getCallMode(),
-            StringUtils.isNotEmpty(user.getUpdateBy()) ? user.getUpdateBy() : SecurityUtils.getUsername());
+            StringUtils.isNotEmpty(user.getUpdateBy()) ? user.getUpdateBy() : SecurityUtils.getUsername()));
         return rows;
     }
 
@@ -466,7 +473,7 @@ public class SysUserServiceImpl implements ISysUserService
         // 删除用户与岗位表
         userPostMapper.deleteUserPostByUserId(userId);
         // 释放坐席绑定（不删除运行记录）
-        agentStatusService.releaseAgentByUserId(userId);
+        eventPublisher.publishEvent(new UserAgentReleaseEvent(userId));
         return userMapper.deleteUserById(userId);
     }
 
@@ -485,7 +492,7 @@ public class SysUserServiceImpl implements ISysUserService
             checkUserAllowed(new SysUser(userId));
             checkUserDataScope(userId);
             // 释放坐席绑定（不删除运行记录）
-            agentStatusService.releaseAgentByUserId(userId);
+            eventPublisher.publishEvent(new UserAgentReleaseEvent(userId));
         }
         // 删除用户与角色关联
         userRoleMapper.deleteUserRole(userIds);
@@ -543,8 +550,8 @@ public class SysUserServiceImpl implements ISysUserService
                     if (user.getAgentId() != null)
                     {
                         userMapper.updateUserAgentConfig(user);
-                        agentStatusService.syncAgentFromUser(u.getUserId(), user.getAgentId(),
-                            user.getNickName(), user.getSipExtension(), user.getCallMode(), operName);
+                        eventPublisher.publishEvent(new UserAgentSyncEvent(u.getUserId(), user.getAgentId(),
+                            user.getNickName(), user.getSipExtension(), user.getCallMode(), operName));
                     }
                     successNum++;
                     successMsg.append("<br/>" + successNum + "、账号 " + user.getUserName() + " 更新成功");

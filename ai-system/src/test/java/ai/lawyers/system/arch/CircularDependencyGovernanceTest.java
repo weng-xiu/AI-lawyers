@@ -5,11 +5,14 @@ import java.lang.reflect.Field;
 import java.util.Arrays;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Lazy;
 
 import ai.lawyers.system.mapper.lawyers.AiCallAgentStatusMapper;
+import ai.lawyers.system.service.impl.SysUserServiceImpl;
 import ai.lawyers.system.service.impl.lawyers.quality.AiQualityInspectionServiceImpl;
 import ai.lawyers.system.service.lawyers.IAiCallAgentStatusService;
+import ai.lawyers.system.service.lawyers.agent.event.UserAgentBindingListener;
 import ai.lawyers.system.service.lawyers.trunk.ICallDispatchService;
 import ai.lawyers.system.service.lawyers.trunk.event.CallEventProcessor;
 import ai.lawyers.system.service.lawyers.trunk.gateway.esl.InboundCallHandler;
@@ -17,16 +20,18 @@ import ai.lawyers.system.service.lawyers.trunk.gateway.esl.InboundCallHandler;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * P10/D1 + D2：循环依赖治理的架构回归基线（全量收口）。
+ * P10/D1 + D2 + D3：循环依赖治理的架构回归基线（全量收口）。
  *
- * <p>已消除的两条环：</p>
+ * <p>已消除的三条环：</p>
  * <ol>
  *   <li>D1：调度 → 事件总线 → 处理器 → 调度 / 坐席状态 / 入站处理器（改为发布订阅 + 接口层）；</li>
  *   <li>D2：质检 → 坐席状态 → 调度 → 事件总线 → 质检转写投递 → 质检
- *       （坐席只读反查改走 Mapper）。</li>
+ *       （坐席只读反查改走 Mapper）；</li>
+ *   <li>D3：系统用户 → 坐席状态 → 会话 → 知识库 → 消息通知 → 系统用户
+ *       （坐席绑定同步/释放改为进程内事件）。</li>
  * </ol>
  *
- * <p>本测试锁定：上述两个门面类不得再持有成环下游类型的字段，也不得再用 {@link Lazy} 补丁。</p>
+ * <p>本测试锁定：上述门面类不得再持有成环下游类型的字段，也不得再用 {@link Lazy} 补丁。</p>
  */
 class CircularDependencyGovernanceTest
 {
@@ -45,6 +50,27 @@ class CircularDependencyGovernanceTest
                 .doesNotContain(IAiCallAgentStatusService.class)
                 .contains(AiCallAgentStatusMapper.class);
         assertNoLazy(AiQualityInspectionServiceImpl.class);
+    }
+
+    @Test
+    void sysUserServicePublishesEventsInsteadOfCallingAgentStatusService()
+    {
+        assertThat(fieldTypes(SysUserServiceImpl.class))
+                .doesNotContain(IAiCallAgentStatusService.class)
+                .contains(ApplicationEventPublisher.class);
+        assertNoLazy(SysUserServiceImpl.class);
+    }
+
+    /**
+     * D3 的监听器是事件消费端，允许反向依赖坐席状态服务；但它不能被任何业务 Bean 依赖，
+     * 否则会重新成环。这里锁定它只作为事件监听器存在（不被 SysUserServiceImpl 持有）。
+     */
+    @Test
+    void userAgentBindingListenerIsOnlyAnEventConsumer()
+    {
+        assertThat(fieldTypes(SysUserServiceImpl.class)).doesNotContain(UserAgentBindingListener.class);
+        assertThat(fieldTypes(UserAgentBindingListener.class)).contains(IAiCallAgentStatusService.class);
+        assertNoLazy(UserAgentBindingListener.class);
     }
 
     private void assertNoLazy(Class<?> type)
