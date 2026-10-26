@@ -105,7 +105,8 @@ user:
 
 # Spring配置
 spring:
-  # SB3 兼容性：允许循环依赖（历史遗留，后续专项重构消除）
+  # SB3：P10/D1+D2 两处已知循环依赖已消除（呼叫事件链、质检坐席反查）；
+  # 本开关暂保留作为存量兜底，待具备 MySQL/Redis/PBX 的完整环境以 false 启动验证后再移除
   main:
     allow-circular-references: true
   # 资源信息

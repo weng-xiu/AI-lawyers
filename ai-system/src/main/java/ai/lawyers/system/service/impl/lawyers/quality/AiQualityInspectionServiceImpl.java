@@ -8,7 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,9 +17,9 @@ import ai.lawyers.system.domain.lawyers.AiCallRecord;
 import ai.lawyers.system.domain.lawyers.AiRiskWarning;
 import ai.lawyers.system.domain.lawyers.AiRiskWarningRule;
 import ai.lawyers.system.domain.lawyers.quality.AiQualityInspection;
+import ai.lawyers.system.mapper.lawyers.AiCallAgentStatusMapper;
 import ai.lawyers.system.mapper.lawyers.AiCallRecordMapper;
 import ai.lawyers.system.mapper.lawyers.quality.AiQualityInspectionMapper;
-import ai.lawyers.system.service.lawyers.IAiCallAgentStatusService;
 import ai.lawyers.system.service.lawyers.IAiRiskWarningRuleService;
 import ai.lawyers.system.service.lawyers.IAiRiskWarningService;
 import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
@@ -73,9 +72,15 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
     @Autowired(required = false)
     private MessageNotifyDispatcher messageNotifyDispatcher;
 
+    /**
+     * P10/D2：坐席只读反查改走 Mapper。
+     *
+     * <p>原 {@code IAiCallAgentStatusService} 会形成
+     * 质检 → 坐席状态 → 调度服务 → 事件总线 → 质检转写投递 → 质检 的环，
+     * 曾用 {@code @Lazy} 打破；Mapper 无下游服务依赖，环随之消除。</p>
+     */
     @Autowired
-    @Lazy
-    private IAiCallAgentStatusService agentStatusService;
+    private AiCallAgentStatusMapper agentStatusMapper;
 
     /** P5：录音加载与转写协作类（录音字节/ASR/声学/说话人分离影子） */
     @Autowired
@@ -533,7 +538,7 @@ public class AiQualityInspectionServiceImpl implements IAiQualityInspectionServi
         }
         try
         {
-            AiCallAgentStatus agent = agentStatusService.selectAiCallAgentStatusByAgentId(agentId);
+            AiCallAgentStatus agent = agentStatusMapper.selectAiCallAgentStatusByAgentId(agentId);
             return agent == null ? null : agent.getUserId();
         }
         catch (Exception e)
