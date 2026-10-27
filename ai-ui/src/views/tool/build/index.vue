@@ -281,11 +281,15 @@ export default {
       document.getElementById('copyNode').click()
     },
     empty() {
-      this.$confirm('确定要清空所有组件吗？', '提示', { type: 'warning' }).then(
+      this.$modal.dangerConfirm({
+        actionType: 'clear',
+        content: '将清空画布上的所有组件',
+        tip: '仅清空当前画布，不会删除已保存的页面配置；需要时可以重新拖拽组件'
+      }).then(
         () => {
           this.drawingList = []
         }
-      )
+      ).catch(() => {})
     },
     drawingItemCopy(item, parent) {
       let clone = JSON.parse(JSON.stringify(item))

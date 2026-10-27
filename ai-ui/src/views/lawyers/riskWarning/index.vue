@@ -959,7 +959,11 @@ export default {
     submitTransfer() {
       this.$refs.transferFormRef.validate(valid => {
         if (!valid) return
-        this.$modal.confirm('确认将该高风险预警转至所选机构？系统将自动创建工单并发起转办。').then(() => {
+        this.$modal.dangerConfirm({
+          actionType: 'caution',
+          content: '确认将该高风险预警转至所选机构？',
+          tip: '系统将自动创建工单并发起转办，请确认机构与预警匹配'
+        }).then(() => {
           this.transferSubmitting = true
           return transferRiskWarning({
             warningId: this.transferForm.warningId,

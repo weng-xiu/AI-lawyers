@@ -471,8 +471,12 @@ export default {
     },
     // 用户状态修改
     handleStatusChange(row) {
-      let text = row.status === "0" ? "启用" : "停用"
-      this.$modal.confirm('确认要"' + text + '""' + row.userName + '"用户吗？').then(function() {
+      const text = row.status === "0" ? "启用" : "停用"
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: '确认要"' + text + '"用户「' + row.userName + '」吗？',
+        tip: row.status === "0" ? '启用后该用户立即可登录使用系统' : '停用后该用户将无法登录，已登录会话在下一次鉴权时失效'
+      }).then(function() {
         return changeUserStatus(row.userId, row.status)
       }).then(() => {
         this.$modal.msgSuccess(text + "成功")
@@ -617,7 +621,13 @@ export default {
     /** 删除按钮操作 */
     handleDelete(row) {
       const userIds = row.userId || this.ids
-      this.$modal.confirm('是否确认删除用户编号为"' + userIds + '"的数据项？').then(function() {
+      const count = row.userId ? 1 : (this.ids || []).length
+      this.$modal.dangerConfirm({
+        content: '将删除选中的系统用户',
+        count: count,
+        countNoun: '个用户',
+        tip: '删除用户会同时解除其角色/岗位关联与坐席绑定，运行记录保留'
+      }).then(function() {
         return delUser(userIds)
       }).then(() => {
         this.getList()

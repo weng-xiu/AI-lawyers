@@ -451,10 +451,10 @@ export default {
         archive: () => archiveTicket({ ticketId: row.ticketId })
       }
       if (!runners[code]) return
-      this.$confirm(tips[code], '提示', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: tips[code],
+        tip: code === 'archive' ? '归档后工单不再参与待办与超时统计，可在归档列表查看' : ''
       }).then(() => {
         runners[code]().then(() => {
           this.$message.success(this.flowActionName(action) + '成功')
@@ -799,10 +799,10 @@ export default {
       }).catch(() => {})
     },
     handleReturn() {
-      this.$confirm('是否确认将该工单退回待处理？', '提示', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: '确认将该工单退回待处理？',
+        tip: '退回后工单回到待处理池，由其他坐席重新领取'
       }).then(() => {
         updateTicket({
           ticketId: this.currentOrder.ticketId,

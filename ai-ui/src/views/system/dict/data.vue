@@ -383,7 +383,12 @@ export default {
     /** 删除按钮操作 */
     handleDelete(row) {
       const dictCodes = row.dictCode || this.ids
-      this.$modal.confirm('是否确认删除字典编码为"' + dictCodes + '"的数据项？').then(function() {
+      const count = row.dictCode ? 1 : (this.ids || []).length
+      this.$modal.dangerConfirm({
+        content: '将删除选中的字典数据',
+        count: count,
+        countNoun: '条字典数据'
+      }).then(function() {
         return delData(dictCodes)
       }).then(() => {
         this.getList()

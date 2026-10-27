@@ -322,7 +322,12 @@ export default {
     /** 删除按钮操作 */
     handleDelete(row) {
       const dictIds = row.dictId || this.ids
-      this.$modal.confirm('是否确认删除字典编号为"' + dictIds + '"的数据项？').then(function() {
+      const count = row.dictId ? 1 : (this.ids || []).length
+      this.$modal.dangerConfirm({
+        content: '将删除选中的字典类型',
+        count: count,
+        countNoun: '条字典'
+      }).then(function() {
         return delType(dictIds)
       }).then(() => {
         this.getList()

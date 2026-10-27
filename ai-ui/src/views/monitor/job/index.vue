@@ -418,8 +418,12 @@ export default {
     },
     // 任务状态修改
     handleStatusChange(row) {
-      let text = row.status === "0" ? "启用" : "停用"
-      this.$modal.confirm('确认要"' + text + '""' + row.jobName + '"任务吗？').then(function() {
+      const text = row.status === "0" ? "启用" : "停用"
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: '确认要"' + text + '"任务「' + row.jobName + '」吗？',
+        tip: row.status === "0" ? '启用后调度器将按 cron 自动触发该任务' : '停用后该任务不再自动触发，手动执行不受影响'
+      }).then(function() {
         return changeJobStatus(row.jobId, row.status)
       }).then(() => {
         this.$modal.msgSuccess(text + "成功")
@@ -429,7 +433,11 @@ export default {
     },
     /* 立即执行一次 */
     handleRun(row) {
-      this.$modal.confirm('确认要立即执行一次"' + row.jobName + '"任务吗？').then(function() {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: '确认要立即执行一次「' + row.jobName + '」任务吗？',
+        tip: '立即执行不受启停状态影响，请确认当前业务窗口允许'
+      }).then(function() {
         return runJob(row.jobId, row.jobGroup)
       }).then(() => {
         this.$modal.msgSuccess("执行成功")

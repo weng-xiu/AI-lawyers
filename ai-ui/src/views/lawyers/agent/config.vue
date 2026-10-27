@@ -302,7 +302,11 @@ export default {
     },
     handleStatusChange(row) {
       const text = row.status === "1" ? "启用" : "停用";
-      this.$modal.confirm(`确认${text}"${row.agentName}"吗？`).then(() => {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: `确认${text}智能体「${row.agentName}」吗？`,
+        tip: row.status === "1" ? '启用后该智能体可接收新会话与调度任务' : '停用后不再接收新会话，进行中的会话不受影响'
+      }).then(() => {
         return updateAgentConfig({ agentId: row.agentId, status: row.status });
       }).then(() => {
         // U2：智能体启停 30 秒内可撤销

@@ -189,8 +189,9 @@ export default {
     
     // 删除记录
     deleteRecord(record, index) {
-      this.$confirm('确认删除该咨询记录吗？', "系统提示", {
-        type: "warning"
+      this.$modal.dangerConfirm({
+        content: '将删除该条咨询记录',
+        tip: '删除后不可恢复，相关检索与统计也会同步排除该记录'
       }).then(() => {
         delConsultation(record.consultationId).then(() => {
           this.historyList.splice(index, 1);

@@ -374,7 +374,11 @@ export default {
       this.$router.push({ path: '/outbound/callee', query: { taskId: row.taskId }})
     },
     handleStart(row) {
-      this.$modal.confirm('是否确认启动任务"' + row.taskName + '"？').then(function() {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: '确认启动任务「' + row.taskName + '」吗？',
+        tip: '启动后将按并发策略开始外呼，可能产生线路费用'
+      }).then(function() {
         return startTask(row.taskId)
       }).then(() => {
         this.getList()
@@ -398,7 +402,11 @@ export default {
       }).catch(() => {})
     },
     handlePause(row) {
-      this.$modal.confirm('是否确认暂停任务"' + row.taskName + '"？').then(function() {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: '确认暂停任务「' + row.taskName + '」吗？',
+        tip: '已拨出的通话不受影响，剩余号码将不再外呼；可稍后继续启动'
+      }).then(function() {
         return pauseTask(row.taskId)
       }).then(() => {
         this.getList()
@@ -406,7 +414,11 @@ export default {
       }).catch(() => {})
     },
     handleStop(row) {
-      this.$modal.confirm('是否确认停止任务"' + row.taskName + '"？').then(function() {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: '确认停止任务「' + row.taskName + '」吗？',
+        tip: '停止后任务不可继续，未拨号码将不再外呼'
+      }).then(function() {
         return stopTask(row.taskId)
       }).then(() => {
         this.getList()

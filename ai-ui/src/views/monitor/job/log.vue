@@ -268,7 +268,11 @@ export default {
     /** 删除按钮操作 */
     handleDelete(row) {
       const jobLogIds = this.ids
-      this.$modal.confirm('是否确认删除调度日志编号为"' + jobLogIds + '"的数据项？').then(function() {
+      this.$modal.dangerConfirm({
+        content: '将删除选中的调度日志',
+        count: (jobLogIds || []).length,
+        countNoun: '条日志'
+      }).then(function() {
         return delJobLog(jobLogIds)
       }).then(() => {
         this.getList()
@@ -277,7 +281,10 @@ export default {
     },
     /** 清空按钮操作 */
     handleClean() {
-      this.$modal.confirm('是否确认清空所有调度日志数据项？').then(function() {
+      this.$modal.dangerConfirm({
+        actionType: 'clear',
+        content: '将清空全部调度日志（历史执行记录不可恢复）'
+      }).then(function() {
         return cleanJobLog()
       }).then(() => {
         this.getList()

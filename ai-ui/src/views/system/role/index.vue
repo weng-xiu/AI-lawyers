@@ -395,8 +395,12 @@ export default {
     },
     // 角色状态修改
     handleStatusChange(row) {
-      let text = row.status === "0" ? "启用" : "停用"
-      this.$modal.confirm('确认要"' + text + '""' + row.roleName + '"角色吗？').then(function() {
+      const text = row.status === "0" ? "启用" : "停用"
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: '确认要"' + text + '"角色「' + row.roleName + '」吗？',
+        tip: row.status === "0" ? '启用后该角色权限对已分配用户即时生效' : '停用后该角色不再授予任何权限'
+      }).then(function() {
         return changeRoleStatus(row.roleId, row.status)
       }).then(() => {
         this.$modal.msgSuccess(text + "成功")
@@ -587,7 +591,13 @@ export default {
     /** 删除按钮操作 */
     handleDelete(row) {
       const roleIds = row.roleId || this.ids
-      this.$modal.confirm('是否确认删除角色编号为"' + roleIds + '"的数据项？').then(function() {
+      const count = row.roleId ? 1 : (this.ids || []).length
+      this.$modal.dangerConfirm({
+        content: '将删除选中的角色',
+        count: count,
+        countNoun: '个角色',
+        tip: '删除角色会同时清除其菜单权限与用户授权关系'
+      }).then(function() {
         return delRole(roleIds)
       }).then(() => {
         this.getList()

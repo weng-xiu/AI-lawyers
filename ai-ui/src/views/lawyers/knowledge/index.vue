@@ -498,7 +498,11 @@ export default {
     },
     /** 全量重建 RAG 索引（异步，完成后刷新状态） */
     handleRagRebuild() {
-      this.$modal.confirm('将在后台全量重建分块与向量索引（embedding 调用可能耗时数分钟），确认提交？').then(() => {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: '将在后台全量重建分块与向量索引',
+        tip: 'embedding 调用可能耗时数分钟并产生调用费用，重建期间检索结果可能短时不全'
+      }).then(() => {
         return rebuildRagIndex()
       }).then(() => {
         this.$modal.msgSuccess('重建任务已提交，可稍后通过"索引状态"确认条目数')

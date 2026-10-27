@@ -316,7 +316,11 @@ export default {
     },
     /** 处理按钮 */
     handleProcess(row) {
-      this.$modal.confirm('是否确认处理该待办事项？').then(function() {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: '确认处理该待办事项吗？',
+        tip: '处理后该待办将关闭，可在工单详情继续跟进'
+      }).then(function() {
         return processTodo(row.todoId)
       }).then(() => {
         this.getList()
@@ -325,7 +329,11 @@ export default {
     },
     /** 延后按钮 */
     handleDefer(row) {
-      this.$modal.confirm('是否确认延后该待办事项？').then(function() {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: '确认延后该待办事项吗？',
+        tip: '延后将顺延提醒时间，不会关闭待办'
+      }).then(function() {
         return deferTodo(row.todoId)
       }).then(() => {
         this.getList()
@@ -334,7 +342,11 @@ export default {
     },
     /** 忽略按钮 */
     handleIgnore(row) {
-      this.$modal.confirm('是否确认忽略该待办事项？').then(function() {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: '确认忽略该待办事项吗？',
+        tip: '忽略后该待办不再提醒，且不会自动恢复'
+      }).then(function() {
         return ignoreTodo(row.todoId)
       }).then(() => {
         this.getList()

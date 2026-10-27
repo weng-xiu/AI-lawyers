@@ -237,7 +237,11 @@ export default {
     /** 解锁按钮操作 */
     handleUnlock() {
       const username = this.selectName
-      this.$modal.confirm('是否确认解锁用户"' + username + '"数据项?').then(function() {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: '确认要解锁用户「' + username + '」的登录锁定吗？',
+        tip: '解锁后该账号可立即重新尝试登录'
+      }).then(function() {
         return unlockLogininfor(username)
       }).then(() => {
         this.$modal.msgSuccess("用户" + username + "解锁成功")

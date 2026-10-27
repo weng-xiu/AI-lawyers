@@ -238,7 +238,11 @@ export default {
       }).catch(() => { this.logLoading = false })
     },
     handleSubmit(row) {
-      this.$modal.confirm('确认提交该知识条目进入审核流程吗？').then(() => submitAudit(row.knowledgeId)).then(() => {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: '确认提交该知识条目进入审核流程吗？',
+        tip: '提交后进入审核队列，审核通过前不会对 AI 回答生效'
+      }).then(() => submitAudit(row.knowledgeId)).then(() => {
         this.$modal.msgSuccess('已提交审核')
         this.getList()
       }).catch(() => {})
@@ -263,9 +267,22 @@ export default {
         return
       }
       run(id, opinion).then(() => {
-        this.$modal.msgSuccess('操作成功')
         this.opinionOpen = false
         this.getList()
+        // U2：发布/下线互为逆操作，30 秒内可撤销
+        const reverse = {
+          publish: { fn: offlineKnowledge, done: '知识已重新下线' },
+          offline: { fn: publishKnowledge, done: '知识已重新发布' }
+        }[this.opinionAction]
+        if (!reverse) {
+          this.$modal.msgSuccess('操作成功')
+          return
+        }
+        this.$modal.undo({
+          message: this.opinionAction === 'publish' ? '知识已发布' : '知识已下线',
+          undoSuccessText: reverse.done,
+          onUndo: () => reverse.fn(id, '撤销操作').then(() => this.getList())
+        })
       })
     },
     openValid(row) {

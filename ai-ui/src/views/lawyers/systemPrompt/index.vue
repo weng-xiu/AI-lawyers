@@ -388,7 +388,11 @@ export default {
     },
     /** 设为默认按钮操作 */
     handleSetDefault(row) {
-      this.$modal.confirm('确认将"' + row.promptName + '"设为默认提示词？').then(function() {
+      this.$modal.dangerConfirm({
+        actionType: 'publish',
+        content: '将「' + row.promptName + '」设为默认提示词',
+        tip: '新建会话将立即使用该提示词，进行中的会话不受影响'
+      }).then(function() {
         return setDefaultSystemPrompt(row.promptId);
       }).then(() => {
         this.getList();

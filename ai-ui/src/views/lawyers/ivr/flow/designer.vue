@@ -939,19 +939,24 @@ export default {
     // ---------- 删除 ----------
     deleteSelected() {
       if (this.selectedKind === 'node' && this.selectedNode) {
-        const node = this.selectedNode
-        this.$confirm(`确定删除节点「${node.name}」及其所有连线吗？`, '提示', {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          type: 'warning'
-        }).then(() => {
-          this.removeNode(node)
-        }).catch(() => {})
+        this.confirmRemoveNode(this.selectedNode)
       } else if (this.selectedKind === 'edge' && this.selectedEdge) {
         this.edges = this.edges.filter(e => e.id !== this.selectedEdge.id)
         this.clearSelection()
         this.markDirty()
       }
+    },
+
+    /** U2：键盘 Delete 与按钮删除统一走确认，避免误删节点及其连线 */
+    confirmRemoveNode(node) {
+      this.$modal.dangerConfirm({
+        content: `将删除节点「${node.name}」及其所有连线`,
+        count: 1,
+        countNoun: '个节点',
+        tip: '删除需保存流程后生效，可通过重新拖拽节点恢复'
+      }).then(() => {
+        this.removeNode(node)
+      }).catch(() => {})
     },
 
     onKeyDown(e) {
@@ -964,7 +969,7 @@ export default {
           this.clearSelection()
           this.markDirty()
         } else if (this.selectedNode) {
-          this.removeNode(this.selectedNode)
+          this.confirmRemoveNode(this.selectedNode)
         }
       }
       if (e.key === 'Escape') {

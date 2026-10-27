@@ -109,7 +109,11 @@ export default {
     },
     /** 强退按钮操作 */
     handleForceLogout(row) {
-      this.$modal.confirm('是否确认强退名称为"' + row.userName + '"的用户？').then(function() {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: '确认要强制下线用户「' + row.userName + '」吗？',
+        tip: '该用户的登录令牌将立即失效，未保存的操作内容可能丢失'
+      }).then(function() {
         return forceLogout(row.tokenId)
       }).then(() => {
         this.getList()

@@ -155,7 +155,11 @@ export default {
       })
     },
     handleConfirm(row) {
-      this.$modal.confirm('确认完成该渠道身份的二次绑定校验吗？').then(() => confirmBind(row.id, { channelNickname: row.channelNickname })).then(() => {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: '确认完成该渠道身份的二次绑定校验吗？',
+        tip: '确认后该渠道身份将绑定至当前账号，请先核对昵称与归属真实'
+      }).then(() => confirmBind(row.id, { channelNickname: row.channelNickname })).then(() => {
         this.$modal.msgSuccess('绑定已确认')
         this.getList()
       }).catch(() => {})

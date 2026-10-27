@@ -367,7 +367,11 @@ export default {
       })
     },
     handleLogout() {
-      this.$confirm('确定签出当前坐席吗？', '提示', { type: 'warning' }).then(() => {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: '确定签出当前坐席吗？',
+        tip: '签出后将停止接听新来电，进行中的通话不受影响'
+      }).then(() => {
         this.$store.dispatch('agent/logout').then(() => {
           this.pendingOutbound = ''
           this.$message.success('已签出')

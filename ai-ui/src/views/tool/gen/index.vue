@@ -272,7 +272,11 @@ export default {
     /** 同步数据库操作 */
     handleSynchDb(row) {
       const tableName = row.tableName
-      this.$modal.confirm('确认要强制同步"' + tableName + '"表结构吗？').then(function() {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: '确认要强制同步「' + tableName + '」表结构吗？',
+        tip: '同步将覆盖该表已生成的实体/字段配置，未保存的手工修改会丢失'
+      }).then(function() {
         return synchDb(tableName)
       }).then(() => {
         this.$modal.msgSuccess("同步成功")
@@ -335,7 +339,13 @@ export default {
     /** 删除按钮操作 */
     handleDelete(row) {
       const tableIds = row.tableId || this.ids
-      this.$modal.confirm('是否确认删除表编号为"' + tableIds + '"的数据项？').then(function() {
+      const count = row.tableId ? 1 : (this.ids || []).length
+      this.$modal.dangerConfirm({
+        content: '将删除选中的导入表配置',
+        count: count,
+        countNoun: '张表',
+        tip: '仅删除生成配置，不会删除数据库中的物理表'
+      }).then(function() {
         return delTable(tableIds)
       }).then(() => {
         this.getList()

@@ -145,7 +145,11 @@ export default {
       }
     },
     handleReplay(row) {
-      this.$modal.confirm('确认将该死信回投到原队列重新消费？消费端幂等，不会重复生效。').then(() => {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: '确认将该死信回投到原队列重新消费？',
+        tip: '消费端幂等，不会重复生效；若消费持续失败可能再次进入死信'
+      }).then(() => {
         return replayDeadLetter(this.currentQueue, row.id)
       }).then(() => {
         this.$modal.msgSuccess('重投成功')

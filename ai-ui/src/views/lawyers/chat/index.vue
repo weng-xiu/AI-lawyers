@@ -306,8 +306,10 @@ export default {
     },
     handleClose() {
       if (!this.currentSession) return
-      this.$confirm('确认结束当前会话？', '结束会话', {
-        confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning'
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: '确认结束当前会话？',
+        tip: '结束后用户将无法继续在该会话中发送消息'
       }).then(() => {
         closeChatSession(this.currentSession.sessionId).then(() => {
           this.$message.success('会话已结束')

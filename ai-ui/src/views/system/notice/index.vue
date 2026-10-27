@@ -300,7 +300,12 @@ export default {
     /** 删除按钮操作 */
     handleDelete(row) {
       const noticeIds = row.noticeId || this.ids
-      this.$modal.confirm('是否确认删除公告编号为"' + noticeIds + '"的数据项？').then(function() {
+      const count = row.noticeId ? 1 : (this.ids || []).length
+      this.$modal.dangerConfirm({
+        content: '将删除选中的通知公告',
+        count: count,
+        countNoun: '条公告'
+      }).then(function() {
         return delNotice(noticeIds)
       }).then(() => {
         this.getList()

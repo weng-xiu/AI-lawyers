@@ -488,7 +488,11 @@ export default {
     },
     /** 手动触发重检 */
     handleInspect(row) {
-      this.$modal.confirm('确认对该话单（recordId=' + row.recordId + '）重新执行 AI 质检？').then(() => {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: '将对话单（recordId=' + row.recordId + '）重新执行 AI 质检',
+        tip: '将覆盖该话单已有质检结果，并产生模型调用费用'
+      }).then(() => {
         return inspectRecord(row.recordId)
       }).then(() => {
         this.$modal.msgSuccess("已触发质检，稍后刷新查看结果")
@@ -624,7 +628,11 @@ export default {
       })
     },
     handleSetDefault(row) {
-      this.$modal.confirm('确认将模板「' + row.templateName + '」设为默认质检模板？').then(() => {
+      this.$modal.dangerConfirm({
+        actionType: 'publish',
+        content: '将模板「' + row.templateName + '」设为默认质检模板',
+        tip: '后续质检默认使用该模板，进行中的质检任务不受影响'
+      }).then(() => {
         return setDefaultQualityTemplate(row.templateId)
       }).then(() => {
         this.$modal.msgSuccess("设置成功")

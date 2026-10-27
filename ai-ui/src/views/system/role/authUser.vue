@@ -176,7 +176,11 @@ export default {
     /** 取消授权按钮操作 */
     cancelAuthUser(row) {
       const roleId = this.queryParams.roleId
-      this.$modal.confirm('确认要取消该用户"' + row.userName + '"角色吗？').then(function() {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: '确认要取消用户「' + row.userName + '」的本角色授权吗？',
+        tip: '取消后该用户将失去此角色对应的菜单与操作权限'
+      }).then(function() {
         return authUserCancel({ userId: row.userId, roleId: roleId })
       }).then(() => {
         this.getList()
@@ -187,7 +191,13 @@ export default {
     cancelAuthUserAll(row) {
       const roleId = this.queryParams.roleId
       const userIds = this.userIds.join(",")
-      this.$modal.confirm('是否取消选中用户授权数据项？').then(function() {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: '将批量取消选中用户的本角色授权',
+        count: this.userIds.length,
+        countNoun: '个用户',
+        tip: '取消后这些用户将失去此角色对应的菜单与操作权限'
+      }).then(function() {
         return authUserCancelAll({ roleId: roleId, userIds: userIds })
       }).then(() => {
         this.getList()

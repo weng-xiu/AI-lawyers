@@ -328,7 +328,12 @@ export default {
     },
     /** 删除按钮操作 */
     handleDelete(row) {
-      this.$modal.confirm('是否确认删除名称为"' + row.deptName + '"的数据项？').then(function() {
+      this.$modal.dangerConfirm({
+        content: '将删除部门「' + row.deptName + '」',
+        count: 1,
+        countNoun: '个部门',
+        tip: '存在下级部门或已分配用户时删除会失败，请先处理关联数据'
+      }).then(function() {
         return delDept(row.deptId)
       }).then(() => {
         this.getList()

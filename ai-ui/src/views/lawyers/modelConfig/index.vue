@@ -314,7 +314,11 @@ export default {
     },
     /** 设为默认按钮操作 */
     handleSetDefault(row) {
-      this.$modal.confirm('确认将"' + row.modelName + '"设为默认模型配置？').then(function() {
+      this.$modal.dangerConfirm({
+        actionType: 'publish',
+        content: '将「' + row.modelName + '」设为默认模型配置',
+        tip: '新建会话将立即使用该默认模型，进行中的会话不受影响'
+      }).then(function() {
         return setDefaultModelConfig(row.configId);
       }).then(() => {
         this.getList();

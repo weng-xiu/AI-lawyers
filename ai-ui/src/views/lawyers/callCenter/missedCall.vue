@@ -342,8 +342,10 @@ export default {
       this.multiple = !selection.length
     },
     handleCallback(row) {
-      this.$confirm('是否确认对来电 ' + row.callerNumber + ' 进行回拨标记？', '回拨确认', {
-        type: 'warning'
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: `确认对来电「${row.callerNumber}」进行回拨标记？`,
+        tip: '标记后该来电将移出待回拨列表'
       }).then(() => {
         return callbackMissedCall(row.missedCallId)
       }).then(() => {

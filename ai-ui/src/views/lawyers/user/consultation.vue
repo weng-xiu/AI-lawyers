@@ -354,7 +354,11 @@ export default {
       console.log(file, fileList);
     },
     beforeRemove(file) {
-      return this.$confirm(`确定移除 ${ file.name }？`);
+      return this.$modal.dangerConfirm({
+        content: `将移除附件「${file.name}」`,
+        count: 1,
+        countNoun: '个附件'
+      });
     },
     handleChange(file, fileList) {
       this.fileList = fileList;

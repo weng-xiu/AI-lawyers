@@ -291,7 +291,12 @@ export default {
     /** 删除按钮操作 */
     handleDelete(row) {
       const postIds = row.postId || this.ids
-      this.$modal.confirm('是否确认删除岗位编号为"' + postIds + '"的数据项？').then(function() {
+      const count = row.postId ? 1 : (this.ids || []).length
+      this.$modal.dangerConfirm({
+        content: '将删除选中的岗位',
+        count: count,
+        countNoun: '个岗位'
+      }).then(function() {
         return delPost(postIds)
       }).then(() => {
         this.getList()

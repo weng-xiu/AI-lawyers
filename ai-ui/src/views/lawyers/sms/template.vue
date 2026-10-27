@@ -252,7 +252,11 @@ export default {
     },
     handleStatusChange(row) {
       const text = row.status === "1" ? "启用" : "停用";
-      this.$modal.confirm(`确认${text}"${row.templateName}"吗？`).then(() => {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: `确认${text}短信模板「${row.templateName}」吗？`,
+        tip: row.status === "1" ? '启用后该模板可用于发送，可在 30 秒内撤销' : '停用后使用该模板的发送请求将被拒绝，可在 30 秒内撤销'
+      }).then(() => {
         return updateSmsTemplate({ templateId: row.templateId, status: row.status });
       }).then(() => {
         // U2：模板启停 30 秒内可撤销

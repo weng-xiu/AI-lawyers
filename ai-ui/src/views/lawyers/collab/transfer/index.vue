@@ -254,7 +254,11 @@ export default {
       try { return JSON.stringify(JSON.parse(p), null, 2) } catch (e) { return p }
     },
     handleRetry(row) {
-      this.$modal.confirm('确认重新推送该转办单吗？').then(() => retryTransfer(row.transferId)).then(() => {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: '确认重新推送该转办单吗？',
+        tip: '将再次推送至接收方系统，若对方已完成处理可能产生重复提醒（按转办单号幂等）'
+      }).then(() => retryTransfer(row.transferId)).then(() => {
         this.$modal.msgSuccess('已重新推送')
         this.getList()
       }).catch(() => {})

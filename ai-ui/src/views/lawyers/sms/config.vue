@@ -258,7 +258,11 @@ export default {
     },
     handleStatusChange(row) {
       const text = row.status === "1" ? "启用" : "停用";
-      this.$modal.confirm(`确认${text}"${row.configName}"吗？`).then(() => {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: `确认${text}短信通道「${row.configName}」吗？`,
+        tip: row.status === "1" ? '启用后该通道将参与短信发送与故障切换' : '停用后该通道不再发送短信，可在 30 秒内撤销'
+      }).then(() => {
         return updateSmsConfig({ configId: row.configId, status: row.status });
       }).then(() => {
         // U2：通道启停 30 秒内可撤销
