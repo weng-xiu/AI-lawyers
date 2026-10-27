@@ -16,9 +16,9 @@ export const DEFAULT_SHORTCUTS = [
   { id: 'ledger', label: '一键登记台账', keys: 'Ctrl+4', method: 'handleLedger' },
   { id: 'afterWork', label: '话后整理', keys: 'Ctrl+5', method: 'handleAfterWork' },
   { id: 'hangup', label: '挂机', keys: 'Ctrl+6', method: 'handleHangup' },
-  { id: 'createTicket', label: '快速建单', keys: 'Ctrl+7', method: 'openQuickTicket' },
-  { id: 'knowledge', label: '查知识', keys: 'Ctrl+8', method: 'openKnowledge' },
-  { id: 'transferOut', label: '转办（协同机构）', keys: 'Ctrl+9', method: 'openTransferOut' }
+  { id: 'createTicket', label: '快速建单', keys: 'Ctrl+7', method: 'openQuickTicket', perm: 'lawyers:call:ticket:add' },
+  { id: 'knowledge', label: '查知识', keys: 'Ctrl+8', method: 'openKnowledge', perm: 'lawyers:knowledge:query' },
+  { id: 'transferOut', label: '转办（协同机构）', keys: 'Ctrl+9', method: 'openTransferOut', perm: 'lawyers:ticketTransfer:add' }
 ]
 
 function normalizeKey(key) {

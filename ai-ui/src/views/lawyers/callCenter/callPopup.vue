@@ -546,10 +546,14 @@ export default {
       if (this.transferOpen || this.editOpen || this.quickTicketOpen || this.knowledgeOpen
         || this.transferOutOpen || this.shortcutOpen) return
       const hit = this.shortcuts.find(s => matchShortcut(e, s.keys))
-      if (hit && typeof this[hit.method] === 'function') {
-        e.preventDefault()
-        this[hit.method]()
+      if (!hit || typeof this[hit.method] !== 'function') return
+      e.preventDefault()
+      // 与按钮上的 v-hasPermi 保持一致：快捷键触发受限动作前同样校验权限
+      if (hit.perm && !this.$auth.hasPermi(hit.perm)) {
+        this.$modal.msgWarning('当前账号无「' + hit.label + '」权限，请联系管理员')
+        return
       }
+      this[hit.method]()
     },
     /** 按钮上的快捷键提示（与自定义配置实时同步） */
     shortcutLabel(id) {

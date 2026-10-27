@@ -36,6 +36,16 @@ describe('U1 快捷键配置', () => {
     ])
   })
 
+  it('建单/查知识/转办携带权限标识，与按钮权限一致', () => {
+    const byId = id => DEFAULT_SHORTCUTS.find(s => s.id === id)
+    expect(byId('createTicket').perm).toBe('lawyers:call:ticket:add')
+    expect(byId('knowledge').perm).toBe('lawyers:knowledge:query')
+    expect(byId('transferOut').perm).toBe('lawyers:ticketTransfer:add')
+    // 通话动作由坐席状态机约束，不额外挂菜单权限
+    expect(byId('answer').perm).toBeUndefined()
+    expect(byId('hangup').perm).toBeUndefined()
+  })
+
   it('保存后按 id 覆盖默认值并持久化', () => {
     const saved = saveShortcuts([{ id: 'answer', keys: 'Alt+A' }])
     expect(saved.find(s => s.id === 'answer').keys).toBe('Alt+A')
