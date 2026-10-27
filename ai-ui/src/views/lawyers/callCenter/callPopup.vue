@@ -194,26 +194,36 @@
       </el-col>
     </el-row>
 
-    <!-- 通话操作按钮 -->
+    <!-- 通话操作按钮（U1：快捷键可在设置中自定义，界面提示实时同步） -->
     <div class="cp-action-bar">
       <el-button type="success" size="medium" class="cp-action-btn cp-btn-green" @click="handleAnswer" :disabled="connected || !incomingRinging">
-        <i class="el-icon-microphone"></i><span>接听</span><kbd class="cp-kbd">Ctrl+1</kbd>
+        <i class="el-icon-microphone"></i><span>接听</span><kbd class="cp-kbd">{{ shortcutLabel('answer') }}</kbd>
       </el-button>
       <el-button size="medium" class="cp-action-btn cp-btn-orange" :disabled="!connected || !(callStatus === '1' || callStatus === '2')" @click="handleHold">
-        <i :class="callStatus === '2' ? 'el-icon-video-play' : 'el-icon-video-pause'"></i><span>{{ callStatus === '2' ? '恢复' : '保持' }}</span><kbd class="cp-kbd">Ctrl+2</kbd>
+        <i :class="callStatus === '2' ? 'el-icon-video-play' : 'el-icon-video-pause'"></i><span>{{ callStatus === '2' ? '恢复' : '保持' }}</span><kbd class="cp-kbd">{{ shortcutLabel('hold') }}</kbd>
       </el-button>
       <el-button size="medium" class="cp-action-btn cp-btn-gray" :disabled="!connected || callStatus !== '1'" @click="handleTransfer">
-        <i class="el-icon-s-promotion"></i><span>转接</span><kbd class="cp-kbd">Ctrl+3</kbd>
+        <i class="el-icon-s-promotion"></i><span>转接</span><kbd class="cp-kbd">{{ shortcutLabel('transfer') }}</kbd>
       </el-button>
       <el-button type="primary" size="medium" class="cp-action-btn cp-btn-blue" @click="handleLedger">
-        <i class="el-icon-document"></i><span>一键登记台账</span><kbd class="cp-kbd">Ctrl+4</kbd>
+        <i class="el-icon-document"></i><span>一键登记台账</span><kbd class="cp-kbd">{{ shortcutLabel('ledger') }}</kbd>
       </el-button>
       <el-button size="medium" class="cp-action-btn cp-btn-purple" :disabled="!connected || !(callStatus === '1' || callStatus === '5')" @click="handleAfterWork">
-        <i class="el-icon-edit-outline"></i><span>话后整理</span><kbd class="cp-kbd">Ctrl+5</kbd>
+        <i class="el-icon-edit-outline"></i><span>话后整理</span><kbd class="cp-kbd">{{ shortcutLabel('afterWork') }}</kbd>
+      </el-button>
+      <el-button v-hasPermi="['lawyers:call:ticket:add']" size="medium" class="cp-action-btn cp-btn-blue" :disabled="!profileData.callerNumber" @click="openQuickTicket">
+        <i class="el-icon-tickets"></i><span>快速建单</span><kbd class="cp-kbd">{{ shortcutLabel('createTicket') }}</kbd>
+      </el-button>
+      <el-button v-hasPermi="['lawyers:ticketTransfer:add']" size="medium" class="cp-action-btn cp-btn-gray" :disabled="!profileData.callerNumber" @click="openTransferOut">
+        <i class="el-icon-connection"></i><span>转办</span><kbd class="cp-kbd">{{ shortcutLabel('transferOut') }}</kbd>
+      </el-button>
+      <el-button v-hasPermi="['lawyers:knowledge:query']" size="medium" class="cp-action-btn cp-btn-purple" @click="openKnowledge">
+        <i class="el-icon-search"></i><span>查知识</span><kbd class="cp-kbd">{{ shortcutLabel('knowledge') }}</kbd>
       </el-button>
       <el-button type="danger" size="medium" class="cp-action-btn cp-btn-red" :disabled="!connected" @click="handleHangup">
-        <i class="el-icon-bangzhu"></i><span>挂机</span><kbd class="cp-kbd">Ctrl+6</kbd>
+        <i class="el-icon-bangzhu"></i><span>挂机</span><kbd class="cp-kbd">{{ shortcutLabel('hangup') }}</kbd>
       </el-button>
+      <el-button type="text" class="cp-shortcut-setting" icon="el-icon-setting" title="自定义快捷键" @click="openShortcutSettings">快捷键</el-button>
     </div>
 
     <!-- 编辑档案弹窗 -->
@@ -260,17 +270,131 @@
         <el-button type="primary" @click="confirmTransfer" :disabled="transferTargetId == null">转 接</el-button>
       </div>
     </el-dialog>
+
+    <!-- U1：通话卡片内直接建单，不必离开工作台 -->
+    <el-dialog title="快速建单" :visible.sync="quickTicketOpen" width="560px" append-to-body>
+      <el-form ref="quickTicketForm" :model="quickTicketForm" :rules="quickTicketRules" label-width="90px" size="small">
+        <el-form-item label="来电号码">
+          <el-input :value="profileData.callerNumber" disabled />
+        </el-form-item>
+        <el-form-item label="工单标题" prop="title">
+          <el-input v-model="quickTicketForm.title" maxlength="120" show-word-limit placeholder="一句话概括来电诉求" />
+        </el-form-item>
+        <el-form-item label="紧急程度" prop="priority">
+          <el-radio-group v-model="quickTicketForm.priority">
+            <el-radio label="1">一般</el-radio>
+            <el-radio label="2">紧急</el-radio>
+            <el-radio label="3">特急</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="诉求详情" prop="content">
+          <el-input v-model="quickTicketForm.content" type="textarea" :rows="4" maxlength="2000" show-word-limit placeholder="记录来电人陈述、已答复内容与待办事项" />
+        </el-form-item>
+      </el-form>
+      <div slot="footer">
+        <el-button @click="quickTicketOpen = false">取 消</el-button>
+        <el-button type="primary" :loading="quickTicketSubmitting" @click="submitQuickTicket">创建工单</el-button>
+      </div>
+    </el-dialog>
+
+    <!-- U1：通话卡片内查知识，结果可复制到话后整理 -->
+    <el-dialog title="知识速查" :visible.sync="knowledgeOpen" width="640px" append-to-body>
+      <el-input
+        ref="knowledgeInput"
+        v-model="knowledgeKeyword"
+        placeholder="输入关键词后回车检索（如：劳动仲裁、离婚财产分割）"
+        clearable
+        @keyup.enter.native="searchKnowledgeBase"
+      >
+        <el-button slot="append" icon="el-icon-search" @click="searchKnowledgeBase">检索</el-button>
+      </el-input>
+      <div class="cp-kb-tip">检索结果可直接复制到话后整理，避免切页丢失通话上下文</div>
+      <div v-loading="knowledgeLoading" class="cp-kb-list">
+        <div v-if="!knowledgeLoading && !knowledgeList.length" class="cp-kb-empty">未检索到相关知识，换个关键词试试</div>
+        <div v-for="(k, i) in knowledgeList" :key="k.knowledgeId || i" class="cp-kb-item">
+          <div class="cp-kb-head">
+            <span class="cp-kb-title">{{ k.title || '未命名知识' }}</span>
+            <el-tag v-if="k.categoryId" size="mini" type="info">分类 {{ k.categoryId }}</el-tag>
+          </div>
+          <div class="cp-kb-content">{{ k.content }}</div>
+          <div class="cp-kb-actions">
+            <el-button type="text" size="mini" @click="copyKnowledge(k)">复制全文</el-button>
+          </div>
+        </div>
+      </div>
+    </el-dialog>
+
+    <!-- U1：通话卡片内转办到协同机构 -->
+    <el-dialog title="工单转办（协同机构）" :visible.sync="transferOutOpen" width="520px" append-to-body>
+      <el-alert
+        v-if="!ticketList.length"
+        type="info"
+        :closable="false"
+        title="该来电暂无工单，请先使用「快速建单」创建后再转办"
+      />
+      <el-form v-else label-width="90px" size="small">
+        <el-form-item label="转办工单">
+          <el-select v-model="transferOutForm.ticketId" placeholder="请选择工单" style="width:100%">
+            <el-option v-for="t in ticketList" :key="t.ticketId" :label="(t.ticketNo || '') + ' ' + (t.title || '')" :value="t.ticketId" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="协同机构">
+          <el-select v-model="transferOutForm.orgId" placeholder="请选择机构" filterable style="width:100%">
+            <el-option v-for="o in orgOptions" :key="o.orgId" :label="o.orgName" :value="o.orgId" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="转办说明">
+          <el-input v-model="transferOutForm.remark" type="textarea" :rows="2" maxlength="500" show-word-limit />
+        </el-form-item>
+      </el-form>
+      <div slot="footer">
+        <el-button @click="transferOutOpen = false">取 消</el-button>
+        <el-button
+          type="primary"
+          :loading="transferOutSubmitting"
+          :disabled="!ticketList.length || !transferOutForm.ticketId || !transferOutForm.orgId"
+          @click="submitTransferOut"
+        >确认转办</el-button>
+      </div>
+    </el-dialog>
+
+    <!-- U1：快捷键自定义（本地保存，界面提示实时同步） -->
+    <el-dialog title="快捷键设置" :visible.sync="shortcutOpen" width="560px" append-to-body>
+      <div class="cp-kb-tip">点击右侧输入框后按下新组合键即可修改；组合键需包含 Ctrl/Alt 或 F1–F12 功能键。</div>
+      <el-table :data="shortcutDraft" size="small" border max-height="360">
+        <el-table-column label="动作" prop="label" />
+        <el-table-column label="快捷键" width="220">
+          <template slot-scope="scope">
+            <el-input
+              :value="scope.row.keys"
+              readonly
+              size="small"
+              placeholder="按下组合键"
+              @keydown.native="captureShortcut(scope.row, $event)"
+            />
+          </template>
+        </el-table-column>
+      </el-table>
+      <div slot="footer">
+        <el-button @click="resetShortcutDraft">恢复默认</el-button>
+        <el-button @click="shortcutOpen = false">取 消</el-button>
+        <el-button type="primary" @click="saveShortcutSettings">保 存</el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
 import { getCallerProfile, getCallerHistory, getCallerTickets, getCallerTrack, updateCallerProfile } from "@/api/lawyers/callPopup"
-import { autoFillLedger, addLedger, transferCall, holdCall, resumeCall, hangupCall, afterWork, listAgent } from "@/api/lawyers/callCenter"
+import { autoFillLedger, addLedger, transferCall, holdCall, resumeCall, hangupCall, afterWork, listAgent, addTicket, transferOutTicket } from "@/api/lawyers/callCenter"
+import { searchKnowledge } from "@/api/lawyers/knowledge"
+import { listExternalOrg } from "@/api/lawyers/externalOrg"
 import AiAssistPanel from "./AiAssistPanel.vue"
 import VoiceCaption from "./VoiceCaption.vue"
 import callSocket from "@/utils/callSocket"
 import { getSipPhone } from "@/utils/webrtcSipPhone"
 import { createPoller } from "@/utils/polling"
+import { loadShortcuts, saveShortcuts, resetShortcuts, formatKeys, matchShortcut } from "@/utils/shortcuts"
 import * as statusTag from '@/utils/statusTag'
 
 export default {
@@ -302,15 +426,26 @@ export default {
       liveCaptionText: '',
       // F4：实时 Copilot 数据（要素/法条/相似工单/建议动作，按 seq 回合刷新）
       copilotData: { seq: 0, element: null, laws: [], tickets: [], actions: [] },
-      // U1：工作台快捷键映射（Ctrl+数字 触发对应通话动作，可按需调整）
-      shortcutMap: [
-        { keys: 'Ctrl+1', method: 'handleAnswer', label: '接听' },
-        { keys: 'Ctrl+2', method: 'handleHold', label: '保持/恢复' },
-        { keys: 'Ctrl+3', method: 'handleTransfer', label: '转接' },
-        { keys: 'Ctrl+4', method: 'handleLedger', label: '登记台账' },
-        { keys: 'Ctrl+5', method: 'handleAfterWork', label: '话后整理' },
-        { keys: 'Ctrl+6', method: 'handleHangup', label: '挂机' }
-      ]
+      // U1：工作台快捷键（默认 Ctrl+1~9，可在「快捷键设置」中自定义并本地持久化）
+      shortcuts: loadShortcuts(),
+      shortcutOpen: false,
+      shortcutDraft: [],
+      // U1：通话卡片内快捷动作（建单/转办/查知识，不离开工作台）
+      quickTicketOpen: false,
+      quickTicketSubmitting: false,
+      quickTicketForm: { title: '', priority: '1', content: '' },
+      quickTicketRules: {
+        title: [{ required: true, message: '请填写工单标题', trigger: 'blur' }],
+        content: [{ required: true, message: '请填写诉求详情', trigger: 'blur' }]
+      },
+      knowledgeOpen: false,
+      knowledgeKeyword: '',
+      knowledgeList: [],
+      knowledgeLoading: false,
+      transferOutOpen: false,
+      transferOutSubmitting: false,
+      transferOutForm: { ticketId: null, orgId: null, remark: '' },
+      orgOptions: []
     }
   },
   computed: {
@@ -402,20 +537,53 @@ export default {
     }
   },
   methods: {
-    // U1：工作台全局快捷键处理（Ctrl+1~6 映射通话动作）
+    // U1：工作台全局快捷键处理（映射可在「快捷键设置」中自定义）
     handleKeydown(e) {
       // 输入框/可编辑元素内不触发，避免与表单输入冲突
       const tag = (e.target.tagName || '').toLowerCase()
       if (['input', 'textarea', 'select'].includes(tag) || e.target.isContentEditable) return
-      // 弹窗打开时不触发（转接、编辑档案等）
-      if (this.transferOpen || this.editOpen) return
-      if (!e.ctrlKey) return
-      const keyMap = { '1': 'handleAnswer', '2': 'handleHold', '3': 'handleTransfer', '4': 'handleLedger', '5': 'handleAfterWork', '6': 'handleHangup' }
-      const method = keyMap[e.key]
-      if (method) {
+      // 任一弹窗打开时不触发，避免在弹窗内误触通话动作
+      if (this.transferOpen || this.editOpen || this.quickTicketOpen || this.knowledgeOpen
+        || this.transferOutOpen || this.shortcutOpen) return
+      const hit = this.shortcuts.find(s => matchShortcut(e, s.keys))
+      if (hit && typeof this[hit.method] === 'function') {
         e.preventDefault()
-        this[method]()
+        this[hit.method]()
       }
+    },
+    /** 按钮上的快捷键提示（与自定义配置实时同步） */
+    shortcutLabel(id) {
+      const hit = this.shortcuts.find(s => s.id === id)
+      return hit ? hit.keys : ''
+    },
+    openShortcutSettings() {
+      this.shortcutDraft = this.shortcuts.map(s => ({ ...s }))
+      this.shortcutOpen = true
+    },
+    /** 捕获组合键：写入草稿，暂不生效，保存后统一应用 */
+    captureShortcut(row, e) {
+      e.preventDefault()
+      e.stopPropagation()
+      const keys = formatKeys(e)
+      if (!keys) {
+        this.$modal.msgWarning('请使用 Ctrl/Alt 组合键或 F1–F12 功能键')
+        return
+      }
+      const dup = this.shortcutDraft.find(s => s.id !== row.id && s.keys === keys)
+      if (dup) {
+        this.$modal.msgWarning('该快捷键已被「' + dup.label + '」占用')
+        return
+      }
+      this.$set(row, 'keys', keys)
+    },
+    resetShortcutDraft() {
+      this.shortcutDraft = resetShortcuts()
+      this.$modal.msgSuccess('已恢复默认快捷键，保存后生效')
+    },
+    saveShortcutSettings() {
+      this.shortcuts = saveShortcuts(this.shortcutDraft)
+      this.shortcutOpen = false
+      this.$modal.msgSuccess('快捷键已保存')
     },
     // 浏览器侧 SIP 通话结束（对方挂机/拒接/失败）：立即结束本页通话状态
     onSipHangup() {
@@ -619,6 +787,128 @@ export default {
         }).catch(() => {})
       }).catch(() => {})
     },
+    // ---------- U1：通话卡片内快捷动作（建单 / 转办 / 查知识） ----------
+    openQuickTicket() {
+      const p = this.profileData || {}
+      this.quickTicketForm = {
+        title: p.callerName ? `${p.callerName} 来电咨询` : '来电咨询',
+        priority: '1',
+        content: ''
+      }
+      this.quickTicketOpen = true
+      this.$nextTick(() => {
+        if (this.$refs.quickTicketForm) this.$refs.quickTicketForm.clearValidate()
+      })
+    },
+    submitQuickTicket() {
+      const form = this.$refs.quickTicketForm
+      if (!form) return
+      form.validate(valid => {
+        if (!valid || this.quickTicketSubmitting) return
+        this.quickTicketSubmitting = true
+        const p = this.profileData || {}
+        addTicket({
+          ...this.quickTicketForm,
+          callerNumber: p.callerNumber,
+          callerName: p.callerName,
+          recordId: this.$route.query.recordId || this.currentRecordId,
+          assignUserId: this.$store.state.user.id,
+          direction: this.direction
+        }).then(() => {
+          this.$modal.msgSuccess('工单已创建')
+          this.quickTicketOpen = false
+          this.activeTab = 'ticket'
+          this.loadTickets()
+        }).catch(() => {}).then(() => {
+          this.quickTicketSubmitting = false
+        })
+      })
+    },
+    openKnowledge() {
+      const p = this.profileData || {}
+      this.knowledgeKeyword = p.highFreqProblem || p.intentPrediction || this.knowledgeKeyword || ''
+      this.knowledgeList = []
+      this.knowledgeOpen = true
+      this.$nextTick(() => {
+        if (this.knowledgeKeyword) {
+          this.searchKnowledgeBase()
+        } else if (this.$refs.knowledgeInput) {
+          this.$refs.knowledgeInput.focus()
+        }
+      })
+    },
+    searchKnowledgeBase() {
+      const kw = (this.knowledgeKeyword || '').trim()
+      if (!kw) {
+        this.$modal.msgWarning('请输入检索关键词')
+        return
+      }
+      this.knowledgeLoading = true
+      searchKnowledge(kw).then(res => {
+        this.knowledgeList = (res && res.data) || []
+      }).catch(() => {
+        this.knowledgeList = []
+      }).then(() => {
+        this.knowledgeLoading = false
+      })
+    },
+    copyKnowledge(item) {
+      const text = [item && item.title, item && item.content].filter(Boolean).join('\n')
+      if (!text) {
+        this.$modal.msgWarning('该知识没有可复制内容')
+        return
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text)
+          .then(() => this.$modal.msgSuccess('已复制，可粘贴到话后整理'))
+          .catch(() => this.copyByTextarea(text))
+      } else {
+        this.copyByTextarea(text)
+      }
+    },
+    /** 非安全上下文（http/旧浏览器）降级复制 */
+    copyByTextarea(text) {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      try {
+        document.execCommand('copy')
+        this.$modal.msgSuccess('已复制，可粘贴到话后整理')
+      } catch (e) {
+        this.$modal.msgError('复制失败，请手动选择文本')
+      }
+      document.body.removeChild(ta)
+    },
+    openTransferOut() {
+      if (!this.ticketList.length) {
+        this.loadTickets()
+        this.$modal.msgWarning('该来电暂无工单，请先使用「快速建单」创建')
+      }
+      this.transferOutForm = { ticketId: null, orgId: null, remark: '' }
+      this.transferOutOpen = true
+      if (!this.orgOptions.length) {
+        listExternalOrg({ pageNum: 1, pageSize: 200, status: '0' }).then(res => {
+          this.orgOptions = res.rows || res.data || []
+        }).catch(() => {})
+      }
+    },
+    submitTransferOut() {
+      if (this.transferOutSubmitting) return
+      const { ticketId, orgId, remark } = this.transferOutForm
+      if (!ticketId || !orgId) return
+      this.transferOutSubmitting = true
+      transferOutTicket({ ticketId, orgId, remark }).then(() => {
+        this.$modal.msgSuccess('转办已发起')
+        this.transferOutOpen = false
+        this.loadTickets()
+        this.$store.dispatch('agent/refresh').catch(() => {})
+      }).catch(() => {}).then(() => {
+        this.transferOutSubmitting = false
+      })
+    },
     handleTransfer() {
       if (this.agentId == null) {
         this.$message.warning('请先在顶部签入坐席')
@@ -669,7 +959,11 @@ export default {
         this.$message.warning('请先在顶部签入坐席')
         return
       }
-      this.$confirm('确定挂断当前通话吗？', '提示', { type: 'warning' }).then(() => {
+      this.$modal.dangerConfirm({
+        actionType: 'caution',
+        content: '确定挂断当前通话吗？',
+        tip: '挂断后当前通话无法恢复，请确认已记录必要信息'
+      }).then(() => {
         hangupCall({ agentId: this.agentId }).then(() => {
           this.connected = false
           this.callEnded = true
@@ -768,7 +1062,7 @@ export default {
 .cp-track-title { margin-left: 8px; font-size: 14px; font-weight: 500; color: #1F2A3A; }
 .cp-track-content { font-size: 12px; color: #5A6A7E; margin-top: 4px; }
 
-.cp-action-bar { position: fixed; bottom: 0; left: 220px; right: 0; background: #fff; border-top: 1px solid #DCE2EB; padding: 16px 24px; display: flex; justify-content: center; gap: 16px; z-index: 100; box-shadow: 0 -4px 12px rgba(0,0,0,0.04); }
+.cp-action-bar { position: fixed; bottom: 0; left: 220px; right: 0; background: #fff; border-top: 1px solid #DCE2EB; padding: 12px 24px; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px; z-index: 100; box-shadow: 0 -4px 12px rgba(0,0,0,0.04); }
 .cp-action-btn { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 90px; padding: 12px 20px; border-radius: 8px; font-size: 13px; i { font-size: 20px; }
   &.cp-btn-green { background: linear-gradient(135deg, #2B8C6E, #2B8C6E); border: none; color: #fff; &:hover { background: linear-gradient(135deg, #2B8C6E, #207058); } }
   &.cp-btn-blue { background: linear-gradient(135deg, #255A99, #1A3C6E); border: none; color: #fff; &:hover { background: linear-gradient(135deg, #1A3C6E, #1A3C6E); } }
@@ -778,5 +1072,17 @@ export default {
   &.cp-btn-red { background: linear-gradient(135deg, #C63D4A, #9E2F3A); border: none; color: #fff; &:hover { background: linear-gradient(135deg, #9E2F3A, #7E2530); } }
 }
 .cp-kbd { display: inline-block; padding: 1px 6px; font-size: 11px; font-family: Menlo, Consolas, monospace; line-height: 1.4; color: #5A6A7E; background: rgba(255,255,255,0.85); border: 1px solid #DCE2EB; border-radius: 4px; box-shadow: 0 1px 0 #DCE2EB; }
+.cp-shortcut-setting { color: #909399; font-size: 12px; }
+.cp-kb-tip { margin: 10px 0 6px; font-size: 12px; color: #909399; }
+.cp-kb-list { max-height: 380px; overflow-y: auto; }
+.cp-kb-empty { padding: 24px 0; text-align: center; color: #909399; font-size: 13px; }
+.cp-kb-item { padding: 10px 0; border-bottom: 1px solid #F0F2F5; }
+.cp-kb-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cp-kb-title { font-weight: 600; color: #1F2A3A; }
+.cp-kb-content { margin-top: 4px; font-size: 13px; color: #5A6A7E; line-height: 1.6; white-space: pre-wrap; max-height: 96px; overflow: hidden; }
+.cp-kb-actions { margin-top: 2px; text-align: right; }
+@media (max-width: 1200px) {
+  .cp-action-btn { min-width: 78px; padding: 10px 12px; }
+}
 .cp-action-btn:not(.cp-btn-gray) .cp-kbd { color: #1A3C6E; background: rgba(255,255,255,0.9); border-color: rgba(255,255,255,0.6); }
 </style>

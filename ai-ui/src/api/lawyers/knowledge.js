@@ -28,7 +28,8 @@ export function getKnowledgeByCategory(categoryId) {
 // 根据关键词搜索法律知识库
 export function searchKnowledge(keyword) {
   return request({
-    url: '/lawyers/knowledge/search/' + keyword,
+    // 关键词可能含中文/空格，统一编码，避免路径非法或截断
+    url: '/lawyers/knowledge/search/' + encodeURIComponent(keyword || ''),
     method: 'get'
   })
 }
