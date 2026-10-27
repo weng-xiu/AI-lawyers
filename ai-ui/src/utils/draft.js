@@ -1,10 +1,10 @@
 /**
- * U4 表单防丢失：localStorage 草稿自动保存 / 恢复 / 清除 + 提交防重锁。
+ * U4 表单防丢失：localStorage 草稿自动保存 / 恢复 / 清除 + 服务端草稿 + 提交防重锁。
  *
  * 设计（对应规划文档 U4）：
- *  - 长表单填写中自动保存草稿（防抖 800ms，deep watch 表单对象）；
- *  - 意外关闭 / 刷新后重新打开弹窗，询问恢复；
- *  - 提交成功清除草稿；表单清空时自动移除草稿；
+ *  - 长表单填写中自动保存草稿：先写 localStorage（零延迟），再节流同步到服务端（默认 2s）；
+ *  - 意外关闭 / 刷新 / 换浏览器后重新打开弹窗，取本地与服务端较新的草稿询问恢复；
+ *  - 提交成功清除草稿（本地 + 服务端）；表单清空时自动移除草稿；
  *  - 附带提交防重锁（draftSubmitting + lockSubmit/unlockSubmit），
  *    避免"提交中禁用重复提交"各页重复实现。
  *
@@ -24,7 +24,9 @@
  *   - 提交成功后 this.draftClear();
  *   - 提交按钮 :loading="draftSubmitting"。
  */
-export function createDraftMixin({ key, formKey = 'form', excludes = [], when = null, debounceMs = 800 }) {
+import { getFormDraft, saveFormDraft, deleteFormDraft } from '@/api/lawyers/formDraft'
+
+export function createDraftMixin({ key, formKey = 'form', excludes = [], when = null, debounceMs = 800, serverSyncMs = 2000 }) {
   const kOf = vm => (typeof key === 'function' ? key(vm) : key)
 
   /** 判断草稿数据是否含有效填写值（全空视为无草稿） */
@@ -45,6 +47,18 @@ export function createDraftMixin({ key, formKey = 'form', excludes = [], when = 
     return data
   }
 
+  /** 解析草稿 JSON（本地/服务端同一结构 {ts, data}），脏数据返回 null */
+  function parseDraft(raw) {
+    if (!raw) return null
+    try {
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+      if (!parsed || !parsed.data || !hasValue(parsed.data)) return null
+      return { ts: Number(parsed.ts) || 0, data: parsed.data }
+    } catch (e) {
+      return null
+    }
+  }
+
   return {
     data() {
       return { draftSubmitting: false }
@@ -55,6 +69,7 @@ export function createDraftMixin({ key, formKey = 'form', excludes = [], when = 
         handler: function(val) {
           if (when && !when(this)) return
           clearTimeout(this._draftTimer)
+          clearTimeout(this._draftServerTimer)
           this._draftTimer = setTimeout(() => this.draftSave(), debounceMs)
         }
       }
@@ -67,43 +82,65 @@ export function createDraftMixin({ key, formKey = 'form', excludes = [], when = 
         const data = pickFields(this)
         if (!hasValue(data)) {
           localStorage.removeItem(k)
-          return
+        } else {
+          try {
+            localStorage.setItem(k, JSON.stringify({ ts: Date.now(), data }))
+          } catch (e) {
+            // 存储满 / 隐私模式：草稿不可用不影响主流程
+          }
         }
+        // 本地已落盘，服务端同步再节流一次，避免每次按键都发请求
+        clearTimeout(this._draftServerTimer)
+        this._draftServerTimer = setTimeout(() => this.draftSaveServer(), serverSyncMs)
+      },
+      /** 把本地草稿同步到服务端（失败静默：本地草稿仍可用） */
+      draftSaveServer() {
+        const k = kOf(this)
+        if (!k) return
+        let raw = null
         try {
-          localStorage.setItem(k, JSON.stringify({ ts: Date.now(), data }))
+          raw = localStorage.getItem(k)
         } catch (e) {
-          // 存储满 / 隐私模式：草稿不可用不影响主流程
+          raw = null
         }
+        const req = raw ? saveFormDraft(k, raw) : deleteFormDraft(k)
+        if (req && typeof req.catch === 'function') req.catch(() => {})
       },
       /**
-       * 有草稿则弹"恢复/丢弃"确认。
+       * 有草稿则弹"恢复/丢弃"确认。本地与服务端都取，按 ts 取较新的。
        * @returns {Promise<boolean>} true=已恢复 / false=无草稿或用户丢弃
        */
-      draftRestorePrompt() {
+      async draftRestorePrompt() {
         const k = kOf(this)
-        if (!k) return Promise.resolve(false)
-        let parsed = null
+        if (!k) return false
+        let best = null
         try {
-          parsed = JSON.parse(localStorage.getItem(k))
+          best = parseDraft(localStorage.getItem(k))
         } catch (e) {
-          parsed = null
+          best = null
         }
-        const data = parsed && parsed.data
-        if (!data || !hasValue(data)) {
-          if (k) localStorage.removeItem(k)
-          return Promise.resolve(false)
+        try {
+          const res = await getFormDraft(k)
+          const server = parseDraft(res && res.data ? res.data.content : null)
+          if (server && (!best || server.ts > best.ts)) best = server
+        } catch (e) {
+          // 服务端不可用（离线/接口未部署）：降级为仅本地草稿
         }
-        const time = new Date(parsed.ts).toLocaleString()
+        if (!best) {
+          localStorage.removeItem(k)
+          return false
+        }
+        const time = new Date(best.ts).toLocaleString()
         return this.$confirm(`检测到 ${time} 保存的未提交草稿，是否恢复？`, '草稿恢复', {
           confirmButtonText: '恢复草稿',
           cancelButtonText: '丢弃',
           type: 'info'
         }).then(() => {
           const form = this[formKey] || {}
-          Object.keys(data).forEach(f => {
+          Object.keys(best.data).forEach(f => {
             // 仅恢复表单已有字段（避免残留旧版本字段），excludes 不恢复
             if (excludes.indexOf(f) === -1 && f in form) {
-              this.$set(form, f, data[f])
+              this.$set(form, f, best.data[f])
             }
           })
           return true
@@ -112,10 +149,14 @@ export function createDraftMixin({ key, formKey = 'form', excludes = [], when = 
           return false
         })
       },
-      /** 清除草稿（提交成功后调用） */
+      /** 清除草稿（提交成功后调用）：本地立即删，服务端异步删 */
       draftClear() {
         const k = kOf(this)
-        if (k) localStorage.removeItem(k)
+        if (!k) return
+        localStorage.removeItem(k)
+        clearTimeout(this._draftServerTimer)
+        const req = deleteFormDraft(k)
+        if (req && typeof req.catch === 'function') req.catch(() => {})
       },
       /** 提交防重：上锁（提交按钮转圈） */
       lockSubmit() {
@@ -128,6 +169,7 @@ export function createDraftMixin({ key, formKey = 'form', excludes = [], when = 
     },
     beforeDestroy() {
       clearTimeout(this._draftTimer)
+      clearTimeout(this._draftServerTimer)
     }
   }
 }

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiFormDraftMapper">
+
+    <resultMap type="AiFormDraft" id="AiFormDraftResult">
+        <result property="draftId"     column="draft_id"     />
+        <result property="userId"      column="user_id"      />
+        <result property="formKey"     column="form_key"     />
+        <result property="content"     column="content"      />
+        <result property="updateTime"  column="update_time"  />
+    </resultMap>
+
+    <select id="selectDraft" resultMap="AiFormDraftResult">
+        select draft_id, user_id, form_key, content, update_time
+        from ai_form_draft
+        where user_id = #{userId} and form_key = #{formKey}
+        limit 1
+    </select>
+
+    <insert id="upsertDraft" parameterType="AiFormDraft">
+        insert into ai_form_draft (user_id, form_key, content, update_time)
+        values (#{userId}, #{formKey}, #{content}, #{updateTime})
+        on duplicate key update
+            content = values(content),
+            update_time = values(update_time)
+    </insert>
+
+    <delete id="deleteDraft">
+        delete from ai_form_draft where user_id = #{userId} and form_key = #{formKey}
+    </delete>
+
+</mapper>
