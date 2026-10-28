@@ -7,14 +7,23 @@
         <p class="page-sub">这里展示与您手机号关联的来电工单和跨部门转办进度</p>
       </div>
 
-      <!-- 状态筛选 -->
-      <el-radio-group v-model="query.status" class="status-tabs" size="medium" @change="handleFilter" aria-label="工单状态筛选">
-        <el-radio-button label="">全部</el-radio-button>
-        <el-radio-button label="0">待处理</el-radio-button>
-        <el-radio-button label="1">处理中</el-radio-button>
-        <el-radio-button label="2">已完成</el-radio-button>
-        <el-radio-button label="3">已归档</el-radio-button>
-      </el-radio-group>
+      <!-- 状态筛选：原生 radio 分段（ElementUI 2.15 的 radio-button 未选中时丢 aria-checked，
+           且内嵌 input 触发 axe nested-interactive，故用原生控件保持正确的选中语义） -->
+      <div class="status-tabs" role="radiogroup" aria-label="工单状态筛选">
+        <label
+          v-for="opt in statusOptions"
+          :key="opt.value"
+          class="status-tab"
+          :class="{ 'is-active': query.status === opt.value }">
+          <input
+            type="radio"
+            name="ticket-status"
+            :value="opt.value"
+            :checked="query.status === opt.value"
+            @change="handleFilter(opt.value)">
+          <span>{{ opt.label }}</span>
+        </label>
+      </div>
 
       <div v-loading="loading">
         <div v-if="ticketList.length === 0 && !loading" class="empty-box" role="status">
@@ -81,6 +90,8 @@
       <div v-if="total > 0" class="pagination-container">
         <el-pagination
           background
+          prev-text="上一页"
+          next-text="下一页"
           @current-change="handlePageChange"
           :current-page="query.pageNum"
           :page-size="query.pageSize"
@@ -105,7 +116,14 @@ export default {
       loading: false,
       ticketList: [],
       total: 0,
-      query: { pageNum: 1, pageSize: 10, status: '' }
+      query: { pageNum: 1, pageSize: 10, status: '' },
+      statusOptions: [
+        { value: '', label: '全部' },
+        { value: '0', label: '待处理' },
+        { value: '1', label: '处理中' },
+        { value: '2', label: '已完成' },
+        { value: '3', label: '已归档' }
+      ]
     }
   },
   created() {
@@ -126,7 +144,8 @@ export default {
         announce('工单加载失败，请稍后重试', 'assertive')
       }).finally(() => { this.loading = false })
     },
-    handleFilter() {
+    handleFilter(status) {
+      this.query.status = status
       this.query.pageNum = 1
       this.loadTickets()
     },
@@ -188,8 +207,26 @@ export default {
 .page-title { font-size: 24px; color: #0b1f4a; margin: 0 0 6px; }
 .page-sub { color: #5b6b84; font-size: 14px; margin: 0; }
 
-.status-tabs { margin-bottom: 18px; }
-.status-tabs .el-radio-button__inner { min-height: 40px; padding: 10px 18px; }
+/* 状态分段控件：原生 radio 视觉隐藏，选中态与焦点环由 label 呈现 */
+.status-tabs { display: inline-flex; flex-wrap: wrap; margin-bottom: 18px; }
+.status-tab { position: relative; display: inline-flex; }
+.status-tab input {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%; margin: 0;
+  opacity: 0; cursor: pointer;
+}
+.status-tab span {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 40px; padding: 10px 18px;
+  border: 1px solid #dcdfe6; border-left: none;
+  background: #fff; color: #44505f;
+  font-size: 14px; cursor: pointer;
+}
+.status-tab:first-child span { border-left: 1px solid #dcdfe6; border-radius: 4px 0 0 4px; }
+.status-tab:last-child span { border-radius: 0 4px 4px 0; }
+.status-tab.is-active span { background: #1A3C6E; border-color: #1A3C6E; color: #fff; }
+.status-tab:focus-within { z-index: 1; }
+.status-tab:focus-within span { outline: 3px solid #ffd04b; outline-offset: 2px; }
 
 .ticket-card { margin-bottom: 16px; border-radius: 8px; border-left: 4px solid #255A99; }
 .ticket-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
@@ -227,7 +264,7 @@ html.care-large .process-box p,
 html.care-large .process-title { font-size: 17px; }
 html.care-large .ticket-title { font-size: 20px; }
 html.care-large .big-btn,
-html.care-large .status-tabs .el-radio-button__inner { min-height: 48px; font-size: 17px; }
+html.care-large .status-tab span { min-height: 48px; font-size: 17px; }
 
 html.care-xlarge .page-title { font-size: 32px; }
 html.care-xlarge .page-sub,
@@ -238,7 +275,7 @@ html.care-xlarge .process-title { font-size: 20px; }
 html.care-xlarge .ticket-title { font-size: 24px; }
 html.care-xlarge .ticket-meta { gap: 10px 28px; }
 html.care-xlarge .big-btn,
-html.care-xlarge .status-tabs .el-radio-button__inner { min-height: 52px; font-size: 19px; padding: 12px 24px; }
+html.care-xlarge .status-tab span { min-height: 52px; font-size: 19px; padding: 12px 24px; }
 html.care-xlarge .ticket-card { border-left-width: 6px; }
 
 html.care-high-contrast .portal-page { background: #fff; }
@@ -251,6 +288,8 @@ html.care-high-contrast .process-box p { color: #000; }
 html.care-high-contrast .ticket-card { border: 2px solid #000; border-left: 6px solid #000; }
 html.care-high-contrast .process-box { background: #fff; border: 2px solid #000; }
 html.care-high-contrast .meta-label { color: #333; text-decoration: underline; }
+html.care-high-contrast .status-tab span { border-color: #000; background: #fff; color: #000; }
+html.care-high-contrast .status-tab.is-active span { background: #000; border-color: #000; color: #fff; }
 
 /* U6 移动端：单列大留白，工单元信息纵向紧凑排列 */
 @media (max-width: 768px) {
@@ -259,5 +298,10 @@ html.care-high-contrast .meta-label { color: #333; text-decoration: underline; }
   .page-title { font-size: 20px; }
   .ticket-meta { gap: 4px 16px; }
   .ticket-meta li { width: 100%; }
+
+  /* 状态分段等分换行，保持 >=44px 热区 */
+  .status-tabs { display: flex; }
+  .status-tab { flex: 1 0 auto; }
+  .status-tab span { width: 100%; min-height: 44px; padding: 10px 8px; }
 }
 </style>

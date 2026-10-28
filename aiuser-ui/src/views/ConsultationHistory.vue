@@ -96,13 +96,17 @@
         
         <!-- 分页 -->
         <div class="pagination-container">
+          <!-- 无障碍：prev/next 用文字替代纯图标按钮（button-name）；
+               移除 jumper 避免未标注的 number 输入框（label 规则） -->
           <el-pagination
+            prev-text="上一页"
+            next-text="下一页"
             @size-change="handleSizeChange"
             @current-change="handleCurrentChange"
             :current-page="pagination.currentPage"
             :page-sizes="[10, 20, 50, 100]"
             :page-size="pagination.pageSize"
-            layout="total, sizes, prev, pager, next, jumper"
+            layout="total, sizes, prev, pager, next"
             :total="pagination.total">
           </el-pagination>
         </div>
@@ -123,9 +127,10 @@
       <div class="evaluation-form">
         <div class="rating-container">
           <span>请对本次咨询结果进行评价:</span>
-          <el-rate 
-            v-model="evaluationForm.overallRating" 
+          <el-rate
+            v-model="evaluationForm.overallRating"
             :colors="colors"
+            aria-label="咨询结果满意度评分"
             show-text>
           </el-rate>
         </div>

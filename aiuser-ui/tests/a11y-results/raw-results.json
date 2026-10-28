@@ -51,16 +51,7 @@
     "updateSnapshots": "missing",
     "version": "1.47.2",
     "workers": 1,
-    "webServer": {
-      "command": "npm run dev -- --port 8091",
-      "url": "http://localhost:8091",
-      "timeout": 240000,
-      "reuseExistingServer": false,
-      "env": {
-        "NODE_OPTIONS": "--openssl-legacy-provider",
-        "npm_config_port": "8091"
-      }
-    }
+    "webServer": null
   },
   "suites": [
     {
@@ -69,6 +60,42 @@
       "column": 0,
       "line": 0,
       "specs": [
+        {
+          "title": "axe 扫描：home (/)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "status": "passed",
+                  "duration": 3495,
+                  "errors": [],
+                  "stdout": [
+                    {
+                      "text": "[home] violations=0 critical/serious=0\n"
+                    }
+                  ],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-28T14:05:35.747Z",
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "efa6be2194cbabd98ccd-c4e9067bba5633271313",
+          "file": "axe-scan.spec.js",
+          "line": 50,
+          "column": 3
+        },
         {
           "title": "axe 扫描：login (/login)",
           "ok": true,
@@ -84,7 +111,7 @@
                 {
                   "workerIndex": 0,
                   "status": "passed",
-                  "duration": 21943,
+                  "duration": 3016,
                   "errors": [],
                   "stdout": [
                     {
@@ -93,7 +120,7 @@
                   ],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-20T14:32:26.854Z",
+                  "startTime": "2026-10-28T14:05:39.595Z",
                   "attachments": []
                 }
               ],
@@ -102,7 +129,7 @@
           ],
           "id": "efa6be2194cbabd98ccd-3a80f79523f50c860cf2",
           "file": "axe-scan.spec.js",
-          "line": 49,
+          "line": 50,
           "column": 3
         },
         {
@@ -120,7 +147,7 @@
                 {
                   "workerIndex": 0,
                   "status": "passed",
-                  "duration": 3329,
+                  "duration": 3133,
                   "errors": [],
                   "stdout": [
                     {
@@ -129,7 +156,7 @@
                   ],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-20T14:32:49.913Z",
+                  "startTime": "2026-10-28T14:05:42.615Z",
                   "attachments": []
                 }
               ],
@@ -138,7 +165,7 @@
           ],
           "id": "efa6be2194cbabd98ccd-675f8f6fad1fb5385a19",
           "file": "axe-scan.spec.js",
-          "line": 49,
+          "line": 50,
           "column": 3
         },
         {
@@ -156,7 +183,7 @@
                 {
                   "workerIndex": 0,
                   "status": "passed",
-                  "duration": 3457,
+                  "duration": 3077,
                   "errors": [],
                   "stdout": [
                     {
@@ -165,7 +192,7 @@
                   ],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-20T14:32:53.254Z",
+                  "startTime": "2026-10-28T14:05:45.751Z",
                   "attachments": []
                 }
               ],
@@ -174,7 +201,7 @@
           ],
           "id": "efa6be2194cbabd98ccd-93cdc8f28296f5710df9",
           "file": "axe-scan.spec.js",
-          "line": 49,
+          "line": 50,
           "column": 3
         },
         {
@@ -192,7 +219,7 @@
                 {
                   "workerIndex": 0,
                   "status": "passed",
-                  "duration": 7694,
+                  "duration": 3589,
                   "errors": [],
                   "stdout": [
                     {
@@ -201,7 +228,7 @@
                   ],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-20T14:32:56.722Z",
+                  "startTime": "2026-10-28T14:05:48.831Z",
                   "attachments": []
                 }
               ],
@@ -210,7 +237,7 @@
           ],
           "id": "efa6be2194cbabd98ccd-87f4f32c0db4b59b9c48",
           "file": "axe-scan.spec.js",
-          "line": 49,
+          "line": 50,
           "column": 3
         },
         {
@@ -228,7 +255,7 @@
                 {
                   "workerIndex": 0,
                   "status": "passed",
-                  "duration": 4466,
+                  "duration": 3574,
                   "errors": [],
                   "stdout": [
                     {
@@ -237,7 +264,7 @@
                   ],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-20T14:33:04.489Z",
+                  "startTime": "2026-10-28T14:05:52.423Z",
                   "attachments": []
                 }
               ],
@@ -246,7 +273,7 @@
           ],
           "id": "efa6be2194cbabd98ccd-19de5755171abbef8313",
           "file": "axe-scan.spec.js",
-          "line": 49,
+          "line": 50,
           "column": 3
         },
         {
@@ -264,7 +291,7 @@
                 {
                   "workerIndex": 0,
                   "status": "passed",
-                  "duration": 4680,
+                  "duration": 3541,
                   "errors": [],
                   "stdout": [
                     {
@@ -273,7 +300,7 @@
                   ],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-20T14:33:08.959Z",
+                  "startTime": "2026-10-28T14:05:56.000Z",
                   "attachments": []
                 }
               ],
@@ -282,7 +309,7 @@
           ],
           "id": "efa6be2194cbabd98ccd-6256ad64df7135edbf3e",
           "file": "axe-scan.spec.js",
-          "line": 49,
+          "line": 50,
           "column": 3
         },
         {
@@ -300,7 +327,7 @@
                 {
                   "workerIndex": 0,
                   "status": "passed",
-                  "duration": 4887,
+                  "duration": 3608,
                   "errors": [],
                   "stdout": [
                     {
@@ -309,7 +336,7 @@
                   ],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-20T14:33:13.669Z",
+                  "startTime": "2026-10-28T14:05:59.544Z",
                   "attachments": []
                 }
               ],
@@ -318,7 +345,7 @@
           ],
           "id": "efa6be2194cbabd98ccd-76638b3721b8cd1f5e04",
           "file": "axe-scan.spec.js",
-          "line": 49,
+          "line": 50,
           "column": 3
         },
         {
@@ -336,7 +363,7 @@
                 {
                   "workerIndex": 0,
                   "status": "passed",
-                  "duration": 7044,
+                  "duration": 3593,
                   "errors": [],
                   "stdout": [
                     {
@@ -345,7 +372,7 @@
                   ],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-20T14:33:18.575Z",
+                  "startTime": "2026-10-28T14:06:03.155Z",
                   "attachments": []
                 }
               ],
@@ -354,7 +381,7 @@
           ],
           "id": "efa6be2194cbabd98ccd-b3a3de4c73ff2029a458",
           "file": "axe-scan.spec.js",
-          "line": 49,
+          "line": 50,
           "column": 3
         },
         {
@@ -372,7 +399,7 @@
                 {
                   "workerIndex": 0,
                   "status": "passed",
-                  "duration": 5549,
+                  "duration": 3611,
                   "errors": [],
                   "stdout": [
                     {
@@ -381,7 +408,7 @@
                   ],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-20T14:33:25.671Z",
+                  "startTime": "2026-10-28T14:06:06.751Z",
                   "attachments": []
                 }
               ],
@@ -390,7 +417,7 @@
           ],
           "id": "efa6be2194cbabd98ccd-4e85a760ea1ecac092cd",
           "file": "axe-scan.spec.js",
-          "line": 49,
+          "line": 50,
           "column": 3
         }
       ]
@@ -398,9 +425,9 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-10-20T14:31:40.009Z",
-    "duration": 113252.985,
-    "expected": 9,
+    "startTime": "2026-10-28T14:05:33.124Z",
+    "duration": 38340.292,
+    "expected": 10,
     "skipped": 0,
     "unexpected": 0,
     "flaky": 0

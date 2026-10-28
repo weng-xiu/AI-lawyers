@@ -45,9 +45,10 @@
           <el-form :model="evaluationForm" :rules="rules" ref="evaluationForm" label-width="100px">
             <el-form-item label="总体评价" prop="overallRating">
               <div class="rating-container">
-                <el-rate 
-                  v-model="evaluationForm.overallRating" 
+                <el-rate
+                  v-model="evaluationForm.overallRating"
                   :colors="colors"
+                  aria-label="总体评价"
                   show-text
                   :texts="ratingTexts">
                 </el-rate>

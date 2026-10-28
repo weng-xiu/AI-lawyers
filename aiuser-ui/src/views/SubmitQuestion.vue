@@ -60,7 +60,10 @@
       :close-on-press-escape="false"
       :show-close="false">
       <div style="text-align: center;">
-        <el-progress :percentage="processingPercentage" :status="processingStatus || undefined"></el-progress>
+        <el-progress
+          :percentage="processingPercentage"
+          :status="processingStatus || undefined"
+          aria-label="咨询处理进度"></el-progress>
         <p style="margin-top: 15px;">{{ processingMessage }}</p>
       </div>
     </el-dialog>

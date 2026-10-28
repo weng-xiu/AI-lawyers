@@ -4,7 +4,7 @@
     <section class="home-hero" aria-labelledby="home-title">
       <div class="hero-inner">
         <p class="hero-eyebrow">12348 公共法律服务 · 在线咨询</p>
-        <h1 id="home-title" class="hero-title">法律问题，先问一声 AI 律师</h1>
+        <h2 id="home-title" class="hero-title">法律问题，先问一声 AI 律师</h2>
         <p class="hero-sub">免费、7×24 小时在线。说清您的纠纷，AI 律师即时给出维权建议；复杂问题可转人工律师或就近公共法律服务机构。</p>
         <div class="hero-actions">
           <router-link class="hero-btn is-primary" to="/consultation/submit">开始免费咨询</router-link>
@@ -135,7 +135,7 @@ export default {
 </script>
 
 <style scoped>
-.home-page { padding-bottom: 8px; background: #f5f7fa; }
+.home-page { padding-bottom: 72px; background: #f5f7fa; }
 
 /* ===== 主视觉 ===== */
 .home-hero {
@@ -173,7 +173,8 @@ export default {
 .section-sub { margin: 0 0 20px; color: #5b6b84; font-size: 15px; line-height: 1.6; }
 
 /* ===== 场景卡：大字号 + 大热区 ===== */
-.scene-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
+.scene-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.scene-card.is-primary { grid-column: span 2; }
 .scene-card {
   display: flex; flex-direction: column;
   min-height: 190px; padding: 22px 20px;
@@ -298,6 +299,7 @@ html.care-high-contrast .flow-step:not(:last-child)::after { background: #000; }
 
 /* ===== 响应式：平板两列、手机单列 ===== */
 @media (max-width: 900px) {
+  .scene-grid { grid-template-columns: repeat(2, 1fr); }
   .flow-list { grid-template-columns: repeat(2, 1fr); gap: 22px 24px; }
   .flow-step:nth-child(2)::after { display: none; }
 }
@@ -309,6 +311,7 @@ html.care-high-contrast .flow-step:not(:last-child)::after { background: #000; }
   .home-section { padding: 30px 12px 0; }
   .section-title { font-size: 22px; }
   .scene-grid { grid-template-columns: 1fr; gap: 12px; }
+  .scene-card.is-primary { grid-column: auto; }
   .scene-card { min-height: 0; padding: 18px 16px; }
   .help-card { flex-direction: column; align-items: stretch; padding: 20px 18px; }
   .help-actions { width: 100%; }

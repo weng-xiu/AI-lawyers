@@ -36,6 +36,7 @@
                   :percentage="confidencePercent"
                   :color="getConfidenceColor(confidencePercent)"
                   :show-text="true"
+                  aria-label="AI 解答置信度"
                   :format="formatConfidence">
                 </el-progress>
               </div>
@@ -90,9 +91,10 @@
               <h3>满意度评价</h3>
               <div class="rating-container">
                 <span>请对本次咨询结果进行评价:</span>
-                <el-rate 
-                  v-model="rating" 
+                <el-rate
+                  v-model="rating"
                   :colors="colors"
+                  aria-label="咨询结果满意度评分"
                   show-text>
                 </el-rate>
               </div>
@@ -293,7 +295,8 @@ export default {
 }
 
 .question-time {
-  color: #909399;
+  /* 无障碍：#909399 在白底仅 3.07:1，改为满足 4.5:1 的深灰蓝 */
+  color: #5b6b84;
   font-size: 14px;
 }
 

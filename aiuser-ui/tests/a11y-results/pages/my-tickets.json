@@ -13,8 +13,8 @@
     "orientationAngle": 0,
     "orientationType": "landscape-primary"
   },
-  "timestamp": "2026-10-28T13:22:30.373Z",
-  "url": "http://localhost:8091/ticket",
+  "timestamp": "2026-10-28T14:05:52.022Z",
+  "url": "http://localhost:8093/ticket",
   "toolOptions": {
     "runOnly": {
       "type": "tag",
@@ -51,21 +51,6 @@
       "nodes": []
     },
     {
-      "id": "aria-allowed-attr",
-      "impact": null,
-      "tags": [
-        "cat.aria",
-        "wcag2a",
-        "wcag412",
-        "EN-301-549",
-        "EN-9.4.1.2"
-      ],
-      "description": "Ensures an element's role supports its ARIA attributes",
-      "help": "Elements must only use supported ARIA attributes",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-allowed-attr?application=playwright",
-      "nodes": []
-    },
-    {
       "id": "aria-braille-equivalent",
       "impact": null,
       "tags": [
@@ -78,71 +63,6 @@
       "description": "Ensure aria-braillelabel and aria-brailleroledescription have a non-braille equivalent",
       "help": "aria-braille attributes must have a non-braille equivalent",
       "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-braille-equivalent?application=playwright",
-      "nodes": []
-    },
-    {
-      "id": "aria-command-name",
-      "impact": null,
-      "tags": [
-        "cat.aria",
-        "wcag2a",
-        "wcag412",
-        "TTv5",
-        "TT6.a",
-        "EN-301-549",
-        "EN-9.4.1.2",
-        "ACT"
-      ],
-      "description": "Ensures every ARIA button, link and menuitem has an accessible name",
-      "help": "ARIA commands must have an accessible name",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-command-name?application=playwright",
-      "nodes": []
-    },
-    {
-      "id": "aria-conditional-attr",
-      "impact": null,
-      "tags": [
-        "cat.aria",
-        "wcag2a",
-        "wcag412",
-        "EN-301-549",
-        "EN-9.4.1.2"
-      ],
-      "description": "Ensures ARIA attributes are used as described in the specification of the element's role",
-      "help": "ARIA attributes must be used as specified for the element's role",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-conditional-attr?application=playwright",
-      "nodes": []
-    },
-    {
-      "id": "aria-deprecated-role",
-      "impact": null,
-      "tags": [
-        "cat.aria",
-        "wcag2a",
-        "wcag412",
-        "EN-301-549",
-        "EN-9.4.1.2"
-      ],
-      "description": "Ensures elements do not use deprecated roles",
-      "help": "Deprecated ARIA roles must not be used",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-deprecated-role?application=playwright",
-      "nodes": []
-    },
-    {
-      "id": "aria-hidden-focus",
-      "impact": null,
-      "tags": [
-        "cat.name-role-value",
-        "wcag2a",
-        "wcag412",
-        "TTv5",
-        "TT6.a",
-        "EN-301-549",
-        "EN-9.4.1.2"
-      ],
-      "description": "Ensures aria-hidden elements are not focusable nor contain focusable elements",
-      "help": "ARIA hidden element must not be focusable or contain focusable elements",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-hidden-focus?application=playwright",
       "nodes": []
     },
     {
@@ -194,66 +114,6 @@
       "nodes": []
     },
     {
-      "id": "aria-prohibited-attr",
-      "impact": null,
-      "tags": [
-        "cat.aria",
-        "wcag2a",
-        "wcag412",
-        "EN-301-549",
-        "EN-9.4.1.2"
-      ],
-      "description": "Ensures ARIA attributes are not prohibited for an element's role",
-      "help": "Elements must only use permitted ARIA attributes",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-prohibited-attr?application=playwright",
-      "nodes": []
-    },
-    {
-      "id": "aria-required-attr",
-      "impact": null,
-      "tags": [
-        "cat.aria",
-        "wcag2a",
-        "wcag412",
-        "EN-301-549",
-        "EN-9.4.1.2"
-      ],
-      "description": "Ensures elements with ARIA roles have all required ARIA attributes",
-      "help": "Required ARIA attributes must be provided",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-required-attr?application=playwright",
-      "nodes": []
-    },
-    {
-      "id": "aria-required-children",
-      "impact": null,
-      "tags": [
-        "cat.aria",
-        "wcag2a",
-        "wcag131",
-        "EN-301-549",
-        "EN-9.1.3.1"
-      ],
-      "description": "Ensures elements with an ARIA role that require child roles contain them",
-      "help": "Certain ARIA roles must contain particular children",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-required-children?application=playwright",
-      "nodes": []
-    },
-    {
-      "id": "aria-required-parent",
-      "impact": null,
-      "tags": [
-        "cat.aria",
-        "wcag2a",
-        "wcag131",
-        "EN-301-549",
-        "EN-9.1.3.1"
-      ],
-      "description": "Ensures elements with an ARIA role that require parent roles are contained by them",
-      "help": "Certain ARIA roles must be contained by particular parents",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-required-parent?application=playwright",
-      "nodes": []
-    },
-    {
       "id": "aria-roledescription",
       "impact": null,
       "tags": [
@@ -267,21 +127,6 @@
       "description": "Ensure aria-roledescription is only used on elements with an implicit or explicit role",
       "help": "aria-roledescription must be on elements with a semantic role",
       "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-roledescription?application=playwright",
-      "nodes": []
-    },
-    {
-      "id": "aria-roles",
-      "impact": null,
-      "tags": [
-        "cat.aria",
-        "wcag2a",
-        "wcag412",
-        "EN-301-549",
-        "EN-9.4.1.2"
-      ],
-      "description": "Ensures all elements with a role attribute use a valid value",
-      "help": "ARIA roles used must conform to valid values",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-roles?application=playwright",
       "nodes": []
     },
     {
@@ -318,36 +163,6 @@
       "nodes": []
     },
     {
-      "id": "aria-valid-attr-value",
-      "impact": null,
-      "tags": [
-        "cat.aria",
-        "wcag2a",
-        "wcag412",
-        "EN-301-549",
-        "EN-9.4.1.2"
-      ],
-      "description": "Ensures all ARIA attributes have valid values",
-      "help": "ARIA attributes must conform to valid values",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-valid-attr-value?application=playwright",
-      "nodes": []
-    },
-    {
-      "id": "aria-valid-attr",
-      "impact": null,
-      "tags": [
-        "cat.aria",
-        "wcag2a",
-        "wcag412",
-        "EN-301-549",
-        "EN-9.4.1.2"
-      ],
-      "description": "Ensures attributes that begin with aria- are valid ARIA attributes",
-      "help": "ARIA attributes must conform to valid names",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-valid-attr?application=playwright",
-      "nodes": []
-    },
-    {
       "id": "audio-caption",
       "impact": null,
       "tags": [
@@ -363,38 +178,6 @@
       "description": "Ensures <audio> elements have captions",
       "help": "<audio> elements must have a captions track",
       "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/audio-caption?application=playwright",
-      "nodes": []
-    },
-    {
-      "id": "autocomplete-valid",
-      "impact": null,
-      "tags": [
-        "cat.forms",
-        "wcag21aa",
-        "wcag135",
-        "EN-301-549",
-        "EN-9.1.3.5",
-        "ACT"
-      ],
-      "description": "Ensure the autocomplete attribute is correct and suitable for the form field",
-      "help": "autocomplete attribute must be used correctly",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/autocomplete-valid?application=playwright",
-      "nodes": []
-    },
-    {
-      "id": "avoid-inline-spacing",
-      "impact": null,
-      "tags": [
-        "cat.structure",
-        "wcag21aa",
-        "wcag1412",
-        "EN-301-549",
-        "EN-9.1.4.12",
-        "ACT"
-      ],
-      "description": "Ensure that text spacing set through style attributes can be adjusted with custom stylesheets",
-      "help": "Inline text spacing must be adjustable with custom stylesheets",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/avoid-inline-spacing?application=playwright",
       "nodes": []
     },
     {
@@ -414,63 +197,6 @@
       "description": "Ensures <blink> elements are not used",
       "help": "<blink> elements are deprecated and must not be used",
       "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/blink?application=playwright",
-      "nodes": []
-    },
-    {
-      "id": "button-name",
-      "impact": null,
-      "tags": [
-        "cat.name-role-value",
-        "wcag2a",
-        "wcag412",
-        "section508",
-        "section508.22.a",
-        "TTv5",
-        "TT6.a",
-        "EN-301-549",
-        "EN-9.4.1.2",
-        "ACT"
-      ],
-      "description": "Ensures buttons have discernible text",
-      "help": "Buttons must have discernible text",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/button-name?application=playwright",
-      "nodes": []
-    },
-    {
-      "id": "bypass",
-      "impact": null,
-      "tags": [
-        "cat.keyboard",
-        "wcag2a",
-        "wcag241",
-        "section508",
-        "section508.22.o",
-        "TTv5",
-        "TT9.a",
-        "EN-301-549",
-        "EN-9.2.4.1"
-      ],
-      "description": "Ensures each page has at least one mechanism for a user to bypass navigation and jump straight to the content",
-      "help": "Page must have means to bypass repeated blocks",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/bypass?application=playwright",
-      "nodes": []
-    },
-    {
-      "id": "color-contrast",
-      "impact": null,
-      "tags": [
-        "cat.color",
-        "wcag2aa",
-        "wcag143",
-        "TTv5",
-        "TT13.c",
-        "EN-301-549",
-        "EN-9.1.4.3",
-        "ACT"
-      ],
-      "description": "Ensures the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
-      "help": "Elements must meet minimum color contrast ratio thresholds",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/color-contrast?application=playwright",
       "nodes": []
     },
     {
@@ -501,38 +227,6 @@
       "description": "Ensures <dt> and <dd> elements are contained by a <dl>",
       "help": "<dt> and <dd> elements must be contained by a <dl>",
       "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/dlitem?application=playwright",
-      "nodes": []
-    },
-    {
-      "id": "duplicate-id-aria",
-      "impact": null,
-      "tags": [
-        "cat.parsing",
-        "wcag2a",
-        "wcag412",
-        "EN-301-549",
-        "EN-9.4.1.2"
-      ],
-      "description": "Ensures every id attribute value used in ARIA and in labels is unique",
-      "help": "IDs used in ARIA and labels must be unique",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/duplicate-id-aria?application=playwright",
-      "nodes": []
-    },
-    {
-      "id": "form-field-multiple-labels",
-      "impact": null,
-      "tags": [
-        "cat.forms",
-        "wcag2a",
-        "wcag332",
-        "TTv5",
-        "TT5.c",
-        "EN-301-549",
-        "EN-9.3.3.2"
-      ],
-      "description": "Ensures form field does not have multiple label elements",
-      "help": "Form field must not have multiple label elements",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/form-field-multiple-labels?application=playwright",
       "nodes": []
     },
     {
@@ -668,26 +362,6 @@
       "nodes": []
     },
     {
-      "id": "label",
-      "impact": null,
-      "tags": [
-        "cat.forms",
-        "wcag2a",
-        "wcag412",
-        "section508",
-        "section508.22.n",
-        "TTv5",
-        "TT5.c",
-        "EN-301-549",
-        "EN-9.4.1.2",
-        "ACT"
-      ],
-      "description": "Ensures every form element has a label",
-      "help": "Form elements must have labels",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/label?application=playwright",
-      "nodes": []
-    },
-    {
       "id": "link-in-text-block",
       "impact": null,
       "tags": [
@@ -702,28 +376,6 @@
       "description": "Ensure links are distinguished from surrounding text in a way that does not rely on color",
       "help": "Links must be distinguishable without relying on color",
       "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/link-in-text-block?application=playwright",
-      "nodes": []
-    },
-    {
-      "id": "link-name",
-      "impact": null,
-      "tags": [
-        "cat.name-role-value",
-        "wcag2a",
-        "wcag244",
-        "wcag412",
-        "section508",
-        "section508.22.a",
-        "TTv5",
-        "TT6.a",
-        "EN-301-549",
-        "EN-9.2.4.4",
-        "EN-9.4.1.2",
-        "ACT"
-      ],
-      "description": "Ensures links have discernible text",
-      "help": "Links must have discernible text",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/link-name?application=playwright",
       "nodes": []
     },
     {
@@ -791,23 +443,6 @@
       "nodes": []
     },
     {
-      "id": "nested-interactive",
-      "impact": null,
-      "tags": [
-        "cat.keyboard",
-        "wcag2a",
-        "wcag412",
-        "TTv5",
-        "TT6.a",
-        "EN-301-549",
-        "EN-9.4.1.2"
-      ],
-      "description": "Ensures interactive controls are not nested as they are not always announced by screen readers or can cause focus problems for assistive technologies",
-      "help": "Interactive controls must not be nested",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/nested-interactive?application=playwright",
-      "nodes": []
-    },
-    {
       "id": "object-alt",
       "impact": null,
       "tags": [
@@ -842,25 +477,6 @@
       "description": "Ensures [role=\"img\"] elements have alternate text",
       "help": "[role=\"img\"] elements must have an alternative text",
       "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/role-img-alt?application=playwright",
-      "nodes": []
-    },
-    {
-      "id": "scrollable-region-focusable",
-      "impact": null,
-      "tags": [
-        "cat.keyboard",
-        "wcag2a",
-        "wcag211",
-        "wcag213",
-        "TTv5",
-        "TT4.a",
-        "EN-301-549",
-        "EN-9.2.1.1",
-        "EN-9.2.1.3"
-      ],
-      "description": "Ensure elements that have scrollable content are accessible by keyboard",
-      "help": "Scrollable region must have keyboard access",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/scrollable-region-focusable?application=playwright",
       "nodes": []
     },
     {
@@ -1018,6 +634,909 @@
   ],
   "passes": [
     {
+      "id": "aria-allowed-attr",
+      "impact": null,
+      "tags": [
+        "cat.aria",
+        "wcag2a",
+        "wcag412",
+        "EN-301-549",
+        "EN-9.4.1.2"
+      ],
+      "description": "Ensures an element's role supports its ARIA attributes",
+      "help": "Elements must only use supported ARIA attributes",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-allowed-attr?application=playwright",
+      "nodes": [
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-allowed-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attributes are used correctly for the defined role"
+            }
+          ],
+          "none": [
+            {
+              "id": "aria-unsupported-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute is supported"
+            }
+          ],
+          "impact": null,
+          "html": "<div id=\"a11y-announcer\" aria-atomic=\"false\" class=\"sr-only\"><span data-role=\"polite\" aria-live=\"polite\">工单加载完成，共 0 条，</span><span data-role=\"assertive\" aria-live=\"assertive\"></span></div>",
+          "target": [
+            "#a11y-announcer"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-allowed-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attributes are used correctly for the defined role"
+            }
+          ],
+          "none": [
+            {
+              "id": "aria-unsupported-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute is supported"
+            }
+          ],
+          "impact": null,
+          "html": "<span data-role=\"polite\" aria-live=\"polite\">工单加载完成，共 0 条，</span>",
+          "target": [
+            "span[data-role=\"polite\"]"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-allowed-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attributes are used correctly for the defined role"
+            }
+          ],
+          "none": [
+            {
+              "id": "aria-unsupported-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute is supported"
+            }
+          ],
+          "impact": null,
+          "html": "<span data-role=\"assertive\" aria-live=\"assertive\"></span>",
+          "target": [
+            "span[data-role=\"assertive\"]"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-allowed-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attributes are used correctly for the defined role"
+            }
+          ],
+          "none": [
+            {
+              "id": "aria-unsupported-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute is supported"
+            }
+          ],
+          "impact": null,
+          "html": "<a href=\"tel:12348\" aria-label=\"语音求助，拨打 12348 公共法律服务人工热线\" class=\"voice-help\"><i class=\"el-icon-phone-outline\"></i><span class=\"voice-help-text\">语音求助</span></a>",
+          "target": [
+            ".voice-help"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-allowed-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attributes are used correctly for the defined role"
+            }
+          ],
+          "none": [
+            {
+              "id": "aria-unsupported-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute is supported"
+            }
+          ],
+          "impact": null,
+          "html": "<div data-v-106964d2=\"\" role=\"group\" aria-label=\"无障碍与语言设置\" class=\"care-controls care-controls--inline\">",
+          "target": [
+            ".care-controls"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-allowed-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attributes are used correctly for the defined role"
+            }
+          ],
+          "none": [
+            {
+              "id": "aria-unsupported-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute is supported"
+            }
+          ],
+          "impact": null,
+          "html": "<div data-v-106964d2=\"\" role=\"radiogroup\" aria-label=\"字号大小\" class=\"care-seg\">",
+          "target": [
+            ".care-seg"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-allowed-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attributes are used correctly for the defined role"
+            }
+          ],
+          "none": [
+            {
+              "id": "aria-unsupported-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute is supported"
+            }
+          ],
+          "impact": null,
+          "html": "<div data-v-106964d2=\"\" class=\"el-select el-select--mini\" aria-label=\"语种偏好\">",
+          "target": [
+            ".el-select"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-allowed-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attributes are used correctly for the defined role"
+            }
+          ],
+          "none": [
+            {
+              "id": "aria-unsupported-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute is supported"
+            }
+          ],
+          "impact": null,
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-9599\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "target": [
+            ".el-dropdown-link"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-allowed-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attributes are used correctly for the defined role"
+            }
+          ],
+          "none": [
+            {
+              "id": "aria-unsupported-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute is supported"
+            }
+          ],
+          "impact": null,
+          "html": "<section data-v-11aaed5e=\"\" aria-label=\"我的工单\" class=\"page-wrap\">",
+          "target": [
+            ".page-wrap"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-allowed-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attributes are used correctly for the defined role"
+            }
+          ],
+          "none": [
+            {
+              "id": "aria-unsupported-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute is supported"
+            }
+          ],
+          "impact": null,
+          "html": "<div data-v-11aaed5e=\"\" role=\"radiogroup\" aria-label=\"工单状态筛选\" class=\"status-tabs\">",
+          "target": [
+            ".status-tabs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "aria-command-name",
+      "impact": null,
+      "tags": [
+        "cat.aria",
+        "wcag2a",
+        "wcag412",
+        "TTv5",
+        "TT6.a",
+        "EN-301-549",
+        "EN-9.4.1.2",
+        "ACT"
+      ],
+      "description": "Ensures every ARIA button, link and menuitem has an accessible name",
+      "help": "ARIA commands must have an accessible name",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-command-name?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "has-visible-text",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has text that is visible to screen readers"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">首页</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(1)"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "has-visible-text",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has text that is visible to screen readers"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我要咨询</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(2)"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "has-visible-text",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has text that is visible to screen readers"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item is-active\" style=\"color: rgb(201, 169, 110); border-bottom-color: rgb(201, 169, 110); background-color: rgb(26, 60, 110);\">我的工单</li>",
+          "target": [
+            ".is-active.el-menu-item[role=\"menuitem\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "has-visible-text",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has text that is visible to screen readers"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">渠道绑定</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(4)"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "has-visible-text",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has text that is visible to screen readers"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">服务导航</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(5)"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "has-visible-text",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has text that is visible to screen readers"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">咨询历史</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(6)"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "has-visible-text",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has text that is visible to screen readers"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item elderly-entry\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">长辈专区</li>",
+          "target": [
+            ".elderly-entry"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "has-visible-text",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has text that is visible to screen readers"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-9599\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "target": [
+            ".el-dropdown-link"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "aria-conditional-attr",
+      "impact": null,
+      "tags": [
+        "cat.aria",
+        "wcag2a",
+        "wcag412",
+        "EN-301-549",
+        "EN-9.4.1.2"
+      ],
+      "description": "Ensures ARIA attributes are used as described in the specification of the element's role",
+      "help": "ARIA attributes must be used as specified for the element's role",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-conditional-attr?application=playwright",
+      "nodes": [
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-conditional-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "ARIA attribute is allowed"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<div id=\"a11y-announcer\" aria-atomic=\"false\" class=\"sr-only\"><span data-role=\"polite\" aria-live=\"polite\">工单加载完成，共 0 条，</span><span data-role=\"assertive\" aria-live=\"assertive\"></span></div>",
+          "target": [
+            "#a11y-announcer"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-conditional-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "ARIA attribute is allowed"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<span data-role=\"polite\" aria-live=\"polite\">工单加载完成，共 0 条，</span>",
+          "target": [
+            "span[data-role=\"polite\"]"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-conditional-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "ARIA attribute is allowed"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<span data-role=\"assertive\" aria-live=\"assertive\"></span>",
+          "target": [
+            "span[data-role=\"assertive\"]"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-conditional-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "ARIA attribute is allowed"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<a href=\"tel:12348\" aria-label=\"语音求助，拨打 12348 公共法律服务人工热线\" class=\"voice-help\"><i class=\"el-icon-phone-outline\"></i><span class=\"voice-help-text\">语音求助</span></a>",
+          "target": [
+            ".voice-help"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-conditional-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "ARIA attribute is allowed"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<div data-v-106964d2=\"\" role=\"group\" aria-label=\"无障碍与语言设置\" class=\"care-controls care-controls--inline\">",
+          "target": [
+            ".care-controls"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-conditional-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "ARIA attribute is allowed"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<div data-v-106964d2=\"\" role=\"radiogroup\" aria-label=\"字号大小\" class=\"care-seg\">",
+          "target": [
+            ".care-seg"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-conditional-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "ARIA attribute is allowed"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<div data-v-106964d2=\"\" class=\"el-select el-select--mini\" aria-label=\"语种偏好\">",
+          "target": [
+            ".el-select"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-conditional-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "ARIA attribute is allowed"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-9599\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "target": [
+            ".el-dropdown-link"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-conditional-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "ARIA attribute is allowed"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<section data-v-11aaed5e=\"\" aria-label=\"我的工单\" class=\"page-wrap\">",
+          "target": [
+            ".page-wrap"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-conditional-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "ARIA attribute is allowed"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<div data-v-11aaed5e=\"\" role=\"radiogroup\" aria-label=\"工单状态筛选\" class=\"status-tabs\">",
+          "target": [
+            ".status-tabs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "aria-deprecated-role",
+      "impact": null,
+      "tags": [
+        "cat.aria",
+        "wcag2a",
+        "wcag412",
+        "EN-301-549",
+        "EN-9.4.1.2"
+      ],
+      "description": "Ensures elements do not use deprecated roles",
+      "help": "Deprecated ARIA roles must not be used",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-deprecated-role?application=playwright",
+      "nodes": [
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "deprecatedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "minor",
+              "message": "ARIA role is not deprecated"
+            }
+          ],
+          "impact": null,
+          "html": "<ul role=\"menubar\" class=\"nav-menu desktop-only el-menu--horizontal el-menu\" style=\"background-color: rgb(26, 60, 110);\">",
+          "target": [
+            ".nav-menu"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "deprecatedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "minor",
+              "message": "ARIA role is not deprecated"
+            }
+          ],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">首页</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(1)"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "deprecatedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "minor",
+              "message": "ARIA role is not deprecated"
+            }
+          ],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我要咨询</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(2)"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "deprecatedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "minor",
+              "message": "ARIA role is not deprecated"
+            }
+          ],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item is-active\" style=\"color: rgb(201, 169, 110); border-bottom-color: rgb(201, 169, 110); background-color: rgb(26, 60, 110);\">我的工单</li>",
+          "target": [
+            ".is-active.el-menu-item[role=\"menuitem\"]"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "deprecatedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "minor",
+              "message": "ARIA role is not deprecated"
+            }
+          ],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">渠道绑定</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(4)"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "deprecatedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "minor",
+              "message": "ARIA role is not deprecated"
+            }
+          ],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">服务导航</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(5)"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "deprecatedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "minor",
+              "message": "ARIA role is not deprecated"
+            }
+          ],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">咨询历史</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(6)"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "deprecatedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "minor",
+              "message": "ARIA role is not deprecated"
+            }
+          ],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item elderly-entry\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">长辈专区</li>",
+          "target": [
+            ".elderly-entry"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "deprecatedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "minor",
+              "message": "ARIA role is not deprecated"
+            }
+          ],
+          "impact": null,
+          "html": "<div data-v-106964d2=\"\" role=\"group\" aria-label=\"无障碍与语言设置\" class=\"care-controls care-controls--inline\">",
+          "target": [
+            ".care-controls"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "deprecatedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "minor",
+              "message": "ARIA role is not deprecated"
+            }
+          ],
+          "impact": null,
+          "html": "<div data-v-106964d2=\"\" role=\"radiogroup\" aria-label=\"字号大小\" class=\"care-seg\">",
+          "target": [
+            ".care-seg"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "deprecatedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "minor",
+              "message": "ARIA role is not deprecated"
+            }
+          ],
+          "impact": null,
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-9599\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "target": [
+            ".el-dropdown-link"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "deprecatedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "minor",
+              "message": "ARIA role is not deprecated"
+            }
+          ],
+          "impact": null,
+          "html": "<main id=\"main-content\" role=\"main\" tabindex=\"-1\" class=\"main-region\">",
+          "target": [
+            "#main-content"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "deprecatedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "minor",
+              "message": "ARIA role is not deprecated"
+            }
+          ],
+          "impact": null,
+          "html": "<div data-v-11aaed5e=\"\" role=\"radiogroup\" aria-label=\"工单状态筛选\" class=\"status-tabs\">",
+          "target": [
+            ".status-tabs"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "deprecatedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "minor",
+              "message": "ARIA role is not deprecated"
+            }
+          ],
+          "impact": null,
+          "html": "<div data-v-11aaed5e=\"\" role=\"status\" class=\"empty-box\"><i data-v-11aaed5e=\"\" class=\"el-icon-document\"></i><p data-v-11aaed5e=\"\">暂无工单记录</p><button data-v-11aaed5e=\"\" type=\"button\" class=\"el-button big-btn el-button--primary\"><!----><!----><span>去提交法律咨询</span></button></div>",
+          "target": [
+            ".empty-box"
+          ]
+        }
+      ]
+    },
+    {
       "id": "aria-hidden-body",
       "impact": null,
       "tags": [
@@ -1049,6 +1568,2675 @@
           "html": "<body>",
           "target": [
             "body"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "aria-hidden-focus",
+      "impact": null,
+      "tags": [
+        "cat.name-role-value",
+        "wcag2a",
+        "wcag412",
+        "TTv5",
+        "TT6.a",
+        "EN-301-549",
+        "EN-9.4.1.2"
+      ],
+      "description": "Ensures aria-hidden elements are not focusable nor contain focusable elements",
+      "help": "ARIA hidden element must not be focusable or contain focusable elements",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-hidden-focus?application=playwright",
+      "nodes": [
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "No focusable elements while a modal is open"
+            },
+            {
+              "id": "focusable-disabled",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "No focusable elements contained within element"
+            },
+            {
+              "id": "focusable-not-tabbable",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "No focusable elements contained within element"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<span data-v-106964d2=\"\" aria-hidden=\"true\" class=\"care-switch-track\"></span>",
+          "target": [
+            ".care-switch-track"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "tags": [
+        "cat.aria",
+        "wcag2a",
+        "wcag412",
+        "EN-301-549",
+        "EN-9.4.1.2"
+      ],
+      "description": "Ensures ARIA attributes are not prohibited for an element's role",
+      "help": "Elements must only use permitted ARIA attributes",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-prohibited-attr?application=playwright",
+      "nodes": [
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "aria-prohibited-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "ARIA attribute is allowed"
+            }
+          ],
+          "impact": null,
+          "html": "<div id=\"a11y-announcer\" aria-atomic=\"false\" class=\"sr-only\"><span data-role=\"polite\" aria-live=\"polite\">工单加载完成，共 0 条，</span><span data-role=\"assertive\" aria-live=\"assertive\"></span></div>",
+          "target": [
+            "#a11y-announcer"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "aria-prohibited-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "ARIA attribute is allowed"
+            }
+          ],
+          "impact": null,
+          "html": "<span data-role=\"polite\" aria-live=\"polite\">工单加载完成，共 0 条，</span>",
+          "target": [
+            "span[data-role=\"polite\"]"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "aria-prohibited-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "ARIA attribute is allowed"
+            }
+          ],
+          "impact": null,
+          "html": "<span data-role=\"assertive\" aria-live=\"assertive\"></span>",
+          "target": [
+            "span[data-role=\"assertive\"]"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "aria-prohibited-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "ARIA attribute is allowed"
+            }
+          ],
+          "impact": null,
+          "html": "<a href=\"tel:12348\" aria-label=\"语音求助，拨打 12348 公共法律服务人工热线\" class=\"voice-help\"><i class=\"el-icon-phone-outline\"></i><span class=\"voice-help-text\">语音求助</span></a>",
+          "target": [
+            ".voice-help"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "aria-prohibited-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "ARIA attribute is allowed"
+            }
+          ],
+          "impact": null,
+          "html": "<div data-v-106964d2=\"\" role=\"group\" aria-label=\"无障碍与语言设置\" class=\"care-controls care-controls--inline\">",
+          "target": [
+            ".care-controls"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "aria-prohibited-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "ARIA attribute is allowed"
+            }
+          ],
+          "impact": null,
+          "html": "<div data-v-106964d2=\"\" role=\"radiogroup\" aria-label=\"字号大小\" class=\"care-seg\">",
+          "target": [
+            ".care-seg"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "aria-prohibited-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "ARIA attribute is allowed"
+            }
+          ],
+          "impact": null,
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-9599\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "target": [
+            ".el-dropdown-link"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "aria-prohibited-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "ARIA attribute is allowed"
+            }
+          ],
+          "impact": null,
+          "html": "<section data-v-11aaed5e=\"\" aria-label=\"我的工单\" class=\"page-wrap\">",
+          "target": [
+            ".page-wrap"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "aria-prohibited-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "ARIA attribute is allowed"
+            }
+          ],
+          "impact": null,
+          "html": "<div data-v-11aaed5e=\"\" role=\"radiogroup\" aria-label=\"工单状态筛选\" class=\"status-tabs\">",
+          "target": [
+            ".status-tabs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "aria-required-attr",
+      "impact": null,
+      "tags": [
+        "cat.aria",
+        "wcag2a",
+        "wcag412",
+        "EN-301-549",
+        "EN-9.4.1.2"
+      ],
+      "description": "Ensures elements with ARIA roles have all required ARIA attributes",
+      "help": "Required ARIA attributes must be provided",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-required-attr?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "aria-required-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "All required ARIA attributes are present"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<ul role=\"menubar\" class=\"nav-menu desktop-only el-menu--horizontal el-menu\" style=\"background-color: rgb(26, 60, 110);\">",
+          "target": [
+            ".nav-menu"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-required-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "All required ARIA attributes are present"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">首页</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(1)"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-required-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "All required ARIA attributes are present"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我要咨询</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(2)"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-required-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "All required ARIA attributes are present"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item is-active\" style=\"color: rgb(201, 169, 110); border-bottom-color: rgb(201, 169, 110); background-color: rgb(26, 60, 110);\">我的工单</li>",
+          "target": [
+            ".is-active.el-menu-item[role=\"menuitem\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-required-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "All required ARIA attributes are present"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">渠道绑定</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(4)"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-required-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "All required ARIA attributes are present"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">服务导航</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(5)"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-required-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "All required ARIA attributes are present"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">咨询历史</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(6)"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-required-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "All required ARIA attributes are present"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item elderly-entry\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">长辈专区</li>",
+          "target": [
+            ".elderly-entry"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-required-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "All required ARIA attributes are present"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<div data-v-106964d2=\"\" role=\"group\" aria-label=\"无障碍与语言设置\" class=\"care-controls care-controls--inline\">",
+          "target": [
+            ".care-controls"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-required-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "All required ARIA attributes are present"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<div data-v-106964d2=\"\" role=\"radiogroup\" aria-label=\"字号大小\" class=\"care-seg\">",
+          "target": [
+            ".care-seg"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-required-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "All required ARIA attributes are present"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-9599\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "target": [
+            ".el-dropdown-link"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-required-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "All required ARIA attributes are present"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<main id=\"main-content\" role=\"main\" tabindex=\"-1\" class=\"main-region\">",
+          "target": [
+            "#main-content"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-required-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "All required ARIA attributes are present"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<div data-v-11aaed5e=\"\" role=\"radiogroup\" aria-label=\"工单状态筛选\" class=\"status-tabs\">",
+          "target": [
+            ".status-tabs"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-required-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "All required ARIA attributes are present"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<div data-v-11aaed5e=\"\" role=\"status\" class=\"empty-box\"><i data-v-11aaed5e=\"\" class=\"el-icon-document\"></i><p data-v-11aaed5e=\"\">暂无工单记录</p><button data-v-11aaed5e=\"\" type=\"button\" class=\"el-button big-btn el-button--primary\"><!----><!----><span>去提交法律咨询</span></button></div>",
+          "target": [
+            ".empty-box"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "aria-required-children",
+      "impact": null,
+      "tags": [
+        "cat.aria",
+        "wcag2a",
+        "wcag131",
+        "EN-301-549",
+        "EN-9.1.3.1"
+      ],
+      "description": "Ensures elements with an ARIA role that require child roles contain them",
+      "help": "Certain ARIA roles must contain particular children",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-required-children?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "aria-required-children",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Required ARIA children are present"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<ul role=\"menubar\" class=\"nav-menu desktop-only el-menu--horizontal el-menu\" style=\"background-color: rgb(26, 60, 110);\">",
+          "target": [
+            ".nav-menu"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "aria-required-parent",
+      "impact": null,
+      "tags": [
+        "cat.aria",
+        "wcag2a",
+        "wcag131",
+        "EN-301-549",
+        "EN-9.1.3.1"
+      ],
+      "description": "Ensures elements with an ARIA role that require parent roles are contained by them",
+      "help": "Certain ARIA roles must be contained by particular parents",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-required-parent?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "aria-required-parent",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Required ARIA parent role present"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">首页</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(1)"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-required-parent",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Required ARIA parent role present"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我要咨询</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(2)"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-required-parent",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Required ARIA parent role present"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item is-active\" style=\"color: rgb(201, 169, 110); border-bottom-color: rgb(201, 169, 110); background-color: rgb(26, 60, 110);\">我的工单</li>",
+          "target": [
+            ".is-active.el-menu-item[role=\"menuitem\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-required-parent",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Required ARIA parent role present"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">渠道绑定</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(4)"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-required-parent",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Required ARIA parent role present"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">服务导航</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(5)"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-required-parent",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Required ARIA parent role present"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">咨询历史</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(6)"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-required-parent",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Required ARIA parent role present"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item elderly-entry\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">长辈专区</li>",
+          "target": [
+            ".elderly-entry"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "aria-roles",
+      "impact": null,
+      "tags": [
+        "cat.aria",
+        "wcag2a",
+        "wcag412",
+        "EN-301-549",
+        "EN-9.4.1.2"
+      ],
+      "description": "Ensures all elements with a role attribute use a valid value",
+      "help": "ARIA roles used must conform to valid values",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-roles?application=playwright",
+      "nodes": [
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "invalidrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is valid"
+            },
+            {
+              "id": "abstractrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Abstract roles are not used"
+            },
+            {
+              "id": "unsupportedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is supported"
+            }
+          ],
+          "impact": null,
+          "html": "<ul role=\"menubar\" class=\"nav-menu desktop-only el-menu--horizontal el-menu\" style=\"background-color: rgb(26, 60, 110);\">",
+          "target": [
+            ".nav-menu"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "invalidrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is valid"
+            },
+            {
+              "id": "abstractrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Abstract roles are not used"
+            },
+            {
+              "id": "unsupportedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is supported"
+            }
+          ],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">首页</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(1)"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "invalidrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is valid"
+            },
+            {
+              "id": "abstractrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Abstract roles are not used"
+            },
+            {
+              "id": "unsupportedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is supported"
+            }
+          ],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我要咨询</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(2)"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "invalidrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is valid"
+            },
+            {
+              "id": "abstractrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Abstract roles are not used"
+            },
+            {
+              "id": "unsupportedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is supported"
+            }
+          ],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item is-active\" style=\"color: rgb(201, 169, 110); border-bottom-color: rgb(201, 169, 110); background-color: rgb(26, 60, 110);\">我的工单</li>",
+          "target": [
+            ".is-active.el-menu-item[role=\"menuitem\"]"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "invalidrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is valid"
+            },
+            {
+              "id": "abstractrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Abstract roles are not used"
+            },
+            {
+              "id": "unsupportedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is supported"
+            }
+          ],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">渠道绑定</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(4)"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "invalidrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is valid"
+            },
+            {
+              "id": "abstractrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Abstract roles are not used"
+            },
+            {
+              "id": "unsupportedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is supported"
+            }
+          ],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">服务导航</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(5)"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "invalidrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is valid"
+            },
+            {
+              "id": "abstractrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Abstract roles are not used"
+            },
+            {
+              "id": "unsupportedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is supported"
+            }
+          ],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">咨询历史</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(6)"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "invalidrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is valid"
+            },
+            {
+              "id": "abstractrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Abstract roles are not used"
+            },
+            {
+              "id": "unsupportedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is supported"
+            }
+          ],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item elderly-entry\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">长辈专区</li>",
+          "target": [
+            ".elderly-entry"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "invalidrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is valid"
+            },
+            {
+              "id": "abstractrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Abstract roles are not used"
+            },
+            {
+              "id": "unsupportedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is supported"
+            }
+          ],
+          "impact": null,
+          "html": "<div data-v-106964d2=\"\" role=\"group\" aria-label=\"无障碍与语言设置\" class=\"care-controls care-controls--inline\">",
+          "target": [
+            ".care-controls"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "invalidrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is valid"
+            },
+            {
+              "id": "abstractrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Abstract roles are not used"
+            },
+            {
+              "id": "unsupportedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is supported"
+            }
+          ],
+          "impact": null,
+          "html": "<div data-v-106964d2=\"\" role=\"radiogroup\" aria-label=\"字号大小\" class=\"care-seg\">",
+          "target": [
+            ".care-seg"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "invalidrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is valid"
+            },
+            {
+              "id": "abstractrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Abstract roles are not used"
+            },
+            {
+              "id": "unsupportedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is supported"
+            }
+          ],
+          "impact": null,
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-9599\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "target": [
+            ".el-dropdown-link"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "invalidrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is valid"
+            },
+            {
+              "id": "abstractrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Abstract roles are not used"
+            },
+            {
+              "id": "unsupportedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is supported"
+            }
+          ],
+          "impact": null,
+          "html": "<main id=\"main-content\" role=\"main\" tabindex=\"-1\" class=\"main-region\">",
+          "target": [
+            "#main-content"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "invalidrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is valid"
+            },
+            {
+              "id": "abstractrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Abstract roles are not used"
+            },
+            {
+              "id": "unsupportedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is supported"
+            }
+          ],
+          "impact": null,
+          "html": "<div data-v-11aaed5e=\"\" role=\"radiogroup\" aria-label=\"工单状态筛选\" class=\"status-tabs\">",
+          "target": [
+            ".status-tabs"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "invalidrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is valid"
+            },
+            {
+              "id": "abstractrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Abstract roles are not used"
+            },
+            {
+              "id": "unsupportedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is supported"
+            }
+          ],
+          "impact": null,
+          "html": "<div data-v-11aaed5e=\"\" role=\"status\" class=\"empty-box\"><i data-v-11aaed5e=\"\" class=\"el-icon-document\"></i><p data-v-11aaed5e=\"\">暂无工单记录</p><button data-v-11aaed5e=\"\" type=\"button\" class=\"el-button big-btn el-button--primary\"><!----><!----><span>去提交法律咨询</span></button></div>",
+          "target": [
+            ".empty-box"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "aria-valid-attr-value",
+      "impact": "critical",
+      "tags": [
+        "cat.aria",
+        "wcag2a",
+        "wcag412",
+        "EN-301-549",
+        "EN-9.4.1.2"
+      ],
+      "description": "Ensures all ARIA attributes have valid values",
+      "help": "ARIA attributes must conform to valid values",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-valid-attr-value?application=playwright",
+      "nodes": [
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-valid-attr-value",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute values are valid"
+            },
+            {
+              "id": "aria-errormessage",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "aria-errormessage exists and references elements visible to screen readers that use a supported aria-errormessage technique"
+            },
+            {
+              "id": "aria-level",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "aria-level values are valid"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<div id=\"a11y-announcer\" aria-atomic=\"false\" class=\"sr-only\"><span data-role=\"polite\" aria-live=\"polite\">工单加载完成，共 0 条，</span><span data-role=\"assertive\" aria-live=\"assertive\"></span></div>",
+          "target": [
+            "#a11y-announcer"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-valid-attr-value",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute values are valid"
+            },
+            {
+              "id": "aria-errormessage",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "aria-errormessage exists and references elements visible to screen readers that use a supported aria-errormessage technique"
+            },
+            {
+              "id": "aria-level",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "aria-level values are valid"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<span data-role=\"polite\" aria-live=\"polite\">工单加载完成，共 0 条，</span>",
+          "target": [
+            "span[data-role=\"polite\"]"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-valid-attr-value",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute values are valid"
+            },
+            {
+              "id": "aria-errormessage",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "aria-errormessage exists and references elements visible to screen readers that use a supported aria-errormessage technique"
+            },
+            {
+              "id": "aria-level",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "aria-level values are valid"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<span data-role=\"assertive\" aria-live=\"assertive\"></span>",
+          "target": [
+            "span[data-role=\"assertive\"]"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-valid-attr-value",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute values are valid"
+            },
+            {
+              "id": "aria-errormessage",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "aria-errormessage exists and references elements visible to screen readers that use a supported aria-errormessage technique"
+            },
+            {
+              "id": "aria-level",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "aria-level values are valid"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<a href=\"tel:12348\" aria-label=\"语音求助，拨打 12348 公共法律服务人工热线\" class=\"voice-help\"><i class=\"el-icon-phone-outline\"></i><span class=\"voice-help-text\">语音求助</span></a>",
+          "target": [
+            ".voice-help"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-valid-attr-value",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute values are valid"
+            },
+            {
+              "id": "aria-errormessage",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "aria-errormessage exists and references elements visible to screen readers that use a supported aria-errormessage technique"
+            },
+            {
+              "id": "aria-level",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "aria-level values are valid"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<div data-v-106964d2=\"\" role=\"group\" aria-label=\"无障碍与语言设置\" class=\"care-controls care-controls--inline\">",
+          "target": [
+            ".care-controls"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-valid-attr-value",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute values are valid"
+            },
+            {
+              "id": "aria-errormessage",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "aria-errormessage exists and references elements visible to screen readers that use a supported aria-errormessage technique"
+            },
+            {
+              "id": "aria-level",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "aria-level values are valid"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<div data-v-106964d2=\"\" role=\"radiogroup\" aria-label=\"字号大小\" class=\"care-seg\">",
+          "target": [
+            ".care-seg"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-valid-attr-value",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute values are valid"
+            },
+            {
+              "id": "aria-errormessage",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "aria-errormessage exists and references elements visible to screen readers that use a supported aria-errormessage technique"
+            },
+            {
+              "id": "aria-level",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "aria-level values are valid"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<div data-v-106964d2=\"\" class=\"el-select el-select--mini\" aria-label=\"语种偏好\">",
+          "target": [
+            ".el-select"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-valid-attr-value",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute values are valid"
+            },
+            {
+              "id": "aria-errormessage",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "aria-errormessage exists and references elements visible to screen readers that use a supported aria-errormessage technique"
+            },
+            {
+              "id": "aria-level",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "aria-level values are valid"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<section data-v-11aaed5e=\"\" aria-label=\"我的工单\" class=\"page-wrap\">",
+          "target": [
+            ".page-wrap"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-valid-attr-value",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute values are valid"
+            },
+            {
+              "id": "aria-errormessage",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "aria-errormessage exists and references elements visible to screen readers that use a supported aria-errormessage technique"
+            },
+            {
+              "id": "aria-level",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "aria-level values are valid"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<div data-v-11aaed5e=\"\" role=\"radiogroup\" aria-label=\"工单状态筛选\" class=\"status-tabs\">",
+          "target": [
+            ".status-tabs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "aria-valid-attr",
+      "impact": null,
+      "tags": [
+        "cat.aria",
+        "wcag2a",
+        "wcag412",
+        "EN-301-549",
+        "EN-9.4.1.2"
+      ],
+      "description": "Ensures attributes that begin with aria- are valid ARIA attributes",
+      "help": "ARIA attributes must conform to valid names",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-valid-attr?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "aria-valid-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute name is valid"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<div id=\"a11y-announcer\" aria-atomic=\"false\" class=\"sr-only\"><span data-role=\"polite\" aria-live=\"polite\">工单加载完成，共 0 条，</span><span data-role=\"assertive\" aria-live=\"assertive\"></span></div>",
+          "target": [
+            "#a11y-announcer"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-valid-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute name is valid"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<span data-role=\"polite\" aria-live=\"polite\">工单加载完成，共 0 条，</span>",
+          "target": [
+            "span[data-role=\"polite\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-valid-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute name is valid"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<span data-role=\"assertive\" aria-live=\"assertive\"></span>",
+          "target": [
+            "span[data-role=\"assertive\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-valid-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute name is valid"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<a href=\"tel:12348\" aria-label=\"语音求助，拨打 12348 公共法律服务人工热线\" class=\"voice-help\"><i class=\"el-icon-phone-outline\"></i><span class=\"voice-help-text\">语音求助</span></a>",
+          "target": [
+            ".voice-help"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-valid-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute name is valid"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<div data-v-106964d2=\"\" role=\"group\" aria-label=\"无障碍与语言设置\" class=\"care-controls care-controls--inline\">",
+          "target": [
+            ".care-controls"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-valid-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute name is valid"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<div data-v-106964d2=\"\" role=\"radiogroup\" aria-label=\"字号大小\" class=\"care-seg\">",
+          "target": [
+            ".care-seg"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-valid-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute name is valid"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<div data-v-106964d2=\"\" class=\"el-select el-select--mini\" aria-label=\"语种偏好\">",
+          "target": [
+            ".el-select"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-valid-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute name is valid"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-9599\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "target": [
+            ".el-dropdown-link"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-valid-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute name is valid"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<section data-v-11aaed5e=\"\" aria-label=\"我的工单\" class=\"page-wrap\">",
+          "target": [
+            ".page-wrap"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-valid-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute name is valid"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<div data-v-11aaed5e=\"\" role=\"radiogroup\" aria-label=\"工单状态筛选\" class=\"status-tabs\">",
+          "target": [
+            ".status-tabs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "autocomplete-valid",
+      "impact": null,
+      "tags": [
+        "cat.forms",
+        "wcag21aa",
+        "wcag135",
+        "EN-301-549",
+        "EN-9.1.3.5",
+        "ACT"
+      ],
+      "description": "Ensure the autocomplete attribute is correct and suitable for the form field",
+      "help": "autocomplete attribute must be used correctly",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/autocomplete-valid?application=playwright",
+      "nodes": [
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "autocomplete-valid",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "the autocomplete attribute is correctly formatted"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<input type=\"text\" readonly=\"readonly\" autocomplete=\"off\" placeholder=\"请选择\" class=\"el-input__inner\">",
+          "target": [
+            ".el-input__inner"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "avoid-inline-spacing",
+      "impact": null,
+      "tags": [
+        "cat.structure",
+        "wcag21aa",
+        "wcag1412",
+        "EN-301-549",
+        "EN-9.1.4.12",
+        "ACT"
+      ],
+      "description": "Ensure that text spacing set through style attributes can be adjusted with custom stylesheets",
+      "help": "Inline text spacing must be adjustable with custom stylesheets",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/avoid-inline-spacing?application=playwright",
+      "nodes": [
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "important-letter-spacing",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Letter-spacing in the style attribute is not set to !important, or meets the minimum"
+            },
+            {
+              "id": "important-word-spacing",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "word-spacing in the style attribute is not set to !important, or meets the minimum"
+            },
+            {
+              "id": "important-line-height",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "line-height in the style attribute is not set to !important, or meets the minimum"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<header class=\"el-header app-header\" style=\"height: 60px;\">",
+          "target": [
+            ".el-header"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "important-letter-spacing",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Letter-spacing in the style attribute is not set to !important, or meets the minimum"
+            },
+            {
+              "id": "important-word-spacing",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "word-spacing in the style attribute is not set to !important, or meets the minimum"
+            },
+            {
+              "id": "important-line-height",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "line-height in the style attribute is not set to !important, or meets the minimum"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<ul role=\"menubar\" class=\"nav-menu desktop-only el-menu--horizontal el-menu\" style=\"background-color: rgb(26, 60, 110);\">",
+          "target": [
+            ".nav-menu"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "important-letter-spacing",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Letter-spacing in the style attribute is not set to !important, or meets the minimum"
+            },
+            {
+              "id": "important-word-spacing",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "word-spacing in the style attribute is not set to !important, or meets the minimum"
+            },
+            {
+              "id": "important-line-height",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "line-height in the style attribute is not set to !important, or meets the minimum"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">首页</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(1)"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "important-letter-spacing",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Letter-spacing in the style attribute is not set to !important, or meets the minimum"
+            },
+            {
+              "id": "important-word-spacing",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "word-spacing in the style attribute is not set to !important, or meets the minimum"
+            },
+            {
+              "id": "important-line-height",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "line-height in the style attribute is not set to !important, or meets the minimum"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我要咨询</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(2)"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "important-letter-spacing",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Letter-spacing in the style attribute is not set to !important, or meets the minimum"
+            },
+            {
+              "id": "important-word-spacing",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "word-spacing in the style attribute is not set to !important, or meets the minimum"
+            },
+            {
+              "id": "important-line-height",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "line-height in the style attribute is not set to !important, or meets the minimum"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item is-active\" style=\"color: rgb(201, 169, 110); border-bottom-color: rgb(201, 169, 110); background-color: rgb(26, 60, 110);\">我的工单</li>",
+          "target": [
+            ".is-active.el-menu-item[role=\"menuitem\"]"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "important-letter-spacing",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Letter-spacing in the style attribute is not set to !important, or meets the minimum"
+            },
+            {
+              "id": "important-word-spacing",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "word-spacing in the style attribute is not set to !important, or meets the minimum"
+            },
+            {
+              "id": "important-line-height",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "line-height in the style attribute is not set to !important, or meets the minimum"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">渠道绑定</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(4)"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "important-letter-spacing",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Letter-spacing in the style attribute is not set to !important, or meets the minimum"
+            },
+            {
+              "id": "important-word-spacing",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "word-spacing in the style attribute is not set to !important, or meets the minimum"
+            },
+            {
+              "id": "important-line-height",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "line-height in the style attribute is not set to !important, or meets the minimum"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">服务导航</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(5)"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "important-letter-spacing",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Letter-spacing in the style attribute is not set to !important, or meets the minimum"
+            },
+            {
+              "id": "important-word-spacing",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "word-spacing in the style attribute is not set to !important, or meets the minimum"
+            },
+            {
+              "id": "important-line-height",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "line-height in the style attribute is not set to !important, or meets the minimum"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">咨询历史</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(6)"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "important-letter-spacing",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Letter-spacing in the style attribute is not set to !important, or meets the minimum"
+            },
+            {
+              "id": "important-word-spacing",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "word-spacing in the style attribute is not set to !important, or meets the minimum"
+            },
+            {
+              "id": "important-line-height",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "line-height in the style attribute is not set to !important, or meets the minimum"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item elderly-entry\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">长辈专区</li>",
+          "target": [
+            ".elderly-entry"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "important-letter-spacing",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Letter-spacing in the style attribute is not set to !important, or meets the minimum"
+            },
+            {
+              "id": "important-word-spacing",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "word-spacing in the style attribute is not set to !important, or meets the minimum"
+            },
+            {
+              "id": "important-line-height",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "line-height in the style attribute is not set to !important, or meets the minimum"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<footer class=\"el-footer app-footer\" style=\"height: 60px;\"><p>公共法律服务热线 12348 ｜ 政务服务便民热线 12345 © 2026 AI律师话务平台</p></footer>",
+          "target": [
+            "footer"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "button-name",
+      "impact": null,
+      "tags": [
+        "cat.name-role-value",
+        "wcag2a",
+        "wcag412",
+        "section508",
+        "section508.22.a",
+        "TTv5",
+        "TT6.a",
+        "EN-301-549",
+        "EN-9.4.1.2",
+        "ACT"
+      ],
+      "description": "Ensures buttons have discernible text",
+      "help": "Buttons must have discernible text",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/button-name?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "button-has-visible-text",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Element has inner text that is visible to screen readers"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<button data-v-11aaed5e=\"\" type=\"button\" class=\"el-button big-btn el-button--primary\"><!----><!----><span>去提交法律咨询</span></button>",
+          "target": [
+            ".el-button"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bypass",
+      "impact": null,
+      "tags": [
+        "cat.keyboard",
+        "wcag2a",
+        "wcag241",
+        "section508",
+        "section508.22.o",
+        "TTv5",
+        "TT9.a",
+        "EN-301-549",
+        "EN-9.2.4.1"
+      ],
+      "description": "Ensures each page has at least one mechanism for a user to bypass navigation and jump straight to the content",
+      "help": "Page must have means to bypass repeated blocks",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/bypass?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "internal-link-present",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Valid skip link found"
+            },
+            {
+              "id": "header-present",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<h1 class=\"logo\">AI律师公众服务</h1>",
+                  "target": [
+                    "h1"
+                  ]
+                },
+                {
+                  "html": "<h2 data-v-11aaed5e=\"\" class=\"page-title\">我的工单</h2>",
+                  "target": [
+                    "h2"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Page has a heading"
+            },
+            {
+              "id": "landmark",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<main class=\"el-main\">",
+                  "target": [
+                    ".el-main"
+                  ]
+                },
+                {
+                  "html": "<main id=\"main-content\" role=\"main\" tabindex=\"-1\" class=\"main-region\">",
+                  "target": [
+                    "#main-content"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Page has a landmark region"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<html lang=\"zh-CN\" data-font-scale=\"normal\" data-high-contrast=\"false\">",
+          "target": [
+            "html"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT"
+      ],
+      "description": "Ensures the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/color-contrast?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#ffffff",
+                "bgColor": "#c8372d",
+                "contrastRatio": 5.19,
+                "fontSize": "12.0pt (16px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 5.19"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<span class=\"voice-help-text\">语音求助</span>",
+          "target": [
+            ".voice-help-text"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#ffffff",
+                "bgColor": "#1a3c6e",
+                "contrastRatio": 10.96,
+                "fontSize": "15.0pt (20px)",
+                "fontWeight": "bold",
+                "expectedContrastRatio": "3:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 10.96"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<h1 class=\"logo\">AI律师公众服务</h1>",
+          "target": [
+            "h1"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#d7e2f3",
+                "bgColor": "#1a3c6e",
+                "contrastRatio": 8.38,
+                "fontSize": "11.3pt (15px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 8.38"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">首页</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(1)"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#d7e2f3",
+                "bgColor": "#1a3c6e",
+                "contrastRatio": 8.38,
+                "fontSize": "11.3pt (15px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 8.38"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我要咨询</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(2)"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#c9a96e",
+                "bgColor": "#1a3c6e",
+                "contrastRatio": 4.89,
+                "fontSize": "11.3pt (15px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 4.89"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item is-active\" style=\"color: rgb(201, 169, 110); border-bottom-color: rgb(201, 169, 110); background-color: rgb(26, 60, 110);\">我的工单</li>",
+          "target": [
+            ".is-active.el-menu-item[role=\"menuitem\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#d7e2f3",
+                "bgColor": "#1a3c6e",
+                "contrastRatio": 8.38,
+                "fontSize": "11.3pt (15px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 8.38"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">渠道绑定</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(4)"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#d7e2f3",
+                "bgColor": "#1a3c6e",
+                "contrastRatio": 8.38,
+                "fontSize": "11.3pt (15px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 8.38"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">服务导航</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(5)"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#d7e2f3",
+                "bgColor": "#1a3c6e",
+                "contrastRatio": 8.38,
+                "fontSize": "11.3pt (15px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 8.38"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">咨询历史</li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(6)"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#c9a96e",
+                "bgColor": "#1a3c6e",
+                "contrastRatio": 4.89,
+                "fontSize": "11.3pt (15px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 4.89"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item elderly-entry\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">长辈专区</li>",
+          "target": [
+            ".elderly-entry"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#1a3c6e",
+                "bgColor": "#ffffff",
+                "contrastRatio": 10.96,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 10.96"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<span data-v-106964d2=\"\">标准</span>",
+          "target": [
+            ".care-seg-item.is-active > span"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#ffffff",
+                "bgColor": "#1a3c6e",
+                "contrastRatio": 10.96,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 10.96"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<span data-v-106964d2=\"\">大字</span>",
+          "target": [
+            ".care-seg-item:nth-child(2) > span"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#ffffff",
+                "bgColor": "#1a3c6e",
+                "contrastRatio": 10.96,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 10.96"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<span data-v-106964d2=\"\">超大</span>",
+          "target": [
+            ".care-seg-item:nth-child(3) > span"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#1f2a3a",
+                "bgColor": "#ffffff",
+                "contrastRatio": 14.47,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 14.47"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<input type=\"text\" readonly=\"readonly\" autocomplete=\"off\" placeholder=\"请选择\" class=\"el-input__inner\">",
+          "target": [
+            ".el-input__inner"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#ffffff",
+                "bgColor": "#1a3c6e",
+                "contrastRatio": 10.96,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 10.96"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-9599\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "target": [
+            ".el-dropdown-link"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#ffffff",
+                "bgColor": "#1a3c6e",
+                "contrastRatio": 10.96,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 10.96"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<span data-v-11aaed5e=\"\">全部</span>",
+          "target": [
+            ".is-active.status-tab > span"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#44505f",
+                "bgColor": "#ffffff",
+                "contrastRatio": 8.2,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 8.2"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<span data-v-11aaed5e=\"\">待处理</span>",
+          "target": [
+            ".status-tab:nth-child(2) > span"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#44505f",
+                "bgColor": "#ffffff",
+                "contrastRatio": 8.2,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 8.2"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<span data-v-11aaed5e=\"\">处理中</span>",
+          "target": [
+            ".status-tab:nth-child(3) > span"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#44505f",
+                "bgColor": "#ffffff",
+                "contrastRatio": 8.2,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 8.2"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<span data-v-11aaed5e=\"\">已完成</span>",
+          "target": [
+            ".status-tab:nth-child(4) > span"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#44505f",
+                "bgColor": "#ffffff",
+                "contrastRatio": 8.2,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 8.2"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<span data-v-11aaed5e=\"\">已归档</span>",
+          "target": [
+            ".status-tab:nth-child(5) > span"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#ffffff",
+                "bgColor": "#1a3c6e",
+                "contrastRatio": 10.96,
+                "fontSize": "12.0pt (16px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 10.96"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<span>去提交法律咨询</span>",
+          "target": [
+            ".el-button > span"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#aebdd6",
+                "bgColor": "#1a3c6e",
+                "contrastRatio": 5.76,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 5.76"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<p>公共法律服务热线 12348 ｜ 政务服务便民热线 12345 © 2026 AI律师话务平台</p>",
+          "target": [
+            "footer > p"
           ]
         }
       ]
@@ -1086,6 +4274,319 @@
           "html": "<html lang=\"zh-CN\" data-font-scale=\"normal\" data-high-contrast=\"false\">",
           "target": [
             "html"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "duplicate-id-aria",
+      "impact": null,
+      "tags": [
+        "cat.parsing",
+        "wcag2a",
+        "wcag412",
+        "EN-301-549",
+        "EN-9.4.1.2"
+      ],
+      "description": "Ensures every id attribute value used in ARIA and in labels is unique",
+      "help": "IDs used in ARIA and labels must be unique",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/duplicate-id-aria?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "duplicate-id-aria",
+              "data": "dropdown-menu-9599",
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Document has no elements referenced with ARIA or labels that share the same id attribute"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<ul class=\"el-dropdown-menu el-popper\" id=\"dropdown-menu-9599\" style=\"display: none;\"><li tabindex=\"-1\" class=\"el-dropdown-menu__item\"><!---->个人信息</li><li tabindex=\"-1\" class=\"el-dropdown-menu__item el-dropdown-menu__item--divided\"><!---->退出登录</li></ul>",
+          "target": [
+            "#dropdown-menu-9599"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "duplicate-id-aria",
+              "data": "el-drawer__title",
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Document has no elements referenced with ARIA or labels that share the same id attribute"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<header id=\"el-drawer__title\" class=\"el-drawer__header\"><span role=\"heading\" title=\"导航与设置\">导航与设置</span><button aria-label=\"close 导航与设置\" type=\"button\" class=\"el-drawer__close-btn\"><i class=\"el-dialog__close el-icon el-icon-close\"></i></button></header>",
+          "target": [
+            "#el-drawer__title"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "form-field-multiple-labels",
+      "impact": null,
+      "tags": [
+        "cat.forms",
+        "wcag2a",
+        "wcag332",
+        "TTv5",
+        "TT5.c",
+        "EN-301-549",
+        "EN-9.3.3.2"
+      ],
+      "description": "Ensures form field does not have multiple label elements",
+      "help": "Form field must not have multiple label elements",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/form-field-multiple-labels?application=playwright",
+      "nodes": [
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "multiple-label",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<label data-v-106964d2=\"\" class=\"care-seg-item is-active\"><input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"normal\"><span data-v-106964d2=\"\">标准</span></label>",
+                  "target": [
+                    ".care-seg-item.is-active"
+                  ]
+                }
+              ],
+              "impact": "moderate",
+              "message": "Form field does not have multiple label elements"
+            }
+          ],
+          "impact": null,
+          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"normal\">",
+          "target": [
+            "input[value=\"normal\"]"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "multiple-label",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<label data-v-106964d2=\"\" class=\"care-seg-item\"><input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"large\"><span data-v-106964d2=\"\">大字</span></label>",
+                  "target": [
+                    ".care-seg-item:nth-child(2)"
+                  ]
+                }
+              ],
+              "impact": "moderate",
+              "message": "Form field does not have multiple label elements"
+            }
+          ],
+          "impact": null,
+          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"large\">",
+          "target": [
+            "input[value=\"large\"]"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "multiple-label",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<label data-v-106964d2=\"\" class=\"care-seg-item\"><input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"xlarge\"><span data-v-106964d2=\"\">超大</span></label>",
+                  "target": [
+                    ".care-seg-item:nth-child(3)"
+                  ]
+                }
+              ],
+              "impact": "moderate",
+              "message": "Form field does not have multiple label elements"
+            }
+          ],
+          "impact": null,
+          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"xlarge\">",
+          "target": [
+            "input[value=\"xlarge\"]"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "multiple-label",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<label data-v-106964d2=\"\" class=\"care-switch\"><input data-v-106964d2=\"\" type=\"checkbox\"><span data-v-106964d2=\"\" aria-hidden=\"true\" class=\"care-switch-track\"></span><span data-v-106964d2=\"\" class=\"sr-only\">高对比度模式</span></label>",
+                  "target": [
+                    ".care-switch"
+                  ]
+                }
+              ],
+              "impact": "moderate",
+              "message": "Form field does not have multiple label elements"
+            }
+          ],
+          "impact": null,
+          "html": "<input data-v-106964d2=\"\" type=\"checkbox\">",
+          "target": [
+            "input[type=\"checkbox\"]"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "multiple-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "moderate",
+              "message": "Form field does not have multiple label elements"
+            }
+          ],
+          "impact": null,
+          "html": "<input type=\"text\" readonly=\"readonly\" autocomplete=\"off\" placeholder=\"请选择\" class=\"el-input__inner\">",
+          "target": [
+            ".el-input__inner"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "multiple-label",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<label data-v-11aaed5e=\"\" class=\"status-tab is-active\"><input data-v-11aaed5e=\"\" type=\"radio\" name=\"ticket-status\" value=\"\"><span data-v-11aaed5e=\"\">全部</span></label>",
+                  "target": [
+                    ".is-active.status-tab"
+                  ]
+                }
+              ],
+              "impact": "moderate",
+              "message": "Form field does not have multiple label elements"
+            }
+          ],
+          "impact": null,
+          "html": "<input data-v-11aaed5e=\"\" type=\"radio\" name=\"ticket-status\" value=\"\">",
+          "target": [
+            "input[value=\"\"]"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "multiple-label",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<label data-v-11aaed5e=\"\" class=\"status-tab\"><input data-v-11aaed5e=\"\" type=\"radio\" name=\"ticket-status\" value=\"0\"><span data-v-11aaed5e=\"\">待处理</span></label>",
+                  "target": [
+                    ".status-tab:nth-child(2)"
+                  ]
+                }
+              ],
+              "impact": "moderate",
+              "message": "Form field does not have multiple label elements"
+            }
+          ],
+          "impact": null,
+          "html": "<input data-v-11aaed5e=\"\" type=\"radio\" name=\"ticket-status\" value=\"0\">",
+          "target": [
+            "input[value=\"0\"]"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "multiple-label",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<label data-v-11aaed5e=\"\" class=\"status-tab\"><input data-v-11aaed5e=\"\" type=\"radio\" name=\"ticket-status\" value=\"1\"><span data-v-11aaed5e=\"\">处理中</span></label>",
+                  "target": [
+                    ".status-tab:nth-child(3)"
+                  ]
+                }
+              ],
+              "impact": "moderate",
+              "message": "Form field does not have multiple label elements"
+            }
+          ],
+          "impact": null,
+          "html": "<input data-v-11aaed5e=\"\" type=\"radio\" name=\"ticket-status\" value=\"1\">",
+          "target": [
+            "input[value=\"1\"]"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "multiple-label",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<label data-v-11aaed5e=\"\" class=\"status-tab\"><input data-v-11aaed5e=\"\" type=\"radio\" name=\"ticket-status\" value=\"2\"><span data-v-11aaed5e=\"\">已完成</span></label>",
+                  "target": [
+                    ".status-tab:nth-child(4)"
+                  ]
+                }
+              ],
+              "impact": "moderate",
+              "message": "Form field does not have multiple label elements"
+            }
+          ],
+          "impact": null,
+          "html": "<input data-v-11aaed5e=\"\" type=\"radio\" name=\"ticket-status\" value=\"2\">",
+          "target": [
+            "input[value=\"2\"]"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "multiple-label",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<label data-v-11aaed5e=\"\" class=\"status-tab\"><input data-v-11aaed5e=\"\" type=\"radio\" name=\"ticket-status\" value=\"3\"><span data-v-11aaed5e=\"\">已归档</span></label>",
+                  "target": [
+                    ".status-tab:nth-child(5)"
+                  ]
+                }
+              ],
+              "impact": "moderate",
+              "message": "Form field does not have multiple label elements"
+            }
+          ],
+          "impact": null,
+          "html": "<input data-v-11aaed5e=\"\" type=\"radio\" name=\"ticket-status\" value=\"3\">",
+          "target": [
+            "input[value=\"3\"]"
           ]
         }
       ]
@@ -1165,6 +4666,450 @@
       ]
     },
     {
+      "id": "label",
+      "impact": null,
+      "tags": [
+        "cat.forms",
+        "wcag2a",
+        "wcag412",
+        "section508",
+        "section508.22.n",
+        "TTv5",
+        "TT5.c",
+        "EN-301-549",
+        "EN-9.4.1.2",
+        "ACT"
+      ],
+      "description": "Ensures every form element has a label",
+      "help": "Form elements must have labels",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/label?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "implicit-label",
+              "data": {
+                "implicitLabel": "标准"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<label data-v-106964d2=\"\" class=\"care-seg-item is-active\"><input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"normal\"><span data-v-106964d2=\"\">标准</span></label>",
+                  "target": [
+                    ".care-seg-item.is-active"
+                  ]
+                }
+              ],
+              "impact": "critical",
+              "message": "Form element has an implicit (wrapped) <label>"
+            }
+          ],
+          "all": [],
+          "none": [
+            {
+              "id": "hidden-explicit-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Form element has a visible explicit <label>"
+            }
+          ],
+          "impact": null,
+          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"normal\">",
+          "target": [
+            "input[value=\"normal\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "implicit-label",
+              "data": {
+                "implicitLabel": "大字"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<label data-v-106964d2=\"\" class=\"care-seg-item\"><input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"large\"><span data-v-106964d2=\"\">大字</span></label>",
+                  "target": [
+                    ".care-seg-item:nth-child(2)"
+                  ]
+                }
+              ],
+              "impact": "critical",
+              "message": "Form element has an implicit (wrapped) <label>"
+            }
+          ],
+          "all": [],
+          "none": [
+            {
+              "id": "hidden-explicit-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Form element has a visible explicit <label>"
+            }
+          ],
+          "impact": null,
+          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"large\">",
+          "target": [
+            "input[value=\"large\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "implicit-label",
+              "data": {
+                "implicitLabel": "超大"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<label data-v-106964d2=\"\" class=\"care-seg-item\"><input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"xlarge\"><span data-v-106964d2=\"\">超大</span></label>",
+                  "target": [
+                    ".care-seg-item:nth-child(3)"
+                  ]
+                }
+              ],
+              "impact": "critical",
+              "message": "Form element has an implicit (wrapped) <label>"
+            }
+          ],
+          "all": [],
+          "none": [
+            {
+              "id": "hidden-explicit-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Form element has a visible explicit <label>"
+            }
+          ],
+          "impact": null,
+          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"xlarge\">",
+          "target": [
+            "input[value=\"xlarge\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "implicit-label",
+              "data": {
+                "implicitLabel": "高对比度模式"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<label data-v-106964d2=\"\" class=\"care-switch\"><input data-v-106964d2=\"\" type=\"checkbox\"><span data-v-106964d2=\"\" aria-hidden=\"true\" class=\"care-switch-track\"></span><span data-v-106964d2=\"\" class=\"sr-only\">高对比度模式</span></label>",
+                  "target": [
+                    ".care-switch"
+                  ]
+                }
+              ],
+              "impact": "critical",
+              "message": "Form element has an implicit (wrapped) <label>"
+            }
+          ],
+          "all": [],
+          "none": [
+            {
+              "id": "hidden-explicit-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Form element has a visible explicit <label>"
+            }
+          ],
+          "impact": null,
+          "html": "<input data-v-106964d2=\"\" type=\"checkbox\">",
+          "target": [
+            "input[type=\"checkbox\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "non-empty-placeholder",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Element has a placeholder attribute"
+            }
+          ],
+          "all": [],
+          "none": [
+            {
+              "id": "hidden-explicit-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Form element has a visible explicit <label>"
+            }
+          ],
+          "impact": null,
+          "html": "<input type=\"text\" readonly=\"readonly\" autocomplete=\"off\" placeholder=\"请选择\" class=\"el-input__inner\">",
+          "target": [
+            ".el-input__inner"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "implicit-label",
+              "data": {
+                "implicitLabel": "全部"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<label data-v-11aaed5e=\"\" class=\"status-tab is-active\"><input data-v-11aaed5e=\"\" type=\"radio\" name=\"ticket-status\" value=\"\"><span data-v-11aaed5e=\"\">全部</span></label>",
+                  "target": [
+                    ".is-active.status-tab"
+                  ]
+                }
+              ],
+              "impact": "critical",
+              "message": "Form element has an implicit (wrapped) <label>"
+            }
+          ],
+          "all": [],
+          "none": [
+            {
+              "id": "hidden-explicit-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Form element has a visible explicit <label>"
+            }
+          ],
+          "impact": null,
+          "html": "<input data-v-11aaed5e=\"\" type=\"radio\" name=\"ticket-status\" value=\"\">",
+          "target": [
+            "input[value=\"\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "implicit-label",
+              "data": {
+                "implicitLabel": "待处理"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<label data-v-11aaed5e=\"\" class=\"status-tab\"><input data-v-11aaed5e=\"\" type=\"radio\" name=\"ticket-status\" value=\"0\"><span data-v-11aaed5e=\"\">待处理</span></label>",
+                  "target": [
+                    ".status-tab:nth-child(2)"
+                  ]
+                }
+              ],
+              "impact": "critical",
+              "message": "Form element has an implicit (wrapped) <label>"
+            }
+          ],
+          "all": [],
+          "none": [
+            {
+              "id": "hidden-explicit-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Form element has a visible explicit <label>"
+            }
+          ],
+          "impact": null,
+          "html": "<input data-v-11aaed5e=\"\" type=\"radio\" name=\"ticket-status\" value=\"0\">",
+          "target": [
+            "input[value=\"0\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "implicit-label",
+              "data": {
+                "implicitLabel": "处理中"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<label data-v-11aaed5e=\"\" class=\"status-tab\"><input data-v-11aaed5e=\"\" type=\"radio\" name=\"ticket-status\" value=\"1\"><span data-v-11aaed5e=\"\">处理中</span></label>",
+                  "target": [
+                    ".status-tab:nth-child(3)"
+                  ]
+                }
+              ],
+              "impact": "critical",
+              "message": "Form element has an implicit (wrapped) <label>"
+            }
+          ],
+          "all": [],
+          "none": [
+            {
+              "id": "hidden-explicit-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Form element has a visible explicit <label>"
+            }
+          ],
+          "impact": null,
+          "html": "<input data-v-11aaed5e=\"\" type=\"radio\" name=\"ticket-status\" value=\"1\">",
+          "target": [
+            "input[value=\"1\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "implicit-label",
+              "data": {
+                "implicitLabel": "已完成"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<label data-v-11aaed5e=\"\" class=\"status-tab\"><input data-v-11aaed5e=\"\" type=\"radio\" name=\"ticket-status\" value=\"2\"><span data-v-11aaed5e=\"\">已完成</span></label>",
+                  "target": [
+                    ".status-tab:nth-child(4)"
+                  ]
+                }
+              ],
+              "impact": "critical",
+              "message": "Form element has an implicit (wrapped) <label>"
+            }
+          ],
+          "all": [],
+          "none": [
+            {
+              "id": "hidden-explicit-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Form element has a visible explicit <label>"
+            }
+          ],
+          "impact": null,
+          "html": "<input data-v-11aaed5e=\"\" type=\"radio\" name=\"ticket-status\" value=\"2\">",
+          "target": [
+            "input[value=\"2\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "implicit-label",
+              "data": {
+                "implicitLabel": "已归档"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<label data-v-11aaed5e=\"\" class=\"status-tab\"><input data-v-11aaed5e=\"\" type=\"radio\" name=\"ticket-status\" value=\"3\"><span data-v-11aaed5e=\"\">已归档</span></label>",
+                  "target": [
+                    ".status-tab:nth-child(5)"
+                  ]
+                }
+              ],
+              "impact": "critical",
+              "message": "Form element has an implicit (wrapped) <label>"
+            }
+          ],
+          "all": [],
+          "none": [
+            {
+              "id": "hidden-explicit-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Form element has a visible explicit <label>"
+            }
+          ],
+          "impact": null,
+          "html": "<input data-v-11aaed5e=\"\" type=\"radio\" name=\"ticket-status\" value=\"3\">",
+          "target": [
+            "input[value=\"3\"]"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "link-name",
+      "impact": null,
+      "tags": [
+        "cat.name-role-value",
+        "wcag2a",
+        "wcag244",
+        "wcag412",
+        "section508",
+        "section508.22.a",
+        "TTv5",
+        "TT6.a",
+        "EN-301-549",
+        "EN-9.2.4.4",
+        "EN-9.4.1.2",
+        "ACT"
+      ],
+      "description": "Ensures links have discernible text",
+      "help": "Links must have discernible text",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/link-name?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "has-visible-text",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has text that is visible to screen readers"
+            }
+          ],
+          "all": [],
+          "none": [
+            {
+              "id": "focusable-no-name",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element is not in tab order or has accessible text"
+            }
+          ],
+          "impact": null,
+          "html": "<a href=\"#main-content\" class=\"skip-link\">跳到主要内容</a>",
+          "target": [
+            ".skip-link"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "has-visible-text",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has text that is visible to screen readers"
+            },
+            {
+              "id": "aria-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute exists and is not empty"
+            }
+          ],
+          "all": [],
+          "none": [
+            {
+              "id": "focusable-no-name",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element is not in tab order or has accessible text"
+            }
+          ],
+          "impact": null,
+          "html": "<a href=\"tel:12348\" aria-label=\"语音求助，拨打 12348 公共法律服务人工热线\" class=\"voice-help\"><i class=\"el-icon-phone-outline\"></i><span class=\"voice-help-text\">语音求助</span></a>",
+          "target": [
+            ".voice-help"
+          ]
+        }
+      ]
+    },
+    {
       "id": "meta-viewport",
       "impact": null,
       "tags": [
@@ -1198,8 +5143,458 @@
           ]
         }
       ]
+    },
+    {
+      "id": "nested-interactive",
+      "impact": null,
+      "tags": [
+        "cat.keyboard",
+        "wcag2a",
+        "wcag412",
+        "TTv5",
+        "TT6.a",
+        "EN-301-549",
+        "EN-9.4.1.2"
+      ],
+      "description": "Ensures interactive controls are not nested as they are not always announced by screen readers or can cause focus problems for assistive technologies",
+      "help": "Interactive controls must not be nested",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/nested-interactive?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "no-focusable-content",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element does not have focusable descendants"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"normal\">",
+          "target": [
+            "input[value=\"normal\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "no-focusable-content",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element does not have focusable descendants"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"large\">",
+          "target": [
+            "input[value=\"large\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "no-focusable-content",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element does not have focusable descendants"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"xlarge\">",
+          "target": [
+            "input[value=\"xlarge\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "no-focusable-content",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element does not have focusable descendants"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<input data-v-106964d2=\"\" type=\"checkbox\">",
+          "target": [
+            "input[type=\"checkbox\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "no-focusable-content",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element does not have focusable descendants"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-9599\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "target": [
+            ".el-dropdown-link"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "no-focusable-content",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element does not have focusable descendants"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<input data-v-11aaed5e=\"\" type=\"radio\" name=\"ticket-status\" value=\"\">",
+          "target": [
+            "input[value=\"\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "no-focusable-content",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element does not have focusable descendants"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<input data-v-11aaed5e=\"\" type=\"radio\" name=\"ticket-status\" value=\"0\">",
+          "target": [
+            "input[value=\"0\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "no-focusable-content",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element does not have focusable descendants"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<input data-v-11aaed5e=\"\" type=\"radio\" name=\"ticket-status\" value=\"1\">",
+          "target": [
+            "input[value=\"1\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "no-focusable-content",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element does not have focusable descendants"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<input data-v-11aaed5e=\"\" type=\"radio\" name=\"ticket-status\" value=\"2\">",
+          "target": [
+            "input[value=\"2\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "no-focusable-content",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element does not have focusable descendants"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<input data-v-11aaed5e=\"\" type=\"radio\" name=\"ticket-status\" value=\"3\">",
+          "target": [
+            "input[value=\"3\"]"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "no-focusable-content",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element does not have focusable descendants"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<button data-v-11aaed5e=\"\" type=\"button\" class=\"el-button big-btn el-button--primary\"><!----><!----><span>去提交法律咨询</span></button>",
+          "target": [
+            ".el-button"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "scrollable-region-focusable",
+      "impact": null,
+      "tags": [
+        "cat.keyboard",
+        "wcag2a",
+        "wcag211",
+        "wcag213",
+        "TTv5",
+        "TT4.a",
+        "EN-301-549",
+        "EN-9.2.1.1",
+        "EN-9.2.1.3"
+      ],
+      "description": "Ensure elements that have scrollable content are accessible by keyboard",
+      "help": "Scrollable region must have keyboard access",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/scrollable-region-focusable?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "focusable-content",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element contains focusable elements"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<main class=\"el-main\">",
+          "target": [
+            ".el-main"
+          ]
+        }
+      ]
     }
   ],
-  "incomplete": [],
+  "incomplete": [
+    {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "tags": [
+        "cat.aria",
+        "wcag2a",
+        "wcag412",
+        "EN-301-549",
+        "EN-9.4.1.2"
+      ],
+      "description": "Ensures ARIA attributes are not prohibited for an element's role",
+      "help": "Elements must only use permitted ARIA attributes",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-prohibited-attr?application=playwright",
+      "nodes": [
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "aria-prohibited-attr",
+              "data": {
+                "role": null,
+                "nodeName": "div",
+                "messageKey": "noRoleSingular",
+                "prohibited": [
+                  "aria-label"
+                ]
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute is not well supported on a div with no valid role attribute."
+            }
+          ],
+          "impact": "serious",
+          "html": "<div data-v-106964d2=\"\" class=\"el-select el-select--mini\" aria-label=\"语种偏好\">",
+          "target": [
+            ".el-select"
+          ],
+          "failureSummary": "Fix all of the following:\n  aria-label attribute is not well supported on a div with no valid role attribute."
+        }
+      ]
+    },
+    {
+      "id": "aria-valid-attr-value",
+      "impact": "critical",
+      "tags": [
+        "cat.aria",
+        "wcag2a",
+        "wcag412",
+        "EN-301-549",
+        "EN-9.4.1.2"
+      ],
+      "description": "Ensures all ARIA attributes have valid values",
+      "help": "ARIA attributes must conform to valid values",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/aria-valid-attr-value?application=playwright",
+      "nodes": [
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-valid-attr-value",
+              "data": {
+                "messageKey": "controlsWithinPopup",
+                "needsReview": "aria-controls=\"dropdown-menu-9599\""
+              },
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Unable to determine if aria-controls referenced ID exists on the page while using aria-haspopup: aria-controls=\"dropdown-menu-9599\""
+            }
+          ],
+          "none": [],
+          "impact": "critical",
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-9599\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "target": [
+            ".el-dropdown-link"
+          ],
+          "failureSummary": "Fix all of the following:\n  Unable to determine if aria-controls referenced ID exists on the page while using aria-haspopup: aria-controls=\"dropdown-menu-9599\""
+        }
+      ]
+    },
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT"
+      ],
+      "description": "Ensures the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/color-contrast?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "18.0pt (24px)",
+                "fontWeight": "bold",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "3:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div data-v-11aaed5e=\"\" class=\"portal-page my-tickets\">",
+                  "target": [
+                    ".portal-page"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h2 data-v-11aaed5e=\"\" class=\"page-title\">我的工单</h2>",
+          "target": [
+            "h2"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div data-v-11aaed5e=\"\" class=\"portal-page my-tickets\">",
+                  "target": [
+                    ".portal-page"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p data-v-11aaed5e=\"\" class=\"page-sub\">这里展示与您手机号关联的来电工单和跨部门转办进度</p>",
+          "target": [
+            ".page-sub"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "11.3pt (15px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div data-v-11aaed5e=\"\" class=\"portal-page my-tickets\">",
+                  "target": [
+                    ".portal-page"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p data-v-11aaed5e=\"\">暂无工单记录</p>",
+          "target": [
+            ".empty-box > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        }
+      ]
+    }
+  ],
   "violations": []
 }

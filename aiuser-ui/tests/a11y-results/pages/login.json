@@ -13,8 +13,8 @@
     "orientationAngle": 0,
     "orientationType": "landscape-primary"
   },
-  "timestamp": "2026-10-28T13:22:21.697Z",
-  "url": "http://localhost:8091/login",
+  "timestamp": "2026-10-28T14:05:42.279Z",
+  "url": "http://localhost:8093/login",
   "toolOptions": {
     "runOnly": {
       "type": "tag",

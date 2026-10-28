@@ -40,36 +40,9 @@
               :class="{ 'elderly-entry': item.elderly }">{{ item.label }}</el-menu-item>
           </el-menu>
 
-          <!-- F2 适老化快捷控制 -->
-          <div class="care-bar desktop-only" role="group" aria-label="无障碍与语言设置">
-            <el-radio-group
-              :value="care.state.fontScale"
-              size="mini"
-              aria-label="字号大小"
-              @input="onFontScale">
-              <el-radio-button label="normal">标准</el-radio-button>
-              <el-radio-button label="large">大字</el-radio-button>
-              <el-radio-button label="xlarge">超大</el-radio-button>
-            </el-radio-group>
-            <el-tooltip content="高对比度主题，文字更清晰" placement="bottom">
-              <el-switch
-                :value="care.state.highContrast"
-                active-color="#C9A96E"
-                inactive-color="#3a5a8c"
-                active-text=""
-                aria-label="高对比度模式"
-                @change="onHighContrast" />
-            </el-tooltip>
-            <el-tooltip content="语种偏好（F1，粤语语音能力二期开通）" placement="bottom">
-              <el-select
-                :value="care.state.languagePreference"
-                size="mini"
-                aria-label="语种偏好"
-                @change="onLanguageChange">
-                <el-option label="普通话" value="zh-CN" />
-                <el-option label="粤语" value="yue-CN" />
-              </el-select>
-            </el-tooltip>
+          <!-- F2 适老化快捷控制（CareControls：原生控件保证 ARIA 正确） -->
+          <div class="care-bar desktop-only">
+            <care-controls />
 
             <el-dropdown v-if="isLoggedIn" @command="handleCommand">
               <span class="el-dropdown-link">
@@ -120,31 +93,8 @@
               :class="{ 'elderly-entry': item.elderly }">{{ item.label }}</el-menu-item>
           </el-menu>
 
-          <div class="mobile-care" role="group" aria-label="无障碍与语言设置">
-            <div class="mobile-care-row">
-              <span class="mobile-care-label">字号</span>
-              <el-radio-group :value="care.state.fontScale" size="mini" aria-label="字号大小" @input="onFontScale">
-                <el-radio-button label="normal">标准</el-radio-button>
-                <el-radio-button label="large">大字</el-radio-button>
-                <el-radio-button label="xlarge">超大</el-radio-button>
-              </el-radio-group>
-            </div>
-            <div class="mobile-care-row">
-              <span class="mobile-care-label">高对比度</span>
-              <el-switch
-                :value="care.state.highContrast"
-                active-color="#C9A96E"
-                inactive-color="#3a5a8c"
-                aria-label="高对比度模式"
-                @change="onHighContrast" />
-            </div>
-            <div class="mobile-care-row">
-              <span class="mobile-care-label">语种偏好</span>
-              <el-select :value="care.state.languagePreference" size="mini" aria-label="语种偏好" @change="onLanguageChange">
-                <el-option label="普通话" value="zh-CN" />
-                <el-option label="粤语" value="yue-CN" />
-              </el-select>
-            </div>
+          <div class="mobile-care">
+            <care-controls layout="rows" />
             <div class="mobile-care-row">
               <span class="mobile-care-label">账号</span>
               <template v-if="isLoggedIn">
@@ -170,9 +120,11 @@
 
 <script>
 import { mapGetters } from 'vuex'
+import CareControls from '@/components/CareControls'
 
 export default {
   name: 'App',
+  components: { CareControls },
   data() {
     return {
       // U6 移动端：桌面横向菜单与抽屉菜单共用同一份导航配置
@@ -189,10 +141,7 @@ export default {
     }
   },
   computed: {
-    ...mapGetters(['isLoggedIn', 'userInfo']),
-    care() {
-      return this.$care ? this.$care.state : { fontScale: 'normal', highContrast: false, languagePreference: 'zh-CN' }
-    }
+    ...mapGetters(['isLoggedIn', 'userInfo'])
   },
   watch: {
     // 登录成功后把本地适老/语种偏好同步到服务端
@@ -200,21 +149,26 @@ export default {
       if (val && this.$care) {
         this.$care.syncPreferenceToServer()
       }
+      // 登录后用户菜单才渲染，需重新纠正 ARIA
+      this.$nextTick(this.fixDropdownAria)
     },
     // 路由变化后收起移动端抽屉
     $route() {
       this.mobileNavOpen = false
     }
   },
-  created() {
-    // $care 已在 main.js 安装时初始化（localStorage 恢复 + 应用根类）
+  mounted() {
+    this.$nextTick(this.fixDropdownAria)
   },
   methods: {
     toggleMobileNav() { this.mobileNavOpen = !this.mobileNavOpen },
     closeMobileNav() { this.mobileNavOpen = false },
-    onFontScale(val) { this.$care.setFontScale(val) },
-    onHighContrast(val) { this.$care.setHighContrast(val) },
-    onLanguageChange(val) { this.$care.setLanguage(val) },
+    // ElementUI 2.15 的 el-dropdown 把 aria-haspopup 固定写成非法值 "list"，
+    // 导致 axe critical(aria-valid-attr-value)；这里纠正为合法的 "menu"
+    fixDropdownAria() {
+      const trigger = this.$el.querySelector('.el-dropdown-link')
+      if (trigger) trigger.setAttribute('aria-haspopup', 'menu')
+    },
     focusMain() {
       const el = document.getElementById('main-content')
       if (el) {
@@ -332,7 +286,6 @@ a:focus-visible,
 button:focus-visible,
 .el-button:focus-visible,
 .el-menu-item:focus-visible,
-.el-radio-button:focus-within,
 .el-input__inner:focus-visible {
   outline: 3px solid #ffd04b;
   outline-offset: 2px;
@@ -414,6 +367,14 @@ button:focus-visible,
   font-size: 13px;
 }
 
+/* 无障碍对比度修复：主题 $--color-info(#8C8C8C) 用于字数统计/提示文案，
+   在白/浅灰底上仅 3.0~3.4:1；主题 CSS 后置导致同优先级覆盖失效，故显式提高优先级 */
+.el-textarea .el-input__count,
+.el-input .el-input__count,
+.el-input .el-input__count .el-input__count-inner { color: #5b6b84 !important; }
+.el-alert.el-alert--info .el-alert__title,
+.el-alert.el-alert--info .el-alert__description { color: #44505f; }
+
 /* =========================================================
  * F2 适老化全局规则（html 根类驱动，覆盖全部 ElementUI 组件）
  * 标准 >=14px / 大字 >=18px / 超大 >=22px，热区 >=44px
@@ -438,7 +399,6 @@ html.care-large .el-menu--horizontal > .el-menu-item { height: 60px; line-height
 html.care-large .app-header { height: auto !important; min-height: 64px; line-height: 64px; }
 html.care-large .el-menu--horizontal > .el-menu-item { height: 64px; line-height: 64px; }
 html.care-large .logo { font-size: 22px; }
-html.care-large .el-radio-button__inner { min-height: 44px; padding: 10px 16px; font-size: 16px; }
 html.care-large .app-footer { font-size: 15px; }
 
 html.care-xlarge body { font-size: 22px; }
@@ -460,7 +420,6 @@ html.care-xlarge .el-tag { font-size: 20px; }
 html.care-xlarge .app-header { height: auto !important; min-height: 72px; line-height: 72px; }
 html.care-xlarge .el-menu--horizontal > .el-menu-item { height: 72px; line-height: 72px; }
 html.care-xlarge .logo { font-size: 26px; }
-html.care-xlarge .el-radio-button__inner { min-height: 48px; padding: 12px 20px; font-size: 19px; }
 html.care-xlarge .app-footer { font-size: 17px; }
 html.care-xlarge .header-content { flex-wrap: wrap; padding-top: 8px; padding-bottom: 8px; }
 
@@ -565,11 +524,6 @@ html.care-high-contrast .el-tag--danger {
   /* 咨询提交：标签改为顶部对齐，避免 100px 固定标签挤压输入区 */
   .submit-question .el-form-item__label { width: auto !important; float: none; text-align: left; padding: 0 0 6px; line-height: 1.5; }
   .submit-question .el-form-item__content { margin-left: 0 !important; }
-
-  /* 工单状态筛选：等分换行，保持 >=44px 热区 */
-  .status-tabs { display: flex; flex-wrap: wrap; }
-  .status-tabs .el-radio-button { flex: 1 0 auto; }
-  .status-tabs .el-radio-button__inner { width: 100%; min-height: 44px; padding: 10px 8px; }
 
   /* 咨询历史筛选区：三列改为单列 */
   .consultation-history .filter-container .el-col { width: 100% !important; margin-bottom: 8px; }
