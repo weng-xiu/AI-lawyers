@@ -1,5 +1,5 @@
 'use strict'
-// F2 无障碍 axe-core 全路由扫描（公众端 9 条路由）
+// F2 无障碍 axe-core 全路由扫描（公众端 10 条路由）
 // 依据 GB/T 37668-2019 基础项对齐 WCAG 2.1 A/AA；产出每页原始结果与汇总报告。
 const { test } = require('@playwright/test')
 const AxeBuilder = require('@axe-core/playwright').default
@@ -13,6 +13,7 @@ const PAGES_DIR = path.join(OUT_DIR, 'pages')
 
 // [路由名, 路径, 是否需要登录, 扫描前额外操作]
 const PAGES = [
+  ['home', '/', false],
   ['login', '/login', false],
   ['register', '/register', false],
   ['services', '/services', false],

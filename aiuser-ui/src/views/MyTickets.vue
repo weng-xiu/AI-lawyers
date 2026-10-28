@@ -31,6 +31,9 @@
           <h3 class="ticket-title">{{ item.title || '法律咨询工单' }}</h3>
           <p v-if="item.content" class="ticket-content">{{ item.content }}</p>
 
+          <!-- V8 进度可视化：已提交 → 待受理 → 办理中 → 已办结 -->
+          <ticket-progress :status="item.status" class="ticket-steps" />
+
           <ul class="ticket-meta">
             <li>
               <span class="meta-label">优先级</span>
@@ -92,9 +95,11 @@
 <script>
 import { myTickets } from '@/api/portal'
 import { announce } from '@/utils/a11y'
+import TicketProgress from '@/components/TicketProgress'
 
 export default {
   name: 'MyTickets',
+  components: { TicketProgress },
   data() {
     return {
       loading: false,
@@ -191,6 +196,7 @@ export default {
 .ticket-no { color: #8a94a6; font-size: 13px; }
 .ticket-title { font-size: 17px; color: #0b1f4a; margin: 0 0 8px; }
 .ticket-content { color: #44505f; font-size: 14px; line-height: 1.7; margin: 0 0 10px; }
+.ticket-steps { margin: 14px 0 10px; }
 
 .ticket-meta { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px 24px; }
 .ticket-meta li { font-size: 14px; color: #3d4a5c; display: flex; align-items: center; gap: 8px; }

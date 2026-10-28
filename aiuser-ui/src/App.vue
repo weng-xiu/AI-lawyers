@@ -178,6 +178,7 @@ export default {
       // U6 移动端：桌面横向菜单与抽屉菜单共用同一份导航配置
       mobileNavOpen: false,
       navItems: [
+        { path: '/', label: '首页' },
         { path: '/consultation/submit', label: '我要咨询' },
         { path: '/ticket', label: '我的工单' },
         { path: '/channels', label: '渠道绑定' },

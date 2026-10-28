@@ -5,6 +5,7 @@ import store from '@/store'
 Vue.use(VueRouter)
 
 // 路由组件懒加载
+const Home = () => import('@/views/Home')
 const SubmitQuestion = () => import('@/views/SubmitQuestion')
 const ConsultationResult = () => import('@/views/ConsultationResult')
 const ConsultationHistory = () => import('@/views/ConsultationHistory')
@@ -31,7 +32,10 @@ const routes = [
   },
   {
     path: '/',
-    redirect: '/consultation/submit'
+    name: 'Home',
+    component: Home,
+    // V8 首页：匿名可浏览场景化入口，点咨询等登录态入口时由守卫带 redirect 处理
+    meta: { title: '首页', requiresAuth: false }
   },
   {
     path: '/ticket',
