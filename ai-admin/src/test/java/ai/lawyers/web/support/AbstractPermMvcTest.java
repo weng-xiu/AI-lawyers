@@ -125,7 +125,9 @@ public abstract class AbstractPermMvcTest
             SysUser user = new SysUser();
             user.setUserId(1001L);
             user.setUserName("perm-tester");
-            LoginUser loginUser = new LoginUser(user,
+            // 与生产登录一致：userId/deptId 显式注入（两参构造不会回填 userId，
+            // 会导致 SecurityUtils.getUserId() 为 null，无法覆盖对象级归属断言）
+            LoginUser loginUser = new LoginUser(user.getUserId(), user.getDeptId(), user,
                     permissions.length == 0 ? new HashSet<>() : new HashSet<>(Arrays.asList(permissions)));
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                     loginUser, null, loginUser.getAuthorities());

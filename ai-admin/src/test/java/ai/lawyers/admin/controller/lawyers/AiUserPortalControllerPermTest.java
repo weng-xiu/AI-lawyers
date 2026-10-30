@@ -141,7 +141,8 @@ public class AiUserPortalControllerPermTest extends AbstractPermMvcTest
             user.setUserId(2002L);
             user.setUserName("portal-tester");
             user.setPhonenumber("15800000000");
-            LoginUser loginUser = new LoginUser(user, new java.util.HashSet<>());
+            LoginUser loginUser = new LoginUser(user.getUserId(), user.getDeptId(), user,
+                    new java.util.HashSet<>());
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                     loginUser, null, loginUser.getAuthorities());
             request.setAttribute(ATTR_INJECT_AUTH, authentication);
