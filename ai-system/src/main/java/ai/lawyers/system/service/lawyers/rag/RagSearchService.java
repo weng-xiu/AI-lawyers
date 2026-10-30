@@ -72,6 +72,10 @@ public class RagSearchService
     @Autowired(required = false)
     private AiModelCallLogRecorder callLogRecorder;
 
+    /** F8：知识检索查询日志（未装配时静默，不影响检索） */
+    @Autowired(required = false)
+    private KnowledgeQueryLogRecorder queryLogRecorder;
+
     @Value("${ai.rag.enabled:true}")
     private boolean ragEnabled;
 
@@ -143,10 +147,28 @@ public class RagSearchService
      */
     public List<RagChunk> search(String query, List<Long> knowledgeIds)
     {
+        return search(query, knowledgeIds, KnowledgeQueryLogRecorder.SCENE_OTHER);
+    }
+
+    /**
+     * 混合检索（F8 起带场景，用于知识命中率/未命中问句运营分析）。
+     *
+     * <p>检索算法与返回结果完全不变，仅在返回前异步落一条查询日志；
+     * 日志记录任何异常都不影响检索主链路。</p>
+     *
+     * @param query        用户问句
+     * @param knowledgeIds 限定知识ID范围（可空，表示全库）
+     * @param scene        检索场景（agent/voice_robot/copilot），见
+     *                     {@link KnowledgeQueryLogRecorder} 场景常量
+     * @return 融合/精排后的命中分块（按相关性降序）；分块表不可用等异常时返回空列表（上层回退旧路）
+     */
+    public List<RagChunk> search(String query, List<Long> knowledgeIds, String scene)
+    {
         if (!ragEnabled || StringUtils.isEmpty(query))
         {
             return new ArrayList<>();
         }
+        long start = System.currentTimeMillis();
         int cand = candidateSize > 0 ? candidateSize : 20;
 
         // ① 关键词路：FULLTEXT 优先，异常/无结果退回 LIKE
@@ -158,16 +180,17 @@ public class RagSearchService
         // ③ RRF 融合
         Map<Long, RagChunk> fused = rrfFuse(keywordHits, vectorHits);
         // T5-1：RAG 命中路由统计（vector/keyword/fused/none）
+        boolean kwHit = keywordHits != null && !keywordHits.isEmpty();
+        boolean vecHit = vectorHits != null && !vectorHits.isEmpty();
+        String route = fused.isEmpty() ? "none"
+                : (kwHit && vecHit ? "fused" : (vecHit ? "vector" : "keyword"));
         if (metrics != null)
         {
-            boolean kwHit = keywordHits != null && !keywordHits.isEmpty();
-            boolean vecHit = vectorHits != null && !vectorHits.isEmpty();
-            String route = fused.isEmpty() ? "none"
-                    : (kwHit && vecHit ? "fused" : (vecHit ? "vector" : "keyword"));
             metrics.incrementRagHit(route);
         }
         if (fused.isEmpty())
         {
+            recordQueryLog(query, scene, null, route, start);
             return new ArrayList<>();
         }
         List<RagChunk> candidates = new ArrayList<>(fused.values());
@@ -180,7 +203,27 @@ public class RagSearchService
         }
 
         int k = topK > 0 ? topK : 3;
-        return candidates.size() > k ? new ArrayList<>(candidates.subList(0, k)) : candidates;
+        List<RagChunk> result = candidates.size() > k
+                ? new ArrayList<>(candidates.subList(0, k)) : candidates;
+        recordQueryLog(query, scene, result, route, start);
+        return result;
+    }
+
+    /** F8：异步记录检索查询日志，任何异常都不影响检索结果 */
+    private void recordQueryLog(String query, String scene, List<RagChunk> hits, String route, long start)
+    {
+        if (queryLogRecorder == null)
+        {
+            return;
+        }
+        try
+        {
+            queryLogRecorder.record(query, scene, hits, route, System.currentTimeMillis() - start);
+        }
+        catch (Exception ignore)
+        {
+            // 运营埋点永不影响检索主链路
+        }
     }
 
     /** 关键词路：FULLTEXT ngram，异常或无结果退回 LIKE */

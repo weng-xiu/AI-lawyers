@@ -23,6 +23,7 @@ import ai.lawyers.system.mapper.lawyers.agent.AiAgentMessageMapper;
 import ai.lawyers.system.service.lawyers.IAiLegalKnowledgeService;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 import ai.lawyers.system.service.lawyers.agent.IAgentChatService;
+import ai.lawyers.system.service.lawyers.rag.KnowledgeQueryLogRecorder;
 import ai.lawyers.system.service.lawyers.rag.RagChunk;
 import ai.lawyers.system.service.lawyers.rag.RagSearchService;
 
@@ -194,7 +195,8 @@ public class AgentChatServiceImpl implements IAgentChatService
     {
         try
         {
-            List<RagChunk> hits = ragSearchService.search(userMessage, scopeIds);
+            List<RagChunk> hits = ragSearchService.search(userMessage, scopeIds,
+                    KnowledgeQueryLogRecorder.SCENE_AGENT);
             if (hits == null || hits.isEmpty())
             {
                 return "";

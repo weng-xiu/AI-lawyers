@@ -23,6 +23,7 @@ import ai.lawyers.system.domain.lawyers.AiLegalKnowledgeChunk;
 import ai.lawyers.system.service.lawyers.IAiCallRecordService;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
+import ai.lawyers.system.service.lawyers.rag.KnowledgeQueryLogRecorder;
 import ai.lawyers.system.service.lawyers.rag.RagChunk;
 import ai.lawyers.system.service.lawyers.rag.RagSearchService;
 import ai.lawyers.system.service.lawyers.stat.AiModelCallLogRecorder;
@@ -83,7 +84,8 @@ class VoiceRobotServiceTest
     {
         List<RagChunk> hits = new ArrayList<>();
         hits.add(chunk("劳动合同法", "第四十六条", "用人单位应当向劳动者支付经济补偿的情形……"));
-        when(ragSearchService.search(eq("被辞退怎么赔偿"), any())).thenReturn(hits);
+        when(ragSearchService.search(eq("被辞退怎么赔偿"), any(),
+                eq(KnowledgeQueryLogRecorder.SCENE_VOICE_ROBOT))).thenReturn(hits);
         when(modelConfigService.chat(anyString(), anyString(), anyString())).thenReturn("您可以主张经济补偿。");
 
         VoiceRobotResult r = service.answer("被辞退怎么赔偿", "sess-1");
@@ -103,7 +105,8 @@ class VoiceRobotServiceTest
     @Test
     void answer_ragEmpty_stillCallsLlmWithNoHitHint()
     {
-        when(ragSearchService.search(anyString(), any())).thenReturn(Collections.emptyList());
+        when(ragSearchService.search(anyString(), any(),
+                eq(KnowledgeQueryLogRecorder.SCENE_VOICE_ROBOT))).thenReturn(Collections.emptyList());
         when(modelConfigService.chat(anyString(), anyString(), anyString())).thenReturn("建议转人工坐席咨询。");
 
         VoiceRobotResult r = service.answer("稀有法律问题", "sess-2");
@@ -127,13 +130,14 @@ class VoiceRobotServiceTest
         assertThat(r.getFallbackReason()).isEqualTo("robot_disabled");
         assertThat(r.getAnswer()).contains("转接人工坐席");
         verify(modelConfigService, never()).chat(anyString(), anyString(), anyString());
-        verify(ragSearchService, never()).search(anyString(), anyList());
+        verify(ragSearchService, never()).search(anyString(), anyList(), anyString());
     }
 
     @Test
     void answer_llmThrows_fallbackAndNeverThrows()
     {
-        when(ragSearchService.search(anyString(), any())).thenReturn(Collections.emptyList());
+        when(ragSearchService.search(anyString(), any(),
+                eq(KnowledgeQueryLogRecorder.SCENE_VOICE_ROBOT))).thenReturn(Collections.emptyList());
         when(modelConfigService.chat(anyString(), anyString(), anyString()))
                 .thenThrow(new RuntimeException("model timeout"));
 
@@ -147,7 +151,8 @@ class VoiceRobotServiceTest
     @Test
     void answer_ragThrows_degradesRagButStillAnswers()
     {
-        when(ragSearchService.search(anyString(), any())).thenThrow(new RuntimeException("chunk table missing"));
+        when(ragSearchService.search(anyString(), any(),
+                eq(KnowledgeQueryLogRecorder.SCENE_VOICE_ROBOT))).thenThrow(new RuntimeException("chunk table missing"));
         when(modelConfigService.chat(anyString(), anyString(), anyString())).thenReturn("通用回答");
 
         VoiceRobotResult r = service.answer("问题", "sess-5");
@@ -161,7 +166,8 @@ class VoiceRobotServiceTest
     @Test
     void answer_llmEmpty_returnsFallback()
     {
-        when(ragSearchService.search(anyString(), any())).thenReturn(Collections.emptyList());
+        when(ragSearchService.search(anyString(), any(),
+                eq(KnowledgeQueryLogRecorder.SCENE_VOICE_ROBOT))).thenReturn(Collections.emptyList());
         when(modelConfigService.chat(anyString(), anyString(), anyString())).thenReturn("  ");
 
         VoiceRobotResult r = service.answer("问题", "sess-6");
@@ -184,7 +190,8 @@ class VoiceRobotServiceTest
     void answer_overLongAnswer_truncatedToMaxChars() throws Exception
     {
         inject("answerMaxChars", 10);
-        when(ragSearchService.search(anyString(), any())).thenReturn(Collections.emptyList());
+        when(ragSearchService.search(anyString(), any(),
+                eq(KnowledgeQueryLogRecorder.SCENE_VOICE_ROBOT))).thenReturn(Collections.emptyList());
         when(modelConfigService.chat(anyString(), anyString(), anyString()))
                 .thenReturn("一二三四五六七八九十十一十二十三十四");
 
@@ -250,7 +257,8 @@ class VoiceRobotServiceTest
     @Test
     void answer_notTicketIntent_fallsBackToRag()
     {
-        when(ragSearchService.search(anyString(), any())).thenReturn(Collections.emptyList());
+        when(ragSearchService.search(anyString(), any(),
+                eq(KnowledgeQueryLogRecorder.SCENE_VOICE_ROBOT))).thenReturn(Collections.emptyList());
         when(modelConfigService.chat(anyString(), anyString(), anyString())).thenReturn("法律解答");
 
         VoiceRobotResult r = service.answer("借钱不还怎么办", "sess-g3", 1001L);
@@ -263,7 +271,8 @@ class VoiceRobotServiceTest
     @Test
     void answer_browserWithoutAnchor_neverQueriesTicketsEvenIfSessionIdNumeric()
     {
-        when(ragSearchService.search(anyString(), any())).thenReturn(Collections.emptyList());
+        when(ragSearchService.search(anyString(), any(),
+                eq(KnowledgeQueryLogRecorder.SCENE_VOICE_ROBOT))).thenReturn(Collections.emptyList());
         when(modelConfigService.chat(anyString(), anyString(), anyString())).thenReturn("法律解答");
 
         // 浏览器侧 anchoredRecordId 恒为 null，即便问题命中意图也不得查库（防伪造越权）
@@ -279,7 +288,8 @@ class VoiceRobotServiceTest
     {
         when(callRecordService.selectAiCallRecordByRecordId(1001L))
                 .thenThrow(new RuntimeException("db down"));
-        when(ragSearchService.search(anyString(), any())).thenReturn(Collections.emptyList());
+        when(ragSearchService.search(anyString(), any(),
+                eq(KnowledgeQueryLogRecorder.SCENE_VOICE_ROBOT))).thenReturn(Collections.emptyList());
         when(modelConfigService.chat(anyString(), anyString(), anyString())).thenReturn("降级解答");
 
         VoiceRobotResult r = service.answer("查工单进度", "sess-g4", 1001L);
@@ -292,7 +302,8 @@ class VoiceRobotServiceTest
     void answer_selfQueryDisabled_fallsBackToRag() throws Exception
     {
         inject("selfQueryEnabled", false);
-        when(ragSearchService.search(anyString(), any())).thenReturn(Collections.emptyList());
+        when(ragSearchService.search(anyString(), any(),
+                eq(KnowledgeQueryLogRecorder.SCENE_VOICE_ROBOT))).thenReturn(Collections.emptyList());
         when(modelConfigService.chat(anyString(), anyString(), anyString())).thenReturn("法律解答");
 
         VoiceRobotResult r = service.answer("查工单进度", "sess-g5", 1001L);

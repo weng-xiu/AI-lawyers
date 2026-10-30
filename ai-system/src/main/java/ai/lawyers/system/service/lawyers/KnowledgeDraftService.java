@@ -19,6 +19,7 @@ import ai.lawyers.system.mapper.lawyers.AiCallRecordMapper;
 import ai.lawyers.system.mapper.lawyers.AiCallTicketMapper;
 import ai.lawyers.system.mapper.lawyers.AiLegalKnowledgeMapper;
 import ai.lawyers.system.mapper.lawyers.quality.AiQualityInspectionMapper;
+import ai.lawyers.system.service.lawyers.rag.KnowledgeQueryTextUtils;
 
 /**
  * P1-10（V2.59）：知识库自动运营——优质通话/工单经 LLM 沉淀为知识草稿。
@@ -105,6 +106,39 @@ public class KnowledgeDraftService
         String sourceKey = "source://ticket/" + ticketId;
         return persistDraft(material, "AI沉淀-工单", sourceKey,
                 "工单 " + ticketId, null);
+    }
+
+    /**
+     * F8：将未命中问句转知识草稿。
+     *
+     * <p>与通话/工单沉淀一致，生成的知识为待审核状态；来源键使用问句哈希
+     * {@code source://query/{hash}}，同一问句重复转草稿会被拒绝。</p>
+     *
+     * @param question  未命中问句（脱敏展示文本即可，最长截断 500 字符）
+     * @param queryHash 归一化问句哈希（为空时按 question 现算）
+     * @return 新知识ID
+     * @throws IllegalArgumentException 问句为空/有效内容为空/已转草稿/模型不可用
+     */
+    public Long draftFromQuery(String question, String queryHash)
+    {
+        if (StringUtils.isEmpty(question) || question.trim().isEmpty())
+        {
+            throw new IllegalArgumentException("问句不能为空");
+        }
+        String material = question.trim();
+        if (material.length() > KnowledgeQueryTextUtils.MAX_STORE_LENGTH)
+        {
+            material = material.substring(0, KnowledgeQueryTextUtils.MAX_STORE_LENGTH);
+        }
+        String hash = StringUtils.isNotEmpty(queryHash) ? queryHash.trim()
+                : KnowledgeQueryTextUtils.hash(material);
+        if (StringUtils.isEmpty(hash))
+        {
+            throw new IllegalArgumentException("问句有效内容为空，无法沉淀");
+        }
+        String sourceKey = "source://query/" + hash;
+        return persistDraft(material, "AI沉淀-未命中问句", sourceKey,
+                "未命中问句", material);
     }
 
     /**

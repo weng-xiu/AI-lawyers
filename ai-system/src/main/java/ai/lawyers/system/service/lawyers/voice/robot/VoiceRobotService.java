@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
+import ai.lawyers.system.service.lawyers.rag.KnowledgeQueryLogRecorder;
 import ai.lawyers.system.service.lawyers.rag.RagChunk;
 import ai.lawyers.system.service.lawyers.rag.RagSearchService;
 import ai.lawyers.system.service.lawyers.stat.AiModelCallLogRecorder;
@@ -284,7 +285,8 @@ public class VoiceRobotService
         {
             if (ragSearchService != null)
             {
-                List<RagChunk> r = ragSearchService.search(question.trim(), null);
+                List<RagChunk> r = ragSearchService.search(question.trim(), null,
+                        KnowledgeQueryLogRecorder.SCENE_VOICE_ROBOT);
                 if (r != null)
                 {
                     hits = r;

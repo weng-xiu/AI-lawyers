@@ -22,7 +22,8 @@ import ai.lawyers.system.service.lawyers.storage.RecordingStorageService;
  *
  * <p>政务热线长期运行后，拨号流水、IVR 执行日志、坐席状态流水、短信日志等热表持续膨胀，
  * 本任务按各表保留期（月）分批物理删除超期数据；话单表 {@code ai_call_record} 清理时
- * 同步删除磁盘录音文件；P3-F1 起纳管智能质检记录与智能体对话消息，共 9 张热表；
+ * 同步删除磁盘录音文件；P3-F1 起纳管智能质检记录与智能体对话消息，
+ * F8 起纳管知识检索查询日志 {@code ai_knowledge_query_log}，共 10 张热表；
  * P3-B4 起纳管 PBX 事件幂等表 {@code ai_call_event_dedup}（按天保留，默认 7 天）。
  * 所有被清理表名/时间列均为代码内白名单常量，不接受外部拼入。</p>
  *
@@ -58,6 +59,7 @@ public class DataLifecycleCleanupTask
     private static final String T_IVR_INTENTION_LOG = "ai_ivr_intention_log";
     private static final String T_QUALITY_INSPECTION = "ai_quality_inspection";
     private static final String T_AGENT_MESSAGE = "ai_agent_message";
+    private static final String T_KNOWLEDGE_QUERY_LOG = "ai_knowledge_query_log";
     private static final String T_CALL_RECORD = "ai_call_record";
     private static final String T_CALL_EVENT_DEDUP = "ai_call_event_dedup";
 
@@ -114,6 +116,10 @@ public class DataLifecycleCleanupTask
     /** AI 智能体对话消息保留月数（多轮上下文审计流水，默认 6 个月） */
     @Value("${data.retention.agent-message-months:6}")
     private int agentMessageMonths;
+
+    /** F8：知识检索查询日志保留月数（运营分析流水，默认 6 个月） */
+    @Value("${data.retention.knowledge-query-log-months:6}")
+    private int knowledgeQueryLogMonths;
 
     /**
      * 话单及录音保留月数。政务热线录音通常要求保存较长时间，默认 36 个月；
@@ -206,6 +212,8 @@ public class DataLifecycleCleanupTask
         // P3-F1 纳管：质检记录/智能体对话消息引用 record_id，须在话单前清理
         specs.add(new TableSpec(T_QUALITY_INSPECTION, "create_time", qualityInspectionMonths, false));
         specs.add(new TableSpec(T_AGENT_MESSAGE, "create_time", agentMessageMonths, false));
+        // F8：知识检索查询日志（运营分析流水，仅统计用途）
+        specs.add(new TableSpec(T_KNOWLEDGE_QUERY_LOG, "create_time", knowledgeQueryLogMonths, false));
         // 话单最后清理（其它流水逻辑上引用 record_id，先删流水再删话单）
         specs.add(new TableSpec(T_CALL_RECORD, "create_time", callRecordMonths, true));
         return specs;

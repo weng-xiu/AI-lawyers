@@ -2,6 +2,7 @@ package ai.lawyers.web.controller.lawyers;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,6 +51,10 @@ public class AiLegalKnowledgeController extends BaseController
     /** P1-10：知识自动沉淀 */
     @Autowired
     private ai.lawyers.system.service.lawyers.KnowledgeDraftService knowledgeDraftService;
+
+    /** F8：知识库运营分析（命中率/未命中问句） */
+    @Autowired
+    private ai.lawyers.system.service.lawyers.KnowledgeOpsService knowledgeOpsService;
 
     /**
      * 查询法律知识库列表
@@ -278,5 +283,58 @@ public class AiLegalKnowledgeController extends BaseController
     {
         return toAjax(aiLegalKnowledgeService.markValidStatus(
                 knowledgeId, validStatus, reason, getUsername()));
+    }
+
+    /**
+     * F8：知识检索总览（总问句/命中/未命中/待处理/命中率/平均耗时）。
+     * 区间默认近 7 天、最长 90 天；查询日志表未建时返回 available=false。
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:knowledge:list')")
+    @GetMapping("/ops/overview")
+    public AjaxResult opsOverview(String beginTime, String endTime)
+    {
+        return success(knowledgeOpsService.overview(beginTime, endTime));
+    }
+
+    /**
+     * F8：未命中问句排行（按归一化问句聚合，次数降序，分页）。
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:knowledge:list')")
+    @GetMapping("/ops/unmatched")
+    public TableDataInfo opsUnmatched(String beginTime, String endTime)
+    {
+        startPage();
+        return getDataTable(knowledgeOpsService.listUnmatchedQuestions(beginTime, endTime));
+    }
+
+    /**
+     * F8：高频命中知识 Top-N（默认 10，最大 50）。
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:knowledge:list')")
+    @GetMapping("/ops/topKnowledge")
+    public AjaxResult opsTopKnowledge(String beginTime, String endTime, Integer limit)
+    {
+        return success(knowledgeOpsService.topKnowledge(beginTime, endTime, limit));
+    }
+
+    /**
+     * F8：未命中问句一键转知识草稿（待审核，生成后标记该问句已转化）。
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:knowledge:add')")
+    @Log(title = "知识沉淀-未命中问句", businessType = BusinessType.INSERT)
+    @PostMapping("/ops/draft")
+    public AjaxResult opsDraft(@RequestBody Map<String, String> body)
+    {
+        try
+        {
+            String question = body == null ? null : body.get("question");
+            String queryHash = body == null ? null : body.get("queryHash");
+            Long knowledgeId = knowledgeOpsService.draftFromQuestion(question, queryHash);
+            return AjaxResult.success("已生成待审核知识草稿", knowledgeId);
+        }
+        catch (IllegalArgumentException e)
+        {
+            return AjaxResult.error(e.getMessage());
+        }
     }
 }

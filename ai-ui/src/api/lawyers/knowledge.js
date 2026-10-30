@@ -152,3 +152,39 @@ export function testRagRerank() {
     method: 'post'
   })
 }
+
+// F8 知识运营分析：区间总览（命中率/未命中/待处理/平均耗时）
+export function getKnowledgeOpsOverview(query) {
+  return request({
+    url: '/lawyers/knowledge/ops/overview',
+    method: 'get',
+    params: query
+  })
+}
+
+// F8 知识运营分析：未命中问句排行（分页）
+export function listUnmatchedQuestions(query) {
+  return request({
+    url: '/lawyers/knowledge/ops/unmatched',
+    method: 'get',
+    params: query
+  })
+}
+
+// F8 知识运营分析：高频命中知识 Top-N
+export function listTopKnowledge(query) {
+  return request({
+    url: '/lawyers/knowledge/ops/topKnowledge',
+    method: 'get',
+    params: query
+  })
+}
+
+// F8 知识运营分析：未命中问句一键转知识草稿
+export function draftFromQuestion(data) {
+  return request({
+    url: '/lawyers/knowledge/ops/draft',
+    method: 'post',
+    data: data
+  })
+}

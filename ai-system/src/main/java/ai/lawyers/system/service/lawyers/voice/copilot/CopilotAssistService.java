@@ -15,6 +15,7 @@ import ai.lawyers.system.mapper.lawyers.AiCallTicketMapper;
 import ai.lawyers.system.mapper.lawyers.AiCopilotFeedbackMapper;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
+import ai.lawyers.system.service.lawyers.rag.KnowledgeQueryLogRecorder;
 import ai.lawyers.system.service.lawyers.rag.RagChunk;
 import ai.lawyers.system.service.lawyers.rag.RagSearchService;
 import ai.lawyers.system.service.lawyers.rag.TicketVectorService;
@@ -178,7 +179,8 @@ public class CopilotAssistService
         {
             if (ragSearchService != null)
             {
-                List<RagChunk> hits = ragSearchService.search(text, null);
+                List<RagChunk> hits = ragSearchService.search(text, null,
+                        KnowledgeQueryLogRecorder.SCENE_COPILOT);
                 if (hits != null)
                 {
                     int n = lawLimit > 0 ? lawLimit : 3;

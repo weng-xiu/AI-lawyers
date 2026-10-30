@@ -125,6 +125,16 @@
           </el-dropdown-menu>
         </el-dropdown>
       </el-col>
+      <el-col :span="1.5">
+        <el-button
+          type="primary"
+          plain
+          icon="el-icon-s-data"
+          size="mini"
+          @click="opsOpen = true"
+          v-hasPermi="['lawyers:knowledge:list']"
+        >运营分析</el-button>
+      </el-col>
       <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
@@ -358,6 +368,9 @@
         <el-button @click="scanOpen = false">取 消</el-button>
       </div>
     </el-dialog>
+
+    <!-- F8 知识运营分析：命中率与未命中问句反哺 -->
+    <knowledge-ops :visible.sync="opsOpen" />
   </div>
 </template>
 
@@ -365,10 +378,12 @@
 import { listKnowledge, getKnowledge, delKnowledge, addKnowledge, updateKnowledge, exportKnowledge, importTemplate, importKnowledge, auditKnowledge, getRagIndexInfo, rebuildRagIndex, testRagRerank, draftFromCall, draftFromTicket, scanDraft } from "@/api/lawyers/knowledge"
 import { getValidCategories } from "@/api/lawyers/category"
 import { createDraftMixin } from '@/utils/draft'
+import KnowledgeOps from './KnowledgeOps'
 
 export default {
   name: "Knowledge",
   dicts: ['lawyers_audit_status'],
+  components: { KnowledgeOps },
   // U4 表单防丢失：新增态自动存草稿（按用户隔离），knowledgeId/viewCount 不入草稿
   mixins: [createDraftMixin({
     key: vm => 'knowledge:' + ((vm.$store && vm.$store.state.user.name) || 'anon'),
@@ -433,6 +448,8 @@ export default {
         minScore: [{ required: true, message: "质量分阈值不能为空", trigger: "blur" }],
         limit: [{ required: true, message: "数量上限不能为空", trigger: "blur" }]
       },
+      // F8 知识运营分析
+      opsOpen: false,
       // 查询参数
       queryParams: {
         pageNum: 1,

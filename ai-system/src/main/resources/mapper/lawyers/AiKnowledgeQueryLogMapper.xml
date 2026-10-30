@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiKnowledgeQueryLogMapper">
+
+    <resultMap type="AiKnowledgeQueryLog" id="AiKnowledgeQueryLogResult">
+        <result property="logId"           column="log_id"           />
+        <result property="queryText"       column="query_text"       />
+        <result property="queryHash"       column="query_hash"       />
+        <result property="scene"           column="scene"            />
+        <result property="hitCount"        column="hit_count"        />
+        <result property="topKnowledgeId"  column="top_knowledge_id"  />
+        <result property="route"           column="route"            />
+        <result property="latencyMs"       column="latency_ms"       />
+        <result property="converted"       column="converted"        />
+        <result property="createTime"      column="create_time"      />
+    </resultMap>
+
+    <insert id="insertKnowledgeQueryLog" parameterType="AiKnowledgeQueryLog"
+            useGeneratedKeys="true" keyProperty="logId">
+        insert into ai_knowledge_query_log
+            (query_text, query_hash, scene, hit_count, top_knowledge_id, route, latency_ms, converted, create_time)
+        values
+            (#{queryText}, #{queryHash}, #{scene}, #{hitCount}, #{topKnowledgeId}, #{route}, #{latencyMs}, #{converted}, #{createTime})
+    </insert>
+
+    <select id="selectQueryOverview" resultType="ai.lawyers.system.domain.lawyers.KnowledgeQueryOverview">
+        select count(1) as totalCount,
+               coalesce(sum(case when hit_count &gt; 0 then 1 else 0 end), 0) as hitCount,
+               coalesce(sum(case when hit_count = 0 then 1 else 0 end), 0) as missCount,
+               coalesce(sum(case when hit_count = 0 and converted = 0 then 1 else 0 end), 0) as pendingCount,
+               coalesce(avg(latency_ms), 0) as avgLatencyMs
+        from ai_knowledge_query_log
+        where create_time &gt;= #{beginTime} and create_time &lt; #{endTime}
+    </select>
+
+    <select id="selectUnmatchedQuestions" resultType="ai.lawyers.system.domain.lawyers.KnowledgeUnmatchedQuestion">
+        select query_hash as queryHash,
+               min(query_text) as queryText,
+               count(1) as askCount,
+               min(create_time) as firstTime,
+               max(create_time) as lastTime,
+               max(converted) as converted
+        from ai_knowledge_query_log
+        where hit_count = 0
+          and create_time &gt;= #{beginTime} and create_time &lt; #{endTime}
+        group by query_hash
+        order by askCount desc, lastTime desc
+    </select>
+
+    <select id="selectTopKnowledge" resultType="ai.lawyers.system.domain.lawyers.KnowledgeHitStat">
+        select l.top_knowledge_id as knowledgeId,
+               k.title as title,
+               count(1) as hitCount,
+               max(l.create_time) as lastTime
+        from ai_knowledge_query_log l
+        left join ai_legal_knowledge k on k.knowledge_id = l.top_knowledge_id
+        where l.hit_count &gt; 0
+          and l.top_knowledge_id is not null
+          and l.create_time &gt;= #{beginTime} and l.create_time &lt; #{endTime}
+        group by l.top_knowledge_id, k.title
+        order by hitCount desc, lastTime desc
+        limit #{limit}
+    </select>
+
+    <update id="markConverted">
+        update ai_knowledge_query_log
+        set converted = 1
+        where query_hash = #{queryHash}
+          and hit_count = 0
+          and converted = 0
+    </update>
+
+</mapper>
