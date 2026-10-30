@@ -60,3 +60,6 @@ nbdist/
 /tmp-verify/
 /doc/
 /perf/jmeter/results/
+# 测试中 ExcelUtil 导出时 file.path 为空会落到模块下 null/download，禁止入库
+/**/null/
+/ai-ui/test-results/
