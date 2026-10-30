@@ -35,6 +35,12 @@ public class AiTodo extends BaseEntity
     @Excel(name = "归属用户ID")
     private Long userId;
 
+    /** F7：关联业务类型（ticket=工单，空=普通待办） */
+    private String bizType;
+
+    /** F7：关联业务ID（工单ID） */
+    private Long bizId;
+
     public void setTodoId(Long todoId)
     {
         this.todoId = todoId;
@@ -105,6 +111,26 @@ public class AiTodo extends BaseEntity
         return userId;
     }
 
+    public void setBizType(String bizType)
+    {
+        this.bizType = bizType;
+    }
+
+    public String getBizType()
+    {
+        return bizType;
+    }
+
+    public void setBizId(Long bizId)
+    {
+        this.bizId = bizId;
+    }
+
+    public Long getBizId()
+    {
+        return bizId;
+    }
+
     @Override
     public String toString() {
         return new ToStringBuilder(this, ToStringStyle.MULTI_LINE_STYLE)
@@ -115,6 +141,8 @@ public class AiTodo extends BaseEntity
             .append("priority", getPriority())
             .append("dueDate", getDueDate())
             .append("userId", getUserId())
+            .append("bizType", getBizType())
+            .append("bizId", getBizId())
             .append("createBy", getCreateBy())
             .append("createTime", getCreateTime())
             .append("updateBy", getUpdateBy())

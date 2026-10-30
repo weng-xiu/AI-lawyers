@@ -20,8 +20,9 @@ import ai.lawyers.system.service.lawyers.IAiTodoService;
 import ai.lawyers.web.support.AbstractPermMvcTest;
 
 /**
- * P2-14：{@link AiTodoController} 权限校验——9 个端点、6 个权限边界。
- * 处理/延期/忽略三个动作端点与编辑共用 lawyers:workbench:todo:edit。
+ * P2-14：{@link AiTodoController} 权限校验——10 个端点、6 个权限边界。
+ * 处理/延期/忽略三个动作端点与编辑共用 lawyers:workbench:todo:edit；
+ * F7 关联工单查询与详情查询共用 lawyers:workbench:todo:query。
  */
 public class AiTodoControllerPermTest extends AbstractPermMvcTest
 {
@@ -51,6 +52,7 @@ public class AiTodoControllerPermTest extends AbstractPermMvcTest
         endpoints.add(new Endpoint("lawyers:workbench:todo:list", get(base + "/list")));
         endpoints.add(new Endpoint("lawyers:workbench:todo:export", post(base + "/export")));
         endpoints.add(new Endpoint("lawyers:workbench:todo:query", get(base + "/1")));
+        endpoints.add(new Endpoint("lawyers:workbench:todo:query", get(base + "/1/ticket")));
         endpoints.add(new Endpoint("lawyers:workbench:todo:add",
                 post(base).contentType(MediaType.APPLICATION_JSON).content("{}")));
         endpoints.add(new Endpoint("lawyers:workbench:todo:edit",

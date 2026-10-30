@@ -92,7 +92,7 @@
       </el-tab-pane>
 
       <el-tab-pane label="待办" name="todo">
-        <todo-panel />
+        <todo-panel ref="todoPanel" />
       </el-tab-pane>
 
       <el-tab-pane label="公告" name="notice">
@@ -137,8 +137,9 @@
 </template>
 
 <script>
-import { getWorkbenchStats, getWorkbenchTodos, getWorkbenchRecentCalls } from "@/api/lawyers/workbench"
+import { getWorkbenchStats, getWorkbenchTodos, getWorkbenchRecentCalls, addTodo } from "@/api/lawyers/workbench"
 import { addTicket } from "@/api/lawyers/callCenter"
+import { checkPermi } from '@/utils/permission'
 import TodoPanel from './todo'
 import NoticePanel from './notice'
 import * as statusTag from '@/utils/statusTag'
@@ -292,7 +293,9 @@ export default {
           priority: this.ticketForm.priority,
           remark: this.ticketForm.remark
         }
-        addTicket(payload).then(() => {
+        addTicket(payload).then(res => {
+          const ticket = (res && res.data) || {}
+          this.createLinkedTodo(ticket)
           this.$modal.msgSuccess('工单创建成功')
           this.ticketOpen = false
           this.ticketSubmitting = false
@@ -300,6 +303,23 @@ export default {
           this.ticketSubmitting = false
         })
       })
+    },
+    // F7：一键生成工单后同步生成关联待办，待办卡片内可直接受理/转办/办结
+    createLinkedTodo(ticket) {
+      if (!ticket || !ticket.ticketId) return
+      if (!checkPermi(['lawyers:workbench:todo:add'])) return
+      addTodo({
+        todoTitle: '处理工单：' + (ticket.title || ticket.ticketNo || ticket.ticketId),
+        todoContent: ticket.content || '',
+        priority: '1',
+        bizType: 'ticket',
+        bizId: ticket.ticketId
+      }).then(() => {
+        this.loadTodos()
+        if (this.$refs.todoPanel && this.$refs.todoPanel.getList) {
+          this.$refs.todoPanel.getList()
+        }
+      }).catch(() => {})
     }
   }
 }

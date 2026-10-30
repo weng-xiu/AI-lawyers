@@ -103,4 +103,31 @@ public class AiUserConsultationPortalController extends BaseController
         consultationService.submitOwnEvaluation(evaluation);
         return AjaxResult.success("评价提交成功");
     }
+
+    /**
+     * 查询本人咨询是否已评价（评价引导态：未评展示引导，已评展示感谢）
+     */
+    @GetMapping("/{id}/evaluated")
+    public AjaxResult evaluated(@PathVariable("id") Long id)
+    {
+        return AjaxResult.success(consultationService.isOwnConsultationEvaluated(id));
+    }
+
+    /**
+     * 补充材料（multipart：note + files）——材料补正，归入咨询侧附件与说明，
+     * 归属校验、状态校验、附件白名单/大小/数量、文本安全均在 service 内处理。
+     * 限流：同 IP 60 秒最多 10 次；防重 5 秒。
+     */
+    @Log(title = "公众端补充咨询材料", businessType = BusinessType.UPDATE)
+    @RateLimiter(time = 60, count = 10, limitType = LimitType.IP)
+    @RepeatSubmit(interval = 5000)
+    @PostMapping("/{id}/supplement")
+    public AjaxResult supplement(@PathVariable("id") Long id, HttpServletRequest request)
+    {
+        MultipartHttpServletRequest multipart = (MultipartHttpServletRequest) request;
+        String note = multipart.getParameter("note");
+        List<MultipartFile> files = multipart.getFiles("files");
+        return AjaxResult.success("材料补充成功",
+                consultationService.supplementOwnConsultation(id, files, note));
+    }
 }

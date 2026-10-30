@@ -60,7 +60,9 @@ public class AiCallTicketController extends BaseController
     public AjaxResult add(@RequestBody @jakarta.validation.Valid AiCallTicket aiCallTicket)
     {
         aiCallTicket.setCreateBy(getUsername());
-        return toAjax(aiCallTicketService.insertAiCallTicket(aiCallTicket));
+        // F7：返回新工单（含自增 ticketId），便于前端一键生成工单后建立待办关联
+        return aiCallTicketService.insertAiCallTicket(aiCallTicket) > 0
+                ? success(aiCallTicket) : error("工单创建失败");
     }
 
     @PreAuthorize("@ss.hasPermi('lawyers:call:ticket:edit')")

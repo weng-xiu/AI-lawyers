@@ -1,6 +1,7 @@
 package ai.lawyers.system.mapper.lawyers;
 
 import java.util.List;
+import org.apache.ibatis.annotations.Param;
 import ai.lawyers.system.domain.lawyers.AiLegalKnowledge;
 
 /**
@@ -49,6 +50,16 @@ public interface AiLegalKnowledgeMapper
      * @return 法律知识库集合
      */
     public List<AiLegalKnowledge> searchAiLegalKnowledge(String keyword);
+
+    /**
+     * F10：公众端常见问题（仅启用/审核通过/现行有效的知识，按浏览量倒序取前 N 条）。
+     *
+     * @param categoryId 知识分类ID（可空）
+     * @param limit      返回条数上限（服务端已收敛到安全范围）
+     * @return 常见问题集合
+     */
+    public List<AiLegalKnowledge> selectFaqKnowledge(@Param("categoryId") Long categoryId,
+                                                     @Param("limit") int limit);
 
     /**
      * T3：加载启用且审核通过的知识（供分块/向量化建索引）

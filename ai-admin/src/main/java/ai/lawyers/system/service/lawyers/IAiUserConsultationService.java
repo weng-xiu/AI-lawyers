@@ -118,4 +118,23 @@ public interface IAiUserConsultationService
      * @return 结果
      */
     public int submitOwnEvaluation(AiUserEvaluation evaluation);
+
+    /**
+     * F10 公众端：补充咨询材料/说明（归属校验，仅已完成咨询；附件追加，不覆盖原问题内容）
+     *
+     * @param consultationId 咨询ID
+     * @param files          补充附件（可空）
+     * @param note           补充说明（可空；与附件至少填一项）
+     * @return 更新后的咨询记录
+     */
+    public AiUserConsultation supplementOwnConsultation(Long consultationId, List<MultipartFile> files,
+                                                        String note);
+
+    /**
+     * F10 公众端：本人咨询是否已评价（归属校验）
+     *
+     * @param consultationId 咨询ID
+     * @return true=已评价
+     */
+    public boolean isOwnConsultationEvaluated(Long consultationId);
 }

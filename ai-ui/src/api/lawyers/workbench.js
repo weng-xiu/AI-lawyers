@@ -47,6 +47,14 @@ export function getTodo(todoId) {
   })
 }
 
+// F7：查询待办关联工单（待办内嵌受理/转办/办结）
+export function getTodoTicket(todoId) {
+  return request({
+    url: '/lawyers/workbench/todo/' + todoId + '/ticket',
+    method: 'get'
+  })
+}
+
 export function addTodo(data) {
   return request({
     url: '/lawyers/workbench/todo',

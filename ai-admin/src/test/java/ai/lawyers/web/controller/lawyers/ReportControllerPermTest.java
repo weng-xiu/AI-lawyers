@@ -12,6 +12,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import ai.lawyers.system.service.lawyers.IAiCallRecordService;
+import ai.lawyers.system.service.lawyers.stat.IAdHocReportService;
 import ai.lawyers.system.service.lawyers.stat.IReportService;
 import ai.lawyers.system.service.lawyers.stat.StatBackfillManager;
 import ai.lawyers.web.support.AbstractPermMvcTest;
@@ -28,6 +30,14 @@ public class ReportControllerPermTest extends AbstractPermMvcTest
     @Mock
     private StatBackfillManager statBackfillManager;
 
+    /** 自定义报表执行服务（ReportController 新增依赖） */
+    @Mock
+    private IAdHocReportService adHocReportService;
+
+    /** 通话记录服务（报表数据来源） */
+    @Mock
+    private IAiCallRecordService aiCallRecordService;
+
     @BeforeEach
     void setUp()
     {
@@ -40,6 +50,8 @@ public class ReportControllerPermTest extends AbstractPermMvcTest
     {
         registerMock("reportService", reportService);
         registerMock("statBackfillManager", statBackfillManager);
+        registerMock("adHocReportService", adHocReportService);
+        registerMock("aiCallRecordService", aiCallRecordService);
     }
 
     @Test

@@ -22,7 +22,8 @@ const PAGES = [
   ['submit-question', '/consultation/submit', true],
   ['consultation-result', '/consultation/result?id=1', true],
   ['consultation-history', '/consultation/history', true],
-  ['evaluation', '/consultation/evaluation?id=1', true]
+  ['evaluation', '/consultation/evaluation?id=1', true],
+  ['messages', '/messages', true]
 ]
 
 fs.mkdirSync(PAGES_DIR, { recursive: true })

@@ -16,6 +16,7 @@ const MyTickets = () => import('@/views/MyTickets')
 const ServiceNav = () => import('@/views/ServiceNav')
 const MyChannels = () => import('@/views/MyChannels')
 const ElderlyZone = () => import('@/views/ElderlyZone')
+const Messages = () => import('@/views/Messages')
 
 const routes = [
   {
@@ -48,6 +49,13 @@ const routes = [
     name: 'MyChannels',
     component: MyChannels,
     meta: { title: '渠道绑定', requiresAuth: true }
+  },
+  {
+    // F10 消息中心：工单进度 / 系统提醒站内信
+    path: '/messages',
+    name: 'Messages',
+    component: Messages,
+    meta: { title: '消息提醒', requiresAuth: true }
   },
   {
     path: '/services',

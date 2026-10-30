@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import ai.lawyers.common.utils.DateUtils;
 import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.common.utils.sign.PiiCryptoUtils;
+import ai.lawyers.common.core.domain.entity.SysUser;
 import ai.lawyers.common.utils.uuid.IdUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +21,7 @@ import ai.lawyers.system.domain.lawyers.AiTicketFlowDefinition;
 import ai.lawyers.system.domain.lawyers.AiTicketTransfer;
 import ai.lawyers.system.mapper.lawyers.AiCallTicketMapper;
 import ai.lawyers.system.mapper.lawyers.AiTicketTransferMapper;
+import ai.lawyers.system.mapper.SysUserMapper;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
 import ai.lawyers.system.service.lawyers.IAiSlaPolicyService;
 import ai.lawyers.system.service.lawyers.TicketFlowService;
@@ -36,6 +38,10 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
 
     @Autowired(required = false)
     private MessageNotifyDispatcher messageNotifyDispatcher;
+
+    /** F10：按来电号码匹配公众账号，推送工单进度站内信（未装配时静默） */
+    @Autowired(required = false)
+    private SysUserMapper sysUserMapper;
 
     /** F9：按策略自动计算 SLA 截止时间（无匹配策略时不阻断建单） */
     @Autowired(required = false)
@@ -165,6 +171,7 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
         if (rows > 0 && "3".equals(status))
         {
             indexIfReady(ticketId);
+            notifyCallerProgress(aiCallTicketMapper.selectAiCallTicketByTicketId(ticketId), "工单归档提醒", "归档");
         }
         return rows;
     }
@@ -194,6 +201,8 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
         {
             indexIfReady(ticketId);
             ticketFlowService.applySlaDeadline(ticketId, completeRule);
+            // F10：办结后向工单来电人推送进度（站内信，best-effort）
+            notifyCallerProgress(exist, "工单办结提醒", "办结");
         }
         return rows;
     }
@@ -229,6 +238,8 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
         {
             // 受理后按 start 规则的 sla_hours（seed=24h）重算 SLA 截止时间
             ticketFlowService.applySlaDeadline(ticketId, startRule);
+            // F10：受理后向来电人推送进度（站内信，best-effort）
+            notifyCallerProgress(exist, "工单受理提醒", "受理");
         }
         // 分配给坐席成功后投递站内信（T5-3 消息中心）
         if (rows > 0 && assignUserId != null && messageNotifyDispatcher != null)
@@ -265,6 +276,8 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
         {
             // 归档按规则 sla_hours=0 清空 due_time
             ticketFlowService.applySlaDeadline(ticketId, archiveRule);
+            // F10：归档后向工单来电人推送进度（站内信，best-effort）
+            notifyCallerProgress(aiCallTicketMapper.selectAiCallTicketByTicketId(ticketId), "工单归档提醒", "归档");
         }
         return rows;
     }
@@ -389,6 +402,77 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
         node.put("color", color);
         node.put("icon", icon);
         timeline.add(node);
+    }
+
+    /**
+     * F10：工单进度推送——按来电号码匹配公众账号，投递站内信（门户消息中心可见）。
+     * 全程 best-effort，异常仅告警，不影响工单主流程。
+     */
+    private void notifyCallerProgress(AiCallTicket ticket, String titlePrefix, String stage)
+    {
+        if (ticket == null || messageNotifyDispatcher == null || sysUserMapper == null)
+        {
+            return;
+        }
+        try
+        {
+            String phone = plainPhone(ticket.getCallerNumber());
+            if (StringUtils.isEmpty(phone))
+            {
+                return;
+            }
+            SysUser user = sysUserMapper.checkPhoneUnique(phone);
+            if (user == null || user.getUserId() == null)
+            {
+                return;
+            }
+            String label = StringUtils.isNotEmpty(ticket.getTitle())
+                    ? ticket.getTitle() : ("#" + ticket.getTicketId());
+            String content;
+            if ("受理".equals(stage))
+            {
+                content = "您提交的工单已受理"
+                        + (StringUtils.isNotEmpty(ticket.getAssignUserName())
+                                ? "，处理人：" + ticket.getAssignUserName() : "")
+                        + "，请留意后续进展。";
+            }
+            else if ("办结".equals(stage))
+            {
+                content = "您提交的工单已办结，可在「我的工单」查看办理情况。";
+            }
+            else
+            {
+                content = "您的工单已归档，本次服务流程结束。";
+            }
+            messageNotifyDispatcher.notify(user.getUserId(), "5",
+                    titlePrefix + "：" + label, content, "ticket", ticket.getTicketId(), "system");
+        }
+        catch (Exception e)
+        {
+            log.warn("工单进度推送失败, ticketId={}, stage={}", ticket.getTicketId(), stage, e);
+        }
+    }
+
+    /** 来电号码取明文（已由解密拦截器处理的明文直接返回） */
+    private String plainPhone(String number)
+    {
+        if (StringUtils.isEmpty(number))
+        {
+            return null;
+        }
+        if (!PiiCryptoUtils.isEncrypted(number))
+        {
+            return number;
+        }
+        try
+        {
+            return PiiCryptoUtils.decrypt(number);
+        }
+        catch (Exception e)
+        {
+            log.warn("工单来电号码解密失败: {}", e.getMessage());
+            return null;
+        }
     }
 
     /** P1-8：触发向量索引（服务未装配时静默） */

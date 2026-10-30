@@ -3,8 +3,16 @@
     <!-- 主内容容器与 skip 目标由 App.vue 统一提供，此处仅作语义分区；列表变化经 #a11y-announcer 播报 -->
     <section class="page-wrap" aria-label="我的工单">
       <div class="page-head">
-        <h2 class="page-title">我的工单</h2>
-        <p class="page-sub">这里展示与您手机号关联的来电工单和跨部门转办进度</p>
+        <div>
+          <h2 class="page-title">我的工单</h2>
+          <p class="page-sub">这里展示与您手机号关联的来电工单和跨部门转办进度</p>
+        </div>
+        <!-- F10 消息入口：工单受理/办结/归档进度推送站内信 -->
+        <router-link class="msg-entry" to="/messages" aria-label="打开消息提醒">
+          <i class="el-icon-bell" aria-hidden="true"></i>
+          <span>消息提醒</span>
+          <span v-if="unread > 0" class="msg-badge" :aria-label="`${unread} 条未读消息`">{{ unread > 99 ? '99+' : unread }}</span>
+        </router-link>
       </div>
 
       <!-- 状态筛选：原生 radio 分段（ElementUI 2.15 的 radio-button 未选中时丢 aria-checked，
@@ -104,7 +112,7 @@
 </template>
 
 <script>
-import { myTickets } from '@/api/portal'
+import { myTickets, getUnreadCount } from '@/api/portal'
 import { announce } from '@/utils/a11y'
 import TicketProgress from '@/components/TicketProgress'
 
@@ -116,6 +124,7 @@ export default {
       loading: false,
       ticketList: [],
       total: 0,
+      unread: 0,
       query: { pageNum: 1, pageSize: 10, status: '' },
       statusOptions: [
         { value: '', label: '全部' },
@@ -128,8 +137,14 @@ export default {
   },
   created() {
     this.loadTickets()
+    this.loadUnread()
   },
   methods: {
+    loadUnread() {
+      getUnreadCount().then(res => {
+        this.unread = Number(res.data || 0)
+      }).catch(() => {})
+    },
     loadTickets() {
       this.loading = true
       myTickets(this.query).then(res => {
@@ -203,9 +218,26 @@ export default {
   padding: 24px 0 40px;
 }
 .page-wrap { max-width: 960px; margin: 0 auto; padding: 0 20px; }
-.page-head { margin-bottom: 18px; }
+.page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
 .page-title { font-size: 24px; color: #0b1f4a; margin: 0 0 6px; }
 .page-sub { color: #5b6b84; font-size: 14px; margin: 0; }
+
+/* F10 消息入口：图标 + 未读角标 */
+.msg-entry {
+  display: inline-flex; align-items: center; gap: 6px;
+  flex: none; min-height: 40px; padding: 8px 14px;
+  border: 1px solid #1A3C6E; border-radius: 6px;
+  background: #fff; color: #1A3C6E;
+  font-size: 14px; font-weight: 600; text-decoration: none;
+}
+.msg-entry:hover { background: #eef3fb; color: #0b1f4a; text-decoration: none; }
+.msg-entry:focus-visible { outline: 3px solid #ffd04b; outline-offset: 2px; }
+.msg-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 9px; background: #C63D4A; color: #fff;
+  font-size: 12px; font-weight: 600; line-height: 1;
+}
 
 /* 状态分段控件：原生 radio 视觉隐藏，选中态与焦点环由 label 呈现 */
 .status-tabs { display: inline-flex; flex-wrap: wrap; margin-bottom: 18px; }
@@ -296,6 +328,8 @@ html.care-high-contrast .status-tab.is-active span { background: #000; border-co
   .portal-page { padding: 12px 0 24px; }
   .page-wrap { padding: 0 12px; }
   .page-title { font-size: 20px; }
+  .page-head { flex-direction: column; }
+  .msg-entry { width: 100%; justify-content: center; }
   .ticket-meta { gap: 4px 16px; }
   .ticket-meta li { width: 100%; }
 

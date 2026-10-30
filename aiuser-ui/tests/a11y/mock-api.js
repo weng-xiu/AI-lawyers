@@ -23,7 +23,33 @@ const routes = [
   // 咨询结果/详情
   [/\/aiuser\/consultation\/(result|info)\//, () => ok({ data: { id: 1, title: '测试咨询', content: '测试内容', status: 'COMPLETED' } })],
   // 评价列表
-  ['/aiuser/evaluation/list', () => ok({ rows: [], total: 0 })]
+  ['/aiuser/evaluation/list', () => ok({ rows: [], total: 0 })],
+  // F10 常见问题推荐（知识库只读投影）
+  ['/lawyers/portal/faq', () => ok({
+    data: [
+      { knowledgeId: 1, title: '劳动合同到期不续签是否有补偿？', summary: '用人单位不续签劳动合同，一般应依法支付经济补偿。', categoryId: 2, viewCount: 128 },
+      { knowledgeId: 2, title: '离婚时房产如何分割？', summary: '婚后共同购买的房产原则上按共同财产分割。', categoryId: 1, viewCount: 96 }
+    ]
+  })],
+  // F10 消息中心
+  ['/lawyers/portal/message/list', () => ok({
+    rows: [
+      {
+        messageId: 1,
+        msgType: '5',
+        title: '工单受理提醒：法律咨询工单',
+        content: '您的工单已由张律师受理，请留意后续办理进度。',
+        isRead: '0',
+        bizType: 'ticket',
+        bizId: 1,
+        createTime: '2026-10-30 10:00:00'
+      }
+    ],
+    total: 1
+  })],
+  ['/lawyers/portal/message/unreadCount', () => ok({ data: 1 })],
+  // F10 评价状态
+  [/\/aiuser\/consultation\/\d+\/evaluated/, () => ok({ data: false })]
 ]
 
 async function mockApi(page) {

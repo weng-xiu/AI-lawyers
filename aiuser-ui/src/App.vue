@@ -37,7 +37,10 @@
               v-for="item in navItems"
               :key="item.path"
               :index="item.path"
-              :class="{ 'elderly-entry': item.elderly }">{{ item.label }}</el-menu-item>
+              :class="{ 'elderly-entry': item.elderly }">{{ item.label }}<span
+                v-if="item.path === '/messages' && unreadCount > 0"
+                class="nav-badge"
+                :aria-label="`${unreadCount} 条未读消息`">{{ unreadCount > 99 ? '99+' : unreadCount }}</span></el-menu-item>
           </el-menu>
 
           <!-- F2 适老化快捷控制（CareControls：原生控件保证 ARIA 正确） -->
@@ -90,7 +93,10 @@
               v-for="item in navItems"
               :key="item.path"
               :index="item.path"
-              :class="{ 'elderly-entry': item.elderly }">{{ item.label }}</el-menu-item>
+              :class="{ 'elderly-entry': item.elderly }">{{ item.label }}<span
+                v-if="item.path === '/messages' && unreadCount > 0"
+                class="nav-badge"
+                :aria-label="`${unreadCount} 条未读消息`">{{ unreadCount > 99 ? '99+' : unreadCount }}</span></el-menu-item>
           </el-menu>
 
           <div class="mobile-care">
@@ -121,6 +127,7 @@
 <script>
 import { mapGetters } from 'vuex'
 import CareControls from '@/components/CareControls'
+import { getUnreadCount } from '@/api/portal'
 
 export default {
   name: 'App',
@@ -129,10 +136,14 @@ export default {
     return {
       // U6 移动端：桌面横向菜单与抽屉菜单共用同一份导航配置
       mobileNavOpen: false,
+      // F10 消息未读角标
+      unreadCount: 0,
+      unreadTimer: null,
       navItems: [
         { path: '/', label: '首页' },
         { path: '/consultation/submit', label: '我要咨询' },
         { path: '/ticket', label: '我的工单' },
+        { path: '/messages', label: '消息提醒' },
         { path: '/channels', label: '渠道绑定' },
         { path: '/services', label: '服务导航' },
         { path: '/consultation/history', label: '咨询历史' },
@@ -149,18 +160,53 @@ export default {
       if (val && this.$care) {
         this.$care.syncPreferenceToServer()
       }
+      if (val) {
+        this.loadUnreadCount()
+        this.startUnreadTimer()
+      } else {
+        this.unreadCount = 0
+        this.stopUnreadTimer()
+      }
       // 登录后用户菜单才渲染，需重新纠正 ARIA
       this.$nextTick(this.fixDropdownAria)
     },
-    // 路由变化后收起移动端抽屉
+    // 路由变化后收起移动端抽屉，并刷新消息未读角标（消息中心标记已读后回到列表可即时同步）
     $route() {
       this.mobileNavOpen = false
+      if (this.isLoggedIn) {
+        this.loadUnreadCount()
+      }
     }
   },
   mounted() {
     this.$nextTick(this.fixDropdownAria)
+    if (this.isLoggedIn) {
+      this.loadUnreadCount()
+      this.startUnreadTimer()
+    }
+  },
+  beforeDestroy() {
+    this.stopUnreadTimer()
   },
   methods: {
+    /** F10 消息中心未读角标（失败静默，不打断页面） */
+    loadUnreadCount() {
+      if (!this.isLoggedIn) return
+      getUnreadCount().then(res => {
+        this.unreadCount = Number(res.data || 0)
+      }).catch(() => {})
+    },
+    /** 轮询刷新未读角标（60 秒；登录态变化时启停） */
+    startUnreadTimer() {
+      if (this.unreadTimer) return
+      this.unreadTimer = setInterval(this.loadUnreadCount, 60000)
+    },
+    stopUnreadTimer() {
+      if (this.unreadTimer) {
+        clearInterval(this.unreadTimer)
+        this.unreadTimer = null
+      }
+    },
     toggleMobileNav() { this.mobileNavOpen = !this.mobileNavOpen },
     closeMobileNav() { this.mobileNavOpen = false },
     // ElementUI 2.15 的 el-dropdown 把 aria-haspopup 固定写成非法值 "list"，
@@ -332,6 +378,24 @@ button:focus-visible,
 .el-menu--horizontal > .el-menu-item.is-active {
   border-bottom: 3px solid var(--color-brand-gold, #C9A96E) !important;
 }
+/* F10 消息未读角标：与菜单文字基线对齐 */
+.nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #C63D4A;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  vertical-align: middle;
+}
+html.care-high-contrast .nav-badge { background: #ffd04b; color: #000; }
 /* V6 长辈专区入口：法治金高亮，与普通菜单区分 */
 .el-menu--horizontal > .el-menu-item.elderly-entry {
   color: var(--color-brand-gold, #C9A96E) !important;

@@ -106,6 +106,22 @@
       </ol>
     </section>
 
+    <!-- F10 常见问题推荐：知识库只读投影，匿名可浏览 -->
+    <section v-if="faqs.length > 0" class="home-section" aria-labelledby="faq-title">
+      <h2 id="faq-title" class="section-title">常见问题</h2>
+      <p class="section-sub">来自法律知识库的高频问题，可先自助了解，也可直接发起同类咨询。</p>
+      <ul class="faq-grid">
+        <li v-for="faq in faqs" :key="faq.knowledgeId" class="faq-card">
+          <span class="faq-card-title">{{ faq.title }}</span>
+          <p class="faq-card-summary">{{ faq.summary }}</p>
+          <router-link
+            class="faq-card-link"
+            :to="{ path: '/consultation/submit', query: { category: 'other', ref: 'faq' } }">咨询类似问题
+            <i class="el-icon-arrow-right" aria-hidden="true"></i></router-link>
+        </li>
+      </ul>
+    </section>
+
     <!-- 人工兜底：热线 + 长辈专区 -->
     <section class="home-section" aria-labelledby="help-title">
       <h2 id="help-title" class="section-title">需要人工帮助？</h2>
@@ -125,11 +141,28 @@
 
 <script>
 import { announce } from '@/utils/a11y'
+import { getFaq } from '@/api/portal'
 
 export default {
   name: 'Home',
+  data() {
+    return {
+      // F10 常见问题推荐（匿名只读，失败静默）
+      faqs: []
+    }
+  },
   created() {
     announce('欢迎使用 AI 律师公众服务，可选择在线咨询、查询进度、查找服务机构或法规查询', 'polite')
+    this.loadFaq()
+  },
+  methods: {
+    loadFaq() {
+      getFaq({ limit: 6 }).then(res => {
+        this.faqs = res.data || []
+      }).catch(() => {
+        this.faqs = []
+      })
+    }
   }
 }
 </script>
@@ -238,6 +271,25 @@ export default {
 .help-btn.is-primary:hover { background: #255A99; color: #fff; }
 .help-btn:focus-visible { outline: 3px solid #1A3C6E; outline-offset: 2px; }
 
+/* ===== F10 常见问题 ===== */
+.faq-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 16px; list-style: none; margin: 22px 0 0; padding: 0;
+}
+.faq-card {
+  display: flex; flex-direction: column;
+  padding: 18px 20px;
+  background: #fff; border: 1px solid #dbe4f0; border-radius: 12px;
+}
+.faq-card-title { color: #0b1f4a; font-size: 17px; font-weight: 700; line-height: 1.5; }
+.faq-card-summary { margin: 8px 0 0; color: #5b6b84; font-size: 14px; line-height: 1.7; }
+.faq-card-link {
+  margin-top: auto; padding-top: 12px;
+  color: #1A3C6E; font-size: 14px; font-weight: 600; text-decoration: none;
+}
+.faq-card-link:hover { text-decoration: underline; }
+.faq-card-link:focus-visible { outline: 3px solid #1A3C6E; outline-offset: 2px; }
+
 /* ===== F2 适老档叠加 ===== */
 html.care-large .hero-title { font-size: 46px; }
 html.care-large .hero-sub { font-size: 19px; }
@@ -251,6 +303,9 @@ html.care-large .scene-name { font-size: 23px; }
 html.care-large .scene-arrow,
 html.care-large .flow-name,
 html.care-large .help-title { font-size: 19px; }
+html.care-large .faq-card-title { font-size: 20px; }
+html.care-large .faq-card-summary,
+html.care-large .faq-card-link { font-size: 17px; }
 html.care-large .help-btn { min-height: 52px; font-size: 18px; }
 
 html.care-xlarge .hero-title { font-size: 52px; }
@@ -265,6 +320,9 @@ html.care-xlarge .scene-name { font-size: 26px; }
 html.care-xlarge .scene-arrow,
 html.care-xlarge .flow-name,
 html.care-xlarge .help-title { font-size: 21px; }
+html.care-xlarge .faq-card-title { font-size: 24px; }
+html.care-xlarge .faq-card-summary,
+html.care-xlarge .faq-card-link { font-size: 20px; }
 html.care-xlarge .help-btn { min-height: 58px; font-size: 20px; }
 html.care-xlarge .scene-card { min-height: 210px; }
 
@@ -296,10 +354,15 @@ html.care-high-contrast .help-btn.is-primary { background: #000; color: #fff; }
 html.care-high-contrast .flow-dot { border-color: #000; background: #fff; color: #000; }
 html.care-high-contrast .flow-step:first-child .flow-dot { background: #000; color: #fff; }
 html.care-high-contrast .flow-step:not(:last-child)::after { background: #000; }
+html.care-high-contrast .faq-card { border: 2px solid #000; background: #fff; }
+html.care-high-contrast .faq-card-title,
+html.care-high-contrast .faq-card-summary,
+html.care-high-contrast .faq-card-link { color: #000; }
 
 /* ===== 响应式：平板两列、手机单列 ===== */
 @media (max-width: 900px) {
   .scene-grid { grid-template-columns: repeat(2, 1fr); }
+  .faq-grid { grid-template-columns: repeat(2, 1fr); }
   .flow-list { grid-template-columns: repeat(2, 1fr); gap: 22px 24px; }
   .flow-step:nth-child(2)::after { display: none; }
 }
@@ -311,6 +374,7 @@ html.care-high-contrast .flow-step:not(:last-child)::after { background: #000; }
   .home-section { padding: 30px 12px 0; }
   .section-title { font-size: 22px; }
   .scene-grid { grid-template-columns: 1fr; gap: 12px; }
+  .faq-grid { grid-template-columns: 1fr; gap: 12px; }
   .scene-card.is-primary { grid-column: auto; }
   .scene-card { min-height: 0; padding: 18px 16px; }
   .help-card { flex-direction: column; align-items: stretch; padding: 20px 18px; }

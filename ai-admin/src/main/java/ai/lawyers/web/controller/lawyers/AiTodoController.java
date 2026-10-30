@@ -57,6 +57,14 @@ public class AiTodoController extends BaseController
         return success(aiTodoService.selectAiTodoByTodoId(todoId));
     }
 
+    /** F7：查询待办关联工单（待办内嵌受理/转办/办结） */
+    @PreAuthorize("@ss.hasPermi('lawyers:workbench:todo:query')")
+    @GetMapping(value = "/{todoId}/ticket")
+    public AjaxResult getLinkedTicket(@PathVariable("todoId") Long todoId)
+    {
+        return success(aiTodoService.selectLinkedTicket(todoId));
+    }
+
     @PreAuthorize("@ss.hasPermi('lawyers:workbench:todo:add')")
     @Log(title = "工作台待办", businessType = BusinessType.INSERT)
     @PostMapping

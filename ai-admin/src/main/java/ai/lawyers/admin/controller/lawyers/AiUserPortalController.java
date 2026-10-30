@@ -1,12 +1,17 @@
 package ai.lawyers.admin.controller.lawyers;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import ai.lawyers.common.annotation.Anonymous;
 import ai.lawyers.common.annotation.Log;
@@ -23,10 +28,14 @@ import ai.lawyers.system.domain.lawyers.AiCallTicket;
 import ai.lawyers.system.domain.lawyers.AiCallerProfile;
 import ai.lawyers.system.domain.lawyers.AiChannelIdentity;
 import ai.lawyers.system.domain.lawyers.AiExternalOrg;
+import ai.lawyers.system.domain.lawyers.AiLegalKnowledge;
+import ai.lawyers.system.domain.lawyers.AiMessage;
 import ai.lawyers.system.mapper.lawyers.AiCallerProfileMapper;
+import ai.lawyers.system.mapper.lawyers.AiLegalKnowledgeMapper;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
 import ai.lawyers.system.service.lawyers.IAiChannelIdentityService;
 import ai.lawyers.system.service.lawyers.IAiExternalOrgService;
+import ai.lawyers.system.service.lawyers.IAiMessageService;
 import ai.lawyers.system.service.lawyers.IPiiSearchTokenService;
 
 /**
@@ -57,6 +66,14 @@ public class AiUserPortalController extends BaseController
     @Autowired(required = false)
     private IPiiSearchTokenService piiSearchTokenService;
 
+    /** F10：常见问题数据源（知识库，只读投影） */
+    @Autowired
+    private AiLegalKnowledgeMapper legalKnowledgeMapper;
+
+    /** F10：门户消息中心（工单进度/系统提醒站内信） */
+    @Autowired
+    private IAiMessageService messageService;
+
     /**
      * 我的工单：强制按登录用户手机号过滤，忽略请求中任何外部条件。
      */
@@ -84,6 +101,79 @@ public class AiUserPortalController extends BaseController
     public AjaxResult serviceOrgs(AiExternalOrg query)
     {
         return success(externalOrgService.selectEnabledOrgsForPortal(query));
+    }
+
+    /**
+     * F10 常见问题推荐：仅开放已审核、现行有效的知识，匿名可读。
+     *
+     * <p>字段裁剪：只暴露标题/摘要/分类/浏览量，不返回审核人、来源 URL、内部备注等字段；
+     * 条数在服务端收敛（默认 8，最大 20），避免被用于批量爬取知识库。</p>
+     */
+    @Anonymous
+    @GetMapping("/faq")
+    public AjaxResult faq(@RequestParam(value = "categoryId", required = false) Long categoryId,
+                          @RequestParam(value = "limit", required = false) Integer limit)
+    {
+        int size = limit == null ? 8 : Math.max(1, Math.min(limit, 20));
+        List<AiLegalKnowledge> rows = legalKnowledgeMapper.selectFaqKnowledge(categoryId, size);
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (rows != null)
+        {
+            for (AiLegalKnowledge row : rows)
+            {
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("knowledgeId", row.getKnowledgeId());
+                item.put("title", row.getTitle());
+                item.put("summary", summarize(row.getContent(), 160));
+                item.put("categoryId", row.getCategoryId());
+                item.put("viewCount", row.getViewCount());
+                result.add(item);
+            }
+        }
+        return success(result);
+    }
+
+    /**
+     * F10 消息中心：我的站内信列表（强制 receiverUserId=当前登录用户，忽略外部条件）。
+     */
+    @GetMapping("/message/list")
+    public TableDataInfo myMessages(AiMessage query)
+    {
+        AiMessage filter = new AiMessage();
+        filter.setReceiverUserId(SecurityUtils.getUserId());
+        // 仅允许类型/已读状态随请求透传
+        if (StringUtils.isNotEmpty(query.getMsgType()))
+        {
+            filter.setMsgType(query.getMsgType());
+        }
+        if (StringUtils.isNotEmpty(query.getIsRead()))
+        {
+            filter.setIsRead(query.getIsRead());
+        }
+        startPage();
+        List<AiMessage> list = messageService.selectAiMessageList(filter);
+        return getDataTable(list);
+    }
+
+    /** F10 消息中心：未读数 */
+    @GetMapping("/message/unreadCount")
+    public AjaxResult unreadCount()
+    {
+        return success(messageService.countUnread(SecurityUtils.getUserId()));
+    }
+
+    /** F10 消息中心：标记单条已读（按 receiverUserId 归属校验） */
+    @PutMapping("/message/read/{messageId}")
+    public AjaxResult readMessage(@PathVariable("messageId") Long messageId)
+    {
+        return toAjax(messageService.markRead(messageId, SecurityUtils.getUserId()));
+    }
+
+    /** F10 消息中心：全部已读 */
+    @PutMapping("/message/readAll")
+    public AjaxResult readAllMessages()
+    {
+        return toAjax(messageService.markAllRead(SecurityUtils.getUserId()));
     }
 
     /**
@@ -191,6 +281,17 @@ public class AiUserPortalController extends BaseController
         }
         ensureOwnIdentity(body.getId());
         return toAjax(channelIdentityService.unbind(body.getId(), SecurityUtils.getUsername()));
+    }
+
+    /** 常见问题摘要：压缩空白并截断，避免整篇知识正文外泄 */
+    private String summarize(String text, int maxLength)
+    {
+        if (StringUtils.isEmpty(text))
+        {
+            return "";
+        }
+        String plain = text.replaceAll("\\s+", " ").trim();
+        return plain.length() <= maxLength ? plain : plain.substring(0, maxLength) + "…";
     }
 
     /** 取当前登录公众用户手机号（公众账号必须绑定手机号） */

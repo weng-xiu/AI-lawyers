@@ -13,8 +13,8 @@
     "orientationAngle": 0,
     "orientationType": "landscape-primary"
   },
-  "timestamp": "2026-10-28T14:06:09.963Z",
-  "url": "http://localhost:8093/consultation/evaluation?id=1",
+  "timestamp": "2026-10-30T15:40:36.662Z",
+  "url": "http://localhost:8091/consultation/evaluation?id=1",
   "toolOptions": {
     "runOnly": {
       "type": "tag",
@@ -773,6 +773,32 @@
             }
           ],
           "impact": null,
+          "html": "<span aria-label=\"1 条未读消息\" class=\"nav-badge\">1</span>",
+          "target": [
+            ".nav-badge"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-allowed-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attributes are used correctly for the defined role"
+            }
+          ],
+          "none": [
+            {
+              "id": "aria-unsupported-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute is supported"
+            }
+          ],
+          "impact": null,
           "html": "<div data-v-106964d2=\"\" role=\"group\" aria-label=\"无障碍与语言设置\" class=\"care-controls care-controls--inline\">",
           "target": [
             ".care-controls"
@@ -851,7 +877,7 @@
             }
           ],
           "impact": null,
-          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-5217\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-4293\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
           "target": [
             ".el-dropdown-link"
           ]
@@ -914,7 +940,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">首页</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">首页<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(1)"
           ]
@@ -932,7 +958,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我要咨询</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我要咨询<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(2)"
           ]
@@ -950,7 +976,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我的工单</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我的工单<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(3)"
           ]
@@ -968,7 +994,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">渠道绑定</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">消息提醒<span aria-label=\"1 条未读消息\" class=\"nav-badge\">1</span></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(4)"
           ]
@@ -986,7 +1012,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">服务导航</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">渠道绑定<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(5)"
           ]
@@ -1004,7 +1030,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">咨询历史</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">服务导航<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(6)"
           ]
@@ -1022,7 +1048,25 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item elderly-entry\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">长辈专区</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">咨询历史<!----></li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(7)"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "has-visible-text",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has text that is visible to screen readers"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item elderly-entry\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">长辈专区<!----></li>",
           "target": [
             ".elderly-entry"
           ]
@@ -1040,7 +1084,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-5217\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-4293\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
           "target": [
             ".el-dropdown-link"
           ]
@@ -1146,6 +1190,24 @@
           ],
           "none": [],
           "impact": null,
+          "html": "<span aria-label=\"1 条未读消息\" class=\"nav-badge\">1</span>",
+          "target": [
+            ".nav-badge"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-conditional-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "ARIA attribute is allowed"
+            }
+          ],
+          "none": [],
+          "impact": null,
           "html": "<div data-v-106964d2=\"\" role=\"group\" aria-label=\"无障碍与语言设置\" class=\"care-controls care-controls--inline\">",
           "target": [
             ".care-controls"
@@ -1200,7 +1262,7 @@
           ],
           "none": [],
           "impact": null,
-          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-5217\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-4293\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
           "target": [
             ".el-dropdown-link"
           ]
@@ -1270,7 +1332,7 @@
             }
           ],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">首页</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">首页<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(1)"
           ]
@@ -1288,7 +1350,7 @@
             }
           ],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我要咨询</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我要咨询<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(2)"
           ]
@@ -1306,7 +1368,7 @@
             }
           ],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我的工单</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我的工单<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(3)"
           ]
@@ -1324,7 +1386,7 @@
             }
           ],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">渠道绑定</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">消息提醒<span aria-label=\"1 条未读消息\" class=\"nav-badge\">1</span></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(4)"
           ]
@@ -1342,7 +1404,7 @@
             }
           ],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">服务导航</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">渠道绑定<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(5)"
           ]
@@ -1360,7 +1422,7 @@
             }
           ],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">咨询历史</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">服务导航<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(6)"
           ]
@@ -1378,7 +1440,25 @@
             }
           ],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item elderly-entry\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">长辈专区</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">咨询历史<!----></li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(7)"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "deprecatedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "minor",
+              "message": "ARIA role is not deprecated"
+            }
+          ],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item elderly-entry\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">长辈专区<!----></li>",
           "target": [
             ".elderly-entry"
           ]
@@ -1432,7 +1512,7 @@
             }
           ],
           "impact": null,
-          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-5217\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-4293\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
           "target": [
             ".el-dropdown-link"
           ]
@@ -1741,7 +1821,7 @@
             }
           ],
           "impact": null,
-          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-5217\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-4293\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
           "target": [
             ".el-dropdown-link"
           ]
@@ -1811,7 +1891,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">首页</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">首页<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(1)"
           ]
@@ -1829,7 +1909,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我要咨询</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我要咨询<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(2)"
           ]
@@ -1847,7 +1927,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我的工单</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我的工单<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(3)"
           ]
@@ -1865,7 +1945,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">渠道绑定</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">消息提醒<span aria-label=\"1 条未读消息\" class=\"nav-badge\">1</span></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(4)"
           ]
@@ -1883,7 +1963,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">服务导航</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">渠道绑定<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(5)"
           ]
@@ -1901,7 +1981,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">咨询历史</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">服务导航<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(6)"
           ]
@@ -1919,7 +1999,25 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item elderly-entry\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">长辈专区</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">咨询历史<!----></li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(7)"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-required-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "All required ARIA attributes are present"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item elderly-entry\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">长辈专区<!----></li>",
           "target": [
             ".elderly-entry"
           ]
@@ -1973,7 +2071,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-5217\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-4293\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
           "target": [
             ".el-dropdown-link"
           ]
@@ -2077,7 +2175,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">首页</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">首页<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(1)"
           ]
@@ -2095,7 +2193,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我要咨询</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我要咨询<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(2)"
           ]
@@ -2113,7 +2211,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我的工单</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我的工单<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(3)"
           ]
@@ -2131,7 +2229,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">渠道绑定</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">消息提醒<span aria-label=\"1 条未读消息\" class=\"nav-badge\">1</span></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(4)"
           ]
@@ -2149,7 +2247,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">服务导航</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">渠道绑定<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(5)"
           ]
@@ -2167,7 +2265,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">咨询历史</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">服务导航<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(6)"
           ]
@@ -2185,7 +2283,25 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item elderly-entry\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">长辈专区</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">咨询历史<!----></li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(7)"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-required-parent",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Required ARIA parent role present"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item elderly-entry\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">长辈专区<!----></li>",
           "target": [
             ".elderly-entry"
           ]
@@ -2265,7 +2381,7 @@
             }
           ],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">首页</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">首页<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(1)"
           ]
@@ -2297,7 +2413,7 @@
             }
           ],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我要咨询</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我要咨询<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(2)"
           ]
@@ -2329,7 +2445,7 @@
             }
           ],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我的工单</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我的工单<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(3)"
           ]
@@ -2361,7 +2477,7 @@
             }
           ],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">渠道绑定</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">消息提醒<span aria-label=\"1 条未读消息\" class=\"nav-badge\">1</span></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(4)"
           ]
@@ -2393,7 +2509,7 @@
             }
           ],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">服务导航</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">渠道绑定<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(5)"
           ]
@@ -2425,7 +2541,7 @@
             }
           ],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">咨询历史</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">服务导航<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(6)"
           ]
@@ -2457,7 +2573,39 @@
             }
           ],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item elderly-entry\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">长辈专区</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">咨询历史<!----></li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(7)"
+          ]
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "invalidrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is valid"
+            },
+            {
+              "id": "abstractrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "Abstract roles are not used"
+            },
+            {
+              "id": "unsupportedrole",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA role is supported"
+            }
+          ],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item elderly-entry\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">长辈专区<!----></li>",
           "target": [
             ".elderly-entry"
           ]
@@ -2553,7 +2701,7 @@
             }
           ],
           "impact": null,
-          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-5217\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-4293\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
           "target": [
             ".el-dropdown-link"
           ]
@@ -2793,6 +2941,38 @@
           ],
           "none": [],
           "impact": null,
+          "html": "<span aria-label=\"1 条未读消息\" class=\"nav-badge\">1</span>",
+          "target": [
+            ".nav-badge"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "aria-valid-attr-value",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute values are valid"
+            },
+            {
+              "id": "aria-errormessage",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "aria-errormessage exists and references elements visible to screen readers that use a supported aria-errormessage technique"
+            },
+            {
+              "id": "aria-level",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "aria-level values are valid"
+            }
+          ],
+          "none": [],
+          "impact": null,
           "html": "<div data-v-106964d2=\"\" role=\"group\" aria-label=\"无障碍与语言设置\" class=\"care-controls care-controls--inline\">",
           "target": [
             ".care-controls"
@@ -2995,6 +3175,24 @@
           "all": [],
           "none": [],
           "impact": null,
+          "html": "<span aria-label=\"1 条未读消息\" class=\"nav-badge\">1</span>",
+          "target": [
+            ".nav-badge"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "aria-valid-attr",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "critical",
+              "message": "ARIA attribute name is valid"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
           "html": "<div data-v-106964d2=\"\" role=\"group\" aria-label=\"无障碍与语言设置\" class=\"care-controls care-controls--inline\">",
           "target": [
             ".care-controls"
@@ -3049,7 +3247,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-5217\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-4293\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
           "target": [
             ".el-dropdown-link"
           ]
@@ -3233,7 +3431,7 @@
           ],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">首页</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">首页<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(1)"
           ]
@@ -3265,7 +3463,7 @@
           ],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我要咨询</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我要咨询<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(2)"
           ]
@@ -3297,7 +3495,7 @@
           ],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我的工单</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我的工单<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(3)"
           ]
@@ -3329,7 +3527,7 @@
           ],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">渠道绑定</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">消息提醒<span aria-label=\"1 条未读消息\" class=\"nav-badge\">1</span></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(4)"
           ]
@@ -3361,7 +3559,7 @@
           ],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">服务导航</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">渠道绑定<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(5)"
           ]
@@ -3393,7 +3591,7 @@
           ],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">咨询历史</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">服务导航<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(6)"
           ]
@@ -3425,7 +3623,39 @@
           ],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item elderly-entry\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">长辈专区</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">咨询历史<!----></li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(7)"
+          ]
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "important-letter-spacing",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Letter-spacing in the style attribute is not set to !important, or meets the minimum"
+            },
+            {
+              "id": "important-word-spacing",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "word-spacing in the style attribute is not set to !important, or meets the minimum"
+            },
+            {
+              "id": "important-line-height",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "line-height in the style attribute is not set to !important, or meets the minimum"
+            }
+          ],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item elderly-entry\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">长辈专区<!----></li>",
           "target": [
             ".elderly-entry"
           ]
@@ -4342,31 +4572,6 @@
             {
               "id": "color-contrast",
               "data": {
-                "fgColor": "#ffffff",
-                "bgColor": "#1a3c6e",
-                "contrastRatio": 10.96,
-                "fontSize": "15.0pt (20px)",
-                "fontWeight": "bold",
-                "expectedContrastRatio": "3:1"
-              },
-              "relatedNodes": [],
-              "impact": "serious",
-              "message": "Element has sufficient color contrast of 10.96"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": null,
-          "html": "<h1 class=\"logo\">AI律师公众服务</h1>",
-          "target": [
-            "h1"
-          ]
-        },
-        {
-          "any": [
-            {
-              "id": "color-contrast",
-              "data": {
                 "fgColor": "#d7e2f3",
                 "bgColor": "#1a3c6e",
                 "contrastRatio": 8.38,
@@ -4382,7 +4587,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">首页</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">首页<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(1)"
           ]
@@ -4407,7 +4612,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我要咨询</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我要咨询<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(2)"
           ]
@@ -4432,7 +4637,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我的工单</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">我的工单<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(3)"
           ]
@@ -4457,9 +4662,34 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">渠道绑定</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">消息提醒<span aria-label=\"1 条未读消息\" class=\"nav-badge\">1</span></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(4)"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#ffffff",
+                "bgColor": "#c63d4a",
+                "contrastRatio": 5.03,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 5.03"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<span aria-label=\"1 条未读消息\" class=\"nav-badge\">1</span>",
+          "target": [
+            ".nav-badge"
           ]
         },
         {
@@ -4482,7 +4712,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">服务导航</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">渠道绑定<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(5)"
           ]
@@ -4507,9 +4737,34 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">咨询历史</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">服务导航<!----></li>",
           "target": [
             ".el-menu-item[role=\"menuitem\"]:nth-child(6)"
+          ]
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#d7e2f3",
+                "bgColor": "#1a3c6e",
+                "contrastRatio": 8.38,
+                "fontSize": "11.3pt (15px)",
+                "fontWeight": "normal",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has sufficient color contrast of 8.38"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": null,
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">咨询历史<!----></li>",
+          "target": [
+            ".el-menu-item[role=\"menuitem\"]:nth-child(7)"
           ]
         },
         {
@@ -4532,7 +4787,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item elderly-entry\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">长辈专区</li>",
+          "html": "<li role=\"menuitem\" tabindex=\"0\" class=\"el-menu-item elderly-entry\" style=\"color: rgb(215, 226, 243); border-bottom-color: transparent; background-color: rgb(26, 60, 110);\">长辈专区<!----></li>",
           "target": [
             ".elderly-entry"
           ]
@@ -4567,56 +4822,6 @@
             {
               "id": "color-contrast",
               "data": {
-                "fgColor": "#ffffff",
-                "bgColor": "#1a3c6e",
-                "contrastRatio": 10.96,
-                "fontSize": "9.0pt (12px)",
-                "fontWeight": "normal",
-                "expectedContrastRatio": "4.5:1"
-              },
-              "relatedNodes": [],
-              "impact": "serious",
-              "message": "Element has sufficient color contrast of 10.96"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": null,
-          "html": "<span data-v-106964d2=\"\">大字</span>",
-          "target": [
-            ".care-seg-item:nth-child(2) > span[data-v-106964d2=\"\"]"
-          ]
-        },
-        {
-          "any": [
-            {
-              "id": "color-contrast",
-              "data": {
-                "fgColor": "#ffffff",
-                "bgColor": "#1a3c6e",
-                "contrastRatio": 10.96,
-                "fontSize": "9.0pt (12px)",
-                "fontWeight": "normal",
-                "expectedContrastRatio": "4.5:1"
-              },
-              "relatedNodes": [],
-              "impact": "serious",
-              "message": "Element has sufficient color contrast of 10.96"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": null,
-          "html": "<span data-v-106964d2=\"\">超大</span>",
-          "target": [
-            ".care-seg-item:nth-child(3) > span[data-v-106964d2=\"\"]"
-          ]
-        },
-        {
-          "any": [
-            {
-              "id": "color-contrast",
-              "data": {
                 "fgColor": "#1f2a3a",
                 "bgColor": "#ffffff",
                 "contrastRatio": 14.47,
@@ -4635,31 +4840,6 @@
           "html": "<input type=\"text\" readonly=\"readonly\" autocomplete=\"off\" placeholder=\"请选择\" class=\"el-input__inner\">",
           "target": [
             ".el-input__inner"
-          ]
-        },
-        {
-          "any": [
-            {
-              "id": "color-contrast",
-              "data": {
-                "fgColor": "#ffffff",
-                "bgColor": "#1a3c6e",
-                "contrastRatio": 10.96,
-                "fontSize": "10.5pt (14px)",
-                "fontWeight": "normal",
-                "expectedContrastRatio": "4.5:1"
-              },
-              "relatedNodes": [],
-              "impact": "serious",
-              "message": "Element has sufficient color contrast of 10.96"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": null,
-          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-5217\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
-          "target": [
-            ".el-dropdown-link"
           ]
         },
         {
@@ -5119,7 +5299,7 @@
           "any": [
             {
               "id": "duplicate-id-aria",
-              "data": "dropdown-menu-5217",
+              "data": "dropdown-menu-4293",
               "relatedNodes": [],
               "impact": "critical",
               "message": "Document has no elements referenced with ARIA or labels that share the same id attribute"
@@ -5128,9 +5308,9 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<ul class=\"el-dropdown-menu el-popper\" id=\"dropdown-menu-5217\" style=\"display: none;\"><li tabindex=\"-1\" class=\"el-dropdown-menu__item\"><!---->个人信息</li><li tabindex=\"-1\" class=\"el-dropdown-menu__item el-dropdown-menu__item--divided\"><!---->退出登录</li></ul>",
+          "html": "<ul class=\"el-dropdown-menu el-popper\" id=\"dropdown-menu-4293\" style=\"display: none;\"><li tabindex=\"-1\" class=\"el-dropdown-menu__item\"><!---->个人信息</li><li tabindex=\"-1\" class=\"el-dropdown-menu__item el-dropdown-menu__item--divided\"><!---->退出登录</li></ul>",
           "target": [
-            "#dropdown-menu-5217"
+            "#dropdown-menu-4293"
           ]
         },
         {
@@ -5178,7 +5358,7 @@
               "data": null,
               "relatedNodes": [
                 {
-                  "html": "<label data-v-106964d2=\"\" class=\"care-seg-item is-active\"><input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"normal\"><span data-v-106964d2=\"\">标准</span></label>",
+                  "html": "<label data-v-106964d2=\"\" class=\"care-seg-item is-active\"><input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-16\" value=\"normal\"><span data-v-106964d2=\"\">标准</span></label>",
                   "target": [
                     ".is-active"
                   ]
@@ -5189,7 +5369,7 @@
             }
           ],
           "impact": null,
-          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"normal\">",
+          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-16\" value=\"normal\">",
           "target": [
             "input[value=\"normal\"]"
           ]
@@ -5203,7 +5383,7 @@
               "data": null,
               "relatedNodes": [
                 {
-                  "html": "<label data-v-106964d2=\"\" class=\"care-seg-item\"><input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"large\"><span data-v-106964d2=\"\">大字</span></label>",
+                  "html": "<label data-v-106964d2=\"\" class=\"care-seg-item\"><input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-16\" value=\"large\"><span data-v-106964d2=\"\">大字</span></label>",
                   "target": [
                     ".care-seg-item:nth-child(2)"
                   ]
@@ -5214,7 +5394,7 @@
             }
           ],
           "impact": null,
-          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"large\">",
+          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-16\" value=\"large\">",
           "target": [
             "input[value=\"large\"]"
           ]
@@ -5228,7 +5408,7 @@
               "data": null,
               "relatedNodes": [
                 {
-                  "html": "<label data-v-106964d2=\"\" class=\"care-seg-item\"><input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"xlarge\"><span data-v-106964d2=\"\">超大</span></label>",
+                  "html": "<label data-v-106964d2=\"\" class=\"care-seg-item\"><input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-16\" value=\"xlarge\"><span data-v-106964d2=\"\">超大</span></label>",
                   "target": [
                     ".care-seg-item:nth-child(3)"
                   ]
@@ -5239,7 +5419,7 @@
             }
           ],
           "impact": null,
-          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"xlarge\">",
+          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-16\" value=\"xlarge\">",
           "target": [
             "input[value=\"xlarge\"]"
           ]
@@ -5409,7 +5589,7 @@
               },
               "relatedNodes": [
                 {
-                  "html": "<label data-v-106964d2=\"\" class=\"care-seg-item is-active\"><input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"normal\"><span data-v-106964d2=\"\">标准</span></label>",
+                  "html": "<label data-v-106964d2=\"\" class=\"care-seg-item is-active\"><input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-16\" value=\"normal\"><span data-v-106964d2=\"\">标准</span></label>",
                   "target": [
                     ".is-active"
                   ]
@@ -5430,7 +5610,7 @@
             }
           ],
           "impact": null,
-          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"normal\">",
+          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-16\" value=\"normal\">",
           "target": [
             "input[value=\"normal\"]"
           ]
@@ -5444,7 +5624,7 @@
               },
               "relatedNodes": [
                 {
-                  "html": "<label data-v-106964d2=\"\" class=\"care-seg-item\"><input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"large\"><span data-v-106964d2=\"\">大字</span></label>",
+                  "html": "<label data-v-106964d2=\"\" class=\"care-seg-item\"><input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-16\" value=\"large\"><span data-v-106964d2=\"\">大字</span></label>",
                   "target": [
                     ".care-seg-item:nth-child(2)"
                   ]
@@ -5465,7 +5645,7 @@
             }
           ],
           "impact": null,
-          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"large\">",
+          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-16\" value=\"large\">",
           "target": [
             "input[value=\"large\"]"
           ]
@@ -5479,7 +5659,7 @@
               },
               "relatedNodes": [
                 {
-                  "html": "<label data-v-106964d2=\"\" class=\"care-seg-item\"><input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"xlarge\"><span data-v-106964d2=\"\">超大</span></label>",
+                  "html": "<label data-v-106964d2=\"\" class=\"care-seg-item\"><input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-16\" value=\"xlarge\"><span data-v-106964d2=\"\">超大</span></label>",
                   "target": [
                     ".care-seg-item:nth-child(3)"
                   ]
@@ -5500,7 +5680,7 @@
             }
           ],
           "impact": null,
-          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"xlarge\">",
+          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-16\" value=\"xlarge\">",
           "target": [
             "input[value=\"xlarge\"]"
           ]
@@ -5740,7 +5920,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"normal\">",
+          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-16\" value=\"normal\">",
           "target": [
             "input[value=\"normal\"]"
           ]
@@ -5758,7 +5938,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"large\">",
+          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-16\" value=\"large\">",
           "target": [
             "input[value=\"large\"]"
           ]
@@ -5776,7 +5956,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-15\" value=\"xlarge\">",
+          "html": "<input data-v-106964d2=\"\" type=\"radio\" name=\"care-font-scale-16\" value=\"xlarge\">",
           "target": [
             "input[value=\"xlarge\"]"
           ]
@@ -5812,7 +5992,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-5217\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-4293\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
           "target": [
             ".el-dropdown-link"
           ]
@@ -5915,6 +6095,32 @@
               "id": "aria-prohibited-attr",
               "data": {
                 "role": null,
+                "nodeName": "span",
+                "messageKey": "noRoleSingular",
+                "prohibited": [
+                  "aria-label"
+                ]
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute is not well supported on a span with no valid role attribute."
+            }
+          ],
+          "impact": "serious",
+          "html": "<span aria-label=\"1 条未读消息\" class=\"nav-badge\">1</span>",
+          "target": [
+            ".nav-badge"
+          ],
+          "failureSummary": "Fix all of the following:\n  aria-label attribute is not well supported on a span with no valid role attribute."
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "aria-prohibited-attr",
+              "data": {
+                "role": null,
                 "nodeName": "div",
                 "messageKey": "noRoleSingular",
                 "prohibited": [
@@ -5956,20 +6162,20 @@
               "id": "aria-valid-attr-value",
               "data": {
                 "messageKey": "controlsWithinPopup",
-                "needsReview": "aria-controls=\"dropdown-menu-5217\""
+                "needsReview": "aria-controls=\"dropdown-menu-4293\""
               },
               "relatedNodes": [],
               "impact": "critical",
-              "message": "Unable to determine if aria-controls referenced ID exists on the page while using aria-haspopup: aria-controls=\"dropdown-menu-5217\""
+              "message": "Unable to determine if aria-controls referenced ID exists on the page while using aria-haspopup: aria-controls=\"dropdown-menu-4293\""
             }
           ],
           "none": [],
           "impact": "critical",
-          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-5217\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-4293\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
           "target": [
             ".el-dropdown-link"
           ],
-          "failureSummary": "Fix all of the following:\n  Unable to determine if aria-controls referenced ID exists on the page while using aria-haspopup: aria-controls=\"dropdown-menu-5217\""
+          "failureSummary": "Fix all of the following:\n  Unable to determine if aria-controls referenced ID exists on the page while using aria-haspopup: aria-controls=\"dropdown-menu-4293\""
         }
       ]
     },
@@ -5990,6 +6196,127 @@
       "help": "Elements must meet minimum color contrast ratio thresholds",
       "helpUrl": "https://dequeuniversity.com/rules/axe/4.9/color-contrast?application=playwright",
       "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "15.0pt (20px)",
+                "fontWeight": "bold",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "3:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h1 class=\"logo\">AI律师公众服务</h1>",
+          "target": [
+            "h1"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<main class=\"el-main\">",
+                  "target": [
+                    ".el-main"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span data-v-106964d2=\"\">大字</span>",
+          "target": [
+            ".care-seg-item:nth-child(2) > span[data-v-106964d2=\"\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<main class=\"el-main\">",
+                  "target": [
+                    ".el-main"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span data-v-106964d2=\"\">超大</span>",
+          "target": [
+            ".care-seg-item:nth-child(3) > span[data-v-106964d2=\"\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<main class=\"el-main\">",
+                  "target": [
+                    ".el-main"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-4293\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "target": [
+            ".el-dropdown-link"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
         {
           "any": [
             {

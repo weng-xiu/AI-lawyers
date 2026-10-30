@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import ai.lawyers.system.service.lawyers.KnowledgeDraftService;
+import ai.lawyers.system.service.lawyers.KnowledgeOpsService;
 import ai.lawyers.system.service.lawyers.rag.IRagIndexService;
 import ai.lawyers.system.service.lawyers.rag.RagSearchService;
 import ai.lawyers.system.service.lawyers.rag.VectorIndexRouter;
@@ -41,6 +42,10 @@ public class AiLegalKnowledgeControllerPermTest extends AbstractPermMvcTest
     @Mock
     private KnowledgeDraftService knowledgeDraftService;
 
+    /** F8 知识库运营分析 */
+    @Mock
+    private KnowledgeOpsService knowledgeOpsService;
+
     @BeforeEach
     void setUp()
     {
@@ -56,6 +61,7 @@ public class AiLegalKnowledgeControllerPermTest extends AbstractPermMvcTest
         registerMock("vectorIndexRouter", vectorIndexRouter);
         registerMock("ragSearchService", ragSearchService);
         registerMock("knowledgeDraftService", knowledgeDraftService);
+        registerMock("knowledgeOpsService", knowledgeOpsService);
     }
 
     @Test

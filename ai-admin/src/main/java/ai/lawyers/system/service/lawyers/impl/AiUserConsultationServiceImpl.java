@@ -36,6 +36,21 @@ import ai.lawyers.system.service.lawyers.session.OccupyResult;
 @Service
 public class AiUserConsultationServiceImpl implements IAiUserConsultationService 
 {
+    /** F10：补充材料单次最多 3 个文件，单个不超过 10MB */
+    private static final int MAX_SUPPLEMENT_FILES = 3;
+
+    private static final long MAX_ATTACHMENT_BYTES = 10L * 1024 * 1024;
+
+    /** 附件路径列长度上限（ai_user_consultation.attachments varchar(1000)） */
+    private static final int MAX_ATTACHMENTS_LENGTH = 1000;
+
+    /** 备注列长度上限（ai_user_consultation.remark varchar(500)） */
+    private static final int MAX_REMARK_LENGTH = 500;
+
+    /** 材料扩展名白名单（与前端上传限制一致） */
+    private static final List<String> ALLOWED_EXTENSIONS =
+            java.util.Arrays.asList(".jpg", ".jpeg", ".png", ".pdf", ".doc", ".docx");
+
     @Autowired
     private AiUserConsultationMapper aiUserConsultationMapper;
     
@@ -205,41 +220,9 @@ public class AiUserConsultationServiceImpl implements IAiUserConsultationService
         consultation.setCreateTime(new Date());
         
         // 处理附件
-        StringBuilder attachmentPaths = new StringBuilder();
-        if (files != null && !files.isEmpty()) {
-            for (MultipartFile file : files) {
-                if (!file.isEmpty()) {
-                    try {
-                        // 生成唯一文件名
-                        String originalFilename = file.getOriginalFilename();
-                        String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
-                        String newFilename = UUID.randomUUID().toString() + extension;
-                        
-                        // 创建文件目录（取绝对路径：MultipartFile.transferTo 对相对路径会按
-                        // Tomcat 临时目录解析，导致 FileNotFoundException，F8 联调修复）
-                        File dir = new File(filePath + "/consultation/").getAbsoluteFile();
-                        if (!dir.exists() && !dir.mkdirs()) {
-                            throw new RuntimeException("上传目录创建失败: " + dir.getAbsolutePath());
-                        }
-                        
-                        // 保存文件
-                        File destFile = new File(dir, newFilename);
-                        file.transferTo(destFile.getAbsoluteFile());
-                        
-                        // 记录文件路径
-                        if (attachmentPaths.length() > 0) {
-                            attachmentPaths.append(",");
-                        }
-                        attachmentPaths.append("/consultation/").append(newFilename);
-                    } catch (IOException e) {
-                        throw new RuntimeException("文件上传失败: " + e.getMessage());
-                    }
-                }
-            }
-        }
-        
-        if (attachmentPaths.length() > 0) {
-            consultation.setAttachments(attachmentPaths.toString());
+        String attachmentPaths = saveAttachments(files);
+        if (StringUtils.isNotEmpty(attachmentPaths)) {
+            consultation.setAttachments(attachmentPaths);
         }
         
         // 保存咨询记录
@@ -439,6 +422,166 @@ public class AiUserConsultationServiceImpl implements IAiUserConsultationService
         evaluation.setUserId(SecurityUtils.getUserId());
         evaluation.setCreateTime(new Date());
         return aiUserEvaluationMapper.insertAiUserEvaluation(evaluation);
+    }
+
+    /**
+     * F10 公众端：补充材料/说明（仅本人、仅已完成咨询；附件追加不覆盖原附件）
+     */
+    @Override
+    public AiUserConsultation supplementOwnConsultation(Long consultationId, List<MultipartFile> files,
+                                                        String note)
+    {
+        AiUserConsultation consultation = selectOwnConsultationById(consultationId);
+        if ("FAILED".equals(consultation.getStatus()))
+        {
+            throw new ServiceException("咨询处理失败，暂不支持补充材料");
+        }
+        if (!"COMPLETED".equals(consultation.getStatus()))
+        {
+            throw new ServiceException("咨询正在处理中，请稍后再补充材料");
+        }
+
+        String safeNote = StringUtils.isEmpty(note) ? null : note.trim();
+        // 复用评价文本校验：≤500 字 + 本地敏感词
+        contentSafetyService.validateFeedback(safeNote);
+
+        List<MultipartFile> uploads = new ArrayList<>();
+        if (files != null)
+        {
+            for (MultipartFile file : files)
+            {
+                if (file != null && !file.isEmpty())
+                {
+                    uploads.add(file);
+                }
+            }
+        }
+        if (uploads.isEmpty() && StringUtils.isEmpty(safeNote))
+        {
+            throw new ServiceException("请上传材料或填写补充说明");
+        }
+        if (uploads.size() > MAX_SUPPLEMENT_FILES)
+        {
+            throw new ServiceException("单次最多补充" + MAX_SUPPLEMENT_FILES + "个材料");
+        }
+
+        String uploaded = saveAttachments(uploads);
+        String mergedAttachments = mergeAttachments(consultation.getAttachments(), uploaded);
+        String mergedRemark = mergeRemark(consultation.getRemark(), safeNote);
+
+        AiUserConsultation update = new AiUserConsultation();
+        update.setConsultationId(consultationId);
+        if (StringUtils.isNotEmpty(uploaded))
+        {
+            update.setAttachments(mergedAttachments);
+        }
+        if (StringUtils.isNotEmpty(safeNote))
+        {
+            update.setRemark(mergedRemark);
+        }
+        update.setUpdateBy(SecurityUtils.getUsername());
+        update.setUpdateTime(new Date());
+        aiUserConsultationMapper.updateAiUserConsultation(update);
+        return aiUserConsultationMapper.selectAiUserConsultationById(consultationId);
+    }
+
+    /**
+     * F10 公众端：本人咨询是否已评价（归属校验后按 consultationId + userId 查询）
+     */
+    @Override
+    public boolean isOwnConsultationEvaluated(Long consultationId)
+    {
+        selectOwnConsultationById(consultationId);
+        AiUserEvaluation query = new AiUserEvaluation();
+        query.setConsultationId(consultationId);
+        query.setUserId(SecurityUtils.getUserId());
+        List<AiUserEvaluation> existed = aiUserEvaluationMapper.selectAiUserEvaluationList(query);
+        return existed != null && !existed.isEmpty();
+    }
+
+    /** 附件落盘：仅白名单扩展名、单个 ≤10MB；返回逗号分隔的相对路径 */
+    private String saveAttachments(List<MultipartFile> files)
+    {
+        if (files == null || files.isEmpty())
+        {
+            return "";
+        }
+        StringBuilder paths = new StringBuilder();
+        for (MultipartFile file : files)
+        {
+            if (file == null || file.isEmpty())
+            {
+                continue;
+            }
+            String originalFilename = file.getOriginalFilename();
+            int dot = originalFilename == null ? -1 : originalFilename.lastIndexOf('.');
+            if (dot < 0)
+            {
+                throw new ServiceException("文件名缺少扩展名，仅支持 jpg/jpeg/png/pdf/doc/docx");
+            }
+            String extension = originalFilename.substring(dot).toLowerCase();
+            if (!ALLOWED_EXTENSIONS.contains(extension))
+            {
+                throw new ServiceException("仅支持 jpg/jpeg/png/pdf/doc/docx 格式材料");
+            }
+            if (file.getSize() > MAX_ATTACHMENT_BYTES)
+            {
+                throw new ServiceException("单个附件不能超过10MB");
+            }
+            try
+            {
+                String newFilename = UUID.randomUUID().toString() + extension;
+                // 创建文件目录（取绝对路径：MultipartFile.transferTo 对相对路径会按
+                // Tomcat 临时目录解析，导致 FileNotFoundException，F8 联调修复）
+                File dir = new File(filePath + "/consultation/").getAbsoluteFile();
+                if (!dir.exists() && !dir.mkdirs())
+                {
+                    throw new ServiceException("上传目录创建失败: " + dir.getAbsolutePath());
+                }
+                File destFile = new File(dir, newFilename);
+                file.transferTo(destFile.getAbsoluteFile());
+                if (paths.length() > 0)
+                {
+                    paths.append(",");
+                }
+                paths.append("/consultation/").append(newFilename);
+            }
+            catch (IOException e)
+            {
+                throw new ServiceException("文件上传失败: " + e.getMessage());
+            }
+        }
+        return paths.toString();
+    }
+
+    /** 追加附件：保留原附件，合并后受列长度约束 */
+    private String mergeAttachments(String existed, String added)
+    {
+        if (StringUtils.isEmpty(added))
+        {
+            return existed;
+        }
+        String merged = StringUtils.isEmpty(existed) ? added : existed + "," + added;
+        if (merged.length() > MAX_ATTACHMENTS_LENGTH)
+        {
+            throw new ServiceException("附件数量已达上限，请通过人工客服补充材料");
+        }
+        return merged;
+    }
+
+    /** 追加补充说明：保留原说明，合并后受列长度约束 */
+    private String mergeRemark(String existed, String note)
+    {
+        if (StringUtils.isEmpty(note))
+        {
+            return existed;
+        }
+        String merged = StringUtils.isEmpty(existed) ? note : existed + "；" + note;
+        if (merged.length() > MAX_REMARK_LENGTH)
+        {
+            throw new ServiceException("补充说明累计不能超过" + MAX_REMARK_LENGTH + "个字，请精简后重试");
+        }
+        return merged;
     }
 
     /**

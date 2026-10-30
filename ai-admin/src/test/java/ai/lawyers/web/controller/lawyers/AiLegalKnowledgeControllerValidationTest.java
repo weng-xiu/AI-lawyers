@@ -13,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.MediaType;
 import ai.lawyers.system.service.lawyers.KnowledgeDraftService;
+import ai.lawyers.system.service.lawyers.KnowledgeOpsService;
 import ai.lawyers.system.service.lawyers.IAiLegalKnowledgeService;
 import ai.lawyers.system.service.lawyers.rag.IRagIndexService;
 import ai.lawyers.system.service.lawyers.rag.RagSearchService;
@@ -42,6 +43,10 @@ public class AiLegalKnowledgeControllerValidationTest extends AbstractPermMvcTes
     @Mock
     private KnowledgeDraftService knowledgeDraftService;
 
+    /** F8 知识库运营分析 */
+    @Mock
+    private KnowledgeOpsService knowledgeOpsService;
+
     @Override
     protected Class<?> webMvcConfig()
     {
@@ -63,6 +68,7 @@ public class AiLegalKnowledgeControllerValidationTest extends AbstractPermMvcTes
         registerMock("vectorIndexRouter", vectorIndexRouter);
         registerMock("ragSearchService", ragSearchService);
         registerMock("knowledgeDraftService", knowledgeDraftService);
+        registerMock("knowledgeOpsService", knowledgeOpsService);
     }
 
     @Test

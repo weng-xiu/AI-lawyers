@@ -98,6 +98,17 @@ export default {
       }
     }
   },
+  created() {
+    // F10 常见问题推荐：从首页/结果页带 category 进入时预填分类
+    const category = this.$route.query.category
+    const validCategories = [
+      'marriage_family', 'labor_dispute', 'contract_dispute', 'property_dispute',
+      'criminal_case', 'intellectual_property', 'consumer_rights', 'other'
+    ]
+    if (category && validCategories.includes(category)) {
+      this.questionForm.category = category
+    }
+  },
   methods: {
     handleFileChange(file, fileList) {
       this.fileList = fileList

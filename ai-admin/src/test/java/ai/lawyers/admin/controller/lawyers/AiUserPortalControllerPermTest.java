@@ -1,9 +1,11 @@
 package ai.lawyers.admin.controller.lawyers;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.ArrayList;
@@ -20,15 +22,17 @@ import ai.lawyers.common.core.domain.model.LoginUser;
 import ai.lawyers.system.domain.lawyers.AiCallerProfile;
 import ai.lawyers.system.domain.lawyers.AiChannelIdentity;
 import ai.lawyers.system.mapper.lawyers.AiCallerProfileMapper;
+import ai.lawyers.system.mapper.lawyers.AiLegalKnowledgeMapper;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
 import ai.lawyers.system.service.lawyers.IAiChannelIdentityService;
 import ai.lawyers.system.service.lawyers.IAiExternalOrgService;
+import ai.lawyers.system.service.lawyers.IAiMessageService;
 import ai.lawyers.web.support.AbstractPermMvcTest;
 
 /**
- * {@link AiUserPortalController} 权限校验——除 /services/orgs 标注 @Anonymous
- * （公开目录，跳过）外，6 个端点均无 @PreAuthorize，但强制要求公众端登录态且数据按
- * 本人手机号归属。仅验证未登录 401、登录（已绑手机号、任意权限）后 200，不验证 403。
+ * {@link AiUserPortalController} 权限校验——除 /services/orgs、/faq 标注 @Anonymous
+ * （公开只读目录，跳过）外，10 个端点均无 @PreAuthorize，但强制要求公众端登录态且数据按
+ * 本人手机号/用户ID归属。仅验证未登录 401、登录（已绑手机号、任意权限）后 200，不验证 403。
  */
 public class AiUserPortalControllerPermTest extends AbstractPermMvcTest
 {
@@ -47,6 +51,14 @@ public class AiUserPortalControllerPermTest extends AbstractPermMvcTest
     @Mock
     private IAiChannelIdentityService channelIdentityService;
 
+    /** F10 常见问题（知识库只读投影） */
+    @Mock
+    private AiLegalKnowledgeMapper legalKnowledgeMapper;
+
+    /** F10 门户消息中心 */
+    @Mock
+    private IAiMessageService messageService;
+
     private final java.util.List<MockHttpServletRequestBuilder> endpoints = new ArrayList<>();
 
     @BeforeEach
@@ -62,6 +74,8 @@ public class AiUserPortalControllerPermTest extends AbstractPermMvcTest
         identity.setProfileId(10L);
         when(channelIdentityService.selectIdentityById(1L)).thenReturn(identity);
         when(channelIdentityService.selectBoundByProfileId(10L)).thenReturn(new ArrayList<>());
+        when(messageService.selectAiMessageList(any())).thenReturn(new ArrayList<>());
+        when(messageService.countUnread(anyLong())).thenReturn(0);
         startMvc(AiUserPortalController.class);
         buildEndpoints();
     }
@@ -73,6 +87,8 @@ public class AiUserPortalControllerPermTest extends AbstractPermMvcTest
         registerMock("externalOrgService", externalOrgService);
         registerMock("callerProfileMapper", callerProfileMapper);
         registerMock("channelIdentityService", channelIdentityService);
+        registerMock("legalKnowledgeMapper", legalKnowledgeMapper);
+        registerMock("messageService", messageService);
     }
 
     private void buildEndpoints()
@@ -90,7 +106,12 @@ public class AiUserPortalControllerPermTest extends AbstractPermMvcTest
                 .contentType(MediaType.APPLICATION_JSON).content("{\"id\":1}"));
         endpoints.add(post(base + "/channel/unbind")
                 .contentType(MediaType.APPLICATION_JSON).content("{\"id\":1}"));
-        // /services/orgs 标注 @Anonymous，属公开目录，跳过鉴权断言
+        // F10 门户消息中心（均要求公众端登录态，接收人强制取当前用户）
+        endpoints.add(get(base + "/message/list"));
+        endpoints.add(get(base + "/message/unreadCount"));
+        endpoints.add(put(base + "/message/read/1"));
+        endpoints.add(put(base + "/message/readAll"));
+        // /services/orgs、/faq 标注 @Anonymous，属公开只读目录，跳过鉴权断言
     }
 
     @Test

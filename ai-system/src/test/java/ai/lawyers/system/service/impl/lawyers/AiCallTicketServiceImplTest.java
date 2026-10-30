@@ -5,11 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.text.ParseException;
@@ -24,12 +26,15 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.test.util.ReflectionTestUtils;
+import ai.lawyers.common.core.domain.entity.SysUser;
 import ai.lawyers.system.domain.lawyers.AiCallTicket;
 import ai.lawyers.system.domain.lawyers.AiTicketFlowDefinition;
 import ai.lawyers.system.domain.lawyers.AiTicketTransfer;
+import ai.lawyers.system.mapper.SysUserMapper;
 import ai.lawyers.system.mapper.lawyers.AiCallTicketMapper;
 import ai.lawyers.system.mapper.lawyers.AiTicketTransferMapper;
 import ai.lawyers.system.service.lawyers.TicketFlowService;
+import ai.lawyers.system.service.lawyers.queue.MessageNotifyDispatcher;
 import ai.lawyers.system.service.lawyers.rag.TicketVectorService;
 
 /**
@@ -48,6 +53,8 @@ class AiCallTicketServiceImplTest
     @Mock private AiTicketTransferMapper transferMapper;
     @Mock private TicketFlowService ticketFlowService;
     @Mock private TicketVectorService ticketVectorService;
+    @Mock private MessageNotifyDispatcher messageNotifyDispatcher;
+    @Mock private SysUserMapper sysUserMapper;
 
     @BeforeEach
     void setUp()
@@ -58,6 +65,8 @@ class AiCallTicketServiceImplTest
         ReflectionTestUtils.setField(service, "aiTicketTransferMapper", transferMapper);
         ReflectionTestUtils.setField(service, "ticketFlowService", ticketFlowService);
         ReflectionTestUtils.setField(service, "ticketVectorService", ticketVectorService);
+        ReflectionTestUtils.setField(service, "messageNotifyDispatcher", messageNotifyDispatcher);
+        ReflectionTestUtils.setField(service, "sysUserMapper", sysUserMapper);
         // 部分用例（再分派/工单不存在）不读角色，用 lenient 避免严格桩冗余报错
         lenient().when(ticketFlowService.currentRoleKeys()).thenReturn(Arrays.asList("agent"));
         lenient().when(transferMapper.selectAiTicketTransferList(any()))
@@ -66,9 +75,17 @@ class AiCallTicketServiceImplTest
 
     private void givenTicket(String status)
     {
+        givenTicket(status, null, null, null);
+    }
+
+    private void givenTicket(String status, String callerNumber, String title, String assignUserName)
+    {
         AiCallTicket t = new AiCallTicket();
         t.setTicketId(TID);
         t.setStatus(status);
+        t.setCallerNumber(callerNumber);
+        t.setTitle(title);
+        t.setAssignUserName(assignUserName);
         when(ticketMapper.selectAiCallTicketByTicketId(TID)).thenReturn(t);
     }
 
@@ -190,6 +207,72 @@ class AiCallTicketServiceImplTest
     {
         when(ticketMapper.selectAiCallTicketByTicketId(TID)).thenReturn(null);
         assertThrows(IllegalArgumentException.class, () -> service.archiveTicket(TID));
+    }
+
+    // ---------------- F10：工单进度推送（站内信） ----------------
+
+    private SysUser matchedUser(Long userId)
+    {
+        SysUser user = new SysUser();
+        user.setUserId(userId);
+        user.setUserName("portal-user");
+        return user;
+    }
+
+    @Test
+    void accept_withMatchedCaller_notifiesProgress()
+    {
+        givenTicket("0", "13800000000", "法律咨询工单", "张律师");
+        allow("0", "start");
+        when(ticketMapper.updateTicketProcess(eq(TID), any(), any(), any())).thenReturn(1);
+        when(sysUserMapper.checkPhoneUnique("13800000000")).thenReturn(matchedUser(1001L));
+
+        assertEquals(1, service.updateTicketProcess(TID, "已受理", null, null));
+
+        verify(messageNotifyDispatcher).notify(eq(1001L), eq("5"),
+                eq("工单受理提醒：法律咨询工单"), contains("处理人：张律师"),
+                eq("ticket"), eq(TID), eq("system"));
+    }
+
+    @Test
+    void complete_withMatchedCaller_notifiesProgress()
+    {
+        givenTicket("1", "13800000000", "法律咨询工单", null);
+        allow("1", "complete");
+        when(ticketMapper.updateTicketStatus(TID, "2")).thenReturn(1);
+        when(sysUserMapper.checkPhoneUnique("13800000000")).thenReturn(matchedUser(1001L));
+
+        assertEquals(1, service.updateTicketStatus(TID, "2"));
+
+        verify(messageNotifyDispatcher).notify(eq(1001L), eq("5"),
+                eq("工单办结提醒：法律咨询工单"), contains("已办结"),
+                eq("ticket"), eq(TID), eq("system"));
+    }
+
+    @Test
+    void progressPush_noMatchedAccount_silent()
+    {
+        givenTicket("0", "13800000000", "法律咨询工单", null);
+        allow("0", "start");
+        when(ticketMapper.updateTicketProcess(eq(TID), any(), any(), any())).thenReturn(1);
+        when(sysUserMapper.checkPhoneUnique("13800000000")).thenReturn(null);
+
+        assertEquals(1, service.updateTicketProcess(TID, "已受理", null, null));
+
+        verifyNoInteractions(messageNotifyDispatcher);
+    }
+
+    @Test
+    void progressPush_dispatcherFailure_doesNotBreakFlow()
+    {
+        givenTicket("0", "13800000000", "法律咨询工单", null);
+        allow("0", "start");
+        when(ticketMapper.updateTicketProcess(eq(TID), any(), any(), any())).thenReturn(1);
+        when(sysUserMapper.checkPhoneUnique("13800000000")).thenReturn(matchedUser(1001L));
+        doThrow(new RuntimeException("mq down")).when(messageNotifyDispatcher)
+                .notify(any(), any(), any(), any(), any(), any(), any());
+
+        assertEquals(1, service.updateTicketProcess(TID, "已受理", null, null));
     }
 
     // ---------------- P1-6：外派纳入统一时间线 ----------------

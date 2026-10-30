@@ -84,33 +84,63 @@
         
         <el-divider></el-divider>
         
-        <!-- 评价区域 -->
-        <el-row :gutter="20">
+        <!-- F10 评价引导 + 材料补正：已完成咨询可评价/补充材料；已评价展示感谢 -->
+        <el-row :gutter="20" v-if="consultationResult.status === 'COMPLETED'">
           <el-col :span="24">
             <div class="evaluation-section">
-              <h3>满意度评价</h3>
-              <div class="rating-container">
-                <span>请对本次咨询结果进行评价:</span>
-                <el-rate
-                  v-model="rating"
-                  :colors="colors"
-                  aria-label="咨询结果满意度评分"
-                  show-text>
-                </el-rate>
+              <div v-if="evaluated" class="evaluated-tip" role="status">
+                <i class="el-icon-circle-check" aria-hidden="true"></i>
+                <span>感谢您的评价，我们会持续改进服务。</span>
               </div>
-              
-              <div class="feedback-container">
-                <el-input
-                  type="textarea"
-                  :rows="3"
-                  placeholder="请输入您的反馈意见（可选）"
-                  v-model="feedback">
-                </el-input>
+              <div v-else>
+                <h3>满意度评价</h3>
+                <div class="rating-container">
+                  <span>请对本次咨询结果进行评价:</span>
+                  <el-rate
+                    v-model="rating"
+                    :colors="colors"
+                    aria-label="咨询结果满意度评分"
+                    show-text>
+                  </el-rate>
+                </div>
+
+                <div class="feedback-container">
+                  <el-input
+                    type="textarea"
+                    :rows="3"
+                    placeholder="请输入您的反馈意见（可选）"
+                    aria-label="反馈意见，可选"
+                    v-model="feedback">
+                  </el-input>
+                </div>
+
+                <div class="submit-feedback">
+                  <el-button type="primary" @click="submitEvaluation" :loading="submitting">提交评价</el-button>
+                </div>
               </div>
-              
-              <div class="submit-feedback">
-                <el-button type="primary" @click="submitEvaluation" :loading="submitting">提交评价</el-button>
+
+              <div class="supplement-entry">
+                <el-button type="text" icon="el-icon-paperclip" @click="openSupplement">
+                  材料不全？点此补充材料
+                </el-button>
               </div>
+            </div>
+          </el-col>
+        </el-row>
+
+        <!-- F10 常见问题推荐：匿名只读知识库，帮助用户先自助排查 -->
+        <el-row :gutter="20" v-if="faqs.length > 0">
+          <el-col :span="24">
+            <div class="faq-section">
+              <h3>相关问题推荐</h3>
+              <ul class="faq-list">
+                <li v-for="faq in faqs" :key="faq.knowledgeId" class="faq-item">
+                  <router-link class="faq-title" :to="{ path: '/consultation/submit', query: { category: 'other', ref: 'faq' } }">
+                    {{ faq.title }}
+                  </router-link>
+                  <p class="faq-summary">{{ faq.summary }}</p>
+                </li>
+              </ul>
             </div>
           </el-col>
         </el-row>
@@ -121,11 +151,51 @@
         <el-button type="primary" @click="goToSubmit">提交新咨询</el-button>
       </div>
     </el-card>
+
+    <!-- F10 补充材料弹窗：追加附件与说明，不覆盖原附件 -->
+    <el-dialog
+      title="补充材料"
+      :visible.sync="supplementVisible"
+      width="40%">
+      <div class="supplement-form">
+        <p class="supplement-tip">可补充证明材料的照片或文档，并说明补充内容（原材料会保留）。</p>
+        <el-upload
+          action=""
+          :auto-upload="false"
+          :on-change="handleSupplementFileChange"
+          :on-remove="handleSupplementFileRemove"
+          :file-list="supplementFiles"
+          multiple>
+          <el-button size="small" type="primary">选择文件</el-button>
+          <div slot="tip" class="el-upload__tip">支持 jpg/png/pdf/doc/docx，单次最多 3 个，单个不超过 10MB</div>
+        </el-upload>
+        <el-input
+          type="textarea"
+          :rows="4"
+          maxlength="500"
+          show-word-limit
+          aria-label="补充说明，最多500个字"
+          placeholder="请说明补充的内容（可选，最多500字）"
+          v-model="supplementNote">
+        </el-input>
+      </div>
+      <span slot="footer" class="dialog-footer">
+        <el-button @click="supplementVisible = false">取消</el-button>
+        <el-button type="primary" :loading="supplementSubmitting" @click="submitSupplement">提交补充</el-button>
+      </span>
+    </el-dialog>
   </div>
 </template>
 
 <script>
 import { announce } from '@/utils/a11y'
+import { isConsultationEvaluated, supplementConsultation } from '@/api/consultation'
+import { getFaq } from '@/api/portal'
+
+/** F10 补充材料限制（与后端保持一致） */
+const MAX_SUPPLEMENT_FILES = 3
+const MAX_SUPPLEMENT_BYTES = 10 * 1024 * 1024
+const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx']
 
 export default {
   name: 'ConsultationResult',
@@ -137,7 +207,16 @@ export default {
       rating: 0,
       feedback: '',
       submitting: false,
-      colors: ['#99A9BF', '#F7BA2A', '#FF9900']
+      colors: ['#99A9BF', '#F7BA2A', '#FF9900'],
+      // F10 评价引导
+      evaluated: false,
+      // F10 材料补正
+      supplementVisible: false,
+      supplementNote: '',
+      supplementFiles: [],
+      supplementSubmitting: false,
+      // F10 常见问题推荐
+      faqs: []
     }
   },
   computed: {
@@ -180,11 +259,95 @@ export default {
           announce(`咨询结果已生成，分类${this.getCategoryName(r.category)}，`
             + `置信度${r.confidence == null ? '未知' : this.confidencePercent + '%'}`
             + (lawCount > 0 ? `，相关法律条文 ${lawCount} 条` : ''), 'polite')
+          if (r.status === 'COMPLETED') {
+            this.loadEvaluated(r.consultationId)
+          }
         })
         .catch(error => {
           this.$message.error('获取咨询结果失败: ' + (error.response && error.response.data && error.response.data.msg || '未知错误'))
           this.loading = false
           announce('获取咨询结果失败，请稍后重试', 'assertive')
+        })
+      this.loadFaq()
+    },
+    /** F10 评价引导态：已评价展示感谢，未评价展示评分入口 */
+    loadEvaluated(id) {
+      if (!id) return
+      isConsultationEvaluated(id).then(res => {
+        this.evaluated = !!res.data
+      }).catch(() => {
+        // 读取失败按未评价处理，不阻断结果页
+      })
+    },
+    /** F10 常见问题推荐（匿名只读，失败静默） */
+    loadFaq() {
+      getFaq({ limit: 5 }).then(res => {
+        this.faqs = res.data || []
+      }).catch(() => {
+        this.faqs = []
+      })
+    },
+    /** F10 材料补正入口 */
+    openSupplement() {
+      this.supplementNote = ''
+      this.supplementFiles = []
+      this.supplementVisible = true
+    },
+    handleSupplementFileChange(file, fileList) {
+      if (fileList.length > MAX_SUPPLEMENT_FILES) {
+        this.$message.warning(`单次最多补充 ${MAX_SUPPLEMENT_FILES} 个材料`)
+        this.supplementFiles = fileList.slice(0, MAX_SUPPLEMENT_FILES)
+        return
+      }
+      this.supplementFiles = fileList
+    },
+    handleSupplementFileRemove(file, fileList) {
+      this.supplementFiles = fileList
+    },
+    submitSupplement() {
+      const files = (this.supplementFiles || [])
+        .map(item => item.raw)
+        .filter(Boolean)
+      const note = this.supplementNote.trim()
+
+      if (files.length === 0 && !note) {
+        this.$message.warning('请上传材料或填写补充说明')
+        return
+      }
+      for (const file of files) {
+        const ext = (file.name || '').split('.').pop().toLowerCase()
+        if (!ALLOWED_EXTENSIONS.includes(ext)) {
+          this.$message.warning('仅支持 jpg/png/pdf/doc/docx 格式材料')
+          return
+        }
+        if (file.size > MAX_SUPPLEMENT_BYTES) {
+          this.$message.warning('单个附件不能超过 10MB')
+          return
+        }
+      }
+
+      const formData = new FormData()
+      if (note) formData.append('note', note)
+      files.forEach(file => formData.append('files', file))
+
+      this.supplementSubmitting = true
+      supplementConsultation(this.consultationResult.consultationId, formData)
+        .then(response => {
+          this.supplementVisible = false
+          this.supplementFiles = []
+          this.supplementNote = ''
+          this.consultationResult = response.data || this.consultationResult
+          this.$message.success('材料补充成功')
+          announce('材料补充成功，工作人员会尽快查看', 'polite')
+        })
+        .catch(error => {
+          const msg = (error.response && error.response.data && error.response.data.msg)
+            || (error.message || '未知错误')
+          this.$message.error('材料补充失败: ' + msg)
+          announce('材料补充失败，请稍后重试', 'assertive')
+        })
+        .finally(() => {
+          this.supplementSubmitting = false
         })
     },
     getCategoryType(category) {
@@ -241,6 +404,7 @@ export default {
 
       this.$http.post('/aiuser/consultation/evaluation', evaluationData)
         .then(() => {
+          this.evaluated = true
           this.$message.success('评价提交成功')
           announce('评价提交成功，感谢您的反馈', 'polite')
           this.submitting = false
@@ -383,6 +547,33 @@ export default {
   text-align: center;
   margin-top: 15px;
 }
+
+/* F10 评价引导：已评价态 / 补充材料入口 */
+.evaluated-tip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 6px;
+  background: #f0f9eb;
+  color: #3f6b2c;
+  font-size: 15px;
+}
+.evaluated-tip i { color: #67C23A; font-size: 20px; }
+.supplement-entry { margin-top: 12px; text-align: right; }
+
+/* F10 常见问题推荐 */
+.faq-section { margin-bottom: 20px; }
+.faq-list { list-style: none; margin: 12px 0 0; padding: 0; }
+.faq-item { padding: 12px 0; border-bottom: 1px solid #ebeef5; }
+.faq-item:last-child { border-bottom: none; }
+.faq-title { color: var(--color-brand-deep, #1A3C6E); font-size: 15px; font-weight: 600; text-decoration: none; }
+.faq-title:hover { text-decoration: underline; }
+.faq-summary { margin: 6px 0 0; color: #5b6b84; font-size: 14px; line-height: 1.7; }
+
+/* F10 补充材料弹窗 */
+.supplement-tip { margin: 0 0 14px; color: #5b6b84; font-size: 14px; line-height: 1.7; }
+.supplement-form .el-upload { width: 100%; margin-bottom: 12px; }
 
 .no-result {
   text-align: center;

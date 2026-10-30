@@ -49,3 +49,28 @@ export function confirmChannelBind(data) {
 export function unbindChannel(data) {
   return request({ url: '/lawyers/portal/channel/unbind', method: 'post', data })
 }
+
+// ========== F10 常见问题推荐（匿名只读） ==========
+
+export function getFaq(params) {
+  return request({ url: '/lawyers/portal/faq', method: 'get', params })
+}
+
+// ========== F10 消息中心（工单进度 / 系统提醒） ==========
+
+// 我的站内信（后端强制按登录用户过滤，仅透传 msgType/isRead）
+export function getMyMessages(params) {
+  return request({ url: '/lawyers/portal/message/list', method: 'get', params })
+}
+
+export function getUnreadCount() {
+  return request({ url: '/lawyers/portal/message/unreadCount', method: 'get' })
+}
+
+export function readMessage(messageId) {
+  return request({ url: `/lawyers/portal/message/read/${messageId}`, method: 'put' })
+}
+
+export function readAllMessages() {
+  return request({ url: '/lawyers/portal/message/readAll', method: 'put' })
+}

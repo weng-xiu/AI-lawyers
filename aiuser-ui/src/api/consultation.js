@@ -46,6 +46,26 @@ export function submitEvaluation(data) {
   })
 }
 
+// F10：是否已评价（评价引导态）
+export function isConsultationEvaluated(id) {
+  return http({
+    url: `/aiuser/consultation/${id}/evaluated`,
+    method: 'get'
+  })
+}
+
+// F10：补充材料（multipart：note + files，追加不覆盖原附件）
+export function supplementConsultation(id, data) {
+  return http({
+    url: `/aiuser/consultation/${id}/supplement`,
+    method: 'post',
+    data: data,
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}
+
 // 获取问题分类
 export function getQuestionCategories() {
   return http({

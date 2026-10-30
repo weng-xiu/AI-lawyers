@@ -84,6 +84,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by view_count desc
     </select>
 
+    <!-- F10：公众端常见问题（只取展示所需列，按浏览量倒序；仅启用/审核通过/现行有效） -->
+    <select id="selectFaqKnowledge" resultMap="AiLegalKnowledgeResult">
+        select knowledge_id, title, content, category_id, keywords, view_count
+        from ai_legal_knowledge
+        where status = '0' and audit_status = '1'
+        and (valid_status is null or valid_status = '1')
+        <if test="categoryId != null"> and category_id = #{categoryId}</if>
+        order by view_count desc, create_time desc
+        limit #{limit}
+    </select>
+
     <!-- T3：加载启用、审核通过且现行有效的知识（供分块/向量化；F7 失效法条过滤） -->
     <select id="selectIndexableKnowledge" resultMap="AiLegalKnowledgeResult">
         <include refid="selectAiLegalKnowledgeVo"/>

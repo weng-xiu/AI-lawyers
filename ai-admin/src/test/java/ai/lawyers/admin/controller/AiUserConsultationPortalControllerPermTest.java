@@ -17,7 +17,7 @@ import ai.lawyers.system.service.lawyers.IAiUserConsultationService;
 import ai.lawyers.web.support.AbstractPermMvcTest;
 
 /**
- * {@link AiUserConsultationPortalController} 权限校验——公众端 5 个端点均无
+ * {@link AiUserConsultationPortalController} 权限校验——公众端 7 个端点均无
  * @PreAuthorize，但公众端安全链要求必须登录（Service 内按登录态 userId 做归属）。
  * 仅验证未登录 401、登录（任意权限）后 200，不验证 403。
  */
@@ -60,6 +60,9 @@ public class AiUserConsultationPortalControllerPermTest extends AbstractPermMvcT
         endpoints.add(get(base + "/history"));
         endpoints.add(post(base + "/evaluation")
                 .contentType("application/json").content("{}"));
+        // 补充材料：与 submit 同走 multipart/form-data 普通 POST（无 part 时解析为空）
+        endpoints.add(post(base + "/1/supplement").contentType("multipart/form-data"));
+        endpoints.add(get(base + "/1/evaluated"));
     }
 
     @Test
