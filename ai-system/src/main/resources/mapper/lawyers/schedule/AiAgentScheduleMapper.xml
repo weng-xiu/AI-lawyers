@@ -161,6 +161,29 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where schedule_id = #{scheduleId}
     </update>
 
+    <!-- F9 互换：只改班次（排班行与坐席保持，唯一键 agent_id+schedule_date 不受影响） -->
+    <update id="updateShiftAssignment">
+        update ai_agent_schedule
+        <trim prefix="SET" suffixOverrides=",">
+            shift_id = #{shiftId},
+            <if test="scheduleType != null">schedule_type = #{scheduleType},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = sysdate()
+        </trim>
+        where schedule_id = #{scheduleId}
+    </update>
+
+    <!-- F9 转班：整条排班转给接收坐席（调用前须校验接收坐席当日无排班，避免撞唯一键） -->
+    <update id="transferScheduleToAgent">
+        update ai_agent_schedule
+        <trim prefix="SET" suffixOverrides=",">
+            agent_id = #{agentId},
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = sysdate()
+        </trim>
+        where schedule_id = #{scheduleId}
+    </update>
+
     <update id="checkIn">
         update ai_agent_schedule
         set check_in_time = #{checkInTime},

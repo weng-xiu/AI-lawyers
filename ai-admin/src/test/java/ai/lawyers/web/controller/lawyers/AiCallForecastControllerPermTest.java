@@ -20,8 +20,9 @@ import ai.lawyers.system.service.lawyers.IAiCallForecastService;
 import ai.lawyers.web.support.AbstractPermMvcTest;
 
 /**
- * {@link AiCallForecastController} 权限校验——7 个端点、2 个权限边界：
- * 查询/预览/确认/日历列表需 lawyers:report:view，日历写操作需 lawyers:report:export。
+ * {@link AiCallForecastController} 权限校验——9 个端点、2 个权限边界：
+ * 查询/预览/15 分钟预测与对比验收/日历列表需 lawyers:report:view，
+ * 日历写操作需 lawyers:report:export。
  * 逐端点验证未登录 401、权限码不符 403、持对应权限码放行 200。
  */
 public class AiCallForecastControllerPermTest extends AbstractPermMvcTest
@@ -50,6 +51,8 @@ public class AiCallForecastControllerPermTest extends AbstractPermMvcTest
     {
         String base = "/lawyers/forecast";
         endpoints.add(new Endpoint("lawyers:report:view", get(base + "/preview")));
+        endpoints.add(new Endpoint("lawyers:report:view", get(base + "/slot-preview")));
+        endpoints.add(new Endpoint("lawyers:report:view", get(base + "/slot-accuracy")));
         endpoints.add(new Endpoint("lawyers:report:view", get(base + "/staffing")));
         endpoints.add(new Endpoint("lawyers:report:view",
                 post(base + "/confirm").contentType(MediaType.APPLICATION_JSON).content("{}")));

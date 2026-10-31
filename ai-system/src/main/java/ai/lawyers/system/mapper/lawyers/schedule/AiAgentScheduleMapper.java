@@ -43,6 +43,21 @@ public interface AiAgentScheduleMapper
     public int updateAiAgentSchedule(AiAgentSchedule aiAgentSchedule);
 
     /**
+     * F9 换班审批：仅改班次（互换场景，排班行与坐席不变）
+     */
+    public int updateShiftAssignment(@Param("scheduleId") Long scheduleId,
+                                     @Param("shiftId") Long shiftId,
+                                     @Param("scheduleType") Integer scheduleType,
+                                     @Param("updateBy") String updateBy);
+
+    /**
+     * F9 换班审批：把整条排班转给接收坐席（转班场景，班次不变）
+     */
+    public int transferScheduleToAgent(@Param("scheduleId") Long scheduleId,
+                                       @Param("agentId") Long agentId,
+                                       @Param("updateBy") String updateBy);
+
+    /**
      * 签到：写入 check_in_time = now()，并将排班置为有效
      */
     public int checkIn(@Param("agentId") Long agentId,

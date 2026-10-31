@@ -143,6 +143,16 @@
           />
         </el-card>
       </el-tab-pane>
+
+      <!-- ========== Tab3: 15 分钟预测与对比验收（F9） ========== -->
+      <el-tab-pane label="15分钟预测" name="forecast">
+        <forecast-slot v-if="activeTab === 'forecast'" />
+      </el-tab-pane>
+
+      <!-- ========== Tab4: 换班申请与审批（F9） ========== -->
+      <el-tab-pane label="换班审批" name="shiftChange">
+        <shift-change v-if="activeTab === 'shiftChange'" />
+      </el-tab-pane>
     </el-tabs>
 
     <!-- 班次新增/编辑对话框 -->
@@ -244,9 +254,12 @@ import {
   batchSchedule, checkIn, checkOut, todaySchedule
 } from '@/api/lawyers/schedule'
 import { listAgent } from '@/api/lawyers/callCenter'
+import ForecastSlot from './forecastSlot.vue'
+import ShiftChange from './shiftChange.vue'
 
 export default {
   name: 'Schedule',
+  components: { ForecastSlot, ShiftChange },
   data() {
     return {
       activeTab: 'shift',

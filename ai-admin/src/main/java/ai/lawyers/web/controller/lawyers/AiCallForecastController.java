@@ -46,6 +46,22 @@ public class AiCallForecastController extends BaseController
         return success(forecastService.preview(days));
     }
 
+    /** F9：未来 N 天 15 分钟粒度话务预测 */
+    @PreAuthorize("@ss.hasPermi('lawyers:report:view')")
+    @GetMapping("/slot-preview")
+    public AjaxResult slotPreview(@RequestParam(defaultValue = "7") int days)
+    {
+        return success(forecastService.slotPreview(days));
+    }
+
+    /** F9：15 分钟预测 vs 实际对比验收（MAE/MAPE/准确率） */
+    @PreAuthorize("@ss.hasPermi('lawyers:report:view')")
+    @GetMapping("/slot-accuracy")
+    public AjaxResult slotAccuracy(@RequestParam(defaultValue = "7") int days)
+    {
+        return success(forecastService.slotAccuracy(days));
+    }
+
     /** 排班建议（预测 + 逐日峰值坐席） */
     @PreAuthorize("@ss.hasPermi('lawyers:report:view')")
     @GetMapping("/staffing")

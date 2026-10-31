@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.schedule.AiShiftChangeRequestMapper">
+
+    <resultMap type="AiShiftChangeRequest" id="AiShiftChangeRequestResult">
+        <result property="requestId"           column="request_id"            />
+        <result property="applicantAgentId"    column="applicant_agent_id"     />
+        <result property="applicantScheduleId" column="applicant_schedule_id"  />
+        <result property="changeType"          column="change_type"            />
+        <result property="targetAgentId"       column="target_agent_id"        />
+        <result property="targetScheduleId"    column="target_schedule_id"     />
+        <result property="reason"              column="reason"                 />
+        <result property="status"              column="status"                 />
+        <result property="approver"            column="approver"               />
+        <result property="approveTime"         column="approve_time"           />
+        <result property="approveRemark"       column="approve_remark"         />
+        <result property="createBy"            column="create_by"              />
+        <result property="createTime"          column="create_time"            />
+        <result property="updateBy"            column="update_by"              />
+        <result property="updateTime"          column="update_time"            />
+        <result property="remark"              column="remark"                 />
+    </resultMap>
+
+    <resultMap type="AiShiftChangeRequestVO" id="AiShiftChangeRequestVOResult" extends="AiShiftChangeRequestResult">
+        <result property="applicantAgentName"   column="applicant_agent_name"    />
+        <result property="targetAgentName"      column="target_agent_name"       />
+        <result property="applicantShiftName"   column="applicant_shift_name"    />
+        <result property="targetShiftName"      column="target_shift_name"       />
+        <result property="applicantScheduleDate" column="applicant_schedule_date" />
+        <result property="targetScheduleDate"   column="target_schedule_date"    />
+    </resultMap>
+
+    <sql id="selectShiftChangeVo">
+        select r.request_id, r.applicant_agent_id, r.applicant_schedule_id, r.change_type,
+               r.target_agent_id, r.target_schedule_id, r.reason, r.status,
+               r.approver, r.approve_time, r.approve_remark,
+               r.create_by, r.create_time, r.update_by, r.update_time, r.remark,
+               a1.agent_name as applicant_agent_name,
+               a2.agent_name as target_agent_name,
+               w1.shift_name as applicant_shift_name,
+               w2.shift_name as target_shift_name,
+               date_format(s1.schedule_date, '%Y-%m-%d') as applicant_schedule_date,
+               date_format(s2.schedule_date, '%Y-%m-%d') as target_schedule_date
+        from ai_shift_change_request r
+        left join ai_call_agent_status a1 on r.applicant_agent_id = a1.agent_id
+        left join ai_call_agent_status a2 on r.target_agent_id = a2.agent_id
+        left join ai_agent_schedule s1 on r.applicant_schedule_id = s1.schedule_id
+        left join ai_agent_schedule s2 on r.target_schedule_id = s2.schedule_id
+        left join ai_work_shift w1 on s1.shift_id = w1.shift_id
+        left join ai_work_shift w2 on s2.shift_id = w2.shift_id
+    </sql>
+
+    <select id="selectShiftChangeRequestById" parameterType="Long" resultMap="AiShiftChangeRequestVOResult">
+        <include refid="selectShiftChangeVo"/>
+        where r.request_id = #{requestId}
+    </select>
+
+    <select id="selectShiftChangeRequestList" parameterType="AiShiftChangeRequest" resultMap="AiShiftChangeRequestVOResult">
+        <include refid="selectShiftChangeVo"/>
+        <where>
+            <if test="applicantAgentId != null"> and r.applicant_agent_id = #{applicantAgentId}</if>
+            <if test="targetAgentId != null"> and r.target_agent_id = #{targetAgentId}</if>
+            <if test="changeType != null and changeType != ''"> and r.change_type = #{changeType}</if>
+            <if test="status != null and status != ''"> and r.status = #{status}</if>
+            <if test="params != null and params.applicantAgentName != null and params.applicantAgentName != ''">
+                and a1.agent_name like concat('%', #{params.applicantAgentName}, '%')
+            </if>
+            <if test="params != null and params.beginTime != null and params.beginTime != ''">
+                and r.create_time &gt;= #{params.beginTime}
+            </if>
+            <if test="params != null and params.endTime != null and params.endTime != ''">
+                and r.create_time &lt;= #{params.endTime}
+            </if>
+        </where>
+        order by r.create_time desc, r.request_id desc
+    </select>
+
+    <select id="countPendingByApplicantSchedule" resultType="int">
+        select count(1) from ai_shift_change_request
+        where applicant_schedule_id = #{applicantScheduleId}
+          and status = '0'
+    </select>
+
+    <insert id="insertShiftChangeRequest" parameterType="AiShiftChangeRequest" useGeneratedKeys="true" keyProperty="requestId">
+        insert into ai_shift_change_request
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            applicant_agent_id,
+            applicant_schedule_id,
+            <if test="changeType != null and changeType != ''">change_type,</if>
+            <if test="targetAgentId != null">target_agent_id,</if>
+            <if test="targetScheduleId != null">target_schedule_id,</if>
+            <if test="reason != null">reason,</if>
+            <if test="status != null and status != ''">status,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            #{applicantAgentId},
+            #{applicantScheduleId},
+            <if test="changeType != null and changeType != ''">#{changeType},</if>
+            <if test="targetAgentId != null">#{targetAgentId},</if>
+            <if test="targetScheduleId != null">#{targetScheduleId},</if>
+            <if test="reason != null">#{reason},</if>
+            <if test="status != null and status != ''">#{status},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate()
+        </trim>
+    </insert>
+
+    <update id="updateApproval">
+        update ai_shift_change_request
+        <trim prefix="SET" suffixOverrides=",">
+            status = #{status},
+            approver = #{approver},
+            approve_time = sysdate(),
+            <if test="approveRemark != null">approve_remark = #{approveRemark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = sysdate()
+        </trim>
+        where request_id = #{requestId}
+          and status = '0'
+    </update>
+</mapper>
