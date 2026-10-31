@@ -239,6 +239,118 @@ class TicketFlowServiceTest
         assertEquals(2, service.listDefinitions(new AiTicketFlowDefinition()).size());
     }
 
+    // ===== F2：可视化编排发布前强校验 =====
+
+    @Test
+    void validateFlow_completeChain_valid()
+    {
+        Map<String, Object> result = serviceWithRules(chain()).validateFlow("HOTLINE");
+        assertEquals(true, result.get("valid"));
+        assertEquals(3, result.get("checked"));
+        assertTrue(((List<?>) result.get("errors")).isEmpty());
+        assertTrue(((List<?>) result.get("warnings")).isEmpty());
+    }
+
+    @Test
+    void validateFlow_emptyFlow_error()
+    {
+        Map<String, Object> result = serviceWithRules(new ArrayList<>()).validateFlow("HOTLINE");
+        assertEquals(false, result.get("valid"));
+        assertEquals(0, result.get("checked"));
+        assertEquals(1, ((List<?>) result.get("errors")).size());
+        assertTrue(String.valueOf(((List<?>) result.get("errors")).get(0)).contains("未配置任何规则"));
+    }
+
+    @Test
+    void validateFlow_deadEndAndUnreachable_reported()
+    {
+        List<AiTicketFlowDefinition> rules = new ArrayList<>();
+        rules.add(rule("start", "1", "agent"));           // 0 -> 1
+        AiTicketFlowDefinition orphan = rule("resume", "2", "leader");
+        orphan.setStatusFrom("9");                        // 9 -> 2，从起点不可达
+        rules.add(orphan);
+
+        Map<String, Object> result = serviceWithRules(rules).validateFlow("HOTLINE");
+        assertEquals(false, result.get("valid"));
+        String errors = String.valueOf(result.get("errors"));
+        assertTrue(errors.contains("没有出向动作"), errors);
+        assertTrue(errors.contains("不可达"), errors);
+    }
+
+    @Test
+    void validateFlow_duplicateActionAndBadSchemaAndNegativeSla_reported()
+    {
+        List<AiTicketFlowDefinition> rules = new ArrayList<>();
+        AiTicketFlowDefinition a = rule("start", "1", "agent");
+        AiTicketFlowDefinition b = rule("start", "1", "agent");   // 同源同动作重复
+        b.setFormSchema("{not-json");
+        b.setSlaHours(new BigDecimal("-1"));
+        rules.add(a);
+        rules.add(b);
+
+        Map<String, Object> result = serviceWithRules(rules).validateFlow("HOTLINE");
+        assertEquals(false, result.get("valid"));
+        String errors = String.valueOf(result.get("errors"));
+        assertTrue(errors.contains("重复"), errors);
+        assertTrue(errors.contains("form_schema 不是合法 JSON"), errors);
+        assertTrue(errors.contains("SLA 时限不能为负数"), errors);
+    }
+
+    @Test
+    void validateFlow_disabledRuleIgnored_andAdminOnlyWarned()
+    {
+        List<AiTicketFlowDefinition> rules = chain();
+        rules.forEach(r -> r.setRoleKey("admin"));
+        AiTicketFlowDefinition disabled = rule("reopen", "0", "leader");
+        disabled.setStatusFrom("2");
+        disabled.setStatus("1");                          // 停用：不参与可达性/死路分析
+        rules.add(disabled);
+
+        Map<String, Object> result = serviceWithRules(rules).validateFlow("HOTLINE");
+        assertEquals(true, result.get("valid"), String.valueOf(result.get("errors")));
+        assertTrue(String.valueOf(result.get("warnings")).contains("仅 admin"), 
+                String.valueOf(result.get("warnings")));
+    }
+
+    @Test
+    void validateFlow_archiveOutgoing_warned()
+    {
+        List<AiTicketFlowDefinition> rules = chain();
+        AiTicketFlowDefinition reopen = rule("reopen", "2", "leader");
+        reopen.setStatusFrom("3");
+        rules.add(reopen);
+
+        Map<String, Object> result = serviceWithRules(rules).validateFlow("HOTLINE");
+        assertEquals(true, result.get("valid"), String.valueOf(result.get("errors")));
+        assertTrue(String.valueOf(result.get("warnings")).contains("归档"), 
+                String.valueOf(result.get("warnings")));
+    }
+
+    /** 0→1→2→3 的完整合法链路 */
+    private List<AiTicketFlowDefinition> chain()
+    {
+        List<AiTicketFlowDefinition> rules = new ArrayList<>();
+        rules.add(rule("start", "1", "agent,leader"));
+        AiTicketFlowDefinition complete = rule("complete", "2", "agent,leader");
+        complete.setStatusFrom("1");
+        rules.add(complete);
+        AiTicketFlowDefinition archive = rule("archive", "3", "leader");
+        archive.setStatusFrom("2");
+        rules.add(archive);
+        return rules;
+    }
+
+    /** 用 Mockito mapper 构造独立 service，只关心 selectByFlowCode */
+    private TicketFlowService serviceWithRules(List<AiTicketFlowDefinition> rules)
+    {
+        AiTicketFlowDefinitionMapper mapper = mock(AiTicketFlowDefinitionMapper.class);
+        when(mapper.selectByFlowCode("HOTLINE")).thenReturn(rules);
+        TicketFlowService s = new TicketFlowService();
+        org.springframework.test.util.ReflectionTestUtils.setField(s, "flowMapper", mapper);
+        org.springframework.test.util.ReflectionTestUtils.setField(s, "ticketMapper", mock(AiCallTicketMapper.class));
+        return s;
+    }
+
     /** 构造与 seed 一致的 fake 流程 mapper（带内存存储，支持管理端 CRUD 测试） */
     private AiTicketFlowDefinitionMapper fakeMapper()
     {

@@ -42,6 +42,17 @@ public class TicketFlowController extends BaseController
     }
 
     /**
+     * 管理端：发布前强校验（必填/重复动作/不可达/死路/终态出向等）。
+     * 只读，供可视化画布在「发布」前阻断不合法流程。
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:ticketFlow:list')")
+    @GetMapping("/validate/{flowCode}")
+    public AjaxResult validate(@PathVariable("flowCode") String flowCode)
+    {
+        return AjaxResult.success(ticketFlowService.validateFlow(flowCode));
+    }
+
+    /**
      * 管理端：规则条件过滤列表。
      */
     @PreAuthorize("@ss.hasPermi('lawyers:ticketFlow:list')")

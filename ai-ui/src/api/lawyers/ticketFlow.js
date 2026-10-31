@@ -17,6 +17,14 @@ export function getTicketFlow(flowId) {
   })
 }
 
+// F2：发布前强校验（必填/重复动作/不可达/死路/终态出向）
+export function validateTicketFlow(flowCode) {
+  return request({
+    url: '/lawyers/ticket-flow/validate/' + encodeURIComponent(flowCode),
+    method: 'get'
+  })
+}
+
 // 新增流程规则
 export function addTicketFlow(data) {
   return request({

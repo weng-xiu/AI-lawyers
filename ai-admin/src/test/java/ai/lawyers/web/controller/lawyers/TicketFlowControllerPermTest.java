@@ -17,7 +17,7 @@ import ai.lawyers.web.support.AbstractPermMvcTest;
 
 /**
  * P1-6：{@link TicketFlowController} 权限校验——动作查询复用 lawyers:call:ticket:list；
- * 规则管理端 list/query/add/edit 分别需 lawyers:ticketFlow:*。
+ * 规则管理端 list/query/add/edit/validate 分别需 lawyers:ticketFlow:*。
  */
 public class TicketFlowControllerPermTest extends AbstractPermMvcTest
 {
@@ -51,6 +51,23 @@ public class TicketFlowControllerPermTest extends AbstractPermMvcTest
                         .with(loginAs("lawyers:call:ticket:list")))
                 .andExpect(status().isOk());
         verify(ticketFlowService).listAllowedActions(any(), any(), any());
+    }
+
+    @Test
+    void validate_wrongPermission_403() throws Exception
+    {
+        mockMvc.perform(get("/lawyers/ticket-flow/validate/HOTLINE")
+                        .with(loginAs("lawyers:call:ticket:list")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void validate_withFlowListPermission_ok() throws Exception
+    {
+        mockMvc.perform(get("/lawyers/ticket-flow/validate/HOTLINE")
+                        .with(loginAs("lawyers:ticketFlow:list")))
+                .andExpect(status().isOk());
+        verify(ticketFlowService).validateFlow("HOTLINE");
     }
 
     @Test

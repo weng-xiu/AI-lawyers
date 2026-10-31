@@ -1,10 +1,18 @@
 package ai.lawyers.system.service.lawyers;
 
 import java.math.BigDecimal;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +41,11 @@ public class TicketFlowService
     public static final String DEFAULT_FLOW = "HOTLINE";
     /** 超级角色：全部动作放行 */
     public static final String ROLE_ADMIN = "admin";
+    /** 流程起点状态（与工单新建时默认状态一致） */
+    public static final String INITIAL_STATUS = "0";
+    /** 非终态：必须至少有一条出向动作，否则流程死锁 */
+    private static final Set<String> NON_TERMINAL_STATUSES =
+            new HashSet<>(Arrays.asList("0", "1"));
 
     @Autowired
     private AiTicketFlowDefinitionMapper flowMapper;
@@ -223,6 +236,157 @@ public class TicketFlowService
     private String normalizeFlow(String flowCode)
     {
         return flowCode == null || flowCode.trim().isEmpty() ? DEFAULT_FLOW : flowCode.trim();
+    }
+
+    // ================= F2：可视化编排发布前强校验 =================
+
+    /**
+     * 发布前校验指定流程的全部规则，返回结构化结果供画布提示。
+     *
+     * <p>校验项：必填与重复动作、form_schema 合法性、SLA 负数、从起点不可达的状态、
+     * 非终态死路、终态仍有出向动作（告警）。错误存在时 valid=false，前端阻断发布。</p>
+     *
+     * @param flowCode 流程编码（空取 HOTLINE）
+     * @return {flowCode, valid, checked, errors[], warnings[]}
+     */
+    public Map<String, Object> validateFlow(String flowCode)
+    {
+        String flow = normalizeFlow(flowCode);
+        List<AiTicketFlowDefinition> rules = flowMapper.selectByFlowCode(flow);
+        List<String> errors = new ArrayList<>();
+        List<String> warnings = new ArrayList<>();
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("flowCode", flow);
+        if (rules == null || rules.isEmpty())
+        {
+            errors.add("流程未配置任何规则");
+            result.put("valid", false);
+            result.put("checked", 0);
+            result.put("errors", errors);
+            result.put("warnings", warnings);
+            return result;
+        }
+
+        // 1) 单条规则基础校验（启用/停用规则都要保证可编辑、可发布）
+        Map<String, Set<String>> actionByFrom = new HashMap<>();
+        for (AiTicketFlowDefinition rule : rules)
+        {
+            String label = "规则" + (rule.getFlowId() == null ? "" : "#" + rule.getFlowId())
+                    + "(" + safe(rule.getStatusFrom()) + "→" + safe(rule.getActionCode()) + ")";
+            if (isBlank(rule.getStatusFrom()) || isBlank(rule.getActionCode())
+                    || isBlank(rule.getTargetStatus()) || isBlank(rule.getActionName()))
+            {
+                errors.add(label + "：源状态/动作标识/动作名称/目标状态均不能为空");
+                continue;
+            }
+            if (isBlank(rule.getRoleKey()))
+            {
+                errors.add(label + "：允许角色不能为空");
+            }
+            if (rule.getRoleKey() != null && ROLE_ADMIN.equalsIgnoreCase(rule.getRoleKey().trim()))
+            {
+                warnings.add(label + "：仅 admin 可执行，业务角色将看不到该动作");
+            }
+            if (rule.getSlaHours() != null && rule.getSlaHours().compareTo(BigDecimal.ZERO) < 0)
+            {
+                errors.add(label + "：SLA 时限不能为负数");
+            }
+            Set<String> actions = actionByFrom.computeIfAbsent(rule.getStatusFrom(), k -> new HashSet<>());
+            if (!actions.add(rule.getActionCode()))
+            {
+                errors.add(label + "：同源状态下动作标识重复，运行时无法确定目标状态");
+            }
+            String schema = rule.getFormSchema();
+            if (!isBlank(schema))
+            {
+                try
+                {
+                    JsonNode root = JSON.readTree(schema);
+                    JsonNode required = root.get("required");
+                    if (required == null || !required.isArray())
+                    {
+                        warnings.add(label + "：form_schema 缺少 required 数组，发布后不会校验必填");
+                    }
+                }
+                catch (Exception e)
+                {
+                    errors.add(label + "：form_schema 不是合法 JSON");
+                }
+            }
+        }
+
+        // 2) 仅启用规则参与图可达性分析（停用规则不影响运行时）
+        Map<String, Set<String>> edges = new HashMap<>();
+        Set<String> nodes = new LinkedHashSet<>();
+        for (AiTicketFlowDefinition rule : rules)
+        {
+            if (!isEnabled(rule) || isBlank(rule.getStatusFrom()) || isBlank(rule.getTargetStatus()))
+            {
+                continue;
+            }
+            nodes.add(rule.getStatusFrom());
+            nodes.add(rule.getTargetStatus());
+            edges.computeIfAbsent(rule.getStatusFrom(), k -> new LinkedHashSet<>())
+                    .add(rule.getTargetStatus());
+        }
+        if (edges.isEmpty())
+        {
+            errors.add("流程没有任何启用中的规则，无法运行");
+        }
+        else
+        {
+            Set<String> reachable = new HashSet<>();
+            Deque<String> queue = new ArrayDeque<>();
+            reachable.add(INITIAL_STATUS);
+            queue.add(INITIAL_STATUS);
+            while (!queue.isEmpty())
+            {
+                String from = queue.poll();
+                for (String to : edges.getOrDefault(from, new LinkedHashSet<>()))
+                {
+                    if (reachable.add(to))
+                    {
+                        queue.add(to);
+                    }
+                }
+            }
+            for (String node : nodes)
+            {
+                if (!reachable.contains(node))
+                {
+                    errors.add("状态「" + node + "」从起点 " + INITIAL_STATUS + " 不可达，动作永远不会触发");
+                }
+            }
+            for (String node : nodes)
+            {
+                if (NON_TERMINAL_STATUSES.contains(node)
+                        && edges.getOrDefault(node, new LinkedHashSet<>()).isEmpty())
+                {
+                    errors.add("状态「" + node + "」没有出向动作，工单将卡死在该状态");
+                }
+            }
+            if (!edges.getOrDefault("3", new LinkedHashSet<>()).isEmpty())
+            {
+                warnings.add("已归档状态仍有出向动作，归档后工单可能被重新推进");
+            }
+        }
+
+        result.put("valid", errors.isEmpty());
+        result.put("checked", rules.size());
+        result.put("errors", errors);
+        result.put("warnings", warnings);
+        return result;
+    }
+
+    private boolean isEnabled(AiTicketFlowDefinition rule)
+    {
+        return rule.getStatus() == null || "0".equals(rule.getStatus());
+    }
+
+    private String safe(String s)
+    {
+        return s == null ? "" : s;
     }
 
     // ================= P1-6：DSL 管理端 CRUD =================
