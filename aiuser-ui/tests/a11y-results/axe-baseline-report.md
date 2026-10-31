@@ -1,6 +1,6 @@
 # 公众端（aiuser-ui）无障碍 axe 扫描回归报告
 
-- 扫描日期：2026-10-30
+- 扫描日期：2026-10-31
 - 工具：Playwright + @axe-core/playwright（axe-core）
 - 规则标签：WCAG 2.0/2.1 Level A、AA
 - 环境：dev server（默认 8091，避开已被旧项目占用的 81/8081；设置 A11Y_BASE_URL 可复用已启动的服务），后端接口由测试统一 mock（空态），不影响 DOM 违规判定
@@ -32,7 +32,7 @@
 
 ## 四、结论与整改说明
 
-- V8 回归（2026-10-30，10 条路由含新增首页）：**全部页面 violations=0，critical / serious 已清零**。此前基线建立在白屏页面上（App.vue 关怀模式计算属性结构错误），本轮先修复白屏再重跑扫描。
+- V8 回归（2026-10-31，10 条路由含新增首页）：**全部页面 violations=0，critical / serious 已清零**。此前基线建立在白屏页面上（App.vue 关怀模式计算属性结构错误），本轮先修复白屏再重跑扫描。
 - 本轮整改（ElementUI 2.15.14 的 ARIA 缺陷与主题对比度）：
   1. `aria-required-attr` / `nested-interactive`：头部关怀设置 `el-radio-button`、`el-switch` 与工单状态筛选 `el-radio-group` 的未选中节点丢失 `aria-checked`，且内嵌原生 input → 抽取 `CareControls`（原生 radio + checkbox），工单筛选改为原生 radio 分段控件。
   2. `aria-valid-attr-value`：`el-dropdown` 将 `aria-haspopup` 固定写成非法值 `list` → 挂载后纠正为 `menu`。

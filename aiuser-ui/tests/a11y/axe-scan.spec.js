@@ -1,7 +1,9 @@
 'use strict'
-// F2 无障碍 axe-core 全路由扫描（公众端 10 条路由）
+// F2 无障碍 axe-core 全路由扫描（公众端 11 条路由）
 // 依据 GB/T 37668-2019 基础项对齐 WCAG 2.1 A/AA；产出每页原始结果与汇总报告。
-const { test } = require('@playwright/test')
+// 默认只采集并打印摘要（便于本地排查）；设置 A11Y_GATE=1 时对 critical/serious 违规阻断
+// （`npm run test:a11y:gate`），可直接接入任意 CI。
+const { test, expect } = require('@playwright/test')
 const AxeBuilder = require('@axe-core/playwright').default
 const fs = require('fs')
 const path = require('path')
@@ -10,6 +12,9 @@ const { buildReport } = require('./report')
 
 const OUT_DIR = path.join(__dirname, '..', 'a11y-results')
 const PAGES_DIR = path.join(OUT_DIR, 'pages')
+
+// CI 门禁开关：仅阻断 critical/serious（moderate/minor 保留基线观察）
+const GATE = process.env.A11Y_GATE === '1'
 
 // [路由名, 路径, 是否需要登录, 扫描前额外操作]
 const PAGES = [
@@ -54,9 +59,15 @@ for (const [name, url, needAuth] of PAGES) {
     try {
       const results = await scanPage(page, name, url, needAuth)
       const blocking = results.violations.filter(v => ['critical', 'serious'].includes(v.impact))
-      // 基线阶段不阻断流水线，仅打印摘要；修复期可改为 expect(blocking.length).toBe(0)
       console.log(`[${name}] violations=${results.violations.length} critical/serious=${blocking.length}`)
       blocking.forEach(v => console.log(`  - ${v.id} [${v.impact}] x${v.nodes.length}`))
+      // 门禁模式下阻断：单页 critical/serious 必须为 0，否则 CI 失败并指明违规项
+      if (GATE)
+      {
+        expect(blocking.length,
+          `[${name}] 存在 ${blocking.length} 项 critical/serious 无障碍违规：`
+          + blocking.map(v => `${v.id}(${v.nodes.length})`).join('、')).toBe(0)
+      }
     } finally {
       await context.close()
     }

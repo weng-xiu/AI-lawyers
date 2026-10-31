@@ -13,7 +13,7 @@
     "orientationAngle": 0,
     "orientationType": "landscape-primary"
   },
-  "timestamp": "2026-10-30T15:40:26.174Z",
+  "timestamp": "2026-10-31T01:17:03.923Z",
   "url": "http://localhost:8091/consultation/submit",
   "toolOptions": {
     "runOnly": {
@@ -880,7 +880,7 @@
             }
           ],
           "impact": null,
-          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-4775\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-3919\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
           "target": [
             ".el-dropdown-link"
           ]
@@ -1087,7 +1087,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-4775\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-3919\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
           "target": [
             ".el-dropdown-link"
           ]
@@ -1265,7 +1265,7 @@
           ],
           "none": [],
           "impact": null,
-          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-4775\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-3919\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
           "target": [
             ".el-dropdown-link"
           ]
@@ -1515,7 +1515,7 @@
             }
           ],
           "impact": null,
-          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-4775\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-3919\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
           "target": [
             ".el-dropdown-link"
           ]
@@ -1761,7 +1761,7 @@
             }
           ],
           "impact": null,
-          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-4775\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-3919\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
           "target": [
             ".el-dropdown-link"
           ]
@@ -1993,7 +1993,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-4775\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-3919\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
           "target": [
             ".el-dropdown-link"
           ]
@@ -2605,7 +2605,7 @@
             }
           ],
           "impact": null,
-          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-4775\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-3919\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
           "target": [
             ".el-dropdown-link"
           ]
@@ -3119,7 +3119,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-4775\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-3919\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
           "target": [
             ".el-dropdown-link"
           ]
@@ -4688,7 +4688,7 @@
           "any": [
             {
               "id": "duplicate-id-aria",
-              "data": "dropdown-menu-4775",
+              "data": "dropdown-menu-3919",
               "relatedNodes": [],
               "impact": "critical",
               "message": "Document has no elements referenced with ARIA or labels that share the same id attribute"
@@ -4697,9 +4697,9 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<ul class=\"el-dropdown-menu el-popper\" id=\"dropdown-menu-4775\" style=\"display: none;\"><li tabindex=\"-1\" class=\"el-dropdown-menu__item\"><!---->个人信息</li><li tabindex=\"-1\" class=\"el-dropdown-menu__item el-dropdown-menu__item--divided\"><!---->退出登录</li></ul>",
+          "html": "<ul class=\"el-dropdown-menu el-popper\" id=\"dropdown-menu-3919\" style=\"display: none;\"><li tabindex=\"-1\" class=\"el-dropdown-menu__item\"><!---->个人信息</li><li tabindex=\"-1\" class=\"el-dropdown-menu__item el-dropdown-menu__item--divided\"><!---->退出登录</li></ul>",
           "target": [
-            "#dropdown-menu-4775"
+            "#dropdown-menu-3919"
           ]
         },
         {
@@ -5459,7 +5459,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-4775\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-3919\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
           "target": [
             ".el-dropdown-link"
           ]
@@ -5637,20 +5637,20 @@
               "id": "aria-valid-attr-value",
               "data": {
                 "messageKey": "controlsWithinPopup",
-                "needsReview": "aria-controls=\"dropdown-menu-4775\""
+                "needsReview": "aria-controls=\"dropdown-menu-3919\""
               },
               "relatedNodes": [],
               "impact": "critical",
-              "message": "Unable to determine if aria-controls referenced ID exists on the page while using aria-haspopup: aria-controls=\"dropdown-menu-4775\""
+              "message": "Unable to determine if aria-controls referenced ID exists on the page while using aria-haspopup: aria-controls=\"dropdown-menu-3919\""
             }
           ],
           "none": [],
           "impact": "critical",
-          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-4775\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-3919\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
           "target": [
             ".el-dropdown-link"
           ],
-          "failureSummary": "Fix all of the following:\n  Unable to determine if aria-controls referenced ID exists on the page while using aria-haspopup: aria-controls=\"dropdown-menu-4775\""
+          "failureSummary": "Fix all of the following:\n  Unable to determine if aria-controls referenced ID exists on the page while using aria-haspopup: aria-controls=\"dropdown-menu-3919\""
         }
       ]
     },
@@ -5786,7 +5786,7 @@
           "all": [],
           "none": [],
           "impact": "serious",
-          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-4775\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
+          "html": "<span class=\"el-dropdown-link el-dropdown-selfdefine\" aria-haspopup=\"menu\" aria-controls=\"dropdown-menu-3919\" role=\"button\" tabindex=\"0\"> 用户 <i class=\"el-icon-arrow-down el-icon--right\"></i></span>",
           "target": [
             ".el-dropdown-link"
           ],
