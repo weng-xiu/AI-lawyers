@@ -2,19 +2,22 @@
 
 /**
  * F2 工单流程可视化编排单测：
- * 边几何（顺向/自环/逆向/停用虚线）、未知状态提示、拖拽连线、表格过滤分页、发布前校验。
+ * 边几何（顺向/自环/逆向/停用虚线）、未知状态提示、拖拽连线、表格过滤分页、发布前校验，
+ * 以及节点自由拖拽布局的边界收敛、回显合并、松手落库与重置。
  */
 import { mount, createLocalVue } from '@vue/test-utils'
 import ElementUI from 'element-ui'
 import TicketFlow from '@/views/lawyers/callCenter/ticketFlow.vue'
-import { listTicketFlow, validateTicketFlow } from '@/api/lawyers/ticketFlow'
+import { listTicketFlow, validateTicketFlow, getTicketFlowLayout, saveTicketFlowLayout } from '@/api/lawyers/ticketFlow'
 
 jest.mock('@/api/lawyers/ticketFlow', () => ({
   listTicketFlow: jest.fn(),
   getTicketFlow: jest.fn(),
   addTicketFlow: jest.fn(),
   updateTicketFlow: jest.fn(),
-  validateTicketFlow: jest.fn()
+  validateTicketFlow: jest.fn(),
+  getTicketFlowLayout: jest.fn(),
+  saveTicketFlowLayout: jest.fn()
 }))
 
 const localVue = createLocalVue()
@@ -57,6 +60,9 @@ describe('TicketFlow F2 画布', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
+    // created 会拉取布局；默认无布局，节点使用默认排布
+    getTicketFlowLayout.mockResolvedValue({ data: [] })
+    saveTicketFlowLayout.mockResolvedValue({})
     jest.spyOn(console, 'warn').mockImplementation(() => {})
   })
 
@@ -202,5 +208,88 @@ describe('TicketFlow F2 画布', () => {
 
     expect(wrapper.vm.validateOpen).toBe(false)
     expect(modal.msgError).toHaveBeenCalled()
+  })
+
+  // ===== F2：节点自由拖拽布局持久化 =====
+
+  it('created 按状态回显已保存布局，未保存节点保持默认坐标', async () => {
+    getTicketFlowLayout.mockResolvedValue({
+      data: [
+        { statusCode: '0', posX: 60, posY: 180 },
+        { statusCode: '2', posX: 620, posY: 120 }
+      ]
+    })
+    wrapper = mountPage([])
+    await flushPromises()
+
+    expect(getTicketFlowLayout).toHaveBeenCalledWith('HOTLINE')
+    const n0 = wrapper.vm.nodeByStatus('0')
+    expect(n0.x).toBe(60)
+    expect(n0.y).toBe(180)
+    const n2 = wrapper.vm.nodeByStatus('2')
+    expect(n2.x).toBe(620)
+    expect(n2.y).toBe(120)
+    // 服务端未保存的状态保持默认排布
+    expect(wrapper.vm.nodeByStatus('1').x).toBe(300)
+    expect(wrapper.vm.nodeByStatus('1').y).toBe(140)
+  })
+
+  it('拖拽移动被画布边界收敛，松手后一次性保存全部节点', async () => {
+    wrapper = mountPage([])
+    await flushPromises()
+
+    const node = wrapper.vm.nodeByStatus('0')
+    wrapper.vm.startNodeDrag(node, { clientX: 100, clientY: 100 })
+    wrapper.vm.onNodeDragMove({ clientX: -900, clientY: 900 })
+    expect(node.x).toBe(20)
+    expect(node.y).toBe(250)
+
+    wrapper.vm.onNodeDragMove({ clientX: 1200, clientY: -500 })
+    expect(node.x).toBe(wrapper.vm.canvasWidth - wrapper.vm.nodeWidth - 20)
+    expect(node.y).toBe(100)
+
+    wrapper.vm.onNodeDragEnd()
+    await flushPromises()
+
+    expect(saveTicketFlowLayout).toHaveBeenCalledTimes(1)
+    const [flow, payload] = saveTicketFlowLayout.mock.calls[0]
+    expect(flow).toBe('HOTLINE')
+    expect(payload).toHaveLength(4)
+    expect(payload.find(p => p.statusCode === '0')).toEqual({
+      statusCode: '0',
+      posX: wrapper.vm.canvasWidth - wrapper.vm.nodeWidth - 20,
+      posY: 100
+    })
+    expect(modal.msgSuccess).toHaveBeenCalled()
+  })
+
+  it('单击节点未产生位移时不写库', async () => {
+    wrapper = mountPage([])
+    await flushPromises()
+
+    wrapper.vm.startNodeDrag(wrapper.vm.nodeByStatus('1'), { clientX: 300, clientY: 140 })
+    wrapper.vm.onNodeDragEnd()
+    await flushPromises()
+
+    expect(saveTicketFlowLayout).not.toHaveBeenCalled()
+  })
+
+  it('重置布局恢复默认坐标并落库', async () => {
+    getTicketFlowLayout.mockResolvedValue({
+      data: [{ statusCode: '0', posX: 10, posY: 200 }]
+    })
+    wrapper = mountPage([])
+    await flushPromises()
+
+    // 越界坐标回显时被收敛到最小边界
+    expect(wrapper.vm.nodeByStatus('0').x).toBe(20)
+
+    wrapper.vm.resetLayout()
+    await flushPromises()
+
+    expect(wrapper.vm.nodeByStatus('0').x).toBe(40)
+    expect(wrapper.vm.nodeByStatus('0').y).toBe(140)
+    expect(saveTicketFlowLayout).toHaveBeenCalledTimes(1)
+    expect(saveTicketFlowLayout.mock.calls[0][1][0]).toEqual({ statusCode: '0', posX: 40, posY: 140 })
   })
 })

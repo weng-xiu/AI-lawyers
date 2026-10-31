@@ -25,6 +25,23 @@ export function validateTicketFlow(flowCode) {
   })
 }
 
+// F2：查询画布节点布局（未保存过返回空数组，前端回退默认排布）
+export function getTicketFlowLayout(flowCode) {
+  return request({
+    url: '/lawyers/ticket-flow/layout/' + encodeURIComponent(flowCode),
+    method: 'get'
+  })
+}
+
+// F2：保存画布节点布局（按 流程+状态 覆盖写入）
+export function saveTicketFlowLayout(flowCode, data) {
+  return request({
+    url: '/lawyers/ticket-flow/layout/' + encodeURIComponent(flowCode),
+    method: 'put',
+    data: data
+  })
+}
+
 // 新增流程规则
 export function addTicketFlow(data) {
   return request({

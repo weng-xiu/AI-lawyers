@@ -23,14 +23,15 @@
           <el-radio-button label="canvas">画布</el-radio-button>
           <el-radio-button label="table">规则表格</el-radio-button>
         </el-radio-group>
-        <el-button size="small" icon="el-icon-refresh" :loading="loading" @click="getList">刷新</el-button>
+        <el-button size="small" icon="el-icon-refresh" :loading="loading" @click="refresh">刷新</el-button>
         <el-button size="small" type="warning" plain icon="el-icon-s-check" @click="runValidate">发布前校验</el-button>
+        <el-button v-hasPermi="['lawyers:ticketFlow:edit']" size="small" plain icon="el-icon-refresh-left" @click="resetLayout">重置布局</el-button>
         <el-button v-hasPermi="['lawyers:ticketFlow:add']" type="primary" plain size="small" icon="el-icon-plus" @click="handleAdd">新增规则</el-button>
       </div>
     </div>
 
     <p class="flow-hint">
-      拖动节点右下角「＋」到目标状态即可新建动作；点击连线可编辑；节点颜色区分状态，虚线表示已停用规则。
+      拖动节点可自由调整布局（松手自动保存，切换流程/刷新后回显）；拖动节点右下角「＋」到目标状态即可新建动作；点击连线可编辑；节点颜色区分状态，虚线表示已停用规则。
     </p>
 
     <el-alert
@@ -82,8 +83,9 @@
           v-for="node in statusNodes"
           :key="node.status"
           class="flow-node"
-          :class="{ 'is-source': linkingFrom === node.status, 'is-target': linkTarget === node.status }"
+          :class="{ 'is-source': linkingFrom === node.status, 'is-target': linkTarget === node.status, 'is-dragging': dragState && dragState.status === node.status }"
           :style="nodeStyle(node)"
+          @mousedown.prevent="startNodeDrag(node, $event)"
         >
           <div class="node-head" :style="{ background: node.color }">{{ node.label }}</div>
           <div class="node-body">
@@ -206,11 +208,35 @@
 </template>
 
 <script>
-import { listTicketFlow, getTicketFlow, addTicketFlow, updateTicketFlow, validateTicketFlow } from '@/api/lawyers/ticketFlow'
+import {
+  listTicketFlow,
+  getTicketFlow,
+  addTicketFlow,
+  updateTicketFlow,
+  validateTicketFlow,
+  getTicketFlowLayout,
+  saveTicketFlowLayout
+} from '@/api/lawyers/ticketFlow'
 
 const NODE_WIDTH = 170
 const NODE_HEIGHT = 86
 const NODE_PADDING = 6
+const CANVAS_WIDTH = 1050
+const CANVAS_HEIGHT = 400
+// 拖拽边界：左右留白，纵向给自环（上方 90px）与逆向边标签（下方约 120px）留出空间
+const NODE_MIN_X = 20
+const NODE_MIN_Y = 100
+const NODE_MAX_Y = 250
+
+/** 画布默认排布（0-3 四个状态节点）；布局缺失或点「重置布局」时使用 */
+function defaultNodes() {
+  return [
+    { status: '0', label: '待处理', desc: '新建/待受理', x: 40, y: 140, color: '#409EFF' },
+    { status: '1', label: '处理中', desc: '已受理/办理中', x: 300, y: 140, color: '#E6A23C' },
+    { status: '2', label: '已完成', desc: '办结待归档', x: 560, y: 140, color: '#67C23A' },
+    { status: '3', label: '已归档', desc: '流程终态', x: 820, y: 140, color: '#909399' }
+  ]
+}
 
 export default {
   name: 'TicketFlow',
@@ -222,16 +248,13 @@ export default {
       showSearch: true,
       allList: [],
       // F2：画布固定节点（状态编码与 ai_ticket_flow_definition.status_from 对齐）
-      statusNodes: [
-        { status: '0', label: '待处理', desc: '新建/待受理', x: 40, y: 140, color: '#409EFF' },
-        { status: '1', label: '处理中', desc: '已受理/办理中', x: 300, y: 140, color: '#E6A23C' },
-        { status: '2', label: '已完成', desc: '办结待归档', x: 560, y: 140, color: '#67C23A' },
-        { status: '3', label: '已归档', desc: '流程终态', x: 820, y: 140, color: '#909399' }
-      ],
+      statusNodes: defaultNodes(),
       nodeWidth: NODE_WIDTH,
       nodeHeight: NODE_HEIGHT,
-      canvasWidth: 1050,
-      canvasHeight: 360,
+      canvasWidth: CANVAS_WIDTH,
+      canvasHeight: CANVAS_HEIGHT,
+      // 节点拖拽状态（window 级监听，松手后落库）
+      dragState: null,
       // 拖拽连线状态
       linkingFrom: null,
       linkPoint: { x: 0, y: 0 },
@@ -348,9 +371,11 @@ export default {
   },
   created() {
     this.getList()
+    this.loadLayout()
   },
   beforeDestroy() {
     this.removeLinkListeners()
+    this.removeNodeDragListeners()
   },
   methods: {
     // ===== 数据 =====
@@ -363,9 +388,17 @@ export default {
         this.loading = false
       }).catch(() => { this.loading = false })
     },
+    /** 刷新按钮：规则与布局同时重拉 */
+    refresh() {
+      this.getList()
+      this.loadLayout()
+    },
     handleFlowChange() {
       this.queryParams.pageNum = 1
       this.validation = null
+      // 切换流程先回到默认排布，再拉取该流程已保存布局，避免沿用上一个流程的坐标
+      this.statusNodes = defaultNodes()
+      this.loadLayout()
     },
     handleQuery() {
       this.queryParams.pageNum = 1
@@ -391,6 +424,94 @@ export default {
     nodeActionCount(status) {
       return this.canvasRules.filter(r => r.statusFrom === status && r.status === '0').length
     },
+
+    // ===== F2：节点自由拖拽 + 布局持久化 =====
+
+    /** 拉取当前流程已保存布局并合并到节点（未保存的节点保持默认坐标） */
+    loadLayout() {
+      if (!this.flowCode) return
+      getTicketFlowLayout(this.flowCode).then(res => {
+        this.applyLayout(res.data || [])
+      }).catch(() => { /* 布局读取失败不阻断画布使用，保持默认排布 */ })
+    },
+    /** 把服务端布局按 statusCode 合并到节点，坐标非法时忽略该条 */
+    applyLayout(saved) {
+      const byCode = {}
+      ;(saved || []).forEach(item => {
+        if (item && item.statusCode != null) byCode[String(item.statusCode)] = item
+      })
+      this.statusNodes.forEach(node => {
+        const item = byCode[node.status]
+        if (!item) return
+        const x = Number(item.posX)
+        const y = Number(item.posY)
+        if (isNaN(x) || isNaN(y)) return
+        node.x = this.clampX(x)
+        node.y = this.clampY(y)
+      })
+    },
+    /** 落库当前画布布局（拖拽松手 / 重置布局后调用） */
+    persistLayout() {
+      if (!this.flowCode) return
+      const payload = this.statusNodes.map(n => ({
+        statusCode: n.status,
+        posX: Math.round(n.x),
+        posY: Math.round(n.y)
+      }))
+      saveTicketFlowLayout(this.flowCode, payload).then(() => {
+        this.$modal.msgSuccess('布局已保存')
+      }).catch(() => {
+        this.$modal.msgError('布局保存失败，请稍后重试')
+      })
+    },
+    /** 恢复默认排布并落库 */
+    resetLayout() {
+      this.statusNodes = defaultNodes()
+      this.persistLayout()
+    },
+    /** 节点拖拽：记录起点与原始坐标，移动交给 window 监听（拖出画布也不丢） */
+    startNodeDrag(node, event) {
+      this.removeNodeDragListeners()
+      this.dragState = {
+        status: node.status,
+        startX: event.clientX,
+        startY: event.clientY,
+        originX: node.x,
+        originY: node.y,
+        moved: false
+      }
+      window.addEventListener('mousemove', this.onNodeDragMove)
+      window.addEventListener('mouseup', this.onNodeDragEnd)
+    },
+    onNodeDragMove(e) {
+      const drag = this.dragState
+      if (!drag) return
+      const dx = e.clientX - drag.startX
+      const dy = e.clientY - drag.startY
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) drag.moved = true
+      const node = this.nodeByStatus(drag.status)
+      if (!node) return
+      node.x = this.clampX(drag.originX + dx)
+      node.y = this.clampY(drag.originY + dy)
+    },
+    onNodeDragEnd() {
+      const drag = this.dragState
+      this.removeNodeDragListeners()
+      this.dragState = null
+      // 仅真实移动才保存，避免单击节点触发无意义的写请求
+      if (drag && drag.moved) this.persistLayout()
+    },
+    removeNodeDragListeners() {
+      window.removeEventListener('mousemove', this.onNodeDragMove)
+      window.removeEventListener('mouseup', this.onNodeDragEnd)
+    },
+    clampX(x) {
+      return Math.min(Math.max(x, NODE_MIN_X), this.canvasWidth - this.nodeWidth - NODE_MIN_X)
+    },
+    clampY(y) {
+      return Math.min(Math.max(y, NODE_MIN_Y), NODE_MAX_Y)
+    },
+
     /**
      * 把规则转为带几何信息的边：
      *  - 顺向：从源节点右侧到目标节点左侧的三次贝塞尔；
@@ -705,6 +826,12 @@ export default {
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(31, 45, 61, 0.08);
   overflow: visible;
+  cursor: move;
+  user-select: none;
+}
+.flow-node.is-dragging {
+  z-index: 3;
+  box-shadow: 0 8px 20px rgba(31, 45, 61, 0.2);
 }
 .flow-node.is-source {
   box-shadow: 0 0 0 3px rgba(64, 158, 255, 0.25);

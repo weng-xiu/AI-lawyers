@@ -21,8 +21,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ai.lawyers.common.utils.SecurityUtils;
 import ai.lawyers.system.domain.lawyers.AiTicketFlowDefinition;
+import ai.lawyers.system.domain.lawyers.AiTicketFlowLayout;
 import ai.lawyers.system.mapper.lawyers.AiCallTicketMapper;
 import ai.lawyers.system.mapper.lawyers.AiTicketFlowDefinitionMapper;
+import ai.lawyers.system.mapper.lawyers.AiTicketFlowLayoutMapper;
 
 /**
  * P1-6（V2.59）：工单流转状态机服务——按 ai_ticket_flow_definition 配置查询/校验/执行动作。
@@ -46,9 +48,16 @@ public class TicketFlowService
     /** 非终态：必须至少有一条出向动作，否则流程死锁 */
     private static final Set<String> NON_TERMINAL_STATUSES =
             new HashSet<>(Arrays.asList("0", "1"));
+    /** F2：画布坐标上限（前端画布约 1050×400，留冗余防脏数据） */
+    private static final int MAX_LAYOUT_POS = 2000;
+    /** F2：单流程布局节点数上限，避免一次请求写入海量行 */
+    private static final int MAX_LAYOUT_NODES = 20;
 
     @Autowired
     private AiTicketFlowDefinitionMapper flowMapper;
+
+    @Autowired
+    private AiTicketFlowLayoutMapper layoutMapper;
 
     @Autowired
     private AiCallTicketMapper ticketMapper;
@@ -387,6 +396,88 @@ public class TicketFlowService
     private String safe(String s)
     {
         return s == null ? "" : s;
+    }
+
+    // ================= F2：画布节点布局持久化 =================
+
+    /**
+     * 查询指定流程已保存的画布节点布局；从未保存过时返回空列表，前端回退默认排布。
+     *
+     * @param flowCode 流程编码（空取 HOTLINE）
+     */
+    public List<AiTicketFlowLayout> listLayout(String flowCode)
+    {
+        List<AiTicketFlowLayout> layouts =
+                layoutMapper.selectLayoutByFlowCode(normalizeFlow(flowCode));
+        return layouts == null ? new ArrayList<>() : layouts;
+    }
+
+    /**
+     * 保存画布节点布局：按 (flowCode, statusCode) 唯一键逐条覆盖写入。
+     *
+     * <p>服务端校验：列表非空、节点数上限、状态编码非空且不重复、坐标非空且在
+     * [0, MAX_LAYOUT_POS] 内；flowCode 强制取路径参数，防止跨流程覆盖布局。</p>
+     *
+     * @return 已处理的节点数
+     */
+    public int saveLayout(String flowCode, List<AiTicketFlowLayout> layouts)
+    {
+        String flow = normalizeFlow(flowCode);
+        if (layouts == null || layouts.isEmpty())
+        {
+            throw new IllegalArgumentException("布局数据不能为空");
+        }
+        if (layouts.size() > MAX_LAYOUT_NODES)
+        {
+            throw new IllegalArgumentException("单流程布局节点不能超过 " + MAX_LAYOUT_NODES + " 个");
+        }
+        Set<String> statusCodes = new HashSet<>();
+        String operator = currentUsername();
+        int rows = 0;
+        for (AiTicketFlowLayout layout : layouts)
+        {
+            if (layout == null || isBlank(layout.getStatusCode()))
+            {
+                throw new IllegalArgumentException("节点状态编码不能为空");
+            }
+            String statusCode = layout.getStatusCode().trim();
+            if (!statusCodes.add(statusCode))
+            {
+                throw new IllegalArgumentException("节点状态编码重复：" + statusCode);
+            }
+            Integer x = layout.getPosX();
+            Integer y = layout.getPosY();
+            if (x == null || y == null)
+            {
+                throw new IllegalArgumentException("节点「" + statusCode + "」坐标不能为空");
+            }
+            if (x < 0 || x > MAX_LAYOUT_POS || y < 0 || y > MAX_LAYOUT_POS)
+            {
+                throw new IllegalArgumentException("节点「" + statusCode + "」坐标超出范围（0~"
+                        + MAX_LAYOUT_POS + "）");
+            }
+            layout.setFlowCode(flow);
+            layout.setStatusCode(statusCode);
+            layout.setUpdateBy(operator);
+            layoutMapper.upsertLayout(layout);
+            rows++;
+        }
+        log.info("工单流程布局保存 flowCode={} nodes={} by={}", flow, rows, operator);
+        return rows;
+    }
+
+    /** 取当前登录用户名；无登录上下文（定时任务/单测）时返回 null，不阻断保存 */
+    private String currentUsername()
+    {
+        try
+        {
+            return SecurityUtils.getUsername();
+        }
+        catch (Exception e)
+        {
+            log.debug("当前上下文无登录用户，布局操作人不记录：{}", e.getMessage());
+            return null;
+        }
     }
 
     // ================= P1-6：DSL 管理端 CRUD =================

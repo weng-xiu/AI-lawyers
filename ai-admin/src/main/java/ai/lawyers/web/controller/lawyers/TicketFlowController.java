@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import ai.lawyers.common.core.controller.BaseController;
 import ai.lawyers.common.core.domain.AjaxResult;
 import ai.lawyers.system.domain.lawyers.AiTicketFlowDefinition;
+import ai.lawyers.system.domain.lawyers.AiTicketFlowLayout;
 import ai.lawyers.system.service.lawyers.TicketFlowService;
 
 /**
@@ -50,6 +51,27 @@ public class TicketFlowController extends BaseController
     public AjaxResult validate(@PathVariable("flowCode") String flowCode)
     {
         return AjaxResult.success(ticketFlowService.validateFlow(flowCode));
+    }
+
+    /**
+     * 管理端：查询画布节点布局（未保存过返回空表，前端回退默认排布）。
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:ticketFlow:list')")
+    @GetMapping("/layout/{flowCode}")
+    public AjaxResult getLayout(@PathVariable("flowCode") String flowCode)
+    {
+        return AjaxResult.success(ticketFlowService.listLayout(flowCode));
+    }
+
+    /**
+     * 管理端：保存画布节点布局（按 流程+状态 覆盖写入，坐标由服务端校验）。
+     */
+    @PreAuthorize("@ss.hasPermi('lawyers:ticketFlow:edit')")
+    @PutMapping("/layout/{flowCode}")
+    public AjaxResult saveLayout(@PathVariable("flowCode") String flowCode,
+                                 @RequestBody List<AiTicketFlowLayout> layouts)
+    {
+        return toAjax(ticketFlowService.saveLayout(flowCode, layouts));
     }
 
     /**

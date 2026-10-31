@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.lawyers.system.mapper.lawyers.AiTicketFlowLayoutMapper">
+
+    <resultMap type="AiTicketFlowLayout" id="FlowLayoutResult">
+        <result property="layoutId"    column="layout_id"   />
+        <result property="flowCode"    column="flow_code"   />
+        <result property="statusCode"  column="status_code" />
+        <result property="posX"        column="pos_x"       />
+        <result property="posY"        column="pos_y"       />
+        <result property="updateBy"    column="update_by"   />
+        <result property="createTime"  column="create_time" />
+        <result property="updateTime"  column="update_time" />
+    </resultMap>
+
+    <sql id="columns">
+        layout_id, flow_code, status_code, pos_x, pos_y, update_by, create_time, update_time
+    </sql>
+
+    <select id="selectLayoutByFlowCode" parameterType="String" resultMap="FlowLayoutResult">
+        select <include refid="columns"/> from ai_ticket_flow_layout
+        where flow_code = #{flowCode}
+        order by status_code
+    </select>
+
+    <!-- 按唯一键 (flow_code, status_code) 覆盖写入；不存在的节点直接新增 -->
+    <insert id="upsertLayout" parameterType="AiTicketFlowLayout">
+        insert into ai_ticket_flow_layout
+            (flow_code, status_code, pos_x, pos_y, update_by, create_time)
+        values
+            (#{flowCode}, #{statusCode}, #{posX}, #{posY}, #{updateBy}, sysdate())
+        on duplicate key update
+            pos_x = values(pos_x),
+            pos_y = values(pos_y),
+            update_by = values(update_by),
+            update_time = values(create_time)
+    </insert>
+</mapper>

@@ -1,6 +1,7 @@
 package ai.lawyers.web.controller.lawyers;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -68,6 +69,44 @@ public class TicketFlowControllerPermTest extends AbstractPermMvcTest
                         .with(loginAs("lawyers:ticketFlow:list")))
                 .andExpect(status().isOk());
         verify(ticketFlowService).validateFlow("HOTLINE");
+    }
+
+    @Test
+    void getLayout_withFlowListPermission_ok() throws Exception
+    {
+        mockMvc.perform(get("/lawyers/ticket-flow/layout/HOTLINE")
+                        .with(loginAs("lawyers:ticketFlow:list")))
+                .andExpect(status().isOk());
+        verify(ticketFlowService).listLayout("HOTLINE");
+    }
+
+    @Test
+    void getLayout_wrongPermission_403() throws Exception
+    {
+        mockMvc.perform(get("/lawyers/ticket-flow/layout/HOTLINE")
+                        .with(loginAs("lawyers:ticketFlow:edit")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void saveLayout_withEditPermission_ok() throws Exception
+    {
+        mockMvc.perform(put("/lawyers/ticket-flow/layout/HOTLINE")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("[{\"statusCode\":\"0\",\"posX\":40,\"posY\":140}]")
+                        .with(loginAs("lawyers:ticketFlow:edit")))
+                .andExpect(status().isOk());
+        verify(ticketFlowService).saveLayout(eq("HOTLINE"), any());
+    }
+
+    @Test
+    void saveLayout_withListPermission_403() throws Exception
+    {
+        mockMvc.perform(put("/lawyers/ticket-flow/layout/HOTLINE")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("[]")
+                        .with(loginAs("lawyers:ticketFlow:list")))
+                .andExpect(status().isForbidden());
     }
 
     @Test

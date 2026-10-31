@@ -22,8 +22,10 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import ai.lawyers.system.domain.lawyers.AiTicketFlowDefinition;
+import ai.lawyers.system.domain.lawyers.AiTicketFlowLayout;
 import ai.lawyers.system.mapper.lawyers.AiCallTicketMapper;
 import ai.lawyers.system.mapper.lawyers.AiTicketFlowDefinitionMapper;
+import ai.lawyers.system.mapper.lawyers.AiTicketFlowLayoutMapper;
 
 /**
  * P1-6：工单流转状态机单测——角色过滤、动作校验。用手写 fake mapper，无 Mockito 依赖。
@@ -34,6 +36,7 @@ class TicketFlowServiceTest
 {
     private TicketFlowService service;
     private AiCallTicketMapper ticketMapper;
+    private AiTicketFlowLayoutMapper layoutMapper;
 
     @BeforeEach
     void setUp()
@@ -42,6 +45,8 @@ class TicketFlowServiceTest
         org.springframework.test.util.ReflectionTestUtils.setField(service, "flowMapper", fakeMapper());
         ticketMapper = mock(AiCallTicketMapper.class);
         org.springframework.test.util.ReflectionTestUtils.setField(service, "ticketMapper", ticketMapper);
+        layoutMapper = mock(AiTicketFlowLayoutMapper.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "layoutMapper", layoutMapper);
     }
 
     @Test
@@ -324,6 +329,107 @@ class TicketFlowServiceTest
         assertEquals(true, result.get("valid"), String.valueOf(result.get("errors")));
         assertTrue(String.valueOf(result.get("warnings")).contains("归档"), 
                 String.valueOf(result.get("warnings")));
+    }
+
+    // ===== F2：画布节点布局持久化 =====
+
+    @Test
+    void layout_list_normalizesDefaultFlow()
+    {
+        List<AiTicketFlowLayout> saved = new ArrayList<>();
+        saved.add(layout("0", 40, 140));
+        when(layoutMapper.selectLayoutByFlowCode("HOTLINE")).thenReturn(saved);
+
+        List<AiTicketFlowLayout> result = service.listLayout("  ");
+        assertEquals(1, result.size());
+        verify(layoutMapper).selectLayoutByFlowCode("HOTLINE");
+    }
+
+    @Test
+    void layout_list_nullResult_returnsEmpty()
+    {
+        when(layoutMapper.selectLayoutByFlowCode("HOTLINE")).thenReturn(null);
+        assertNotNull(service.listLayout(null));
+        assertTrue(service.listLayout(null).isEmpty());
+    }
+
+    @Test
+    void layout_save_forcesFlowCodeAndUpsertsEachNode()
+    {
+        List<AiTicketFlowLayout> layouts = new ArrayList<>();
+        layouts.add(layout(" 0 ", 40, 140));
+        AiTicketFlowLayout second = layout("1", 300, 140);
+        second.setFlowCode("OTHER"); // 跨流程脏数据应被路径参数覆盖
+        layouts.add(second);
+
+        assertEquals(2, service.saveLayout("HOTLINE", layouts));
+        assertEquals("HOTLINE", layouts.get(0).getFlowCode());
+        assertEquals("0", layouts.get(0).getStatusCode());
+        assertEquals("HOTLINE", layouts.get(1).getFlowCode());
+        assertNull(layouts.get(0).getUpdateBy()); // 单测无登录上下文，操作人缺省
+        verify(layoutMapper, times(2)).upsertLayout(any(AiTicketFlowLayout.class));
+    }
+
+    @Test
+    void layout_save_emptyList_throws()
+    {
+        assertThrows(IllegalArgumentException.class, () -> service.saveLayout("HOTLINE", null));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.saveLayout("HOTLINE", new ArrayList<>()));
+        verify(layoutMapper, times(0)).upsertLayout(any(AiTicketFlowLayout.class));
+    }
+
+    @Test
+    void layout_save_duplicateStatus_throws()
+    {
+        List<AiTicketFlowLayout> layouts = new ArrayList<>();
+        layouts.add(layout("0", 40, 140));
+        layouts.add(layout("0", 40, 140));
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> service.saveLayout("HOTLINE", layouts));
+        assertTrue(e.getMessage().contains("重复"), e.getMessage());
+    }
+
+    @Test
+    void layout_save_invalidCoordinate_throws()
+    {
+        List<AiTicketFlowLayout> negative = new ArrayList<>();
+        negative.add(layout("0", -1, 140));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.saveLayout("HOTLINE", negative));
+
+        List<AiTicketFlowLayout> tooLarge = new ArrayList<>();
+        tooLarge.add(layout("0", 40, 3000));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.saveLayout("HOTLINE", tooLarge));
+
+        List<AiTicketFlowLayout> missing = new ArrayList<>();
+        AiTicketFlowLayout noY = layout("0", 40, 140);
+        noY.setPosY(null);
+        missing.add(noY);
+        assertThrows(IllegalArgumentException.class,
+                () -> service.saveLayout("HOTLINE", missing));
+        verify(layoutMapper, times(0)).upsertLayout(any(AiTicketFlowLayout.class));
+    }
+
+    @Test
+    void layout_save_blankStatusCode_throws()
+    {
+        List<AiTicketFlowLayout> layouts = new ArrayList<>();
+        layouts.add(layout("  ", 40, 140));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.saveLayout("HOTLINE", layouts));
+    }
+
+    /** 构造布局节点（默认 flowCode 与请求路径不一致，用于验证强制覆盖） */
+    private AiTicketFlowLayout layout(String statusCode, int x, int y)
+    {
+        AiTicketFlowLayout layout = new AiTicketFlowLayout();
+        layout.setFlowCode("OTHER");
+        layout.setStatusCode(statusCode);
+        layout.setPosX(x);
+        layout.setPosY(y);
+        return layout;
     }
 
     /** 0→1→2→3 的完整合法链路 */
