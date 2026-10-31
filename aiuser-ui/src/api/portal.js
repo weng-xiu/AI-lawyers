@@ -11,6 +11,14 @@ export function myTickets(params) {
   })
 }
 
+// F10 消息深链：按工单ID定位本人名下工单（后端校验来电号码归属，防越权）
+export function myTicketDetail(ticketId) {
+  return request({
+    url: `/lawyers/portal/ticket/${encodeURIComponent(ticketId)}`,
+    method: 'get'
+  })
+}
+
 // ========== F8 服务导航 ==========
 
 // 服务机构目录（匿名只读，已脱敏，无对接密钥）

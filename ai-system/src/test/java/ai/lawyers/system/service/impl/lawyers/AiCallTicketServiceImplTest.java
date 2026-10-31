@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -33,6 +34,7 @@ import ai.lawyers.system.domain.lawyers.AiTicketTransfer;
 import ai.lawyers.system.mapper.SysUserMapper;
 import ai.lawyers.system.mapper.lawyers.AiCallTicketMapper;
 import ai.lawyers.system.mapper.lawyers.AiTicketTransferMapper;
+import ai.lawyers.system.service.lawyers.IAiTodoService;
 import ai.lawyers.system.service.lawyers.TicketFlowService;
 import ai.lawyers.system.service.lawyers.queue.MessageNotifyDispatcher;
 import ai.lawyers.system.service.lawyers.rag.TicketVectorService;
@@ -55,6 +57,7 @@ class AiCallTicketServiceImplTest
     @Mock private TicketVectorService ticketVectorService;
     @Mock private MessageNotifyDispatcher messageNotifyDispatcher;
     @Mock private SysUserMapper sysUserMapper;
+    @Mock private IAiTodoService aiTodoService;
 
     @BeforeEach
     void setUp()
@@ -67,6 +70,7 @@ class AiCallTicketServiceImplTest
         ReflectionTestUtils.setField(service, "ticketVectorService", ticketVectorService);
         ReflectionTestUtils.setField(service, "messageNotifyDispatcher", messageNotifyDispatcher);
         ReflectionTestUtils.setField(service, "sysUserMapper", sysUserMapper);
+        ReflectionTestUtils.setField(service, "aiTodoService", aiTodoService);
         // 部分用例（再分派/工单不存在）不读角色，用 lenient 避免严格桩冗余报错
         lenient().when(ticketFlowService.currentRoleKeys()).thenReturn(Arrays.asList("agent"));
         lenient().when(transferMapper.selectAiTicketTransferList(any()))
@@ -198,6 +202,85 @@ class AiCallTicketServiceImplTest
 
         assertThrows(IllegalArgumentException.class, () -> service.archiveTicket(TID));
         verify(ticketMapper, never()).archiveTicket(TID);
+    }
+
+    // ---------------- F7：办结/归档自动关闭关联待办 ----------------
+
+    /** 构造只带 ticketId/status 的编辑入参 */
+    private static AiCallTicket editPayload(String status)
+    {
+        AiCallTicket t = new AiCallTicket();
+        t.setTicketId(TID);
+        t.setStatus(status);
+        t.setTitle("法律咨询工单");
+        return t;
+    }
+
+    @Test
+    void complete_closesLinkedTodos()
+    {
+        givenTicket("1");
+        allow("1", "complete");
+        when(ticketMapper.updateTicketStatus(TID, "2")).thenReturn(1);
+
+        assertEquals(1, service.updateTicketStatus(TID, "2"));
+
+        verify(aiTodoService).closeTodosByBiz("ticket", TID, null);
+    }
+
+    @Test
+    void archive_closesLinkedTodos()
+    {
+        givenTicket("2");
+        allow("2", "archive");
+        when(ticketMapper.archiveTicket(TID)).thenReturn(1);
+
+        assertEquals(1, service.archiveTicket(TID));
+
+        verify(aiTodoService).closeTodosByBiz("ticket", TID, null);
+    }
+
+    @Test
+    void statusToArchived_closesLinkedTodos()
+    {
+        givenTicket("2");
+        when(ticketMapper.updateTicketStatus(TID, "3")).thenReturn(1);
+
+        assertEquals(1, service.updateTicketStatus(TID, "3"));
+
+        verify(aiTodoService).closeTodosByBiz("ticket", TID, null);
+    }
+
+    @Test
+    void editToCompleted_closesLinkedTodos()
+    {
+        when(ticketMapper.updateAiCallTicket(any())).thenReturn(1);
+
+        assertEquals(1, service.updateAiCallTicket(editPayload("2")));
+
+        verify(aiTodoService).closeTodosByBiz("ticket", TID, null);
+    }
+
+    @Test
+    void editToProcessing_doesNotCloseTodos()
+    {
+        when(ticketMapper.updateAiCallTicket(any())).thenReturn(1);
+
+        service.updateAiCallTicket(editPayload("1"));
+
+        verify(aiTodoService, never()).closeTodosByBiz(any(), any(), any());
+    }
+
+    @Test
+    void complete_todoCloseFailure_doesNotBreakFlow()
+    {
+        givenTicket("1");
+        allow("1", "complete");
+        when(ticketMapper.updateTicketStatus(TID, "2")).thenReturn(1);
+        when(aiTodoService.closeTodosByBiz(eq("ticket"), eq(TID), isNull()))
+                .thenThrow(new RuntimeException("todo db down"));
+
+        assertEquals(1, service.updateTicketStatus(TID, "2"));
     }
 
     // ---------------- 工单不存在 ----------------

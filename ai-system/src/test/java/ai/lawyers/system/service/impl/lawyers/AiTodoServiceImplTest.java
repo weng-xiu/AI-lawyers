@@ -2,6 +2,9 @@ package ai.lawyers.system.service.impl.lawyers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -83,6 +86,74 @@ class AiTodoServiceImplTest
         when(aiCallTicketMapper.selectAiCallTicketByTicketId(1001L)).thenReturn(null);
 
         assertNull(service.selectLinkedTicket(5L));
+    }
+
+    // ---------------- F7：工单办结/归档自动关闭关联待办 ----------------
+
+    @Test
+    void closeTodosByBiz_delegatesWithGivenOperator()
+    {
+        when(aiTodoMapper.closeTodosByBiz("ticket", 1001L, "张三")).thenReturn(2);
+
+        assertEquals(2, service.closeTodosByBiz("ticket", 1001L, "张三"));
+
+        verify(aiTodoMapper).closeTodosByBiz("ticket", 1001L, "张三");
+    }
+
+    @Test
+    void closeTodosByBiz_blankOperatorFallsBackToLoginContext()
+    {
+        // 单测无登录上下文：不阻断，操作人记为 null
+        when(aiTodoMapper.closeTodosByBiz(eq("ticket"), eq(1001L), isNull())).thenReturn(1);
+
+        assertEquals(1, service.closeTodosByBiz(" ticket ", 1001L, null));
+
+        verify(aiTodoMapper).closeTodosByBiz("ticket", 1001L, null);
+    }
+
+    @Test
+    void closeTodosByBiz_ignoresInvalidArgs()
+    {
+        assertEquals(0, service.closeTodosByBiz(null, 1001L, "张三"));
+        assertEquals(0, service.closeTodosByBiz("  ", 1001L, "张三"));
+        assertEquals(0, service.closeTodosByBiz("ticket", null, "张三"));
+
+        verify(aiTodoMapper, never()).closeTodosByBiz(any(), any(), any());
+    }
+
+    // ---------------- F7：新增待办的服务端兜底 ----------------
+
+    @Test
+    void insertTodo_fillsTicketBizTypeWhenBizIdPresent()
+    {
+        AiTodo input = new AiTodo();
+        input.setTodoTitle("跟进工单");
+        input.setBizId(1001L);
+        when(aiTodoMapper.insertAiTodo(any())).thenReturn(1);
+
+        assertEquals(1, service.insertAiTodo(input));
+
+        assertEquals("ticket", input.getBizType(), "填了工单ID 应自动补齐 bizType");
+        assertEquals("0", input.getStatus(), "默认待办状态");
+        assertEquals("2", input.getPriority(), "默认普通优先级");
+    }
+
+    @Test
+    void insertTodo_keepsExplicitBizTypeAndDefaults()
+    {
+        AiTodo input = new AiTodo();
+        input.setTodoTitle("审查材料");
+        input.setBizType("ledger");
+        input.setBizId(9L);
+        input.setStatus("2");
+        input.setPriority("1");
+        when(aiTodoMapper.insertAiTodo(any())).thenReturn(1);
+
+        service.insertAiTodo(input);
+
+        assertEquals("ledger", input.getBizType(), "显式 bizType 不应被覆盖");
+        assertEquals("2", input.getStatus());
+        assertEquals("1", input.getPriority());
     }
 
     private static AiTodo todo(String bizType, Long bizId)

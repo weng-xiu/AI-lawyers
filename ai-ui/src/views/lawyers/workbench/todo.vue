@@ -96,7 +96,7 @@
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="280">
         <template slot-scope="scope">
           <el-button
-            v-if="scope.row.status === 0"
+            v-if="isPendingTodo(scope.row.status)"
             size="mini"
             type="text"
             icon="el-icon-check"
@@ -147,10 +147,11 @@
           <el-input v-model="form.todoTitle" placeholder="请输入待办标题" />
         </el-form-item>
         <el-form-item label="优先级" prop="priority">
+          <!-- 后端 priority 为字符串，label 必须同为字符串，否则回显时选中态丢失 -->
           <el-radio-group v-model="form.priority">
-            <el-radio :label="1">紧急</el-radio>
-            <el-radio :label="2">普通</el-radio>
-            <el-radio :label="3">低</el-radio>
+            <el-radio label="1">紧急</el-radio>
+            <el-radio label="2">普通</el-radio>
+            <el-radio label="3">低</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="到期日期" prop="dueDate">
@@ -352,7 +353,6 @@ export default {
         loading: false,
         todoId: null,
         todoTitle: '',
-        todoStatus: '',
         ticket: null
       },
       acceptOpen: false,
@@ -404,8 +404,8 @@ export default {
         todoId: null,
         todoTitle: null,
         todoContent: null,
-        status: 0,
-        priority: 2,
+        status: '0',
+        priority: '2',
         dueDate: null,
         bizType: null,
         bizId: null
@@ -529,7 +529,6 @@ export default {
       this.ticketDrawer.open = true
       this.ticketDrawer.todoId = row.todoId
       this.ticketDrawer.todoTitle = row.todoTitle
-      this.ticketDrawer.todoStatus = row.status
       this.ticketDrawer.ticket = null
       this.loadLinkedTicket()
     },
@@ -623,9 +622,7 @@ export default {
         return completeTicket({ ticketId: ticketId })
       }).then(() => {
         this.$modal.msgSuccess('工单已办结')
-        if (String(this.ticketDrawer.todoStatus) === '0') {
-          return processTodo(this.ticketDrawer.todoId).catch(() => {})
-        }
+        // 关联待办由服务端在办结/归档时统一关闭（不受入口限制），此处只刷新
       }).then(() => {
         this.loadLinkedTicket()
         this.getList()
@@ -652,20 +649,26 @@ export default {
       const map = { 1: 'danger', 2: 'warning', 3: 'info' }
       return map[priority] || 'info'
     },
-    // 优先级文本
+    // 优先级文本：后端为字符串，统一按字符串比较，避免 '2' !== 2 时不显示
     priorityLabel(priority) {
-      const item = this.priorityOptions.find(i => i.value === priority)
+      const key = String(priority)
+      const item = this.priorityOptions.find(i => String(i.value) === key)
       return item ? item.label : '未知'
     },
     // 状态标签类型
     statusTagType(status) {
       const map = { 0: 'warning', 1: 'success', 2: 'info', 3: '' }
-      return map[status] || ''
+      return map[String(status)] || ''
     },
     // 状态文本
     statusLabel(status) {
-      const item = this.statusOptions.find(i => i.value === status)
+      const key = String(status)
+      const item = this.statusOptions.find(i => String(i.value) === key)
       return item ? item.label : '未知'
+    },
+    // F7：仅"待办"状态可处理（后端 status 为字符串，避免数字严格比较失效）
+    isPendingTodo(status) {
+      return String(status) === '0'
     }
   }
 }

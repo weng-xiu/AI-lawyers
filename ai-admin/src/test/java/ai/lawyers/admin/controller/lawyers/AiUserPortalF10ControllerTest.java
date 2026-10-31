@@ -23,6 +23,9 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import ai.lawyers.common.core.domain.entity.SysUser;
+import ai.lawyers.common.utils.sign.PiiCryptoUtils;
+import ai.lawyers.system.domain.lawyers.AiCallTicket;
 import ai.lawyers.system.domain.lawyers.AiLegalKnowledge;
 import ai.lawyers.system.domain.lawyers.AiMessage;
 import ai.lawyers.system.mapper.lawyers.AiCallerProfileMapper;
@@ -135,6 +138,90 @@ public class AiUserPortalF10ControllerTest extends AbstractPermMvcTest
                 .andExpect(status().isOk());
 
         verify(legalKnowledgeMapper).selectFaqKnowledge(isNull(), eq(1));
+    }
+
+    // ---------------- F10 消息深链：按工单ID定位本人名下工单 ----------------
+
+    private static SysUser portalUser(String phone)
+    {
+        SysUser user = new SysUser();
+        user.setUserId(CURRENT_USER_ID);
+        user.setUserName("portal-user");
+        user.setPhonenumber(phone);
+        return user;
+    }
+
+    private static AiCallTicket ticket(Long ticketId, String callerNumber)
+    {
+        AiCallTicket t = new AiCallTicket();
+        t.setTicketId(ticketId);
+        t.setTicketNo("TKT20261031001");
+        t.setTitle("法律咨询工单");
+        t.setStatus("2");
+        t.setCallerNumber(callerNumber);
+        return t;
+    }
+
+    @Test
+    void ticketDetail_returnsOwnTicket() throws Exception
+    {
+        when(callTicketService.selectAiCallTicketByTicketId(88L))
+                .thenReturn(ticket(88L, "13800000000"));
+
+        mockMvc.perform(get(BASE + "/ticket/88").with(loginAsUser(portalUser("13800000000")))
+                        // 请求方不能通过参数改写手机号
+                        .param("callerNumber", "13900000000"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.ticketId").value(88))
+                .andExpect(jsonPath("$.data.title").value("法律咨询工单"));
+    }
+
+    @Test
+    void ticketDetail_matchesEncryptedStoredNumber() throws Exception
+    {
+        String encrypted = PiiCryptoUtils.encrypt("13800000000");
+        assertNotNull(encrypted);
+        when(callTicketService.selectAiCallTicketByTicketId(88L))
+                .thenReturn(ticket(88L, encrypted));
+
+        mockMvc.perform(get(BASE + "/ticket/88").with(loginAsUser(portalUser("13800000000"))))
+                        .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+    }
+
+    @Test
+    void ticketDetail_otherCallerNumber_denied() throws Exception
+    {
+        when(callTicketService.selectAiCallTicketByTicketId(99L))
+                .thenReturn(ticket(99L, "13900000000"));
+
+        mockMvc.perform(get(BASE + "/ticket/99").with(loginAsUser(portalUser("13800000000"))))
+                        .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(500))
+                .andExpect(jsonPath("$.msg").value("工单不存在或无权查看"))
+                .andExpect(content().string(not(containsString("TKT20261031001"))));
+    }
+
+    @Test
+    void ticketDetail_missingTicket_denied() throws Exception
+    {
+        when(callTicketService.selectAiCallTicketByTicketId(77L)).thenReturn(null);
+
+        mockMvc.perform(get(BASE + "/ticket/77").with(loginAsUser(portalUser("13800000000"))))
+                        .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(500))
+                .andExpect(jsonPath("$.msg").value("工单不存在或无权查看"));
+    }
+
+    @Test
+    void ticketDetail_ticketWithoutCallerNumber_denied() throws Exception
+    {
+        when(callTicketService.selectAiCallTicketByTicketId(66L)).thenReturn(ticket(66L, null));
+
+        mockMvc.perform(get(BASE + "/ticket/66").with(loginAsUser(portalUser("13800000000"))))
+                        .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(500));
     }
 
     // ---------------- 消息中心 ----------------

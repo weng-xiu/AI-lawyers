@@ -24,6 +24,7 @@ import ai.lawyers.system.mapper.lawyers.AiTicketTransferMapper;
 import ai.lawyers.system.mapper.SysUserMapper;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
 import ai.lawyers.system.service.lawyers.IAiSlaPolicyService;
+import ai.lawyers.system.service.lawyers.IAiTodoService;
 import ai.lawyers.system.service.lawyers.TicketFlowService;
 import ai.lawyers.system.service.lawyers.queue.MessageNotifyDispatcher;
 import ai.lawyers.system.service.lawyers.rag.TicketVectorService;
@@ -58,6 +59,10 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
     /** P1-6：跨域转办流水，纳入统一工单时间线可审计 */
     @Autowired
     private AiTicketTransferMapper aiTicketTransferMapper;
+
+    /** F7：工单进入办结/归档时自动关闭关联待办（不限入口，避免只在前端抽屉同步） */
+    @Autowired(required = false)
+    private IAiTodoService aiTodoService;
 
     @Override
     public AiCallTicket selectAiCallTicketByTicketId(Long ticketId)
@@ -122,11 +127,12 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
     public int updateAiCallTicket(AiCallTicket aiCallTicket)
     {
         int rows = aiCallTicketMapper.updateAiCallTicket(aiCallTicket);
-        // P1-8：编辑路径办结/归档时入语义索引
+        // P1-8：编辑路径办结/归档时入语义索引；F7：同步关闭关联待办
         if (rows > 0 && aiCallTicket.getTicketId() != null
                 && ("2".equals(aiCallTicket.getStatus()) || "3".equals(aiCallTicket.getStatus())))
         {
             indexIfReady(aiCallTicket.getTicketId());
+            closeLinkedTodos(aiCallTicket.getTicketId());
         }
         return rows;
     }
@@ -172,6 +178,7 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
         {
             indexIfReady(ticketId);
             notifyCallerProgress(aiCallTicketMapper.selectAiCallTicketByTicketId(ticketId), "工单归档提醒", "归档");
+            closeLinkedTodos(ticketId);
         }
         return rows;
     }
@@ -203,6 +210,8 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
             ticketFlowService.applySlaDeadline(ticketId, completeRule);
             // F10：办结后向工单来电人推送进度（站内信，best-effort）
             notifyCallerProgress(exist, "工单办结提醒", "办结");
+            // F7：办结后同步关闭关联待办
+            closeLinkedTodos(ticketId);
         }
         return rows;
     }
@@ -278,8 +287,34 @@ public class AiCallTicketServiceImpl implements IAiCallTicketService
             ticketFlowService.applySlaDeadline(ticketId, archiveRule);
             // F10：归档后向工单来电人推送进度（站内信，best-effort）
             notifyCallerProgress(aiCallTicketMapper.selectAiCallTicketByTicketId(ticketId), "工单归档提醒", "归档");
+            // F7：归档后同步关闭关联待办（兼容"先办结未关待办、后归档"的路径）
+            closeLinkedTodos(ticketId);
         }
         return rows;
+    }
+
+    /**
+     * F7：工单办结/归档后关闭关联待办（biz_type=ticket + biz_id=ticketId）。
+     * best-effort：异常仅告警，不影响工单主流程。
+     */
+    private void closeLinkedTodos(Long ticketId)
+    {
+        if (ticketId == null || aiTodoService == null)
+        {
+            return;
+        }
+        try
+        {
+            int closed = aiTodoService.closeTodosByBiz("ticket", ticketId, null);
+            if (closed > 0)
+            {
+                log.info("工单状态变更同步关闭关联待办 ticketId={} closed={}", ticketId, closed);
+            }
+        }
+        catch (Exception e)
+        {
+            log.warn("工单关联待办同步关闭失败 ticketId={}", ticketId, e);
+        }
     }
 
     @Override

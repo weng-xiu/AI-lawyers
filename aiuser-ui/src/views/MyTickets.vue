@@ -33,6 +33,52 @@
         </label>
       </div>
 
+      <!-- F10 消息深链：被定位的工单不在当前列表页时，单独置顶展示 -->
+      <el-card
+        v-if="focusTicket && !focusInList"
+        ref="focusCard"
+        class="ticket-card focus-card"
+        shadow="hover"
+        aria-label="从消息定位的工单"
+      >
+        <div class="ticket-head">
+          <span class="ticket-no" :title="focusTicket.ticketNo">
+            工单号：{{ focusTicket.ticketNo || focusTicket.ticketId }}
+            <span class="focus-badge"><i class="el-icon-bell" aria-hidden="true"></i> 消息定位</span>
+          </span>
+          <el-tag :type="statusTag(focusTicket.status)" size="medium" effect="dark">
+            {{ statusText(focusTicket.status) }}
+          </el-tag>
+        </div>
+        <h3 class="ticket-title">{{ focusTicket.title || '法律咨询工单' }}</h3>
+        <p v-if="focusTicket.content" class="ticket-content">{{ focusTicket.content }}</p>
+        <ticket-progress :status="focusTicket.status" class="ticket-steps" />
+        <ul class="ticket-meta">
+          <li>
+            <span class="meta-label">承办人</span>
+            <span>{{ focusTicket.assignUserName || '待分派' }}</span>
+          </li>
+          <li>
+            <span class="meta-label">承诺时限</span>
+            <span>{{ formatTime(focusTicket.dueTime) }}</span>
+          </li>
+          <li>
+            <span class="meta-label">提交时间</span>
+            <span>{{ formatTime(focusTicket.createTime) }}</span>
+          </li>
+        </ul>
+        <div v-if="focusTicket.processContent" class="process-box">
+          <div class="process-title">
+            <i class="el-icon-service"></i> 最新办理情况
+            <span class="process-time">{{ formatTime(focusTicket.processTime) }}</span>
+          </div>
+          <p>{{ focusTicket.processContent }}</p>
+        </div>
+        <div class="focus-actions">
+          <el-button type="text" @click="clearFocus">收起定位工单</el-button>
+        </div>
+      </el-card>
+
       <div v-loading="loading">
         <div v-if="ticketList.length === 0 && !loading" class="empty-box" role="status">
           <i class="el-icon-document"></i>
@@ -40,9 +86,21 @@
           <el-button type="primary" class="big-btn" @click="goConsult">去提交法律咨询</el-button>
         </div>
 
-        <el-card v-for="item in ticketList" :key="item.ticketId" class="ticket-card" shadow="hover">
+        <el-card
+          v-for="item in ticketList"
+          :key="item.ticketId"
+          ref="ticketCard"
+          :data-ticket-id="item.ticketId"
+          class="ticket-card"
+          :class="{ 'is-focus': isFocusRow(item) }"
+          shadow="hover">
           <div class="ticket-head">
-            <span class="ticket-no" :title="item.ticketNo">工单号：{{ item.ticketNo || item.ticketId }}</span>
+            <span class="ticket-no" :title="item.ticketNo">
+              工单号：{{ item.ticketNo || item.ticketId }}
+              <span v-if="isFocusRow(item)" class="focus-badge">
+                <i class="el-icon-bell" aria-hidden="true"></i> 消息定位
+              </span>
+            </span>
             <el-tag :type="statusTag(item.status)" size="medium" effect="dark">{{ statusText(item.status) }}</el-tag>
           </div>
           <h3 class="ticket-title">{{ item.title || '法律咨询工单' }}</h3>
@@ -112,7 +170,7 @@
 </template>
 
 <script>
-import { myTickets, getUnreadCount } from '@/api/portal'
+import { myTickets, myTicketDetail, getUnreadCount } from '@/api/portal'
 import { announce } from '@/utils/a11y'
 import TicketProgress from '@/components/TicketProgress'
 
@@ -125,6 +183,8 @@ export default {
       ticketList: [],
       total: 0,
       unread: 0,
+      // F10 消息深链：被定位的工单（来自消息提醒「查看工单进度」）
+      focusTicket: null,
       query: { pageNum: 1, pageSize: 10, status: '' },
       statusOptions: [
         { value: '', label: '全部' },
@@ -135,11 +195,79 @@ export default {
       ]
     }
   },
+  computed: {
+    /** 被定位的工单是否已在当前列表页（在列表中则高亮，不再重复置顶展示） */
+    focusInList() {
+      const target = this.focusTicket
+      if (!target) return false
+      return this.ticketList.some(item => String(item.ticketId) === String(target.ticketId))
+    }
+  },
+  watch: {
+    '$route.query.ticketId'() {
+      this.loadFocusedTicket()
+    }
+  },
   created() {
     this.loadTickets()
     this.loadUnread()
+    this.loadFocusedTicket()
   },
   methods: {
+    /** F10：按消息深链参数定位工单（后端校验来电号码归属，非本人工单返回错误） */
+    loadFocusedTicket() {
+      const raw = this.$route && this.$route.query ? this.$route.query.ticketId : null
+      if (!raw) {
+        this.focusTicket = null
+        return
+      }
+      this.focusTicket = null
+      myTicketDetail(raw).then(res => {
+        this.focusTicket = res.data || null
+        if (!this.focusTicket) {
+          announce('未找到该工单，可能已删除', 'assertive')
+          return
+        }
+        const label = this.focusTicket.ticketNo || this.focusTicket.ticketId
+        announce(`已定位到工单 ${label}`, 'polite')
+        this.$nextTick(() => {
+          if (this.focusInList) {
+            this.scrollToTicket(this.focusTicket.ticketId)
+          } else {
+            this.scrollToFocusCard()
+          }
+        })
+      }).catch(() => {
+        // 请求拦截器已提示错误原因（如无权查看），此处清理深链参数
+        announce('未能定位该工单，请稍后重试', 'assertive')
+        this.clearFocus()
+      })
+    },
+    /** 收起定位工单并移除 URL 中的深链参数（保留其他查询条件） */
+    clearFocus() {
+      this.focusTicket = null
+      const query = Object.assign({}, this.$route.query)
+      delete query.ticketId
+      this.$router.replace({ path: '/ticket', query }).catch(() => {})
+    },
+    isFocusRow(item) {
+      return this.focusTicket && String(item.ticketId) === String(this.focusTicket.ticketId)
+    },
+    scrollToTicket(ticketId) {
+      const refs = this.$refs.ticketCard
+      const cards = Array.isArray(refs) ? refs : (refs ? [refs] : [])
+      const hit = cards.find(card => card && card.$el &&
+        String(card.$el.getAttribute('data-ticket-id')) === String(ticketId))
+      if (hit && hit.$el.scrollIntoView) {
+        hit.$el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    },
+    scrollToFocusCard() {
+      const card = this.$refs.focusCard
+      if (card && card.$el && card.$el.scrollIntoView) {
+        card.$el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    },
     loadUnread() {
       getUnreadCount().then(res => {
         this.unread = Number(res.data || 0)
@@ -261,6 +389,16 @@ export default {
 .status-tab:focus-within span { outline: 3px solid #ffd04b; outline-offset: 2px; }
 
 .ticket-card { margin-bottom: 16px; border-radius: 8px; border-left: 4px solid #255A99; }
+/* F10 消息深链：被定位工单的视觉标记（颜色 + 角标，不依赖单一颜色传达信息） */
+.ticket-card.is-focus { border-left-color: #C9A96E; box-shadow: 0 4px 16px rgba(201, 169, 110, .35); }
+.focus-card { border-left-color: #C9A96E; background: #fffdf7; }
+.focus-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-left: 8px; padding: 2px 8px;
+  border-radius: 10px; background: #fff4dc; color: #8a5a00;
+  font-size: 12px; font-weight: 600;
+}
+.focus-actions { margin-top: 8px; }
 .ticket-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .ticket-no { color: #8a94a6; font-size: 13px; }
 .ticket-title { font-size: 17px; color: #0b1f4a; margin: 0 0 8px; }
@@ -295,6 +433,7 @@ html.care-large .ticket-meta li,
 html.care-large .process-box p,
 html.care-large .process-title { font-size: 17px; }
 html.care-large .ticket-title { font-size: 20px; }
+html.care-large .focus-badge { font-size: 14px; }
 html.care-large .big-btn,
 html.care-large .status-tab span { min-height: 48px; font-size: 17px; }
 
@@ -309,6 +448,7 @@ html.care-xlarge .ticket-meta { gap: 10px 28px; }
 html.care-xlarge .big-btn,
 html.care-xlarge .status-tab span { min-height: 52px; font-size: 19px; padding: 12px 24px; }
 html.care-xlarge .ticket-card { border-left-width: 6px; }
+html.care-xlarge .focus-badge { font-size: 16px; padding: 4px 10px; }
 
 html.care-high-contrast .portal-page { background: #fff; }
 html.care-high-contrast .page-title,
@@ -320,6 +460,9 @@ html.care-high-contrast .process-box p { color: #000; }
 html.care-high-contrast .ticket-card { border: 2px solid #000; border-left: 6px solid #000; }
 html.care-high-contrast .process-box { background: #fff; border: 2px solid #000; }
 html.care-high-contrast .meta-label { color: #333; text-decoration: underline; }
+html.care-high-contrast .focus-badge { background: #000; color: #fff; border: 2px solid #000; }
+html.care-high-contrast .ticket-card.is-focus,
+html.care-high-contrast .focus-card { background: #fff; border-left-color: #000; box-shadow: none; }
 html.care-high-contrast .status-tab span { border-color: #000; background: #fff; color: #000; }
 html.care-high-contrast .status-tab.is-active span { background: #000; border-color: #000; color: #fff; }
 

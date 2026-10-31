@@ -136,16 +136,16 @@ router.beforeEach((to, from, next) => {
         store.dispatch('getInfo').then(() => {
           next()
         }).catch(error => {
-          // 获取用户信息失败，清除token并重定向到登录页
+          // 获取用户信息失败，清除token并重定向到登录页（保留完整深链，登录后可回到原页面）
           store.dispatch('logout').then(() => {
-            next({ path: `/login?redirect=${to.path}` })
+            next({ path: `/login?redirect=${encodeURIComponent(to.fullPath)}` })
           })
         })
       }
     } else {
-      // 没有token，重定向到登录页
+      // 没有token，重定向到登录页（redirect 带完整路径+查询参数，登录后回到原页面）
       if (to.meta.requiresAuth !== false) {
-        next({ path: `/login?redirect=${to.path}` })
+        next({ path: `/login?redirect=${encodeURIComponent(to.fullPath)}` })
       } else {
         next()
       }

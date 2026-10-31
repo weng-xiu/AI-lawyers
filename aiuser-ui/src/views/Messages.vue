@@ -173,8 +173,27 @@ export default {
       })
     },
     goTicket(item) {
-      this.$router.push('/ticket')
-      announce('正在打开我的工单', 'polite')
+      // F10 深链：打开「我的工单」并定位该工单；未读先标记已读（失败不阻断跳转）
+      const target = String(item.bizId)
+      const open = () => {
+        this.$router.push({ path: '/ticket', query: { ticketId: target } })
+        announce('正在打开我的工单并定位到该工单', 'polite')
+      }
+      if (!this.isUnread(item)) {
+        open()
+        return
+      }
+      this.readingId = item.messageId
+      readMessage(item.messageId).then(() => {
+        item.isRead = '1'
+        this.unread = Math.max(0, this.unread - 1)
+        announce('已标记为已读', 'polite')
+      }).catch(() => {
+        // 标记失败不影响查看进度
+      }).finally(() => {
+        this.readingId = null
+        open()
+      })
     },
     goTickets() {
       this.$router.push('/ticket')

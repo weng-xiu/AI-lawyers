@@ -121,10 +121,22 @@ public abstract class AbstractPermMvcTest
      */
     public static RequestPostProcessor loginAs(String... permissions)
     {
+        SysUser user = new SysUser();
+        user.setUserId(1001L);
+        user.setUserName("perm-tester");
+        return loginAsUser(user, permissions);
+    }
+
+    /**
+     * 以指定用户身份登录（用于需要手机号等用户属性的对象级归属断言）。
+     */
+    public static RequestPostProcessor loginAsUser(SysUser user, String... permissions)
+    {
         return request -> {
-            SysUser user = new SysUser();
-            user.setUserId(1001L);
-            user.setUserName("perm-tester");
+            if (user.getUserId() == null)
+            {
+                user.setUserId(1001L);
+            }
             // 与生产登录一致：userId/deptId 显式注入（两参构造不会回填 userId，
             // 会导致 SecurityUtils.getUserId() 为 null，无法覆盖对象级归属断言）
             LoginUser loginUser = new LoginUser(user.getUserId(), user.getDeptId(), user,

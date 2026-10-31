@@ -99,6 +99,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where todo_id = #{todoId}
     </update>
 
+    <!-- F7：工单办结/归档后自动关闭关联待办；已完成(1)/已忽略(3) 保持原状 -->
+    <update id="closeTodosByBiz">
+        update ai_todo
+        <trim prefix="SET" suffixOverrides=",">
+            status = '1',
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            update_time = sysdate()
+        </trim>
+        where biz_type = #{bizType}
+          and biz_id = #{bizId}
+          and status in ('0', '2')
+    </update>
+
     <delete id="deleteAiTodoByTodoId" parameterType="Long">
         delete from ai_todo where todo_id = #{todoId}
     </delete>

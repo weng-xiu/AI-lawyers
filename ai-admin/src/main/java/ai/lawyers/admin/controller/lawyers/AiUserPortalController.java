@@ -94,6 +94,51 @@ public class AiUserPortalController extends BaseController
     }
 
     /**
+     * F10 消息深链：按工单ID定位本人名下工单（消息中心「查看工单进度」跳转）。
+     *
+     * <p><b>对象级权限：</b>仅当工单来电号码与当前登录用户手机号一致时返回，
+     * 其余一律提示"不存在或无权查看"，防止用工单ID 探测他人服务记录（IDOR）。</p>
+     */
+    @GetMapping("/ticket/{ticketId}")
+    public AjaxResult myTicketDetail(@PathVariable("ticketId") Long ticketId)
+    {
+        if (ticketId == null)
+        {
+            return AjaxResult.error("工单ID不能为空");
+        }
+        AiCallTicket ticket = callTicketService.selectAiCallTicketByTicketId(ticketId);
+        if (ticket == null || !belongsToCurrentCaller(ticket.getCallerNumber(), currentPhone()))
+        {
+            return AjaxResult.error("工单不存在或无权查看");
+        }
+        return success(ticket);
+    }
+
+    /**
+     * 号码归属比对：工单来电号码可能为 G1-b 密文，解密失败按"不匹配"处理。
+     */
+    private boolean belongsToCurrentCaller(String storedNumber, String currentPhone)
+    {
+        if (StringUtils.isEmpty(storedNumber) || StringUtils.isEmpty(currentPhone))
+        {
+            return false;
+        }
+        String plain = storedNumber;
+        if (PiiCryptoUtils.isEncrypted(storedNumber))
+        {
+            try
+            {
+                plain = PiiCryptoUtils.decrypt(storedNumber);
+            }
+            catch (Exception e)
+            {
+                return false;
+            }
+        }
+        return currentPhone.equals(plain == null ? null : plain.trim());
+    }
+
+    /**
      * 服务导航：按条线/属地查询启用机构（只读目录，匿名可访问，不含对接密钥）。
      */
     @Anonymous
