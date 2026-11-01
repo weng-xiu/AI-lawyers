@@ -1,75 +1,44 @@
 <template>
   <div class="app-container">
-    <el-card class="search-card" shadow="never">
-      <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" label-width="80px">
-        <el-form-item label="机构名称" prop="orgName">
-          <el-input v-model="queryParams.orgName" placeholder="请输入机构名称" clearable style="width: 180px" @keyup.enter.native="handleQuery" />
-        </el-form-item>
-        <el-form-item label="条线类型" prop="externalType">
-          <el-select v-model="queryParams.externalType" placeholder="全部" clearable style="width: 160px">
-            <el-option v-for="item in typeOptions" :key="item.value" :label="item.label" :value="item.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="地市" prop="city">
-          <el-input v-model="queryParams.city" placeholder="请输入地市" clearable style="width: 140px" @keyup.enter.native="handleQuery" />
-        </el-form-item>
-        <el-form-item label="状态" prop="status">
-          <el-select v-model="queryParams.status" placeholder="全部" clearable style="width: 110px">
-            <el-option label="启用" value="0" />
-            <el-option label="停用" value="1" />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">查询</el-button>
-          <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
-
-    <el-card shadow="never" class="table-card">
-      <el-row :gutter="10" class="mb8">
-        <el-col :span="1.5">
-          <el-button v-hasPermi="['lawyers:externalOrg:add']" type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd">新增机构</el-button>
-        </el-col>
-        <el-col :span="1.5">
-          <el-button v-hasPermi="['lawyers:externalOrg:remove']" type="danger" plain icon="el-icon-delete" size="mini" :disabled="multiple" @click="handleDelete">删除</el-button>
-        </el-col>
-      </el-row>
-
-      <el-table v-loading="loading" :data="orgList" border size="small" @selection-change="handleSelectionChange">
-        <el-table-column type="selection" width="45" align="center" />
-        <el-table-column label="机构ID" align="center" prop="orgId" width="80" />
-        <el-table-column label="机构名称" align="center" prop="orgName" min-width="200" show-overflow-tooltip />
-        <el-table-column label="条线类型" align="center" width="120">
-          <template slot-scope="scope">
-            <el-tag size="mini" :type="typeTag(scope.row.externalType)">{{ typeText(scope.row.externalType) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="属地" align="center" width="170">
-          <template slot-scope="scope">{{ [scope.row.province, scope.row.city, scope.row.district].filter(Boolean).join(' / ') || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="联系电话" align="center" prop="contactPhone" width="140" />
-        <el-table-column label="对接方式" align="center" width="90">
-          <template slot-scope="scope">
-            <el-tag size="mini" :type="scope.row.accessMode === 'API' ? 'success' : 'info'">{{ scope.row.accessMode }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="服务时间" align="center" prop="serviceHours" width="160" show-overflow-tooltip />
-        <el-table-column label="状态" align="center" width="80">
-          <template slot-scope="scope">
-            <el-tag size="mini" :type="scope.row.status === '0' ? 'success' : 'danger'">{{ scope.row.status === '0' ? '启用' : '停用' }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" align="center" width="150" fixed="right">
-          <template slot-scope="scope">
-            <el-button v-hasPermi="['lawyers:externalOrg:edit']" type="text" size="mini" icon="el-icon-edit" @click="handleUpdate(scope.row)">编辑</el-button>
-            <el-button v-hasPermi="['lawyers:externalOrg:remove']" type="text" size="mini" icon="el-icon-delete" style="color:#C63D4A" @click="handleDelete(scope.row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <pagination v-show="total > 0" :total="total" :page.sync="queryParams.pageNum" :limit.sync="queryParams.pageSize" @pagination="getList" />
-    </el-card>
+    <!-- V3：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="orgList"
+      :loading="loading"
+      :total="total"
+      :show-search.sync="showSearch"
+      :table-attrs="{ border: true }"
+      has-selection
+      label-width="80px"
+      empty-text="暂无协同机构"
+      empty-hint="新增法律援助、人民调解、公证、司法鉴定等外部机构后可发起转办"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList"
+      @selection-change="handleSelectionChange">
+      <template #toolbar-left>
+        <el-button v-hasPermi="['lawyers:externalOrg:add']" type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd">新增机构</el-button>
+        <el-button v-hasPermi="['lawyers:externalOrg:remove']" type="danger" plain icon="el-icon-delete" size="mini" :disabled="multiple" @click="handleDelete">删除</el-button>
+      </template>
+      <template #column-externalType="{ row }">
+        <el-tag size="mini" :type="typeTag(row.externalType)">{{ typeText(row.externalType) }}</el-tag>
+      </template>
+      <template #column-region="{ row }">
+        {{ [row.province, row.city, row.district].filter(Boolean).join(' / ') || '-' }}
+      </template>
+      <template #column-accessMode="{ row }">
+        <el-tag size="mini" :type="row.accessMode === 'API' ? 'success' : 'info'">{{ row.accessMode }}</el-tag>
+      </template>
+      <template #column-status="{ row }">
+        <el-tag size="mini" :type="row.status === '0' ? 'success' : 'danger'">{{ row.status === '0' ? '启用' : '停用' }}</el-tag>
+      </template>
+      <template #column-action="{ row }">
+        <el-button v-hasPermi="['lawyers:externalOrg:edit']" type="text" size="mini" icon="el-icon-edit" @click="handleUpdate(row)">编辑</el-button>
+        <el-button v-hasPermi="['lawyers:externalOrg:remove']" type="text" size="mini" icon="el-icon-delete" style="color:#C63D4A" @click="handleDelete(row)">删除</el-button>
+      </template>
+    </ProTable>
 
     <el-dialog :title="title" :visible.sync="open" width="680px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="110px" size="small">
@@ -160,8 +129,21 @@ export default {
   data() {
     return {
       loading: false,
+      showSearch: true,
       total: 0,
       orgList: [],
+      // V3：ProTable 列定义（条线/属地/对接方式/状态/操作走插槽）
+      columns: [
+        { prop: 'orgId', label: '机构ID', width: 80 },
+        { prop: 'orgName', label: '机构名称', minWidth: 200, showOverflowTooltip: true },
+        { prop: 'externalType', label: '条线类型', width: 120, slot: true },
+        { prop: 'region', label: '属地', width: 170, slot: true },
+        { prop: 'contactPhone', label: '联系电话', width: 140 },
+        { prop: 'accessMode', label: '对接方式', width: 90, slot: true },
+        { prop: 'serviceHours', label: '服务时间', width: 160, showOverflowTooltip: true },
+        { prop: 'status', label: '状态', width: 80, slot: true },
+        { prop: 'action', label: '操作', width: 150, slot: true, className: 'small-padding fixed-width' }
+      ],
       open: false,
       title: '',
       ids: [],
@@ -186,6 +168,19 @@ export default {
   created() {
     this.getList()
   },
+  computed: {
+    /** V3：ProTable 查询字段 */
+    queryFormItems() {
+      return [
+        { prop: 'orgName', label: '机构名称', placeholder: '请输入机构名称', width: '180px' },
+        { prop: 'externalType', label: '条线类型', type: 'select', placeholder: '全部', width: '160px', options: this.typeOptions },
+        { prop: 'city', label: '地市', placeholder: '请输入地市', width: '140px' },
+        { prop: 'status', label: '状态', type: 'select', placeholder: '全部', width: '110px', options: [
+          { label: '启用', value: '0' }, { label: '停用', value: '1' }
+        ] }
+      ]
+    }
+  },
   methods: {
     typeText(v) {
       const hit = this.typeOptions.find(i => i.value === v)
@@ -205,9 +200,9 @@ export default {
     },
     handleQuery() { this.queryParams.pageNum = 1; this.getList() },
     resetQuery() {
-      this.resetForm('queryForm')
+      // ProTable 已复位查询表单，页面只需恢复筛选初值并重查
       this.queryParams = { pageNum: 1, pageSize: 10, orgName: undefined, externalType: undefined, city: undefined, status: undefined }
-      this.handleQuery()
+      this.getList()
     },
     reset() {
       this.form = { orgId: undefined, orgName: undefined, externalType: undefined, province: undefined, city: undefined, district: undefined, address: undefined, contactPhone: undefined, contactPerson: undefined, accessMode: 'MANUAL', apiUrl: undefined, appId: undefined, appSecret: undefined, serviceHours: undefined, applyMaterials: undefined, status: '0', remark: undefined }

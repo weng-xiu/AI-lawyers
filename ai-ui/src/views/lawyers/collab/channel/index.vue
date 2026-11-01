@@ -1,74 +1,44 @@
 <template>
   <div class="app-container">
-    <el-card class="search-card" shadow="never">
-      <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" label-width="90px">
-        <el-form-item label="档案ID" prop="profileId">
-          <el-input v-model="queryParams.profileId" placeholder="来电档案ID" clearable style="width: 140px" @keyup.enter.native="handleQuery" />
-        </el-form-item>
-        <el-form-item label="渠道类型" prop="channelType">
-          <el-select v-model="queryParams.channelType" placeholder="全部" clearable style="width: 150px">
-            <el-option v-for="item in channelOptions" :key="item.value" :label="item.label" :value="item.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="绑定状态" prop="bindStatus">
-          <el-select v-model="queryParams.bindStatus" placeholder="全部" clearable style="width: 120px">
-            <el-option label="已绑定" value="0" />
-            <el-option label="已解绑" value="1" />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">查询</el-button>
-          <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
-
-    <el-card shadow="never" class="table-card">
-      <el-row :gutter="10" class="mb8">
-        <el-col :span="1.5">
-          <el-button v-hasPermi="['lawyers:channelIdentity:unbind']" type="primary" plain icon="el-icon-link" size="mini" @click="openBind">代客发起绑定</el-button>
-        </el-col>
-      </el-row>
-
-      <el-table v-loading="loading" :data="identityList" border size="small">
-        <el-table-column label="ID" align="center" prop="id" width="80" />
-        <el-table-column label="档案ID" align="center" prop="profileId" width="100" />
-        <el-table-column label="渠道类型" align="center" width="130">
-          <template slot-scope="scope">
-            <el-tag size="mini">{{ channelText(scope.row.channelType) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="渠道标识" align="center" prop="channelUid" min-width="220" show-overflow-tooltip />
-        <el-table-column label="渠道昵称" align="center" prop="channelNickname" width="160" show-overflow-tooltip>
-          <template slot-scope="scope">{{ scope.row.channelNickname || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="状态" align="center" width="100">
-          <template slot-scope="scope">
-            <el-tag size="mini" :type="scope.row.bindStatus === '0' ? 'success' : 'info'">{{ scope.row.bindStatus === '0' ? '已绑定' : '已解绑' }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="绑定时间" align="center" prop="bindConfirmTime" width="160">
-          <template slot-scope="scope">{{ scope.row.bindConfirmTime ? parseTime(scope.row.bindConfirmTime) : '-' }}</template>
-        </el-table-column>
-        <el-table-column label="解绑时间" align="center" prop="unbindTime" width="160">
-          <template slot-scope="scope">{{ scope.row.unbindTime ? parseTime(scope.row.unbindTime) : '-' }}</template>
-        </el-table-column>
-        <el-table-column label="操作" align="center" width="170" fixed="right">
-          <template slot-scope="scope">
-            <el-button
-              v-if="scope.row.bindStatus !== '0'"
-              v-hasPermi="['lawyers:channelIdentity:unbind']"
-              type="text" size="mini" icon="el-icon-check" @click="handleConfirm(scope.row)">确认绑定</el-button>
-            <el-button
-              v-if="scope.row.bindStatus === '0'"
-              v-hasPermi="['lawyers:channelIdentity:unbind']"
-              type="text" size="mini" icon="el-icon-unlink" style="color:#C63D4A" @click="handleUnbind(scope.row)">解绑</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <pagination v-show="total > 0" :total="total" :page.sync="queryParams.pageNum" :limit.sync="queryParams.pageSize" @pagination="getList" />
-    </el-card>
+    <!-- V3：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="identityList"
+      :loading="loading"
+      :total="total"
+      :show-search.sync="showSearch"
+      :table-attrs="{ border: true }"
+      label-width="90px"
+      empty-text="暂无渠道身份绑定记录"
+      empty-hint="坐席可按来电档案发起渠道绑定，待二次确认后生效"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList">
+      <template #toolbar-left>
+        <el-button v-hasPermi="['lawyers:channelIdentity:unbind']" type="primary" plain icon="el-icon-link" size="mini" @click="openBind">代客发起绑定</el-button>
+      </template>
+      <template #column-channelType="{ row }">
+        <el-tag size="mini">{{ channelText(row.channelType) }}</el-tag>
+      </template>
+      <template #column-channelNickname="{ row }">{{ row.channelNickname || '-' }}</template>
+      <template #column-bindStatus="{ row }">
+        <el-tag size="mini" :type="row.bindStatus === '0' ? 'success' : 'info'">{{ row.bindStatus === '0' ? '已绑定' : '已解绑' }}</el-tag>
+      </template>
+      <template #column-bindConfirmTime="{ row }">{{ row.bindConfirmTime ? parseTime(row.bindConfirmTime) : '-' }}</template>
+      <template #column-unbindTime="{ row }">{{ row.unbindTime ? parseTime(row.unbindTime) : '-' }}</template>
+      <template #column-action="{ row }">
+        <el-button
+          v-if="row.bindStatus !== '0'"
+          v-hasPermi="['lawyers:channelIdentity:unbind']"
+          type="text" size="mini" icon="el-icon-check" @click="handleConfirm(row)">确认绑定</el-button>
+        <el-button
+          v-if="row.bindStatus === '0'"
+          v-hasPermi="['lawyers:channelIdentity:unbind']"
+          type="text" size="mini" icon="el-icon-unlink" style="color:#C63D4A" @click="handleUnbind(row)">解绑</el-button>
+      </template>
+    </ProTable>
 
     <el-dialog title="代客发起渠道绑定（待二次确认）" :visible.sync="bindOpen" width="480px" append-to-body>
       <el-form ref="bindForm" :model="bindForm" :rules="bindRules" label-width="100px" size="small">
@@ -103,8 +73,21 @@ export default {
   data() {
     return {
       loading: false,
+      showSearch: true,
       total: 0,
       identityList: [],
+      // V3：ProTable 列定义（渠道类型/昵称/状态/时间/操作走插槽）
+      columns: [
+        { prop: 'id', label: 'ID', width: 80 },
+        { prop: 'profileId', label: '档案ID', width: 100 },
+        { prop: 'channelType', label: '渠道类型', width: 130, slot: true },
+        { prop: 'channelUid', label: '渠道标识', minWidth: 220, showOverflowTooltip: true },
+        { prop: 'channelNickname', label: '渠道昵称', width: 160, slot: true },
+        { prop: 'bindStatus', label: '状态', width: 100, slot: true },
+        { prop: 'bindConfirmTime', label: '绑定时间', width: 160, slot: true },
+        { prop: 'unbindTime', label: '解绑时间', width: 160, slot: true },
+        { prop: 'action', label: '操作', width: 170, slot: true, className: 'small-padding fixed-width' }
+      ],
       queryParams: { pageNum: 1, pageSize: 10, profileId: undefined, channelType: undefined, bindStatus: undefined },
       channelOptions: [
         { value: 'PHONE', label: '电话' },
@@ -122,6 +105,18 @@ export default {
       }
     }
   },
+  computed: {
+    /** V3：ProTable 查询字段 */
+    queryFormItems() {
+      return [
+        { prop: 'profileId', label: '档案ID', placeholder: '来电档案ID', width: '140px' },
+        { prop: 'channelType', label: '渠道类型', type: 'select', placeholder: '全部', width: '150px', options: this.channelOptions },
+        { prop: 'bindStatus', label: '绑定状态', type: 'select', placeholder: '全部', width: '120px', options: [
+          { label: '已绑定', value: '0' }, { label: '已解绑', value: '1' }
+        ] }
+      ]
+    }
+  },
   created() { this.getList() },
   methods: {
     channelText(v) { const hit = this.channelOptions.find(i => i.value === v); return hit ? hit.label : (v || '-') },
@@ -135,9 +130,9 @@ export default {
     },
     handleQuery() { this.queryParams.pageNum = 1; this.getList() },
     resetQuery() {
-      this.resetForm('queryForm')
+      // ProTable 已复位查询表单，页面只需恢复筛选初值并重查
       this.queryParams = { pageNum: 1, pageSize: 10, profileId: undefined, channelType: undefined, bindStatus: undefined }
-      this.handleQuery()
+      this.getList()
     },
     openBind() {
       this.bindForm = { profileId: undefined, channelType: undefined, channelUid: undefined, channelNickname: undefined }

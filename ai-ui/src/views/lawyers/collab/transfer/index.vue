@@ -1,90 +1,46 @@
 <template>
   <div class="app-container">
-    <el-card class="search-card" shadow="never">
-      <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" label-width="90px">
-        <el-form-item label="工单号" prop="ticketNo">
-          <el-input v-model="queryParams.ticketNo" placeholder="请输入工单号" clearable style="width: 180px" @keyup.enter.native="handleQuery" />
-        </el-form-item>
-        <el-form-item label="方向" prop="direction">
-          <el-select v-model="queryParams.direction" placeholder="全部" clearable style="width: 110px">
-            <el-option label="转出" value="OUT" />
-            <el-option label="转入" value="IN" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="条线" prop="externalType">
-          <el-select v-model="queryParams.externalType" placeholder="全部" clearable style="width: 150px">
-            <el-option v-for="item in typeOptions" :key="item.value" :label="item.label" :value="item.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="流水状态" prop="transferStatus">
-          <el-select v-model="queryParams.transferStatus" placeholder="全部" clearable style="width: 120px">
-            <el-option label="处理中" value="0" />
-            <el-option label="成功" value="1" />
-            <el-option label="失败" value="2" />
-            <el-option label="人工处理" value="3" />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">查询</el-button>
-          <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
-
-    <el-card shadow="never" class="table-card">
-      <el-row :gutter="10" class="mb8">
-        <el-col :span="1.5">
-          <el-button v-hasPermi="['lawyers:ticketTransfer:add']" type="primary" plain icon="el-icon-s-promotion" size="mini" @click="openTransfer">发起转办</el-button>
-        </el-col>
-        <el-col :span="1.5">
-          <el-button type="warning" plain icon="el-icon-time" size="mini" @click="timelineOpen = true">跨渠道时间线</el-button>
-        </el-col>
-      </el-row>
-
-      <el-table v-loading="loading" :data="transferList" border size="small">
-        <el-table-column label="流水ID" align="center" prop="transferId" width="80" />
-        <el-table-column label="工单号" align="center" prop="ticketNo" width="200" show-overflow-tooltip />
-        <el-table-column label="方向" align="center" width="80">
-          <template slot-scope="scope">
-            <el-tag size="mini" :type="scope.row.direction === 'OUT' ? 'warning' : 'success'">{{ scope.row.direction === 'OUT' ? '转出' : '转入' }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="条线" align="center" width="110">
-          <template slot-scope="scope">{{ typeText(scope.row.externalType) }}</template>
-        </el-table-column>
-        <el-table-column label="协同机构" align="center" prop="orgName" min-width="180" show-overflow-tooltip>
-          <template slot-scope="scope">{{ scope.row.orgName || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="外部工单号" align="center" prop="externalTicketNo" width="170" show-overflow-tooltip>
-          <template slot-scope="scope">{{ scope.row.externalTicketNo || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="外部状态" align="center" width="110">
-          <template slot-scope="scope">
-            <el-tag size="mini" :type="extStatusTag(scope.row.externalStatus)">{{ scope.row.externalStatus || '-' }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="流水状态" align="center" width="100">
-          <template slot-scope="scope">
-            <el-tag size="mini" :type="flowTag(scope.row.transferStatus)">{{ flowText(scope.row.transferStatus) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="重试" align="center" prop="retryCount" width="70" />
-        <el-table-column label="发起时间" align="center" prop="transferTime" width="160">
-          <template slot-scope="scope">{{ scope.row.transferTime ? parseTime(scope.row.transferTime) : '-' }}</template>
-        </el-table-column>
-        <el-table-column label="操作" align="center" width="170" fixed="right">
-          <template slot-scope="scope">
-            <el-button type="text" size="mini" icon="el-icon-view" @click="showDetail(scope.row)">详情</el-button>
-            <el-button
-              v-if="scope.row.direction === 'OUT' && (scope.row.transferStatus === '0' || scope.row.transferStatus === '2')"
-              v-hasPermi="['lawyers:ticketTransfer:retry']"
-              type="text" size="mini" icon="el-icon-refresh-right" @click="handleRetry(scope.row)">重试</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <pagination v-show="total > 0" :total="total" :page.sync="queryParams.pageNum" :limit.sync="queryParams.pageSize" @pagination="getList" />
-    </el-card>
+    <!-- V3：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="transferList"
+      :loading="loading"
+      :total="total"
+      :show-search.sync="showSearch"
+      :table-attrs="{ border: true }"
+      label-width="90px"
+      empty-text="暂无转办流水"
+      empty-hint="发起转办后，可按工单号、方向与处理结果追踪跨机构流转进度"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList">
+      <template #toolbar-left>
+        <el-button v-hasPermi="['lawyers:ticketTransfer:add']" type="primary" plain icon="el-icon-s-promotion" size="mini" @click="openTransfer">发起转办</el-button>
+        <el-button type="warning" plain icon="el-icon-time" size="mini" @click="timelineOpen = true">跨渠道时间线</el-button>
+      </template>
+      <template #column-direction="{ row }">
+        <el-tag size="mini" :type="row.direction === 'OUT' ? 'warning' : 'success'">{{ row.direction === 'OUT' ? '转出' : '转入' }}</el-tag>
+      </template>
+      <template #column-externalType="{ row }">{{ typeText(row.externalType) }}</template>
+      <template #column-orgName="{ row }">{{ row.orgName || '-' }}</template>
+      <template #column-externalTicketNo="{ row }">{{ row.externalTicketNo || '-' }}</template>
+      <template #column-externalStatus="{ row }">
+        <el-tag size="mini" :type="extStatusTag(row.externalStatus)">{{ row.externalStatus || '-' }}</el-tag>
+      </template>
+      <template #column-transferStatus="{ row }">
+        <el-tag size="mini" :type="flowTag(row.transferStatus)">{{ flowText(row.transferStatus) }}</el-tag>
+      </template>
+      <template #column-transferTime="{ row }">{{ row.transferTime ? parseTime(row.transferTime) : '-' }}</template>
+      <template #column-action="{ row }">
+        <el-button type="text" size="mini" icon="el-icon-view" @click="showDetail(row)">详情</el-button>
+        <el-button
+          v-if="row.direction === 'OUT' && (row.transferStatus === '0' || row.transferStatus === '2')"
+          v-hasPermi="['lawyers:ticketTransfer:retry']"
+          type="text" size="mini" icon="el-icon-refresh-right" @click="handleRetry(row)">重试</el-button>
+      </template>
+    </ProTable>
 
     <!-- 发起转办 -->
     <el-dialog title="发起工单转办" :visible.sync="transferOpen" width="520px" append-to-body>
@@ -173,7 +129,21 @@ export default {
       loading: false,
       total: 0,
       transferList: [],
+      showSearch: true,
       queryParams: { pageNum: 1, pageSize: 10, ticketNo: undefined, direction: undefined, externalType: undefined, transferStatus: undefined },
+      columns: [
+        { prop: 'transferId', label: '流水ID', width: 80, align: 'center' },
+        { prop: 'ticketNo', label: '工单号', width: 200, align: 'center', showOverflowTooltip: true },
+        { prop: 'direction', label: '方向', width: 80, align: 'center', slot: true },
+        { prop: 'externalType', label: '条线', width: 110, align: 'center', slot: true },
+        { prop: 'orgName', label: '协同机构', minWidth: 180, align: 'center', showOverflowTooltip: true, slot: true },
+        { prop: 'externalTicketNo', label: '外部工单号', width: 170, align: 'center', showOverflowTooltip: true, slot: true },
+        { prop: 'externalStatus', label: '外部状态', width: 110, align: 'center', slot: true },
+        { prop: 'transferStatus', label: '流水状态', width: 100, align: 'center', slot: true },
+        { prop: 'retryCount', label: '重试', width: 70, align: 'center' },
+        { prop: 'transferTime', label: '发起时间', width: 160, align: 'center', slot: true },
+        { prop: 'action', label: '操作', width: 170, align: 'center', slot: true, className: 'small-padding fixed-width' }
+      ],
       typeOptions: [
         { value: 'LEGAL_AID', label: '法律援助' },
         { value: 'MEDIATION', label: '人民调解' },
@@ -201,6 +171,35 @@ export default {
       timeline: []
     }
   },
+  computed: {
+    queryFormItems() {
+      return [
+        { prop: 'ticketNo', label: '工单号', placeholder: '请输入工单号', width: 180 },
+        {
+          prop: 'direction',
+          label: '方向',
+          type: 'select',
+          placeholder: '全部',
+          width: 110,
+          options: [{ label: '转出', value: 'OUT' }, { label: '转入', value: 'IN' }]
+        },
+        { prop: 'externalType', label: '条线', type: 'select', placeholder: '全部', width: 150, options: this.typeOptions },
+        {
+          prop: 'transferStatus',
+          label: '流水状态',
+          type: 'select',
+          placeholder: '全部',
+          width: 120,
+          options: [
+            { label: '处理中', value: '0' },
+            { label: '成功', value: '1' },
+            { label: '失败', value: '2' },
+            { label: '人工处理', value: '3' }
+          ]
+        }
+      ]
+    }
+  },
   created() { this.getList() },
   methods: {
     typeText(v) { const hit = this.typeOptions.find(i => i.value === v); return hit ? hit.label : (v || '-') },
@@ -222,9 +221,9 @@ export default {
     },
     handleQuery() { this.queryParams.pageNum = 1; this.getList() },
     resetQuery() {
-      this.resetForm('queryForm')
+      // ProTable 已复位查询表单，页面只需恢复筛选初值并重查
       this.queryParams = { pageNum: 1, pageSize: 10, ticketNo: undefined, direction: undefined, externalType: undefined, transferStatus: undefined }
-      this.handleQuery()
+      this.getList()
     },
     openTransfer() {
       this.transferForm = { ticketId: undefined, orgId: undefined, remark: undefined }

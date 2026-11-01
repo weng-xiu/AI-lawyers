@@ -1,81 +1,45 @@
 <template>
   <div class="app-container">
-    <el-card class="search-card" shadow="never">
-      <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" label-width="90px">
-        <el-form-item label="策略名称" prop="policyName">
-          <el-input v-model="queryParams.policyName" placeholder="请输入策略名称" clearable style="width: 170px" @keyup.enter.native="handleQuery" />
-        </el-form-item>
-        <el-form-item label="业务类型" prop="bizType">
-          <el-select v-model="queryParams.bizType" placeholder="全部" clearable style="width: 150px">
-            <el-option v-for="item in bizOptions" :key="item.value" :label="item.label" :value="item.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="状态" prop="status">
-          <el-select v-model="queryParams.status" placeholder="全部" clearable style="width: 110px">
-            <el-option label="启用" value="0" />
-            <el-option label="停用" value="1" />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">查询</el-button>
-          <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
-
-    <el-card shadow="never" class="table-card">
-      <el-row :gutter="10" class="mb8">
-        <el-col :span="1.5">
-          <el-button v-hasPermi="['lawyers:slaPolicy:add']" type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd">新增策略</el-button>
-        </el-col>
-        <el-col :span="1.5">
-          <el-button v-hasPermi="['lawyers:slaPolicy:remove']" type="danger" plain icon="el-icon-delete" size="mini" :disabled="multiple" @click="handleDelete">删除</el-button>
-        </el-col>
-      </el-row>
-
-      <el-table v-loading="loading" :data="policyList" border size="small" @selection-change="handleSelectionChange">
-        <el-table-column type="selection" width="45" align="center" />
-        <el-table-column label="ID" align="center" prop="policyId" width="70" />
-        <el-table-column label="策略名称" align="center" prop="policyName" min-width="180" show-overflow-tooltip />
-        <el-table-column label="业务类型" align="center" width="130">
-          <template slot-scope="scope">{{ bizText(scope.row.bizType) }}</template>
-        </el-table-column>
-        <el-table-column label="优先级" align="center" width="90">
-          <template slot-scope="scope">
-            <el-tag size="mini" :type="scope.row.priority === '1' ? 'danger' : (scope.row.priority === '3' ? 'info' : '')">
-              {{ priorityText(scope.row.priority) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="响应时限" align="center" width="110">
-          <template slot-scope="scope">{{ scope.row.respondMinutes }} 分钟</template>
-        </el-table-column>
-        <el-table-column label="办结时限" align="center" width="110">
-          <template slot-scope="scope">{{ scope.row.resolveMinutes }} 分钟</template>
-        </el-table-column>
-        <el-table-column label="预警阈值" align="center" width="100">
-          <template slot-scope="scope">{{ scope.row.warnThreshold }}%</template>
-        </el-table-column>
-        <el-table-column label="逐级升级角色链" align="center" prop="escalateRoles" min-width="200" show-overflow-tooltip>
-          <template slot-scope="scope">
-            <el-tag v-for="(r, i) in (scope.row.escalateRoles || '').split(',').filter(Boolean)" :key="i" size="mini" style="margin-right:4px">{{ r }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="状态" align="center" width="80">
-          <template slot-scope="scope">
-            <el-tag size="mini" :type="scope.row.status === '0' ? 'success' : 'danger'">{{ scope.row.status === '0' ? '启用' : '停用' }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" align="center" width="150" fixed="right">
-          <template slot-scope="scope">
-            <el-button v-hasPermi="['lawyers:slaPolicy:edit']" type="text" size="mini" icon="el-icon-edit" @click="handleUpdate(scope.row)">编辑</el-button>
-            <el-button v-hasPermi="['lawyers:slaPolicy:remove']" type="text" size="mini" icon="el-icon-delete" style="color:#C63D4A" @click="handleDelete(scope.row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <pagination v-show="total > 0" :total="total" :page.sync="queryParams.pageNum" :limit.sync="queryParams.pageSize" @pagination="getList" />
-    </el-card>
+    <!-- V3：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="policyList"
+      :loading="loading"
+      :total="total"
+      :show-search.sync="showSearch"
+      :table-attrs="{ border: true }"
+      has-selection
+      label-width="90px"
+      empty-text="暂无 SLA 策略"
+      empty-hint="新增策略后，转办工单将按业务类型自动匹配响应与办结时限"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList"
+      @selection-change="handleSelectionChange">
+      <template #toolbar-left>
+        <el-button v-hasPermi="['lawyers:slaPolicy:add']" type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd">新增策略</el-button>
+        <el-button v-hasPermi="['lawyers:slaPolicy:remove']" type="danger" plain icon="el-icon-delete" size="mini" :disabled="multiple" @click="handleDelete">删除</el-button>
+      </template>
+      <template #column-bizType="{ row }">{{ bizText(row.bizType) }}</template>
+      <template #column-priority="{ row }">
+        <el-tag size="mini" :type="row.priority === '1' ? 'danger' : (row.priority === '3' ? 'info' : '')">{{ priorityText(row.priority) }}</el-tag>
+      </template>
+      <template #column-respondMinutes="{ row }">{{ row.respondMinutes }} 分钟</template>
+      <template #column-resolveMinutes="{ row }">{{ row.resolveMinutes }} 分钟</template>
+      <template #column-warnThreshold="{ row }">{{ row.warnThreshold }}%</template>
+      <template #column-escalateRoles="{ row }">
+        <el-tag v-for="(r, i) in (row.escalateRoles || '').split(',').filter(Boolean)" :key="i" size="mini" style="margin-right:4px">{{ r }}</el-tag>
+      </template>
+      <template #column-status="{ row }">
+        <el-tag size="mini" :type="row.status === '0' ? 'success' : 'danger'">{{ row.status === '0' ? '启用' : '停用' }}</el-tag>
+      </template>
+      <template #column-action="{ row }">
+        <el-button v-hasPermi="['lawyers:slaPolicy:edit']" type="text" size="mini" icon="el-icon-edit" @click="handleUpdate(row)">编辑</el-button>
+        <el-button v-hasPermi="['lawyers:slaPolicy:remove']" type="text" size="mini" icon="el-icon-delete" style="color:#C63D4A" @click="handleDelete(row)">删除</el-button>
+      </template>
+    </ProTable>
 
     <el-dialog :title="title" :visible.sync="open" width="600px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="130px" size="small">
@@ -130,8 +94,22 @@ export default {
   data() {
     return {
       loading: false,
+      showSearch: true,
       total: 0,
       policyList: [],
+      // V3：ProTable 列定义（业务类型/优先级/时限/角色链/状态/操作走插槽）
+      columns: [
+        { prop: 'policyId', label: 'ID', width: 70 },
+        { prop: 'policyName', label: '策略名称', minWidth: 180, showOverflowTooltip: true },
+        { prop: 'bizType', label: '业务类型', width: 130, slot: true },
+        { prop: 'priority', label: '优先级', width: 90, slot: true },
+        { prop: 'respondMinutes', label: '响应时限', width: 110, slot: true },
+        { prop: 'resolveMinutes', label: '办结时限', width: 110, slot: true },
+        { prop: 'warnThreshold', label: '预警阈值', width: 100, slot: true },
+        { prop: 'escalateRoles', label: '逐级升级角色链', minWidth: 200, slot: true },
+        { prop: 'status', label: '状态', width: 80, slot: true },
+        { prop: 'action', label: '操作', width: 150, slot: true, className: 'small-padding fixed-width' }
+      ],
       open: false,
       title: '',
       ids: [],
@@ -157,6 +135,18 @@ export default {
     }
   },
   created() { this.getList() },
+  computed: {
+    /** V3：ProTable 查询字段 */
+    queryFormItems() {
+      return [
+        { prop: 'policyName', label: '策略名称', placeholder: '请输入策略名称', width: '170px' },
+        { prop: 'bizType', label: '业务类型', type: 'select', placeholder: '全部', width: '150px', options: this.bizOptions },
+        { prop: 'status', label: '状态', type: 'select', placeholder: '全部', width: '110px', options: [
+          { label: '启用', value: '0' }, { label: '停用', value: '1' }
+        ] }
+      ]
+    }
+  },
   methods: {
     bizText(v) { const hit = this.bizOptions.find(i => i.value === v); return hit ? hit.label : (v || '-') },
     priorityText(v) { return { '1': '紧急', '2': '普通', '3': '低' }[String(v)] || v },
@@ -170,9 +160,9 @@ export default {
     },
     handleQuery() { this.queryParams.pageNum = 1; this.getList() },
     resetQuery() {
-      this.resetForm('queryForm')
+      // ProTable 已复位查询表单，页面只需恢复筛选初值并重查
       this.queryParams = { pageNum: 1, pageSize: 10, policyName: undefined, bizType: undefined, status: undefined }
-      this.handleQuery()
+      this.getList()
     },
     reset() {
       this.form = { policyId: undefined, policyName: undefined, bizType: 'TICKET', priority: '2', respondMinutes: 30, resolveMinutes: 480, warnThreshold: 80, escalateRoles: undefined, status: '0', remark: undefined }
