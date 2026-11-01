@@ -7,6 +7,7 @@
  */
 import { mount, createLocalVue } from '@vue/test-utils'
 import ElementUI from 'element-ui'
+import ProTable from '@/components/ProTable/index.vue'
 import Todo from '@/views/lawyers/workbench/todo.vue'
 import {
   listTodo,
@@ -46,6 +47,7 @@ jest.mock('@/api/lawyers/externalOrg', () => ({
 
 const localVue = createLocalVue()
 localVue.use(ElementUI)
+localVue.component('ProTable', ProTable)
 localVue.directive('hasPermi', {})
 // main.js 全局挂载的工具方法
 localVue.prototype.parseTime = () => '2026-10-31 10:00'
@@ -80,7 +82,8 @@ function mountPage(rows = [todoRow()]) {
     localVue,
     stubs: {
       pagination: { template: '<div class="pagination-stub" />' },
-      'right-toolbar': { template: '<div class="toolbar-stub" />' }
+      'right-toolbar': { template: '<div class="toolbar-stub" />' },
+      TableEmpty: { template: '<div class="empty-stub" />', props: ['text', 'hint', 'actionText', 'actionIcon'] }
     },
     mocks: {
       $modal: modal,

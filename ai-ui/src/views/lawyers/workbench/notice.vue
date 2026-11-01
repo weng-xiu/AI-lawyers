@@ -1,33 +1,23 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="公告标题" prop="noticeTitle">
-        <el-input
-          v-model="queryParams.noticeTitle"
-          placeholder="请输入公告标题"
-          clearable
-          style="width: 240px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="状态" prop="status">
-        <el-select v-model="queryParams.status" placeholder="请选择状态" clearable>
-          <el-option
-            v-for="item in statusOptions"
-            :key="item.value"
-            :label="item.label"
-            :value="item.value"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
-
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="noticeList"
+      :loading="loading"
+      :total="total"
+      :show-search.sync="showSearch"
+      has-selection
+      label-width="80px"
+      empty-text="暂无公告"
+      empty-hint="新增并发布公告后，坐席工作台首页将同步展示"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList"
+      @selection-change="handleSelectionChange">
+      <template #toolbar-left>
         <el-button
           type="primary"
           plain
@@ -36,8 +26,6 @@
           @click="handleAdd"
           v-hasPermi="['lawyers:workbench:notice:add']"
         >新增</el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button
           type="danger"
           plain
@@ -47,72 +35,42 @@
           @click="handleDelete"
           v-hasPermi="['lawyers:workbench:notice:remove']"
         >删除</el-button>
-      </el-col>
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
-    </el-row>
-
-    <el-table v-loading="loading" :data="noticeList" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="公告标题" prop="noticeTitle" :show-overflow-tooltip="true" />
-      <el-table-column label="类型" align="center" prop="noticeType" width="100">
-        <template slot-scope="scope">
-          <el-tag :type="scope.row.noticeType === '紧急' ? 'danger' : ''">{{ scope.row.noticeType || '普通' }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="是否置顶" align="center" prop="isTop" width="100">
-        <template slot-scope="scope">
-          <el-tag :type="scope.row.isTop === 1 ? 'danger' : 'info'">{{ scope.row.isTop === 1 ? '置顶' : '否' }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="状态" align="center" prop="status" width="100">
-        <template slot-scope="scope">
-          <el-tag :type="statusTagType(scope.row.status)">{{ statusLabel(scope.row.status) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="发布时间" align="center" prop="publishTime" width="160">
-        <template slot-scope="scope">
-          <span>{{ parseTime(scope.row.publishTime) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="创建时间" align="center" prop="createTime" width="160">
-        <template slot-scope="scope">
-          <span>{{ parseTime(scope.row.createTime) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="200">
-        <template slot-scope="scope">
-          <el-button
-            v-if="scope.row.status === 0"
-            size="mini"
-            type="text"
-            icon="el-icon-s-promotion"
-            @click="handlePublish(scope.row)"
-          >发布</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-edit"
-            @click="handleUpdate(scope.row)"
-            v-hasPermi="['lawyers:workbench:notice:edit']"
-          >修改</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-delete"
-            @click="handleDelete(scope.row)"
-            v-hasPermi="['lawyers:workbench:notice:remove']"
-          >删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <pagination
-      v-show="total > 0"
-      :total="total"
-      :page.sync="queryParams.pageNum"
-      :limit.sync="queryParams.pageSize"
-      @pagination="getList"
-    />
+      </template>
+      <template #column-noticeType="{ row }">
+        <el-tag :type="row.noticeType === '紧急' ? 'danger' : ''">{{ row.noticeType || '普通' }}</el-tag>
+      </template>
+      <template #column-isTop="{ row }">
+        <el-tag :type="row.isTop === 1 ? 'danger' : 'info'">{{ row.isTop === 1 ? '置顶' : '否' }}</el-tag>
+      </template>
+      <template #column-status="{ row }">
+        <el-tag :type="statusTagType(row.status)">{{ statusLabel(row.status) }}</el-tag>
+      </template>
+      <template #column-publishTime="{ row }">{{ parseTime(row.publishTime) }}</template>
+      <template #column-createTime="{ row }">{{ parseTime(row.createTime) }}</template>
+      <template #column-action="{ row }">
+        <el-button
+          v-if="row.status === 0"
+          size="mini"
+          type="text"
+          icon="el-icon-s-promotion"
+          @click="handlePublish(row)"
+        >发布</el-button>
+        <el-button
+          size="mini"
+          type="text"
+          icon="el-icon-edit"
+          @click="handleUpdate(row)"
+          v-hasPermi="['lawyers:workbench:notice:edit']"
+        >修改</el-button>
+        <el-button
+          size="mini"
+          type="text"
+          icon="el-icon-delete"
+          @click="handleDelete(row)"
+          v-hasPermi="['lawyers:workbench:notice:remove']"
+        >删除</el-button>
+      </template>
+    </ProTable>
 
     <!-- 添加或修改公告对话框 -->
     <el-dialog :title="title" :visible.sync="open" width="680px" append-to-body>
@@ -169,6 +127,16 @@ export default {
       total: 0,
       // 公告表格数据
       noticeList: [],
+      // V3：ProTable 列定义（类型/置顶/状态/时间/操作走插槽）
+      columns: [
+        { prop: 'noticeTitle', label: '公告标题', minWidth: 200, showOverflowTooltip: true },
+        { prop: 'noticeType', label: '类型', width: 100, align: 'center', slot: true },
+        { prop: 'isTop', label: '是否置顶', width: 100, align: 'center', slot: true },
+        { prop: 'status', label: '状态', width: 100, align: 'center', slot: true },
+        { prop: 'publishTime', label: '发布时间', width: 160, align: 'center', slot: true },
+        { prop: 'createTime', label: '创建时间', width: 160, align: 'center', slot: true },
+        { prop: 'action', label: '操作', width: 200, align: 'center', slot: true, className: 'small-padding fixed-width' }
+      ],
       // 弹出层标题
       title: '',
       // 是否显示弹出层
@@ -197,6 +165,15 @@ export default {
   },
   created() {
     this.getList()
+  },
+  computed: {
+    /** V3：ProTable 查询字段 */
+    queryFormItems() {
+      return [
+        { prop: 'noticeTitle', label: '公告标题', placeholder: '请输入公告标题', width: '240px' },
+        { prop: 'status', label: '状态', type: 'select', placeholder: '请选择状态', width: '110px', options: this.statusOptions }
+      ]
+    }
   },
   methods: {
     /** 查询公告列表 */
@@ -233,8 +210,9 @@ export default {
     },
     /** 重置按钮操作 */
     resetQuery() {
-      this.resetForm('queryForm')
-      this.handleQuery()
+      // ProTable 已复位查询表单，页面只需恢复筛选初值并重查
+      this.queryParams = { pageNum: 1, pageSize: 10, noticeTitle: undefined, status: undefined }
+      this.getList()
     },
     // 多选框选中数据
     handleSelectionChange(selection) {

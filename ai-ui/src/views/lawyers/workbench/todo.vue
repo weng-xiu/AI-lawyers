@@ -1,43 +1,23 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="待办标题" prop="todoTitle">
-        <el-input
-          v-model="queryParams.todoTitle"
-          placeholder="请输入待办标题"
-          clearable
-          style="width: 240px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="状态" prop="status">
-        <el-select v-model="queryParams.status" placeholder="请选择状态" clearable>
-          <el-option
-            v-for="item in statusOptions"
-            :key="item.value"
-            :label="item.label"
-            :value="item.value"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="优先级" prop="priority">
-        <el-select v-model="queryParams.priority" placeholder="请选择优先级" clearable>
-          <el-option
-            v-for="item in priorityOptions"
-            :key="item.value"
-            :label="item.label"
-            :value="item.value"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
-
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="todoList"
+      :loading="loading"
+      :total="total"
+      :show-search.sync="showSearch"
+      has-selection
+      label-width="80px"
+      empty-text="暂无待办事项"
+      empty-hint="工单办结或归档后关联待办会自动关闭；也可手动新增待办跟进事项"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList"
+      @selection-change="handleSelectionChange">
+      <template #toolbar-left>
         <el-button
           type="primary"
           plain
@@ -46,8 +26,6 @@
           @click="handleAdd"
           v-hasPermi="['lawyers:workbench:todo:add']"
         >新增</el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button
           type="danger"
           plain
@@ -57,88 +35,60 @@
           @click="handleDelete"
           v-hasPermi="['lawyers:workbench:todo:remove']"
         >删除</el-button>
-      </el-col>
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
-    </el-row>
-
-    <el-table v-loading="loading" :data="todoList" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="待办标题" prop="todoTitle" :show-overflow-tooltip="true" />
-      <el-table-column label="内容" prop="todoContent" :show-overflow-tooltip="true" />
-      <el-table-column label="关联工单" align="center" width="120">
-        <template slot-scope="scope">
-          <el-button
-            v-if="scope.row.bizType === 'ticket' && scope.row.bizId"
-            type="text"
-            size="mini"
-            icon="el-icon-tickets"
-            @click="handleOpenTicket(scope.row)"
-          >工单 #{{ scope.row.bizId }}</el-button>
-          <span v-else class="todo-no-link">—</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="优先级" align="center" prop="priority" width="90">
-        <template slot-scope="scope">
-          <el-tag :type="priorityTagType(scope.row.priority)">{{ priorityLabel(scope.row.priority) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="状态" align="center" prop="status" width="90">
-        <template slot-scope="scope">
-          <el-tag :type="statusTagType(scope.row.status)">{{ statusLabel(scope.row.status) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="到期日期" align="center" prop="dueDate" width="120" />
-      <el-table-column label="创建时间" align="center" prop="createTime" width="160">
-        <template slot-scope="scope">
-          <span>{{ parseTime(scope.row.createTime) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="280">
-        <template slot-scope="scope">
-          <el-button
-            v-if="isPendingTodo(scope.row.status)"
-            size="mini"
-            type="text"
-            icon="el-icon-check"
-            @click="handleProcess(scope.row)"
-          >处理</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-time"
-            @click="handleDefer(scope.row)"
-          >延后</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-remove-outline"
-            @click="handleIgnore(scope.row)"
-          >忽略</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-edit"
-            @click="handleUpdate(scope.row)"
-            v-hasPermi="['lawyers:workbench:todo:edit']"
-          >修改</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-delete"
-            @click="handleDelete(scope.row)"
-            v-hasPermi="['lawyers:workbench:todo:remove']"
-          >删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <pagination
-      v-show="total > 0"
-      :total="total"
-      :page.sync="queryParams.pageNum"
-      :limit.sync="queryParams.pageSize"
-      @pagination="getList"
-    />
+      </template>
+      <template #column-bizId="{ row }">
+        <el-button
+          v-if="row.bizType === 'ticket' && row.bizId"
+          type="text"
+          size="mini"
+          icon="el-icon-tickets"
+          @click="handleOpenTicket(row)"
+        >工单 #{{ row.bizId }}</el-button>
+        <span v-else class="todo-no-link">—</span>
+      </template>
+      <template #column-priority="{ row }">
+        <el-tag :type="priorityTagType(row.priority)">{{ priorityLabel(row.priority) }}</el-tag>
+      </template>
+      <template #column-status="{ row }">
+        <el-tag :type="statusTagType(row.status)">{{ statusLabel(row.status) }}</el-tag>
+      </template>
+      <template #column-createTime="{ row }">{{ parseTime(row.createTime) }}</template>
+      <template #column-action="{ row }">
+        <el-button
+          v-if="isPendingTodo(row.status)"
+          size="mini"
+          type="text"
+          icon="el-icon-check"
+          @click="handleProcess(row)"
+        >处理</el-button>
+        <el-button
+          size="mini"
+          type="text"
+          icon="el-icon-time"
+          @click="handleDefer(row)"
+        >延后</el-button>
+        <el-button
+          size="mini"
+          type="text"
+          icon="el-icon-remove-outline"
+          @click="handleIgnore(row)"
+        >忽略</el-button>
+        <el-button
+          size="mini"
+          type="text"
+          icon="el-icon-edit"
+          @click="handleUpdate(row)"
+          v-hasPermi="['lawyers:workbench:todo:edit']"
+        >修改</el-button>
+        <el-button
+          size="mini"
+          type="text"
+          icon="el-icon-delete"
+          @click="handleDelete(row)"
+          v-hasPermi="['lawyers:workbench:todo:remove']"
+        >删除</el-button>
+      </template>
+    </ProTable>
 
     <!-- 添加或修改待办事项对话框 -->
     <el-dialog :title="title" :visible.sync="open" width="600px" append-to-body>
@@ -314,6 +264,17 @@ export default {
       total: 0,
       // 待办表格数据
       todoList: [],
+      // V3：ProTable 列定义（关联工单/优先级/状态/时间/操作走插槽）
+      columns: [
+        { prop: 'todoTitle', label: '待办标题', minWidth: 200, showOverflowTooltip: true },
+        { prop: 'todoContent', label: '内容', minWidth: 200, showOverflowTooltip: true },
+        { prop: 'bizId', label: '关联工单', width: 120, align: 'center', slot: true },
+        { prop: 'priority', label: '优先级', width: 90, align: 'center', slot: true },
+        { prop: 'status', label: '状态', width: 90, align: 'center', slot: true },
+        { prop: 'dueDate', label: '到期日期', width: 120, align: 'center' },
+        { prop: 'createTime', label: '创建时间', width: 160, align: 'center', slot: true },
+        { prop: 'action', label: '操作', width: 280, align: 'center', slot: true, className: 'small-padding fixed-width' }
+      ],
       // 弹出层标题
       title: '',
       // 是否显示弹出层
@@ -383,6 +344,16 @@ export default {
   created() {
     this.getList()
   },
+  computed: {
+    /** V3：ProTable 查询字段 */
+    queryFormItems() {
+      return [
+        { prop: 'todoTitle', label: '待办标题', placeholder: '请输入待办标题', width: '240px' },
+        { prop: 'status', label: '状态', type: 'select', placeholder: '请选择状态', width: '110px', options: this.statusOptions },
+        { prop: 'priority', label: '优先级', type: 'select', placeholder: '请选择优先级', width: '110px', options: this.priorityOptions }
+      ]
+    }
+  },
   methods: {
     /** 查询待办列表 */
     getList() {
@@ -419,8 +390,9 @@ export default {
     },
     /** 重置按钮操作 */
     resetQuery() {
-      this.resetForm('queryForm')
-      this.handleQuery()
+      // ProTable 已复位查询表单，页面只需恢复筛选初值并重查
+      this.queryParams = { pageNum: 1, pageSize: 10, todoTitle: undefined, status: undefined, priority: undefined }
+      this.getList()
     },
     // 多选框选中数据
     handleSelectionChange(selection) {
