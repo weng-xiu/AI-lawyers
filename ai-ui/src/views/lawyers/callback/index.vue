@@ -49,82 +49,46 @@
       <div ref="trendChart" class="cb-trend-chart"></div>
     </el-card>
 
-    <!-- 查询 -->
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="80px">
-      <el-form-item label="来电号码" prop="callerNumber">
-        <el-input v-model="queryParams.callerNumber" placeholder="请输入来电号码" clearable style="width: 200px" @keyup.enter.native="handleQuery" />
-      </el-form-item>
-      <el-form-item label="来电人" prop="callerName">
-        <el-input v-model="queryParams.callerName" placeholder="请输入来电人" clearable style="width: 200px" @keyup.enter.native="handleQuery" />
-      </el-form-item>
-      <el-form-item label="满意度" prop="satisfaction">
-        <el-select v-model="queryParams.satisfaction" placeholder="全部" clearable style="width: 140px">
-          <el-option label="非常满意" value="1" />
-          <el-option label="满意" value="2" />
-          <el-option label="一般" value="3" />
-          <el-option label="不满意" value="4" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="状态" prop="status">
-        <el-select v-model="queryParams.status" placeholder="全部" clearable style="width: 140px">
-          <el-option label="待回访" value="0" />
-          <el-option label="已完成" value="1" />
-          <el-option label="无法联系" value="2" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="回访时间">
-        <el-date-picker v-model="dateRange" style="width: 240px" value-format="yyyy-MM-dd" type="daterange" range-separator="-" start-placeholder="开始日期" end-placeholder="结束日期" />
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
-
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="callbackList"
+      :loading="loading"
+      :total="total"
+      :show-search.sync="showSearch"
+      has-selection
+      label-width="80px"
+      empty-text="暂无客户回访记录"
+      empty-hint="工单办结后可生成回访记录，坐席可在回访页记录满意度与回访意见"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList"
+      @selection-change="handleSelectionChange">
+      <template #toolbar-left>
         <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd" v-hasPermi="['lawyers:callback:add']">新增</el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button type="danger" plain icon="el-icon-delete" size="mini" :disabled="multiple" @click="handleDelete" v-hasPermi="['lawyers:callback:remove']">删除</el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button type="warning" plain icon="el-icon-download" size="mini" @click="handleExport" v-hasPermi="['lawyers:callback:export']">导出</el-button>
-      </el-col>
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
-    </el-row>
-
-    <el-table v-loading="loading" :data="callbackList" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="50" align="center" />
-      <el-table-column label="来电号码" prop="callerNumber" width="130" />
-      <el-table-column label="来电人" prop="callerName" width="100" />
-      <el-table-column label="回访时间" prop="visitTime" width="160">
-        <template slot-scope="scope">{{ scope.row.visitTime || '-' }}</template>
-      </el-table-column>
-      <el-table-column label="回访人" prop="visitBy" width="100">
-        <template slot-scope="scope">{{ scope.row.visitBy || '-' }}</template>
-      </el-table-column>
-      <el-table-column label="满意度" prop="satisfaction" width="100" align="center">
-        <template slot-scope="scope">
-          <el-tag size="mini" :type="satTagType(scope.row.satisfaction)">{{ satText(scope.row.satisfaction) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="状态" prop="status" width="90" align="center">
-        <template slot-scope="scope">
-          <el-tag size="mini" :type="statusTagType(scope.row.status)">{{ statusText(scope.row.status) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="回访意见" prop="visitOpinion" show-overflow-tooltip />
-      <el-table-column label="操作" align="center" width="180" fixed="right">
-        <template slot-scope="scope">
-          <el-button size="mini" type="text" icon="el-icon-view" @click="handleDetail(scope.row)" v-hasPermi="['lawyers:callback:query']">详情</el-button>
-          <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(scope.row)" v-hasPermi="['lawyers:callback:edit']">修改</el-button>
-          <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(scope.row)" v-hasPermi="['lawyers:callback:remove']">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <pagination v-show="total > 0" :total="total" :page.sync="queryParams.pageNum" :limit.sync="queryParams.pageSize" @pagination="getList" />
+      </template>
+      <!-- 回访时间为区间控件，走自定义查询插槽，仍由页面维护 dateRange -->
+      <template #query-dateRange>
+        <el-date-picker v-model="dateRange" style="width: 240px" value-format="yyyy-MM-dd" type="daterange" range-separator="-" start-placeholder="开始日期" end-placeholder="结束日期" />
+      </template>
+      <template #column-visitTime="{ row }">{{ row.visitTime || '-' }}</template>
+      <template #column-visitBy="{ row }">{{ row.visitBy || '-' }}</template>
+      <template #column-satisfaction="{ row }">
+        <el-tag size="mini" :type="satTagType(row.satisfaction)">{{ satText(row.satisfaction) }}</el-tag>
+      </template>
+      <template #column-status="{ row }">
+        <el-tag size="mini" :type="statusTagType(row.status)">{{ statusText(row.status) }}</el-tag>
+      </template>
+      <template #column-action="{ row }">
+        <el-button size="mini" type="text" icon="el-icon-view" @click="handleDetail(row)" v-hasPermi="['lawyers:callback:query']">详情</el-button>
+        <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(row)" v-hasPermi="['lawyers:callback:edit']">修改</el-button>
+        <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(row)" v-hasPermi="['lawyers:callback:remove']">删除</el-button>
+      </template>
+    </ProTable>
 
     <!-- 新增/修改 -->
     <el-dialog :title="title" :visible.sync="open" width="600px" append-to-body>
@@ -226,6 +190,17 @@ export default {
       showSearch: true,
       stats: {},
       callbackList: [],
+      // V3：ProTable 列定义（时间/回访人/满意度/状态/操作走插槽）
+      columns: [
+        { prop: 'callerNumber', label: '来电号码', width: 130 },
+        { prop: 'callerName', label: '来电人', width: 100 },
+        { prop: 'visitTime', label: '回访时间', width: 160, slot: true },
+        { prop: 'visitBy', label: '回访人', width: 100, slot: true },
+        { prop: 'satisfaction', label: '满意度', width: 100, align: 'center', slot: true },
+        { prop: 'status', label: '状态', width: 90, align: 'center', slot: true },
+        { prop: 'visitOpinion', label: '回访意见', minWidth: 200, showOverflowTooltip: true },
+        { prop: 'action', label: '操作', width: 180, align: 'center', slot: true, className: 'small-padding fixed-width' }
+      ],
       total: 0,
       open: false,
       detailOpen: false,
@@ -247,6 +222,41 @@ export default {
       rules: {
         callerNumber: [{ required: true, message: '来电号码不能为空', trigger: 'blur' }]
       }
+    }
+  },
+  computed: {
+    /** V3：ProTable 查询字段（回访时间区间走 #query-dateRange 插槽，由页面维护 dateRange） */
+    queryFormItems() {
+      return [
+        { prop: 'callerNumber', label: '来电号码', placeholder: '请输入来电号码', width: 200 },
+        { prop: 'callerName', label: '来电人', placeholder: '请输入来电人', width: 200 },
+        {
+          prop: 'satisfaction',
+          label: '满意度',
+          type: 'select',
+          placeholder: '全部',
+          width: 140,
+          options: [
+            { label: '非常满意', value: '1' },
+            { label: '满意', value: '2' },
+            { label: '一般', value: '3' },
+            { label: '不满意', value: '4' }
+          ]
+        },
+        {
+          prop: 'status',
+          label: '状态',
+          type: 'select',
+          placeholder: '全部',
+          width: 140,
+          options: [
+            { label: '待回访', value: '0' },
+            { label: '已完成', value: '1' },
+            { label: '无法联系', value: '2' }
+          ]
+        },
+        { prop: 'dateRange', label: '回访时间', slot: true }
+      ]
     }
   },
   mounted() {
@@ -318,9 +328,10 @@ export default {
       this.getList()
     },
     resetQuery() {
+      // ProTable 已复位查询表单，页面只需恢复筛选初值与时间区间并重查
       this.dateRange = []
-      this.resetForm('queryForm')
-      this.handleQuery()
+      this.queryParams = { pageNum: 1, pageSize: 10, callerNumber: undefined, callerName: undefined, satisfaction: undefined, status: undefined }
+      this.getList()
     },
     handleSelectionChange(selection) {
       this.ids = selection.map(i => i.callbackId)

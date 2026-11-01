@@ -1,94 +1,47 @@
 <template>
   <div class="app-container blacklist-page">
-    <el-card class="search-card" shadow="never">
-      <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" label-width="80px">
-        <el-form-item label="电话号码" prop="phoneNumber">
-          <el-input
-            v-model="queryParams.phoneNumber"
-            placeholder="请输入电话号码"
-            clearable
-            style="width: 180px"
-            @keyup.enter.native="handleQuery"
-          />
-        </el-form-item>
-        <el-form-item label="名单类型" prop="listType">
-          <el-select v-model="queryParams.listType" placeholder="全部" clearable style="width: 140px">
-            <el-option label="黑名单" value="1" />
-            <el-option label="白名单" value="2" />
-            <el-option label="退订名单" value="3" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="状态" prop="status">
-          <el-select v-model="queryParams.status" placeholder="全部" clearable style="width: 120px">
-            <el-option label="启用" value="1" />
-            <el-option label="停用" value="0" />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">查询</el-button>
-          <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
-
-    <el-card shadow="never" class="table-card">
-      <el-row :gutter="10" class="mb8">
-        <el-col :span="1.5">
-          <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd">新增</el-button>
-        </el-col>
-        <el-col :span="1.5">
-          <el-button type="success" plain icon="el-icon-circle-check" size="mini" @click="openCheckDialog">号码检查</el-button>
-        </el-col>
-      </el-row>
-
-      <el-table v-loading="loading" :data="blacklistList" border size="small">
-        <el-table-column label="ID" align="center" prop="id" width="80" />
-        <el-table-column label="电话号码" align="center" prop="phoneNumber" width="150" />
-        <el-table-column label="名单类型" align="center" width="100">
-          <template slot-scope="scope">
-            <el-tag :type="listTypeTagType(scope.row.listType)" size="mini">
-              {{ listTypeText(scope.row.listType) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="原因" align="center" prop="reason" min-width="180" show-overflow-tooltip>
-          <template slot-scope="scope">{{ scope.row.reason || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="状态" align="center" width="90">
-          <template slot-scope="scope">
-            <el-switch
-              v-model="scope.row.status"
-              active-value="1"
-              inactive-value="0"
-              @change="handleStatusChange(scope.row)"
-            />
-          </template>
-        </el-table-column>
-        <el-table-column label="生效开始" align="center" prop="effectiveStart" width="160">
-          <template slot-scope="scope">{{ scope.row.effectiveStart ? parseTime(scope.row.effectiveStart) : '-' }}</template>
-        </el-table-column>
-        <el-table-column label="生效结束" align="center" prop="effectiveEnd" width="160">
-          <template slot-scope="scope">{{ scope.row.effectiveEnd ? parseTime(scope.row.effectiveEnd) : '-' }}</template>
-        </el-table-column>
-        <el-table-column label="创建时间" align="center" prop="createTime" width="160">
-          <template slot-scope="scope">{{ parseTime(scope.row.createTime) }}</template>
-        </el-table-column>
-        <el-table-column label="操作" align="center" width="160" fixed="right">
-          <template slot-scope="scope">
-            <el-button type="text" size="mini" icon="el-icon-edit" @click="handleUpdate(scope.row)">编辑</el-button>
-            <el-button type="text" size="mini" icon="el-icon-delete" style="color:#C63D4A" @click="handleDelete(scope.row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <pagination
-        v-show="total > 0"
-        :total="total"
-        :page.sync="queryParams.pageNum"
-        :limit.sync="queryParams.pageSize"
-        @pagination="getList"
-      />
-    </el-card>
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="blacklistList"
+      :loading="loading"
+      :total="total"
+      :show-search.sync="showSearch"
+      :table-attrs="{ border: true }"
+      label-width="80px"
+      empty-text="暂无名单记录"
+      empty-hint="新增黑名单/白名单后，来电将按名单策略弹屏提示或拦截"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList">
+      <template #toolbar-left>
+        <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd">新增</el-button>
+        <el-button type="success" plain icon="el-icon-circle-check" size="mini" @click="openCheckDialog">号码检查</el-button>
+      </template>
+      <template #column-listType="{ row }">
+        <el-tag :type="listTypeTagType(row.listType)" size="mini">
+          {{ listTypeText(row.listType) }}
+        </el-tag>
+      </template>
+      <template #column-reason="{ row }">{{ row.reason || '-' }}</template>
+      <template #column-status="{ row }">
+        <el-switch
+          v-model="row.status"
+          active-value="1"
+          inactive-value="0"
+          @change="handleStatusChange(row)"
+        />
+      </template>
+      <template #column-effectiveStart="{ row }">{{ row.effectiveStart ? parseTime(row.effectiveStart) : '-' }}</template>
+      <template #column-effectiveEnd="{ row }">{{ row.effectiveEnd ? parseTime(row.effectiveEnd) : '-' }}</template>
+      <template #column-createTime="{ row }">{{ parseTime(row.createTime) }}</template>
+      <template #column-action="{ row }">
+        <el-button type="text" size="mini" icon="el-icon-edit" @click="handleUpdate(row)">编辑</el-button>
+        <el-button type="text" size="mini" icon="el-icon-delete" style="color:#C63D4A" @click="handleDelete(row)">删除</el-button>
+      </template>
+    </ProTable>
 
     <!-- 新增/编辑对话框（V3 ProDialog：统一外壳 + 提交 loading + 脏改动关闭拦截） -->
     <pro-dialog
@@ -146,7 +99,20 @@ export default {
     return {
       loading: false,
       total: 0,
+      showSearch: true,
       blacklistList: [],
+      // V3：ProTable 列定义（名单类型/状态开关/时间/操作走插槽）
+      columns: [
+        { prop: 'id', label: 'ID', width: 80, align: 'center' },
+        { prop: 'phoneNumber', label: '电话号码', width: 150, align: 'center' },
+        { prop: 'listType', label: '名单类型', width: 100, align: 'center', slot: true },
+        { prop: 'reason', label: '原因', minWidth: 180, align: 'center', showOverflowTooltip: true, slot: true },
+        { prop: 'status', label: '状态', width: 90, align: 'center', slot: true },
+        { prop: 'effectiveStart', label: '生效开始', width: 160, align: 'center', slot: true },
+        { prop: 'effectiveEnd', label: '生效结束', width: 160, align: 'center', slot: true },
+        { prop: 'createTime', label: '创建时间', width: 160, align: 'center', slot: true },
+        { prop: 'action', label: '操作', width: 160, align: 'center', slot: true, className: 'small-padding fixed-width' }
+      ],
       open: false,
       title: '',
       // V3 ProDialog：提交防重锁 + 脏改动快照
@@ -183,6 +149,35 @@ export default {
     }
   },
   computed: {
+    /** V3：ProTable 查询字段 */
+    queryFormItems() {
+      return [
+        { prop: 'phoneNumber', label: '电话号码', placeholder: '请输入电话号码', width: 180 },
+        {
+          prop: 'listType',
+          label: '名单类型',
+          type: 'select',
+          placeholder: '全部',
+          width: 140,
+          options: [
+            { label: '黑名单', value: '1' },
+            { label: '白名单', value: '2' },
+            { label: '退订名单', value: '3' }
+          ]
+        },
+        {
+          prop: 'status',
+          label: '状态',
+          type: 'select',
+          placeholder: '全部',
+          width: 120,
+          options: [
+            { label: '启用', value: '1' },
+            { label: '停用', value: '0' }
+          ]
+        }
+      ]
+    },
     checkResultTitle() {
       if (!this.checkResult) return ''
       if (this.checkResult.listed) {
@@ -231,9 +226,9 @@ export default {
       this.getList()
     },
     resetQuery() {
-      this.resetForm('queryForm')
+      // ProTable 已复位查询表单，页面只需恢复筛选初值并重查
       this.queryParams = { pageNum: 1, pageSize: 10, phoneNumber: undefined, listType: undefined, status: undefined }
-      this.handleQuery()
+      this.getList()
     },
     reset() {
       this.form = {
