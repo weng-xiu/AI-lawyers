@@ -1,41 +1,22 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="88px">
-      <el-form-item label="任务名称" prop="taskName">
-        <el-input
-          v-model="queryParams.taskName"
-          placeholder="请输入任务名称"
-          clearable
-          style="width: 240px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="任务编号" prop="taskNo">
-        <el-input
-          v-model="queryParams.taskNo"
-          placeholder="请输入任务编号"
-          clearable
-          style="width: 200px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="状态" prop="status">
-        <el-select v-model="queryParams.status" placeholder="请选择状态" clearable>
-          <el-option label="待开始" value="0" />
-          <el-option label="进行中" value="1" />
-          <el-option label="已暂停" value="3" />
-          <el-option label="已停止" value="4" />
-          <el-option label="已完成" value="5" />
-        </el-select>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
-
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="taskList"
+      :loading="loading"
+      :total="total"
+      :show-search.sync="showSearch"
+      empty-text="还没有外呼任务"
+      empty-hint="新建任务并导入号码名单后，即可按调度策略自动外呼"
+      empty-action-text="新建外呼任务"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList"
+      @empty-action="handleAdd">
+      <template #toolbar-left>
         <el-button
           type="primary"
           plain
@@ -44,8 +25,6 @@
           @click="handleAdd"
           v-hasPermi="['lawyers:outbound:task:add']"
         >新增</el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button
           type="warning"
           plain
@@ -54,111 +33,78 @@
           @click="handleExport"
           v-hasPermi="['lawyers:outbound:task:export']"
         >导出</el-button>
-      </el-col>
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
-    </el-row>
-
-    <el-table v-loading="loading" :data="taskList">
-      <!-- U7 空态引导：从建任务到导入名单的下一步 -->
-      <template slot="empty">
-        <TableEmpty
-          text="还没有外呼任务"
-          hint="新建任务并导入号码名单后，即可按调度策略自动外呼"
-          action-text="新建外呼任务"
-          @action="handleAdd" />
       </template>
-      <el-table-column label="任务名称" prop="taskName" :show-overflow-tooltip="true" />
-      <el-table-column label="任务编号" prop="taskNo" width="160" />
-      <el-table-column label="任务类型" prop="taskType" width="100" align="center">
-        <template slot-scope="scope">
-          <el-tag v-if="scope.row.taskType === '1'" type="primary">批量外呼</el-tag>
-          <el-tag v-else-if="scope.row.taskType === '2'" type="success">回访</el-tag>
-          <el-tag v-else type="warning">通知</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="总号码数" prop="totalCount" width="100" align="center" />
-      <el-table-column label="已完成" prop="completedCount" width="100" align="center" />
-      <el-table-column label="已接听" prop="answeredCount" width="100" align="center" />
-      <el-table-column label="状态" align="center" prop="status" width="100">
-        <template slot-scope="scope">
-          <el-tag v-if="scope.row.status === '0'" type="info">待开始</el-tag>
-          <el-tag v-else-if="scope.row.status === '1'" type="success">进行中</el-tag>
-          <el-tag v-else-if="scope.row.status === '2'" type="primary">已完成</el-tag>
-          <el-tag v-else-if="scope.row.status === '3'" type="warning">已暂停</el-tag>
-          <el-tag v-else type="danger">已停止</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="创建时间" align="center" prop="createTime" width="160">
-        <template slot-scope="scope">
-          <span>{{ parseTime(scope.row.createTime) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="360">
-        <template slot-scope="scope">
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-user"
-            @click="handleCallee(scope.row)"
-            v-hasPermi="['lawyers:outbound:callee:list']"
-          >号码</el-button>
-          <el-button
-            v-if="scope.row.status === '0'"
-            size="mini"
-            type="text"
-            icon="el-icon-video-play"
-            @click="handleStart(scope.row)"
-            v-hasPermi="['lawyers:outbound:task:start']"
-          >启动</el-button>
-          <el-button
-            v-if="scope.row.status === '1'"
-            size="mini"
-            type="text"
-            icon="el-icon-video-play"
-            @click="handleExecute(scope.row)"
-            v-hasPermi="['lawyers:outbound:task:start']"
-          >执行</el-button>
-          <el-button
-            v-if="scope.row.status === '1'"
-            size="mini"
-            type="text"
-            icon="el-icon-video-pause"
-            @click="handlePause(scope.row)"
-            v-hasPermi="['lawyers:outbound:task:pause']"
-          >暂停</el-button>
-          <el-button
-            v-if="scope.row.status === '1' || scope.row.status === '3'"
-            size="mini"
-            type="text"
-            icon="el-icon-circle-close"
-            @click="handleStop(scope.row)"
-            v-hasPermi="['lawyers:outbound:task:stop']"
-          >停止</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-edit"
-            @click="handleUpdate(scope.row)"
-            v-hasPermi="['lawyers:outbound:task:edit']"
-          >修改</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-delete"
-            @click="handleDelete(scope.row)"
-            v-hasPermi="['lawyers:outbound:task:remove']"
-          >删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <pagination
-      v-show="total>0"
-      :total="total"
-      :page.sync="queryParams.pageNum"
-      :limit.sync="queryParams.pageSize"
-      @pagination="getList"
-    />
+      <template #column-taskType="{ row }">
+        <el-tag v-if="row.taskType === '1'" type="primary">批量外呼</el-tag>
+        <el-tag v-else-if="row.taskType === '2'" type="success">回访</el-tag>
+        <el-tag v-else type="warning">通知</el-tag>
+      </template>
+      <template #column-status="{ row }">
+        <el-tag v-if="row.status === '0'" type="info">待开始</el-tag>
+        <el-tag v-else-if="row.status === '1'" type="success">进行中</el-tag>
+        <el-tag v-else-if="row.status === '2'" type="primary">已完成</el-tag>
+        <el-tag v-else-if="row.status === '3'" type="warning">已暂停</el-tag>
+        <el-tag v-else type="danger">已停止</el-tag>
+      </template>
+      <template #column-createTime="{ row }">
+        <span>{{ parseTime(row.createTime) }}</span>
+      </template>
+      <template #column-action="{ row }">
+        <el-button
+          size="mini"
+          type="text"
+          icon="el-icon-user"
+          @click="handleCallee(row)"
+          v-hasPermi="['lawyers:outbound:callee:list']"
+        >号码</el-button>
+        <el-button
+          v-if="row.status === '0'"
+          size="mini"
+          type="text"
+          icon="el-icon-video-play"
+          @click="handleStart(row)"
+          v-hasPermi="['lawyers:outbound:task:start']"
+        >启动</el-button>
+        <el-button
+          v-if="row.status === '1'"
+          size="mini"
+          type="text"
+          icon="el-icon-video-play"
+          @click="handleExecute(row)"
+          v-hasPermi="['lawyers:outbound:task:start']"
+        >执行</el-button>
+        <el-button
+          v-if="row.status === '1'"
+          size="mini"
+          type="text"
+          icon="el-icon-video-pause"
+          @click="handlePause(row)"
+          v-hasPermi="['lawyers:outbound:task:pause']"
+        >暂停</el-button>
+        <el-button
+          v-if="row.status === '1' || row.status === '3'"
+          size="mini"
+          type="text"
+          icon="el-icon-circle-close"
+          @click="handleStop(row)"
+          v-hasPermi="['lawyers:outbound:task:stop']"
+        >停止</el-button>
+        <el-button
+          size="mini"
+          type="text"
+          icon="el-icon-edit"
+          @click="handleUpdate(row)"
+          v-hasPermi="['lawyers:outbound:task:edit']"
+        >修改</el-button>
+        <el-button
+          size="mini"
+          type="text"
+          icon="el-icon-delete"
+          @click="handleDelete(row)"
+          v-hasPermi="['lawyers:outbound:task:remove']"
+        >删除</el-button>
+      </template>
+    </ProTable>
 
     <el-dialog :title="title" :visible.sync="open" width="600px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
@@ -246,6 +192,18 @@ export default {
       showSearch: true,
       total: 0,
       taskList: [],
+      // V3：ProTable 列定义（任务类型/状态/创建时间/操作走插槽）
+      columns: [
+        { prop: 'taskName', label: '任务名称', minWidth: 180, align: 'left', showOverflowTooltip: true },
+        { prop: 'taskNo', label: '任务编号', width: 160 },
+        { prop: 'taskType', label: '任务类型', width: 100, align: 'center', slot: true },
+        { prop: 'totalCount', label: '总号码数', width: 100, align: 'center' },
+        { prop: 'completedCount', label: '已完成', width: 100, align: 'center' },
+        { prop: 'answeredCount', label: '已接听', width: 100, align: 'center' },
+        { prop: 'status', label: '状态', width: 100, align: 'center', slot: true },
+        { prop: 'createTime', label: '创建时间', width: 160, align: 'center', slot: true },
+        { prop: 'action', label: '操作', width: 360, align: 'center', slot: true, className: 'small-padding fixed-width' }
+      ],
       flowOptions: [],
       title: "",
       open: false,
@@ -265,6 +223,28 @@ export default {
           { required: true, message: "任务类型不能为空", trigger: "change" }
         ]
       }
+    }
+  },
+  computed: {
+    queryFormItems() {
+      return [
+        { prop: 'taskName', label: '任务名称', placeholder: '请输入任务名称', width: 240 },
+        { prop: 'taskNo', label: '任务编号', placeholder: '请输入任务编号', width: 200 },
+        {
+          prop: 'status',
+          label: '状态',
+          type: 'select',
+          placeholder: '全部',
+          width: 140,
+          options: [
+            { label: '待开始', value: '0' },
+            { label: '进行中', value: '1' },
+            { label: '已暂停', value: '3' },
+            { label: '已停止', value: '4' },
+            { label: '已完成', value: '5' }
+          ]
+        }
+      ]
     }
   },
   created() {
@@ -361,8 +341,15 @@ export default {
       this.getList()
     },
     resetQuery() {
-      this.resetForm("queryForm")
-      this.handleQuery()
+      // ProTable 已复位查询表单，页面只需恢复筛选初值并重查
+      this.queryParams = {
+        pageNum: 1,
+        pageSize: 10,
+        taskName: undefined,
+        taskNo: undefined,
+        status: undefined
+      }
+      this.getList()
     },
     handleAdd() {
       this.reset()

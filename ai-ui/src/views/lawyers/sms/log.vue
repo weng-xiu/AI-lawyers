@@ -1,63 +1,35 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="80px">
-      <el-form-item label="接收号码" prop="phone">
-        <el-input v-model="queryParams.phone" placeholder="请输入接收号码" clearable style="width: 180px"
-          @keyup.enter.native="handleQuery" />
-      </el-form-item>
-      <el-form-item label="短信模板" prop="templateId">
-        <el-select v-model="queryParams.templateId" placeholder="请选择模板" clearable filterable style="width: 180px">
-          <el-option v-for="t in templateOptions" :key="t.templateId" :label="t.templateName" :value="t.templateId" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="发送状态" prop="sendStatus">
-        <el-select v-model="queryParams.sendStatus" placeholder="请选择状态" clearable style="width: 130px">
-          <el-option label="成功" value="1" />
-          <el-option label="失败" value="2" />
-          <el-option label="待发" value="0" />
-        </el-select>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
-
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="logList"
+      :loading="loading"
+      :total="total"
+      :show-search.sync="showSearch"
+      has-selection
+      label-width="80px"
+      empty-text="暂无短信发送记录"
+      empty-hint="调试发送或业务触发后将在此留痕"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList"
+      @selection-change="handleSelectionChange">
+      <template #toolbar-left>
         <el-button type="primary" plain icon="el-icon-s-promotion" size="mini" @click="handleSend">调试发送</el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button type="danger" plain icon="el-icon-delete" size="mini" :disabled="multiple" @click="handleDelete"
           v-hasPermi="['lawyers:smsLog:remove']">删除</el-button>
-      </el-col>
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
-    </el-row>
-
-    <el-table v-loading="loading" :data="logList" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="ID" prop="logId" width="70" />
-      <el-table-column label="接收号码" prop="phone" width="130" />
-      <el-table-column label="模板" prop="templateName" width="120" :show-overflow-tooltip="true" />
-      <el-table-column label="发送内容" prop="content" min-width="260" :show-overflow-tooltip="true" />
-      <el-table-column label="状态" prop="sendStatus" width="80" align="center">
-        <template slot-scope="scope">
-          <el-tag :type="statusTag(scope.row.sendStatus)" size="small">{{ statusLabel(scope.row.sendStatus) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="回执ID" prop="providerMsgId" width="170" :show-overflow-tooltip="true" />
-      <el-table-column label="失败原因" prop="failReason" width="150" :show-overflow-tooltip="true" />
-      <el-table-column label="发送时间" prop="createTime" width="160" align="center" />
-      <el-table-column label="操作" width="80" align="center">
-        <template slot-scope="scope">
-          <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(scope.row)"
-            v-hasPermi="['lawyers:smsLog:remove']">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <pagination v-show="total > 0" :total="total" :page.sync="queryParams.pageNum" :limit.sync="queryParams.pageSize"
-      @pagination="getList" />
+      </template>
+      <template #column-sendStatus="{ row }">
+        <el-tag :type="statusTag(row.sendStatus)" size="small">{{ statusLabel(row.sendStatus) }}</el-tag>
+      </template>
+      <template #column-action="{ row }">
+        <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(row)"
+          v-hasPermi="['lawyers:smsLog:remove']">删除</el-button>
+      </template>
+    </ProTable>
 
     <!-- 调试发送对话框 -->
     <el-dialog title="调试发送短信" :visible.sync="sendOpen" width="520px" append-to-body>
@@ -99,6 +71,18 @@ export default {
       showSearch: true,
       total: 0,
       logList: [],
+      // V3：ProTable 列定义（发送状态/操作走插槽）
+      columns: [
+        { prop: 'logId', label: 'ID', width: 70, align: 'center' },
+        { prop: 'phone', label: '接收号码', width: 130, align: 'center' },
+        { prop: 'templateName', label: '模板', width: 120, align: 'left', showOverflowTooltip: true },
+        { prop: 'content', label: '发送内容', minWidth: 260, align: 'left', showOverflowTooltip: true },
+        { prop: 'sendStatus', label: '状态', width: 80, align: 'center', slot: true },
+        { prop: 'providerMsgId', label: '回执ID', width: 170, align: 'left', showOverflowTooltip: true },
+        { prop: 'failReason', label: '失败原因', width: 150, align: 'left', showOverflowTooltip: true },
+        { prop: 'createTime', label: '发送时间', width: 160, align: 'center' },
+        { prop: 'action', label: '操作', width: 80, align: 'center', slot: true, className: 'small-padding fixed-width' }
+      ],
       templateOptions: [],
       sendOpen: false,
       queryParams: {
@@ -120,6 +104,32 @@ export default {
     };
   },
   computed: {
+    queryFormItems() {
+      return [
+        { prop: 'phone', label: '接收号码', placeholder: '请输入接收号码', width: 180 },
+        {
+          prop: 'templateId',
+          label: '短信模板',
+          type: 'select',
+          placeholder: '请选择模板',
+          width: 180,
+          filterable: true,
+          options: this.templateOptions.map(t => ({ label: t.templateName, value: t.templateId }))
+        },
+        {
+          prop: 'sendStatus',
+          label: '发送状态',
+          type: 'select',
+          placeholder: '请选择状态',
+          width: 130,
+          options: [
+            { label: '成功', value: '1' },
+            { label: '失败', value: '2' },
+            { label: '待发', value: '0' }
+          ]
+        }
+      ]
+    },
     currentTemplate() {
       if (!this.sendForm.templateId) return null;
       return this.templateOptions.find(t => t.templateId === this.sendForm.templateId) || null;
@@ -156,8 +166,15 @@ export default {
       this.getList();
     },
     resetQuery() {
-      this.$refs["queryForm"].resetFields();
-      this.handleQuery();
+      // ProTable 已复位查询表单，页面只需恢复筛选初值并重查
+      this.queryParams = {
+        pageNum: 1,
+        pageSize: 10,
+        phone: undefined,
+        templateId: undefined,
+        sendStatus: undefined
+      }
+      this.getList()
     },
     handleSelectionChange(selection) {
       this.ids = selection.map(item => item.logId);

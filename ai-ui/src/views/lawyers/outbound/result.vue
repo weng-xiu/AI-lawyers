@@ -1,31 +1,5 @@
 <template>
   <div class="app-container outbound-result-page">
-    <el-card class="search-card" shadow="never">
-      <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" label-width="80px">
-        <el-form-item label="任务" prop="taskId">
-          <el-select v-model="queryParams.taskId" placeholder="全部任务" clearable filterable style="width:220px" @change="handleTaskChange">
-            <el-option v-for="t in taskList" :key="t.taskId" :label="t.taskName || ('任务#' + t.taskId)" :value="t.taskId" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="呼叫状态" prop="callStatus">
-          <el-select v-model="queryParams.callStatus" placeholder="全部" clearable style="width:140px">
-            <el-option label="待呼叫" value="0" />
-            <el-option label="呼叫中" value="1" />
-            <el-option label="已接通" value="2" />
-            <el-option label="未接听" value="3" />
-            <el-option label="呼叫失败" value="4" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="被叫号码" prop="calleeNumber">
-          <el-input v-model="queryParams.calleeNumber" placeholder="被叫号码" clearable style="width:180px" @keyup.enter.native="handleQuery" />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">查询</el-button>
-          <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
-
     <!-- 统计卡片 -->
     <el-row :gutter="16" class="stat-row">
       <el-col :span="4" :offset="2">
@@ -60,41 +34,38 @@
       </el-col>
     </el-row>
 
-    <el-card shadow="never" class="table-card">
-      <el-table v-loading="loading" :data="resultList" border size="small">
-        <el-table-column label="结果ID" align="center" prop="resultId" width="90" />
-        <el-table-column label="被叫号码" align="center" prop="calleeNumber" width="140" />
-        <el-table-column label="被叫姓名" align="center" prop="calleeName" width="120">
-          <template slot-scope="scope">{{ scope.row.calleeName || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="任务ID" align="center" prop="taskId" width="100" />
-        <el-table-column label="呼叫状态" align="center" width="100">
-          <template slot-scope="scope">
-            <el-tag size="mini" :type="callStatusType(scope.row.callStatus)">{{ callStatusLabel(scope.row.callStatus) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="通话时长" align="center" width="110">
-          <template slot-scope="scope">{{ formatDuration(scope.row.callDuration) }}</template>
-        </el-table-column>
-        <el-table-column label="挂断原因" align="center" prop="hangupCause" min-width="140" show-overflow-tooltip>
-          <template slot-scope="scope">{{ scope.row.hangupCause || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="重试次数" align="center" prop="retryCount" width="90">
-          <template slot-scope="scope">{{ scope.row.retryCount || 0 }}</template>
-        </el-table-column>
-        <el-table-column label="呼叫时间" align="center" prop="callTime" width="170">
-          <template slot-scope="scope">{{ parseTime(scope.row.callTime) }}</template>
-        </el-table-column>
-      </el-table>
-
-      <pagination
-        v-show="total > 0"
-        :total="total"
-        :page.sync="queryParams.pageNum"
-        :limit.sync="queryParams.pageSize"
-        @pagination="getList"
-      />
-    </el-card>
+    <!-- V3/U：查询区/表格/分页骨架收敛到 ProTable；顶部结果统计卡保留 -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="resultList"
+      :loading="loading"
+      :total="total"
+      :show-toolbar="false"
+      :stripe="false"
+      :table-attrs="{ border: true }"
+      label-width="80px"
+      empty-text="暂无外呼结果"
+      empty-hint="任务执行后，这里会展示每个号码的呼叫结果"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList">
+      <!-- 任务下拉需在切换后即时刷新统计，走自定义查询插槽 -->
+      <template #query-taskId>
+        <el-select v-model="queryParams.taskId" placeholder="全部任务" clearable filterable style="width:220px" @change="handleTaskChange">
+          <el-option v-for="t in taskList" :key="t.taskId" :label="t.taskName || ('任务#' + t.taskId)" :value="t.taskId" />
+        </el-select>
+      </template>
+      <template #column-calleeName="{ row }">{{ row.calleeName || '-' }}</template>
+      <template #column-callStatus="{ row }">
+        <el-tag size="mini" :type="callStatusType(row.callStatus)">{{ callStatusLabel(row.callStatus) }}</el-tag>
+      </template>
+      <template #column-callDuration="{ row }">{{ formatDuration(row.callDuration) }}</template>
+      <template #column-hangupCause="{ row }">{{ row.hangupCause || '-' }}</template>
+      <template #column-retryCount="{ row }">{{ row.retryCount || 0 }}</template>
+      <template #column-callTime="{ row }">{{ parseTime(row.callTime) }}</template>
+    </ProTable>
   </div>
 </template>
 
@@ -110,6 +81,18 @@ export default {
       total: 0,
       resultList: [],
       taskList: [],
+      // V3：ProTable 列定义（姓名/状态/时长/挂断原因/重试/时间走插槽）
+      columns: [
+        { prop: 'resultId', label: '结果ID', width: 90, align: 'center' },
+        { prop: 'calleeNumber', label: '被叫号码', width: 140, align: 'center' },
+        { prop: 'calleeName', label: '被叫姓名', width: 120, align: 'center', slot: true },
+        { prop: 'taskId', label: '任务ID', width: 100, align: 'center' },
+        { prop: 'callStatus', label: '呼叫状态', width: 100, align: 'center', slot: true },
+        { prop: 'callDuration', label: '通话时长', width: 110, align: 'center', slot: true },
+        { prop: 'hangupCause', label: '挂断原因', minWidth: 140, align: 'center', slot: true },
+        { prop: 'retryCount', label: '重试次数', width: 90, align: 'center', slot: true },
+        { prop: 'callTime', label: '呼叫时间', width: 170, align: 'center', slot: true }
+      ],
       queryParams: {
         pageNum: 1,
         pageSize: 10,
@@ -124,6 +107,28 @@ export default {
         failedCount: 0,
         avgDuration: 0
       }
+    }
+  },
+  computed: {
+    queryFormItems() {
+      return [
+        { prop: 'taskId', label: '任务', slot: true },
+        {
+          prop: 'callStatus',
+          label: '呼叫状态',
+          type: 'select',
+          placeholder: '全部',
+          width: 140,
+          options: [
+            { label: '待呼叫', value: '0' },
+            { label: '呼叫中', value: '1' },
+            { label: '已接通', value: '2' },
+            { label: '未接听', value: '3' },
+            { label: '呼叫失败', value: '4' }
+          ]
+        },
+        { prop: 'calleeNumber', label: '被叫号码', placeholder: '被叫号码', width: 180 }
+      ]
     }
   },
   created() {
@@ -180,9 +185,9 @@ export default {
       this.getList()
     },
     resetQuery() {
-      this.resetForm('queryForm')
+      // ProTable 已复位查询表单，页面只需恢复筛选初值并重查
       this.queryParams = { pageNum: 1, pageSize: 10, taskId: undefined, callStatus: undefined, calleeNumber: undefined }
-      this.handleQuery()
+      this.getList()
     },
     handleTaskChange() {
       this.queryParams.pageNum = 1

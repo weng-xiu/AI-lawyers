@@ -1,76 +1,44 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="80px">
-      <el-form-item label="模板名称" prop="templateName">
-        <el-input v-model="queryParams.templateName" placeholder="请输入模板名称" clearable style="width: 200px"
-          @keyup.enter.native="handleQuery" />
-      </el-form-item>
-      <el-form-item label="场景" prop="sceneType">
-        <el-select v-model="queryParams.sceneType" placeholder="请选择场景" clearable style="width: 150px">
-          <el-option label="排队通知" value="queue" />
-          <el-option label="欢迎语" value="welcome" />
-          <el-option label="工单通知" value="ticket" />
-          <el-option label="回访提醒" value="visit" />
-          <el-option label="通用" value="generic" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="状态" prop="status">
-        <el-select v-model="queryParams.status" placeholder="请选择状态" clearable style="width: 120px">
-          <el-option label="启用" value="1" />
-          <el-option label="停用" value="0" />
-        </el-select>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
-
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="templateList"
+      :loading="loading"
+      :total="total"
+      :show-search.sync="showSearch"
+      has-selection
+      label-width="80px"
+      empty-text="暂无短信模板"
+      empty-hint="新增模板后可在发送调试与业务通知中选用"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList"
+      @selection-change="handleSelectionChange">
+      <template #toolbar-left>
         <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd"
           v-hasPermi="['lawyers:smsTemplate:add']">新增</el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button type="success" plain icon="el-icon-edit" size="mini" :disabled="single" @click="handleUpdate"
           v-hasPermi="['lawyers:smsTemplate:edit']">修改</el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button type="danger" plain icon="el-icon-delete" size="mini" :disabled="multiple" @click="handleDelete"
           v-hasPermi="['lawyers:smsTemplate:remove']">删除</el-button>
-      </el-col>
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
-    </el-row>
-
-    <el-table v-loading="loading" :data="templateList" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="ID" prop="templateId" width="70" />
-      <el-table-column label="模板名称" prop="templateName" :show-overflow-tooltip="true" />
-      <el-table-column label="模板内容" prop="content" min-width="260" :show-overflow-tooltip="true" />
-      <el-table-column label="场景" prop="sceneType" width="110" align="center">
-        <template slot-scope="scope">
-          <el-tag :type="sceneTag(scope.row.sceneType)" size="small">{{ sceneLabel(scope.row.sceneType) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="所属通道" prop="configName" width="130" :show-overflow-tooltip="true" />
-      <el-table-column label="状态" prop="status" width="80" align="center">
-        <template slot-scope="scope">
-          <el-switch v-model="scope.row.status" active-value="1" inactive-value="0"
-            @change="handleStatusChange(scope.row)"></el-switch>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="150" align="center">
-        <template slot-scope="scope">
-          <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(scope.row)"
-            v-hasPermi="['lawyers:smsTemplate:edit']">修改</el-button>
-          <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(scope.row)"
-            v-hasPermi="['lawyers:smsTemplate:remove']">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <pagination v-show="total > 0" :total="total" :page.sync="queryParams.pageNum" :limit.sync="queryParams.pageSize"
-      @pagination="getList" />
+      </template>
+      <template #column-sceneType="{ row }">
+        <el-tag :type="sceneTag(row.sceneType)" size="small">{{ sceneLabel(row.sceneType) }}</el-tag>
+      </template>
+      <template #column-status="{ row }">
+        <el-switch v-model="row.status" active-value="1" inactive-value="0"
+          @change="handleStatusChange(row)"></el-switch>
+      </template>
+      <template #column-action="{ row }">
+        <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(row)"
+          v-hasPermi="['lawyers:smsTemplate:edit']">修改</el-button>
+        <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(row)"
+          v-hasPermi="['lawyers:smsTemplate:remove']">删除</el-button>
+      </template>
+    </ProTable>
 
     <!-- 新增/修改对话框 -->
     <el-dialog :title="title" :visible.sync="open" width="620px" append-to-body>
@@ -137,6 +105,16 @@ export default {
       showSearch: true,
       total: 0,
       templateList: [],
+      // V3：ProTable 列定义（场景/状态/操作走插槽）
+      columns: [
+        { prop: 'templateId', label: 'ID', width: 70, align: 'center' },
+        { prop: 'templateName', label: '模板名称', minWidth: 160, align: 'left', showOverflowTooltip: true },
+        { prop: 'content', label: '模板内容', minWidth: 260, align: 'left', showOverflowTooltip: true },
+        { prop: 'sceneType', label: '场景', width: 110, align: 'center', slot: true },
+        { prop: 'configName', label: '所属通道', width: 130, align: 'left', showOverflowTooltip: true },
+        { prop: 'status', label: '状态', width: 80, align: 'center', slot: true },
+        { prop: 'action', label: '操作', width: 150, align: 'center', slot: true, className: 'small-padding fixed-width' }
+      ],
       configOptions: [],
       title: "",
       open: false,
@@ -154,6 +132,38 @@ export default {
         configId: [{ required: true, message: "请选择所属通道", trigger: "change" }]
       }
     };
+  },
+  computed: {
+    queryFormItems() {
+      return [
+        { prop: 'templateName', label: '模板名称', placeholder: '请输入模板名称', width: 200 },
+        {
+          prop: 'sceneType',
+          label: '场景',
+          type: 'select',
+          placeholder: '请选择场景',
+          width: 150,
+          options: [
+            { label: '排队通知', value: 'queue' },
+            { label: '欢迎语', value: 'welcome' },
+            { label: '工单通知', value: 'ticket' },
+            { label: '回访提醒', value: 'visit' },
+            { label: '通用', value: 'generic' }
+          ]
+        },
+        {
+          prop: 'status',
+          label: '状态',
+          type: 'select',
+          placeholder: '请选择状态',
+          width: 120,
+          options: [
+            { label: '启用', value: '1' },
+            { label: '停用', value: '0' }
+          ]
+        }
+      ]
+    }
   },
   created() {
     this.getList();
@@ -197,8 +207,15 @@ export default {
       this.getList();
     },
     resetQuery() {
-      this.$refs["queryForm"].resetFields();
-      this.handleQuery();
+      // ProTable 已复位查询表单，页面只需恢复筛选初值并重查
+      this.queryParams = {
+        pageNum: 1,
+        pageSize: 10,
+        templateName: undefined,
+        sceneType: undefined,
+        status: undefined
+      }
+      this.getList()
     },
     handleSelectionChange(selection) {
       this.ids = selection.map(item => item.templateId);

@@ -1,50 +1,23 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="88px">
-      <el-form-item label="任务ID" prop="taskId" v-if="!taskId">
-        <el-input
-          v-model="queryParams.taskId"
-          placeholder="请输入任务ID"
-          clearable
-          style="width: 180px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="姓名" prop="calleeName">
-        <el-input
-          v-model="queryParams.calleeName"
-          placeholder="请输入姓名"
-          clearable
-          style="width: 200px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="手机号" prop="phoneNumber">
-        <el-input
-          v-model="queryParams.phoneNumber"
-          placeholder="请输入手机号"
-          clearable
-          style="width: 200px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="呼叫状态" prop="callStatus">
-        <el-select v-model="queryParams.callStatus" placeholder="请选择状态" clearable>
-          <el-option label="待呼叫" value="0" />
-          <el-option label="已接听" value="1" />
-          <el-option label="未接听" value="2" />
-          <el-option label="呼叫失败" value="3" />
-          <el-option label="已取消" value="4" />
-        </el-select>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
-
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable；从任务跳转时隐藏任务ID筛选 -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="calleeList"
+      :loading="loading"
+      :total="total"
+      :show-search.sync="showSearch"
+      has-selection
+      label-width="80px"
+      empty-text="暂无外呼号码"
+      empty-hint="通过「导入」批量粘贴号码，或新增单个号码"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList"
+      @selection-change="handleSelectionChange">
+      <template #toolbar-left>
         <el-button
           type="primary"
           plain
@@ -53,8 +26,6 @@
           @click="handleAdd"
           v-hasPermi="['lawyers:outbound:callee:add']"
         >新增</el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button
           type="success"
           plain
@@ -63,8 +34,6 @@
           @click="handleImport"
           v-hasPermi="['lawyers:outbound:callee:add']"
         >导入</el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button
           type="warning"
           plain
@@ -73,8 +42,6 @@
           @click="handleExport"
           v-hasPermi="['lawyers:outbound:callee:export']"
         >导出</el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button
           type="danger"
           plain
@@ -84,64 +51,39 @@
           v-hasPermi="['lawyers:outbound:callee:remove']"
           :disabled="!taskId"
         >清空号码</el-button>
-      </el-col>
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
-    </el-row>
-
-    <el-table v-loading="loading" :data="calleeList">
-      <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="姓名" prop="calleeName" :show-overflow-tooltip="true" />
-      <el-table-column label="手机号" prop="phoneNumber" width="140" />
-      <el-table-column label="性别" prop="gender" width="80" align="center">
-        <template slot-scope="scope">
-          <span v-if="scope.row.gender === '0'">男</span>
-          <span v-else-if="scope.row.gender === '1'">女</span>
-          <span v-else>未知</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="所属地区" prop="area" :show-overflow-tooltip="true" width="140" />
-      <el-table-column label="呼叫次数" prop="callCount" width="90" align="center" />
-      <el-table-column label="呼叫状态" align="center" prop="callStatus" width="100">
-        <template slot-scope="scope">
-          <el-tag v-if="scope.row.callStatus === '0'" type="info">待呼叫</el-tag>
-          <el-tag v-else-if="scope.row.callStatus === '1'" type="success">已接听</el-tag>
-          <el-tag v-else-if="scope.row.callStatus === '2'" type="warning">未接听</el-tag>
-          <el-tag v-else-if="scope.row.callStatus === '3'" type="danger">呼叫失败</el-tag>
-          <el-tag v-else type="info">已取消</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="最近呼叫时间" align="center" prop="lastCallTime" width="160">
-        <template slot-scope="scope">
-          <span>{{ parseTime(scope.row.lastCallTime) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="200">
-        <template slot-scope="scope">
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-edit"
-            @click="handleUpdate(scope.row)"
-            v-hasPermi="['lawyers:outbound:callee:edit']"
-          >修改</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-delete"
-            @click="handleDelete(scope.row)"
-            v-hasPermi="['lawyers:outbound:callee:remove']"
-          >删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <pagination
-      v-show="total>0"
-      :total="total"
-      :page.sync="queryParams.pageNum"
-      :limit.sync="queryParams.pageSize"
-      @pagination="getList"
-    />
+      </template>
+      <template #column-gender="{ row }">
+        <span v-if="row.gender === '0'">男</span>
+        <span v-else-if="row.gender === '1'">女</span>
+        <span v-else>未知</span>
+      </template>
+      <template #column-callStatus="{ row }">
+        <el-tag v-if="row.callStatus === '0'" type="info">待呼叫</el-tag>
+        <el-tag v-else-if="row.callStatus === '1'" type="success">已接听</el-tag>
+        <el-tag v-else-if="row.callStatus === '2'" type="warning">未接听</el-tag>
+        <el-tag v-else-if="row.callStatus === '3'" type="danger">呼叫失败</el-tag>
+        <el-tag v-else type="info">已取消</el-tag>
+      </template>
+      <template #column-lastCallTime="{ row }">
+        <span>{{ parseTime(row.lastCallTime) }}</span>
+      </template>
+      <template #column-action="{ row }">
+        <el-button
+          size="mini"
+          type="text"
+          icon="el-icon-edit"
+          @click="handleUpdate(row)"
+          v-hasPermi="['lawyers:outbound:callee:edit']"
+        >修改</el-button>
+        <el-button
+          size="mini"
+          type="text"
+          icon="el-icon-delete"
+          @click="handleDelete(row)"
+          v-hasPermi="['lawyers:outbound:callee:remove']"
+        >删除</el-button>
+      </template>
+    </ProTable>
 
     <el-dialog :title="title" :visible.sync="open" width="500px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
@@ -204,7 +146,19 @@ export default {
       showSearch: true,
       total: 0,
       calleeList: [],
+      // V3：ProTable 列定义（性别/呼叫状态/最近呼叫时间/操作走插槽）
+      columns: [
+        { prop: 'calleeName', label: '姓名', minWidth: 140, align: 'left', showOverflowTooltip: true },
+        { prop: 'phoneNumber', label: '手机号', width: 140 },
+        { prop: 'gender', label: '性别', width: 80, align: 'center', slot: true },
+        { prop: 'area', label: '所属地区', width: 140, showOverflowTooltip: true },
+        { prop: 'callCount', label: '呼叫次数', width: 90, align: 'center' },
+        { prop: 'callStatus', label: '呼叫状态', width: 100, align: 'center', slot: true },
+        { prop: 'lastCallTime', label: '最近呼叫时间', width: 160, align: 'center', slot: true },
+        { prop: 'action', label: '操作', width: 200, align: 'center', slot: true, className: 'small-padding fixed-width' }
+      ],
       taskId: null,
+      selectedRows: [],
       title: "",
       open: false,
       importOpen: false,
@@ -225,6 +179,34 @@ export default {
           { pattern: /^1[3|4|5|6|7|8|9][0-9]\d{8}$/, message: "请输入正确的手机号码", trigger: "blur" }
         ]
       }
+    }
+  },
+  computed: {
+    queryFormItems() {
+      const items = []
+      // 从任务页跳转时任务 ID 由路由带入且固定，不再暴露筛选
+      if (!this.taskId) {
+        items.push({ prop: 'taskId', label: '任务ID', placeholder: '请输入任务ID', width: 180 })
+      }
+      items.push(
+        { prop: 'calleeName', label: '姓名', placeholder: '请输入姓名', width: 200 },
+        { prop: 'phoneNumber', label: '手机号', placeholder: '请输入手机号', width: 200 },
+        {
+          prop: 'callStatus',
+          label: '呼叫状态',
+          type: 'select',
+          placeholder: '全部',
+          width: 140,
+          options: [
+            { label: '待呼叫', value: '0' },
+            { label: '已接听', value: '1' },
+            { label: '未接听', value: '2' },
+            { label: '呼叫失败', value: '3' },
+            { label: '已取消', value: '4' }
+          ]
+        }
+      )
+      return items
     }
   },
   created() {
@@ -267,8 +249,19 @@ export default {
       this.getList()
     },
     resetQuery() {
-      this.resetForm("queryForm")
-      this.handleQuery()
+      // ProTable 已复位查询表单，页面只需恢复筛选初值并重查（保留路由带入的任务 ID）
+      this.queryParams = {
+        pageNum: 1,
+        pageSize: 10,
+        taskId: this.taskId || undefined,
+        calleeName: undefined,
+        phoneNumber: undefined,
+        callStatus: undefined
+      }
+      this.getList()
+    },
+    handleSelectionChange(selection) {
+      this.selectedRows = selection
     },
     handleAdd() {
       this.reset()

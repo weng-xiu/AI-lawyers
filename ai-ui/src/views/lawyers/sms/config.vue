@@ -1,75 +1,44 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="80px">
-      <el-form-item label="通道名称" prop="configName">
-        <el-input v-model="queryParams.configName" placeholder="请输入通道名称" clearable style="width: 200px"
-          @keyup.enter.native="handleQuery" />
-      </el-form-item>
-      <el-form-item label="供应商" prop="provider">
-        <el-select v-model="queryParams.provider" placeholder="请选择供应商" clearable style="width: 160px">
-          <el-option label="本地模拟" value="mock" />
-          <el-option label="阿里云" value="aliyun" />
-          <el-option label="腾讯云" value="tencent" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="状态" prop="status">
-        <el-select v-model="queryParams.status" placeholder="请选择状态" clearable style="width: 120px">
-          <el-option label="启用" value="1" />
-          <el-option label="停用" value="0" />
-        </el-select>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
-
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="configList"
+      :loading="loading"
+      :total="total"
+      :show-search.sync="showSearch"
+      has-selection
+      label-width="80px"
+      empty-text="暂无短信通道"
+      empty-hint="新增通道后可用于排队通知、工单通知等短信发送"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList"
+      @selection-change="handleSelectionChange">
+      <template #toolbar-left>
         <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd"
           v-hasPermi="['lawyers:smsConfig:add']">新增</el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button type="success" plain icon="el-icon-edit" size="mini" :disabled="single" @click="handleUpdate"
           v-hasPermi="['lawyers:smsConfig:edit']">修改</el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button type="danger" plain icon="el-icon-delete" size="mini" :disabled="multiple" @click="handleDelete"
           v-hasPermi="['lawyers:smsConfig:remove']">删除</el-button>
-      </el-col>
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
-    </el-row>
-
-    <el-table v-loading="loading" :data="configList" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="ID" prop="configId" width="70" />
-      <el-table-column label="通道名称" prop="configName" :show-overflow-tooltip="true" />
-      <el-table-column label="供应商" prop="provider" width="110" align="center">
-        <template slot-scope="scope">
-          <el-tag :type="providerTag(scope.row.provider)" size="small">{{ providerLabel(scope.row.provider) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="短信签名" prop="signName" width="140" :show-overflow-tooltip="true" />
-      <el-table-column label="日发送上限" prop="dailyLimit" width="100" align="center" />
-      <el-table-column label="状态" prop="status" width="80" align="center">
-        <template slot-scope="scope">
-          <el-switch v-model="scope.row.status" active-value="1" inactive-value="0"
-            @change="handleStatusChange(scope.row)"></el-switch>
-        </template>
-      </el-table-column>
-      <el-table-column label="创建时间" prop="createTime" width="160" align="center" />
-      <el-table-column label="操作" width="150" align="center">
-        <template slot-scope="scope">
-          <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(scope.row)"
-            v-hasPermi="['lawyers:smsConfig:edit']">修改</el-button>
-          <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(scope.row)"
-            v-hasPermi="['lawyers:smsConfig:remove']">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <pagination v-show="total > 0" :total="total" :page.sync="queryParams.pageNum" :limit.sync="queryParams.pageSize"
-      @pagination="getList" />
+      </template>
+      <template #column-provider="{ row }">
+        <el-tag :type="providerTag(row.provider)" size="small">{{ providerLabel(row.provider) }}</el-tag>
+      </template>
+      <template #column-status="{ row }">
+        <el-switch v-model="row.status" active-value="1" inactive-value="0"
+          @change="handleStatusChange(row)"></el-switch>
+      </template>
+      <template #column-action="{ row }">
+        <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(row)"
+          v-hasPermi="['lawyers:smsConfig:edit']">修改</el-button>
+        <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(row)"
+          v-hasPermi="['lawyers:smsConfig:remove']">删除</el-button>
+      </template>
+    </ProTable>
 
     <!-- 新增/编辑对话框（V3 ProDialog） -->
     <pro-dialog
@@ -149,6 +118,17 @@ export default {
       showSearch: true,
       total: 0,
       configList: [],
+      // V3：ProTable 列定义（供应商/状态/操作走插槽）
+      columns: [
+        { prop: 'configId', label: 'ID', width: 70, align: 'center' },
+        { prop: 'configName', label: '通道名称', minWidth: 160, align: 'left', showOverflowTooltip: true },
+        { prop: 'provider', label: '供应商', width: 110, align: 'center', slot: true },
+        { prop: 'signName', label: '短信签名', width: 140, align: 'left', showOverflowTooltip: true },
+        { prop: 'dailyLimit', label: '日发送上限', width: 100, align: 'center' },
+        { prop: 'status', label: '状态', width: 80, align: 'center', slot: true },
+        { prop: 'createTime', label: '创建时间', width: 160, align: 'center' },
+        { prop: 'action', label: '操作', width: 150, align: 'center', slot: true, className: 'small-padding fixed-width' }
+      ],
       title: "",
       open: false,
       // V3 ProDialog：提交防重锁 + 脏改动快照
@@ -169,6 +149,34 @@ export default {
     };
   },
   computed: {
+    queryFormItems() {
+      return [
+        { prop: 'configName', label: '通道名称', placeholder: '请输入通道名称', width: 200 },
+        {
+          prop: 'provider',
+          label: '供应商',
+          type: 'select',
+          placeholder: '请选择供应商',
+          width: 160,
+          options: [
+            { label: '本地模拟', value: 'mock' },
+            { label: '阿里云', value: 'aliyun' },
+            { label: '腾讯云', value: 'tencent' }
+          ]
+        },
+        {
+          prop: 'status',
+          label: '状态',
+          type: 'select',
+          placeholder: '请选择状态',
+          width: 120,
+          options: [
+            { label: '启用', value: '1' },
+            { label: '停用', value: '0' }
+          ]
+        }
+      ]
+    },
     /** 表单相对打开时是否有改动（供 ProDialog 关闭拦截） */
     formDirty() {
       return this.open && this.formSnapshot !== JSON.stringify(this.form);
@@ -205,8 +213,15 @@ export default {
       this.getList();
     },
     resetQuery() {
-      this.$refs["queryForm"].resetFields();
-      this.handleQuery();
+      // ProTable 已复位查询表单，页面只需恢复筛选初值并重查
+      this.queryParams = {
+        pageNum: 1,
+        pageSize: 10,
+        configName: undefined,
+        provider: undefined,
+        status: undefined
+      }
+      this.getList()
     },
     handleSelectionChange(selection) {
       this.ids = selection.map(item => item.configId);
