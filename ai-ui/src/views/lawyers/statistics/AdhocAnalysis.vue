@@ -40,40 +40,45 @@
       </el-form-item>
     </el-form>
 
-    <!-- 结果：动态列 -->
+    <!-- 结果：动态列（服务端目录驱动，仍走 ProTable 骨架，无分页） -->
     <el-alert v-if="capped" type="warning" show-icon :closable="false" class="adhoc-alert"
               :title="`结果超过上限 ${maxRows} 行已截断，请缩小统计区间或减少维度`" />
-    <el-table v-loading="loading" :data="rows" border stripe max-height="520" size="small">
-      <el-table-column v-for="col in columns" :key="col.key" :label="col.label"
-                       :align="isMetricColumn(col) ? 'right' : 'left'" min-width="120">
-        <template slot-scope="scope">{{ renderCell(scope.row, col) }}</template>
-      </el-table-column>
-      <el-table-column label="操作" width="80" fixed="right">
-        <template slot-scope="scope">
-          <el-button type="text" size="mini" @click="openDrill(scope.row)">下钻</el-button>
-        </template>
-      </el-table-column>
-      <div slot="empty">
-        <TableEmpty />
-      </div>
-    </el-table>
+    <ProTable
+      :columns="resultColumns"
+      :query-params="resultQuery"
+      :data="rows"
+      :loading="loading"
+      :show-search="false"
+      :show-toolbar="false"
+      :table-attrs="{ border: true, 'max-height': '520' }"
+      persist-key="statistics:adhoc-result"
+      hide-pagination
+      empty-text="暂无分析结果"
+      empty-hint="选择统计区间与指标后点击查询">
+      <template #column-action="{ row }">
+        <el-button type="text" size="mini" @click="openDrill(row)">下钻</el-button>
+      </template>
+    </ProTable>
     <div v-if="rows.length" class="adhoc-meta">数据来源：{{ source === 'realtime' ? '实时聚合（跨维度组合）' : '分钟预聚合' }}</div>
 
     <!-- 下钻话单明细 -->
     <el-dialog :title="drillTitle" :visible.sync="drillOpen" width="960px" append-to-body top="6vh">
-      <el-table v-loading="drillLoading" :data="drillRows" border stripe size="small" max-height="420">
-        <el-table-column label="主叫号码" prop="callerNumber" width="130" />
-        <el-table-column label="主叫姓名" prop="callerName" width="110" show-overflow-tooltip />
-        <el-table-column label="呼叫时间" prop="callTime" width="160" />
-        <el-table-column label="时长(秒)" prop="duration" width="90" align="right" />
-        <el-table-column label="状态" width="80" align="center">
-          <template slot-scope="scope">{{ statusText(scope.row.status) }}</template>
-        </el-table-column>
-        <el-table-column label="坐席" prop="agentName" width="110" />
-        <el-table-column label="咨询分类" prop="categoryName" min-width="110" show-overflow-tooltip />
-      </el-table>
-      <pagination v-show="drillTotal > 0" :total="drillTotal" :page.sync="drillPageNum"
-                  :limit.sync="drillPageSize" layout="total, prev, pager, next" @pagination="loadDrill" />
+      <ProTable
+        :columns="drillColumns"
+        :query-params="drillQueryParams"
+        :data="drillRows"
+        :total="drillTotal"
+        :loading="drillLoading"
+        :show-search="false"
+        :show-toolbar="false"
+        :table-attrs="{ border: true, 'max-height': '420' }"
+        persist-key="statistics:adhoc-drill"
+        pagination-layout="total, prev, pager, next"
+        empty-text="暂无话单明细"
+        empty-hint="调整下钻条件或切换分页后重试"
+        @pagination="loadDrill">
+        <template #column-status="{ row }">{{ statusText(row.status) }}</template>
+      </ProTable>
     </el-dialog>
   </div>
 </template>
@@ -99,14 +104,15 @@ export default {
       capped: false,
       maxRows: 0,
       source: '',
+      // V3：结果表无分页 / 下钻表有分页，均以 queryParams 载体驱动 ProTable
+      resultQuery: { pageNum: 1, pageSize: 10 },
+      drillQueryParams: { pageNum: 1, pageSize: 10 },
       // 下钻弹窗
       drillOpen: false,
       drillLoading: false,
       drillTitle: '',
       drillRows: [],
       drillTotal: 0,
-      drillPageNum: 1,
-      drillPageSize: 10,
       drillQuery: null
     }
   },
@@ -146,6 +152,28 @@ export default {
         return dim && !dim.crossDim ? '该维度仅支持单维度分析' : ''
       }
       return '不选维度=全局趋势分析'
+    },
+    // V3：服务端目录驱动的动态列，formatter 复用原 renderCell 的维度标签翻译
+    resultColumns() {
+      const cols = this.columns.map(col => ({
+        prop: col.key,
+        label: col.label,
+        minWidth: 120,
+        align: this.isMetricColumn(col) ? 'right' : 'left',
+        formatter: row => this.renderCell(row, col)
+      }))
+      return cols.concat([{ prop: 'action', label: '操作', width: 80, align: 'center', slot: true }])
+    },
+    drillColumns() {
+      return [
+        { prop: 'callerNumber', label: '主叫号码', width: 130 },
+        { prop: 'callerName', label: '主叫姓名', width: 110, showOverflowTooltip: true },
+        { prop: 'callTime', label: '呼叫时间', width: 160 },
+        { prop: 'duration', label: '时长(秒)', width: 90, align: 'right' },
+        { prop: 'status', label: '状态', width: 80, align: 'center', slot: true },
+        { prop: 'agentName', label: '坐席', width: 110 },
+        { prop: 'categoryName', label: '咨询分类', minWidth: 110, showOverflowTooltip: true }
+      ]
     }
   },
   created() {
@@ -252,14 +280,18 @@ export default {
         lang: drill.lang
       }
       this.drillTitle = `话单明细 ${drill.begin || ''} ~ ${drill.end || ''}`
-      this.drillPageNum = 1
+      this.drillQueryParams.pageNum = 1
       this.drillOpen = true
       this.loadDrill()
     },
     loadDrill() {
       if (!this.drillQuery) return
       this.drillLoading = true
-      drillAdhoc({ ...this.drillQuery, pageNum: this.drillPageNum, pageSize: this.drillPageSize }).then(res => {
+      drillAdhoc({
+        ...this.drillQuery,
+        pageNum: this.drillQueryParams.pageNum,
+        pageSize: this.drillQueryParams.pageSize
+      }).then(res => {
         this.drillRows = res.rows || []
         this.drillTotal = res.total || 0
       }).finally(() => {

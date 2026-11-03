@@ -24,59 +24,68 @@
     </el-form>
 
     <el-tabs v-model="activeTab" class="rp-tabs" @tab-click="loadData">
-      <!-- 呼叫报表 -->
+      <!-- 呼叫报表：报表区间/粒度由页面工具栏驱动，表格骨架收敛到 ProTable（无分页） -->
       <el-tab-pane label="呼叫报表" name="call">
-        <el-table v-loading="loading" :data="rows" border stripe>
-          <el-table-column label="周期" prop="period" width="110" />
-          <el-table-column label="呼叫总量" prop="totalCalls" align="right" />
-          <el-table-column label="接通量" prop="answeredCalls" align="right" />
-          <el-table-column label="未接量" prop="missedCalls" align="right" />
-          <el-table-column label="转接量" prop="transferredCalls" align="right" />
-          <el-table-column label="接通率" align="right">
-            <template slot-scope="scope">{{ scope.row.answerRate }}%</template>
-          </el-table-column>
-          <el-table-column label="平均通话时长(秒)" prop="avgDurationSec" align="right" />
-        </el-table>
+        <ProTable
+          :columns="callColumns"
+          :query-params="tableQuery"
+          :data="rows"
+          :loading="loading"
+          :show-search="false"
+          :show-toolbar="false"
+          :table-attrs="{ border: true }"
+          persist-key="statistics:call"
+          hide-pagination
+          empty-text="暂无呼叫报表数据"
+          empty-hint="调整统计区间或粒度后点击查询" />
       </el-tab-pane>
 
       <!-- 坐席服务报表 -->
       <el-tab-pane label="坐席服务报表" name="service">
-        <el-table v-loading="loading" :data="rows" border stripe>
-          <el-table-column label="坐席" prop="agentName" width="140" />
-          <el-table-column label="接线量" prop="totalCalls" align="right" />
-          <el-table-column label="接通量" prop="answeredCalls" align="right" />
-          <el-table-column label="接通率" align="right">
-            <template slot-scope="scope">{{ scope.row.answerRate }}%</template>
-          </el-table-column>
-          <el-table-column label="平均通话时长(秒)" prop="avgDurationSec" align="right" />
-          <el-table-column label="总通话时长(秒)" prop="totalTalkSec" align="right" />
-        </el-table>
+        <ProTable
+          :columns="serviceColumns"
+          :query-params="tableQuery"
+          :data="rows"
+          :loading="loading"
+          :show-search="false"
+          :show-toolbar="false"
+          :table-attrs="{ border: true }"
+          persist-key="statistics:service"
+          hide-pagination
+          empty-text="暂无坐席服务报表数据"
+          empty-hint="当前区间内坐席无接线记录时为空" />
       </el-tab-pane>
 
       <!-- 质检报表 -->
       <el-tab-pane label="质检报表" name="quality">
-        <el-table v-loading="loading" :data="rows" border stripe>
-          <el-table-column label="周期" prop="period" width="110" />
-          <el-table-column label="质检量" prop="inspections" align="right" />
-          <el-table-column label="平均分" prop="avgScore" align="right" />
-          <el-table-column label="已复核" prop="reviewedCount" align="right" />
-          <el-table-column label="待复核" prop="pendingCount" align="right" />
-          <el-table-column label="关联风险数" prop="riskCount" align="right" />
-        </el-table>
+        <ProTable
+          :columns="qualityColumns"
+          :query-params="tableQuery"
+          :data="rows"
+          :loading="loading"
+          :show-search="false"
+          :show-toolbar="false"
+          :table-attrs="{ border: true }"
+          persist-key="statistics:quality"
+          hide-pagination
+          empty-text="暂无质检报表数据"
+          empty-hint="调整统计区间或粒度后点击查询" />
       </el-tab-pane>
 
       <!-- 业务工单报表 -->
       <el-tab-pane label="业务工单报表" name="business">
-        <el-table v-loading="loading" :data="rows" border stripe>
-          <el-table-column label="周期" prop="period" width="110" />
-          <el-table-column label="工单量" prop="totalTickets" align="right" />
-          <el-table-column label="办结量" prop="closedTickets" align="right" />
-          <el-table-column label="办结率" align="right">
-            <template slot-scope="scope">{{ scope.row.closeRate }}%</template>
-          </el-table-column>
-          <el-table-column label="超时量" prop="overdueTickets" align="right" />
-          <el-table-column label="平均办结时长(分钟)" prop="avgCloseMinutes" align="right" />
-        </el-table>
+        <ProTable
+          :columns="businessColumns"
+          :query-params="tableQuery"
+          :data="rows"
+          :loading="loading"
+          :show-search="false"
+          :show-toolbar="false"
+          :table-attrs="{ border: true }"
+          persist-key="statistics:business"
+          hide-pagination
+          empty-text="暂无业务工单报表数据"
+          empty-hint="调整统计区间或粒度后点击查询" />
       </el-tab-pane>
 
       <!-- F6 报表自助分析：自定义指标 + 维度选择器 + 下钻话单明细 -->
@@ -156,6 +165,8 @@ export default {
       dateRange: [],
       granularity: 'day',
       rows: [],
+      // V3：报表表格无分页，ProTable 仍需分页对象载体
+      tableQuery: { pageNum: 1, pageSize: 10 },
       backfillOpen: false,
       backfillLoading: false,
       backfillRange: [],
@@ -169,6 +180,48 @@ export default {
     }
   },
   computed: {
+    // V3：4 张报表表的列定义（百分比列走 formatter，保持原有展示口径）
+    callColumns() {
+      return [
+        { prop: 'period', label: '周期', width: 110, align: 'left' },
+        { prop: 'totalCalls', label: '呼叫总量', align: 'right' },
+        { prop: 'answeredCalls', label: '接通量', align: 'right' },
+        { prop: 'missedCalls', label: '未接量', align: 'right' },
+        { prop: 'transferredCalls', label: '转接量', align: 'right' },
+        { prop: 'answerRate', label: '接通率', align: 'right', formatter: row => this.percent(row.answerRate) },
+        { prop: 'avgDurationSec', label: '平均通话时长(秒)', align: 'right' }
+      ]
+    },
+    serviceColumns() {
+      return [
+        { prop: 'agentName', label: '坐席', width: 140, align: 'left' },
+        { prop: 'totalCalls', label: '接线量', align: 'right' },
+        { prop: 'answeredCalls', label: '接通量', align: 'right' },
+        { prop: 'answerRate', label: '接通率', align: 'right', formatter: row => this.percent(row.answerRate) },
+        { prop: 'avgDurationSec', label: '平均通话时长(秒)', align: 'right' },
+        { prop: 'totalTalkSec', label: '总通话时长(秒)', align: 'right' }
+      ]
+    },
+    qualityColumns() {
+      return [
+        { prop: 'period', label: '周期', width: 110, align: 'left' },
+        { prop: 'inspections', label: '质检量', align: 'right' },
+        { prop: 'avgScore', label: '平均分', align: 'right' },
+        { prop: 'reviewedCount', label: '已复核', align: 'right' },
+        { prop: 'pendingCount', label: '待复核', align: 'right' },
+        { prop: 'riskCount', label: '关联风险数', align: 'right' }
+      ]
+    },
+    businessColumns() {
+      return [
+        { prop: 'period', label: '周期', width: 110, align: 'left' },
+        { prop: 'totalTickets', label: '工单量', align: 'right' },
+        { prop: 'closedTickets', label: '办结量', align: 'right' },
+        { prop: 'closeRate', label: '办结率', align: 'right', formatter: row => this.percent(row.closeRate) },
+        { prop: 'overdueTickets', label: '超时量', align: 'right' },
+        { prop: 'avgCloseMinutes', label: '平均办结时长(分钟)', align: 'right' }
+      ]
+    },
     statusText() {
       if (this.backfillStatus === 'SUCCESS') return '已完成'
       if (this.backfillStatus === 'FAILED') return '失败'
@@ -188,6 +241,10 @@ export default {
       const m = String(d.getMonth() + 1).padStart(2, '0')
       const day = String(d.getDate()).padStart(2, '0')
       return `${d.getFullYear()}-${m}-${day}`
+    },
+    /** ProTable 列 formatter：百分比列展示，空值不留裸 % 号 */
+    percent(v) {
+      return v === null || v === undefined || v === '' ? '-' : `${v}%`
     },
     loadData() {
       // F6 自助分析 Tab 数据由子组件自行加载
