@@ -1,103 +1,38 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="88px">
-      <el-form-item label="意图名称" prop="intentionName">
-        <el-input
-          v-model="queryParams.intentionName"
-          placeholder="请输入意图名称"
-          clearable
-          style="width: 240px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="意图编码" prop="intentionCode">
-        <el-input
-          v-model="queryParams.intentionCode"
-          placeholder="请输入意图编码"
-          clearable
-          style="width: 200px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="状态" prop="status">
-        <el-select v-model="queryParams.status" placeholder="请选择状态" clearable>
-          <el-option label="启用" value="0" />
-          <el-option label="停用" value="1" />
-        </el-select>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
-
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
-        <el-button
-          type="primary"
-          plain
-          icon="el-icon-plus"
-          size="mini"
-          @click="handleAdd"
-          v-hasPermi="['lawyers:ivr:intention:add']"
-        >新增</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="warning"
-          plain
-          icon="el-icon-download"
-          size="mini"
-          @click="handleExport"
-          v-hasPermi="['lawyers:ivr:intention:export']"
-        >导出</el-button>
-      </el-col>
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
-    </el-row>
-
-    <el-table v-loading="loading" :data="intentionList">
-      <el-table-column label="意图名称" prop="intentionName" :show-overflow-tooltip="true" />
-      <el-table-column label="意图编码" prop="intentionCode" width="140" />
-      <el-table-column label="匹配关键词" prop="keywords" :show-overflow-tooltip="true" width="200" />
-      <el-table-column label="优先级" prop="priority" width="80" align="center" />
-      <el-table-column label="状态" align="center" prop="status" width="100">
-        <template slot-scope="scope">
-          <el-tag v-if="scope.row.status === '0'" type="success">启用</el-tag>
-          <el-tag v-else type="danger">停用</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="创建时间" align="center" prop="createTime" width="160">
-        <template slot-scope="scope">
-          <span>{{ parseTime(scope.row.createTime) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="200">
-        <template slot-scope="scope">
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-edit"
-            @click="handleUpdate(scope.row)"
-            v-hasPermi="['lawyers:ivr:intention:edit']"
-          >修改</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-delete"
-            @click="handleDelete(scope.row)"
-            v-hasPermi="['lawyers:ivr:intention:remove']"
-          >删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <pagination
-      v-show="total>0"
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="intentionList"
+      :loading="loading"
       :total="total"
-      :page.sync="queryParams.pageNum"
-      :limit.sync="queryParams.pageSize"
-      @pagination="getList"
-    />
+      :show-search.sync="showSearch"
+      label-width="88px"
+      empty-text="还没有意图定义"
+      empty-hint="维护关键词/正则/AI 提示词后，IVR 意图节点即可按意图分流"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList">
+      <template #toolbar-left>
+        <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd"
+          v-hasPermi="['lawyers:ivr:intention:add']">新增</el-button>
+        <el-button type="warning" plain icon="el-icon-download" size="mini" @click="handleExport"
+          v-hasPermi="['lawyers:ivr:intention:export']">导出</el-button>
+      </template>
+      <template #column-status="{ row }">
+        <el-tag v-if="row.status === '0'" type="success">启用</el-tag>
+        <el-tag v-else type="danger">停用</el-tag>
+      </template>
+      <template #column-createTime="{ row }">{{ parseTime(row.createTime) }}</template>
+      <template #column-action="{ row }">
+        <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(row)"
+          v-hasPermi="['lawyers:ivr:intention:edit']">修改</el-button>
+        <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(row)"
+          v-hasPermi="['lawyers:ivr:intention:remove']">删除</el-button>
+      </template>
+    </ProTable>
 
     <el-dialog :title="title" :visible.sync="open" width="600px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
@@ -148,6 +83,16 @@ export default {
       showSearch: true,
       total: 0,
       intentionList: [],
+      // V3：ProTable 列定义（状态/时间/操作走插槽）
+      columns: [
+        { prop: 'intentionName', label: '意图名称', minWidth: 180, align: 'center', showOverflowTooltip: true },
+        { prop: 'intentionCode', label: '意图编码', width: 140, align: 'center' },
+        { prop: 'keywords', label: '匹配关键词', width: 200, align: 'center', showOverflowTooltip: true },
+        { prop: 'priority', label: '优先级', width: 80, align: 'center' },
+        { prop: 'status', label: '状态', width: 100, align: 'center', slot: true },
+        { prop: 'createTime', label: '创建时间', width: 160, align: 'center', slot: true },
+        { prop: 'action', label: '操作', width: 200, align: 'center', slot: true, className: 'small-padding fixed-width' }
+      ],
       title: "",
       open: false,
       queryParams: {
@@ -170,6 +115,25 @@ export default {
   },
   created() {
     this.getList()
+  },
+  computed: {
+    queryFormItems() {
+      return [
+        { prop: 'intentionName', label: '意图名称', placeholder: '请输入意图名称', width: 240 },
+        { prop: 'intentionCode', label: '意图编码', placeholder: '请输入意图编码', width: 200 },
+        {
+          prop: 'status',
+          label: '状态',
+          type: 'select',
+          placeholder: '请选择状态',
+          width: 120,
+          options: [
+            { label: '启用', value: '0' },
+            { label: '停用', value: '1' }
+          ]
+        }
+      ]
+    }
   },
   methods: {
     getList() {
@@ -203,8 +167,9 @@ export default {
       this.getList()
     },
     resetQuery() {
-      this.resetForm("queryForm")
-      this.handleQuery()
+      // ProTable 已复位查询表单，页面只需恢复筛选初值并重查
+      this.queryParams = { pageNum: 1, pageSize: 10, intentionName: undefined, intentionCode: undefined, status: undefined }
+      this.getList()
     },
     handleAdd() {
       this.reset()

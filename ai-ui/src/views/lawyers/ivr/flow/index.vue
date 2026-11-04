@@ -1,132 +1,49 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="88px">
-      <el-form-item label="流程名称" prop="flowName">
-        <el-input
-          v-model="queryParams.flowName"
-          placeholder="请输入流程名称"
-          clearable
-          style="width: 240px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="流程编码" prop="flowCode">
-        <el-input
-          v-model="queryParams.flowCode"
-          placeholder="请输入流程编码"
-          clearable
-          style="width: 200px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="状态" prop="status">
-        <el-select v-model="queryParams.status" placeholder="请选择状态" clearable>
-          <el-option label="草稿" value="0" />
-          <el-option label="已发布" value="1" />
-          <el-option label="已停用" value="2" />
-        </el-select>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
-
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
-        <el-button
-          type="primary"
-          plain
-          icon="el-icon-plus"
-          size="mini"
-          @click="handleAdd"
-          v-hasPermi="['lawyers:ivr:flow:add']"
-        >新增</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="warning"
-          plain
-          icon="el-icon-download"
-          size="mini"
-          @click="handleExport"
-          v-hasPermi="['lawyers:ivr:flow:export']"
-        >导出</el-button>
-      </el-col>
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
-    </el-row>
-
-    <el-table v-loading="loading" :data="flowList">
-      <el-table-column label="流程名称" prop="flowName" :show-overflow-tooltip="true" />
-      <el-table-column label="流程编码" prop="flowCode" :show-overflow-tooltip="true" width="140" />
-      <el-table-column label="版本号" prop="version" width="80" align="center" />
-      <el-table-column label="状态" align="center" prop="status" width="100">
-        <template slot-scope="scope">
-          <el-tag v-if="scope.row.status === '0'" type="info">草稿</el-tag>
-          <el-tag v-else-if="scope.row.status === '1'" type="success">已发布</el-tag>
-          <el-tag v-else type="danger">已停用</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="是否默认" align="center" prop="isDefault" width="100">
-        <template slot-scope="scope">
-          <el-tag v-if="scope.row.isDefault === '1'" type="success">是</el-tag>
-          <span v-else>否</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="创建时间" align="center" prop="createTime" width="160">
-        <template slot-scope="scope">
-          <span>{{ parseTime(scope.row.createTime) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="280">
-        <template slot-scope="scope">
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-edit-outline"
-            @click="handleDesign(scope.row)"
-            v-hasPermi="['lawyers:ivr:flow:edit']"
-          >设计</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-edit"
-            @click="handleUpdate(scope.row)"
-            v-hasPermi="['lawyers:ivr:flow:edit']"
-          >修改</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-video-play"
-            @click="handleTest(scope.row)"
-            v-hasPermi="['lawyers:ivr:flow:list']"
-          >测试</el-button>
-          <el-button
-            v-if="scope.row.status === '0'"
-            size="mini"
-            type="text"
-            icon="el-icon-check"
-            @click="handlePublish(scope.row)"
-            v-hasPermi="['lawyers:ivr:flow:publish']"
-          >发布</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-delete"
-            @click="handleDelete(scope.row)"
-            v-hasPermi="['lawyers:ivr:flow:remove']"
-          >删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <pagination
-      v-show="total>0"
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="flowList"
+      :loading="loading"
       :total="total"
-      :page.sync="queryParams.pageNum"
-      :limit.sync="queryParams.pageSize"
-      @pagination="getList"
-    />
+      :show-search.sync="showSearch"
+      label-width="88px"
+      empty-text="还没有 IVR 流程"
+      empty-hint="新增流程后可在设计器中编排节点与连线，发布后按新流程接通来电"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList">
+      <template #toolbar-left>
+        <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd"
+          v-hasPermi="['lawyers:ivr:flow:add']">新增</el-button>
+        <el-button type="warning" plain icon="el-icon-download" size="mini" @click="handleExport"
+          v-hasPermi="['lawyers:ivr:flow:export']">导出</el-button>
+      </template>
+      <template #column-status="{ row }">
+        <el-tag v-if="row.status === '0'" type="info">草稿</el-tag>
+        <el-tag v-else-if="row.status === '1'" type="success">已发布</el-tag>
+        <el-tag v-else type="danger">已停用</el-tag>
+      </template>
+      <template #column-isDefault="{ row }">
+        <el-tag v-if="row.isDefault === '1'" type="success">是</el-tag>
+        <span v-else>否</span>
+      </template>
+      <template #column-createTime="{ row }">{{ parseTime(row.createTime) }}</template>
+      <template #column-action="{ row }">
+        <el-button size="mini" type="text" icon="el-icon-edit-outline" @click="handleDesign(row)"
+          v-hasPermi="['lawyers:ivr:flow:edit']">设计</el-button>
+        <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(row)"
+          v-hasPermi="['lawyers:ivr:flow:edit']">修改</el-button>
+        <el-button size="mini" type="text" icon="el-icon-video-play" @click="handleTest(row)"
+          v-hasPermi="['lawyers:ivr:flow:list']">测试</el-button>
+        <el-button v-if="row.status === '0'" size="mini" type="text" icon="el-icon-check" @click="handlePublish(row)"
+          v-hasPermi="['lawyers:ivr:flow:publish']">发布</el-button>
+        <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(row)"
+          v-hasPermi="['lawyers:ivr:flow:remove']">删除</el-button>
+      </template>
+    </ProTable>
 
     <el-dialog title="IVR流程测试运行" :visible.sync="testOpen" width="760px" append-to-body>
       <el-form label-width="100px">
@@ -214,6 +131,16 @@ export default {
       showSearch: true,
       total: 0,
       flowList: [],
+      // V3：ProTable 列定义（状态/默认/时间/操作走插槽）
+      columns: [
+        { prop: 'flowName', label: '流程名称', minWidth: 180, align: 'center', showOverflowTooltip: true },
+        { prop: 'flowCode', label: '流程编码', width: 140, align: 'center', showOverflowTooltip: true },
+        { prop: 'version', label: '版本号', width: 80, align: 'center' },
+        { prop: 'status', label: '状态', width: 100, align: 'center', slot: true },
+        { prop: 'isDefault', label: '是否默认', width: 100, align: 'center', slot: true },
+        { prop: 'createTime', label: '创建时间', width: 160, align: 'center', slot: true },
+        { prop: 'action', label: '操作', width: 280, align: 'center', slot: true, className: 'small-padding fixed-width' }
+      ],
       title: "",
       open: false,
       testOpen: false,
@@ -242,6 +169,26 @@ export default {
   },
   created() {
     this.getList()
+  },
+  computed: {
+    queryFormItems() {
+      return [
+        { prop: 'flowName', label: '流程名称', placeholder: '请输入流程名称', width: 240 },
+        { prop: 'flowCode', label: '流程编码', placeholder: '请输入流程编码', width: 200 },
+        {
+          prop: 'status',
+          label: '状态',
+          type: 'select',
+          placeholder: '请选择状态',
+          width: 120,
+          options: [
+            { label: '草稿', value: '0' },
+            { label: '已发布', value: '1' },
+            { label: '已停用', value: '2' }
+          ]
+        }
+      ]
+    }
   },
   methods: {
     getList() {
@@ -272,8 +219,9 @@ export default {
       this.getList()
     },
     resetQuery() {
-      this.resetForm("queryForm")
-      this.handleQuery()
+      // ProTable 已复位查询表单，页面只需恢复筛选初值并重查
+      this.queryParams = { pageNum: 1, pageSize: 10, flowName: undefined, flowCode: undefined, status: undefined }
+      this.getList()
     },
     handleAdd() {
       this.reset()

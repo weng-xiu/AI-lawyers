@@ -1,105 +1,38 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="知识标题" prop="title">
-        <el-input
-          v-model="queryParams.title"
-          placeholder="请输入知识标题"
-          clearable
-          style="width: 240px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="知识分类" prop="categoryId">
-        <el-select v-model="queryParams.categoryId" placeholder="请选择知识分类" clearable>
-          <el-option
-            v-for="item in categoryOptions"
-            :key="item.categoryId"
-            :label="item.categoryName"
-            :value="item.categoryId"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="关键词" prop="keywords">
-        <el-input
-          v-model="queryParams.keywords"
-          placeholder="请输入关键词"
-          clearable
-          style="width: 240px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
-
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
-        <el-button
-          type="primary"
-          plain
-          icon="el-icon-plus"
-          size="mini"
-          @click="handleAdd"
-          v-hasPermi="['lawyers:knowledge:add']"
-        >新增</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="success"
-          plain
-          icon="el-icon-edit"
-          size="mini"
-          :disabled="single"
-          @click="handleUpdate"
-          v-hasPermi="['lawyers:knowledge:edit']"
-        >修改</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="danger"
-          plain
-          icon="el-icon-delete"
-          size="mini"
-          :disabled="multiple"
-          @click="handleDelete"
-          v-hasPermi="['lawyers:knowledge:remove']"
-        >删除</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="warning"
-          plain
-          icon="el-icon-download"
-          size="mini"
-          @click="handleExport"
-          v-hasPermi="['lawyers:knowledge:export']"
-        >导出</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="info"
-          plain
-          icon="el-icon-upload2"
-          size="mini"
-          @click="handleImport"
-          v-hasPermi="['lawyers:knowledge:import']"
-        >导入</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="success"
-          plain
-          icon="el-icon-check"
-          size="mini"
-          :disabled="multiple"
-          @click="handleAudit"
-          v-hasPermi="['lawyers:knowledge:audit']"
-        >审核</el-button>
-      </el-col>
-      <el-col :span="1.5">
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="knowledgeList"
+      :loading="loading"
+      :total="total"
+      :show-search.sync="showSearch"
+      has-selection
+      label-width="68px"
+      empty-text="知识库还没有内容"
+      empty-hint="可直接新增，或用右上角「导入」批量导入文档，也可以用「AI 沉淀」从通话/工单自动生成草稿"
+      empty-action-text="新增知识"
+      empty-action-icon="el-icon-plus"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList"
+      @selection-change="handleSelectionChange"
+      @empty-action="handleAdd">
+      <template #toolbar-left>
+        <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd"
+          v-hasPermi="['lawyers:knowledge:add']">新增</el-button>
+        <el-button type="success" plain icon="el-icon-edit" size="mini" :disabled="single" @click="handleUpdate"
+          v-hasPermi="['lawyers:knowledge:edit']">修改</el-button>
+        <el-button type="danger" plain icon="el-icon-delete" size="mini" :disabled="multiple" @click="handleDelete"
+          v-hasPermi="['lawyers:knowledge:remove']">删除</el-button>
+        <el-button type="warning" plain icon="el-icon-download" size="mini" @click="handleExport"
+          v-hasPermi="['lawyers:knowledge:export']">导出</el-button>
+        <el-button type="info" plain icon="el-icon-upload2" size="mini" @click="handleImport"
+          v-hasPermi="['lawyers:knowledge:import']">导入</el-button>
+        <el-button type="success" plain icon="el-icon-check" size="mini" :disabled="multiple" @click="handleAudit"
+          v-hasPermi="['lawyers:knowledge:audit']">审核</el-button>
         <el-dropdown trigger="click" @command="handleDraftCommand">
           <el-button type="primary" plain icon="el-icon-magic-stick" size="mini" v-hasPermi="['lawyers:knowledge:add']">
             AI 沉淀<i class="el-icon-arrow-down el-icon--right"></i>
@@ -110,8 +43,6 @@
             <el-dropdown-item icon="el-icon-files" command="scan">扫描高分通话批量沉淀</el-dropdown-item>
           </el-dropdown-menu>
         </el-dropdown>
-      </el-col>
-      <el-col :span="1.5">
         <el-dropdown trigger="click" @command="handleRagCommand">
           <el-button type="warning" plain icon="el-icon-cpu" size="mini">
             RAG 运维<i class="el-icon-arrow-down el-icon--right"></i>
@@ -124,87 +55,26 @@
             <el-dropdown-item icon="el-icon-connection" command="rerankTest" v-hasPermi="['lawyers:knowledge:edit']">rerank 连通测试</el-dropdown-item>
           </el-dropdown-menu>
         </el-dropdown>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="primary"
-          plain
-          icon="el-icon-s-data"
-          size="mini"
-          @click="opsOpen = true"
-          v-hasPermi="['lawyers:knowledge:list']"
-        >运营分析</el-button>
-      </el-col>
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
-    </el-row>
-
-    <el-table v-loading="loading" :data="knowledgeList" @selection-change="handleSelectionChange">
-      <!-- U7 空态引导：给出三条可立即执行的沉淀路径 -->
-      <template slot="empty">
-        <TableEmpty
-          text="知识库还没有内容"
-          hint="可直接新增，或用右上角「导入」批量导入文档，也可以用「AI 沉淀」从通话/工单自动生成草稿"
-          action-text="新增知识"
-          @action="handleAdd" />
+        <el-button type="primary" plain icon="el-icon-s-data" size="mini" @click="opsOpen = true"
+          v-hasPermi="['lawyers:knowledge:list']">运营分析</el-button>
       </template>
-      <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="知识ID" align="center" prop="knowledgeId" />
-      <el-table-column label="知识标题" align="center" prop="title" :show-overflow-tooltip="true" />
-      <el-table-column label="知识分类" align="center" prop="categoryName" />
-      <el-table-column label="关键词" align="center" prop="keywords" :show-overflow-tooltip="true" />
-      <el-table-column label="审核状态" align="center" prop="auditStatus">
-        <template slot-scope="scope">
-          <dict-tag :options="dict.type.lawyers_audit_status" :value="scope.row.auditStatus"/>
-        </template>
-      </el-table-column>
-      <el-table-column label="浏览次数" align="center" prop="viewCount" />
-      <el-table-column label="创建时间" align="center" prop="createTime" width="180">
-        <template slot-scope="scope">
-          <span>{{ parseTime(scope.row.createTime) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
-        <template slot-scope="scope">
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-view"
-            @click="handleDetail(scope.row)"
-            v-hasPermi="['lawyers:knowledge:query']"
-          >详情</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-edit"
-            @click="handleUpdate(scope.row)"
-            v-hasPermi="['lawyers:knowledge:edit']"
-          >修改</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-check"
-            @click="handleSingleAudit(scope.row)"
-            v-hasPermi="['lawyers:knowledge:audit']"
-            v-if="scope.row.auditStatus == 0"
-          >审核</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-delete"
-            @click="handleDelete(scope.row)"
-            v-hasPermi="['lawyers:knowledge:remove']"
-          >删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <pagination
-      v-show="total>0"
-      :total="total"
-      :page.sync="queryParams.pageNum"
-      :limit.sync="queryParams.pageSize"
-      @pagination="getList"
-    />
+      <template #column-auditStatus="{ row }">
+        <dict-tag :options="dict.type.lawyers_audit_status" :value="row.auditStatus"/>
+      </template>
+      <template #column-createTime="{ row }">
+        <span>{{ parseTime(row.createTime) }}</span>
+      </template>
+      <template #column-action="{ row }">
+        <el-button size="mini" type="text" icon="el-icon-view" @click="handleDetail(row)"
+          v-hasPermi="['lawyers:knowledge:query']">详情</el-button>
+        <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(row)"
+          v-hasPermi="['lawyers:knowledge:edit']">修改</el-button>
+        <el-button size="mini" type="text" icon="el-icon-check" @click="handleSingleAudit(row)"
+          v-hasPermi="['lawyers:knowledge:audit']" v-if="row.auditStatus == 0">审核</el-button>
+        <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(row)"
+          v-hasPermi="['lawyers:knowledge:remove']">删除</el-button>
+      </template>
+    </ProTable>
 
     <!-- 添加或修改法律知识库对话框 -->
     <el-dialog :title="title" :visible.sync="open" width="800px" append-to-body>
@@ -407,6 +277,17 @@ export default {
       total: 0,
       // 法律知识库表格数据
       knowledgeList: [],
+      // V3：ProTable 列定义（审核状态/时间/操作走插槽）
+      columns: [
+        { prop: 'knowledgeId', label: '知识ID', width: 100, align: 'center' },
+        { prop: 'title', label: '知识标题', minWidth: 200, align: 'center', showOverflowTooltip: true },
+        { prop: 'categoryName', label: '知识分类', width: 140, align: 'center' },
+        { prop: 'keywords', label: '关键词', minWidth: 180, align: 'center', showOverflowTooltip: true },
+        { prop: 'auditStatus', label: '审核状态', width: 100, align: 'center', slot: true },
+        { prop: 'viewCount', label: '浏览次数', width: 90, align: 'center' },
+        { prop: 'createTime', label: '创建时间', width: 180, align: 'center', slot: true },
+        { prop: 'action', label: '操作', width: 260, align: 'center', slot: true, className: 'small-padding fixed-width' }
+      ],
       // 咨询分类选项
       categoryOptions: [],
       // 弹出层标题
@@ -493,6 +374,22 @@ export default {
     this.getList()
     this.getCategoryOptions()
     this.fetchRagInfo()
+  },
+  computed: {
+    queryFormItems() {
+      return [
+        { prop: 'title', label: '知识标题', placeholder: '请输入知识标题', width: 240 },
+        {
+          prop: 'categoryId',
+          label: '知识分类',
+          type: 'select',
+          placeholder: '请选择知识分类',
+          width: 180,
+          options: this.categoryOptions.map(c => ({ label: c.categoryName, value: c.categoryId }))
+        },
+        { prop: 'keywords', label: '关键词', placeholder: '请输入关键词', width: 240 }
+      ]
+    }
   },
   methods: {
     /** P3-E1 查询 RAG 索引/rerank 状态 */
@@ -617,8 +514,15 @@ export default {
     },
     /** 重置按钮操作 */
     resetQuery() {
-      this.resetForm("queryForm")
-      this.handleQuery()
+      // ProTable 已复位查询表单，页面只需恢复筛选初值并重查
+      this.queryParams = {
+        pageNum: 1,
+        pageSize: 10,
+        title: undefined,
+        categoryId: undefined,
+        keywords: undefined
+      }
+      this.getList()
     },
     /** 新增按钮操作 */
     handleAdd() {

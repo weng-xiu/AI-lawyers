@@ -1,82 +1,48 @@
 <template>
   <div class="app-container ivr-exec-log-page">
-    <el-card class="search-card" shadow="never">
-      <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" label-width="80px">
-        <el-form-item label="会话ID" prop="sessionId">
-          <el-input v-model="queryParams.sessionId" placeholder="请输入会话ID" clearable style="width:220px" @keyup.enter.native="handleQuery" />
-        </el-form-item>
-        <el-form-item label="节点类型" prop="nodeType">
-          <el-select v-model="queryParams.nodeType" placeholder="全部" clearable style="width:160px">
-            <el-option v-for="t in nodeTypeOptions" :key="t.value" :label="t.label" :value="t.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="执行结果" prop="execResult">
-          <el-select v-model="queryParams.execResult" placeholder="全部" clearable style="width:140px">
-            <el-option label="成功" value="1" />
-            <el-option label="失败" value="0" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="执行时间">
-          <el-date-picker
-            v-model="dateRange"
-            style="width: 260px"
-            value-format="yyyy-MM-dd"
-            type="daterange"
-            range-separator="-"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-          ></el-date-picker>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">查询</el-button>
-          <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
-
-    <el-card shadow="never" class="table-card">
-      <el-table v-loading="loading" :data="logList" border size="small">
-        <el-table-column label="日志ID" align="center" prop="execId" width="90" />
-        <el-table-column label="会话ID" align="center" prop="sessionId" width="220" show-overflow-tooltip />
-        <el-table-column label="节点类型" align="center" width="120">
-          <template slot-scope="scope">
-            <el-tag size="mini" :type="nodeTypeTag(scope.row.nodeType)">{{ nodeTypeLabel(scope.row.nodeType) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="节点名称" align="center" prop="nodeName" min-width="140" show-overflow-tooltip>
-          <template slot-scope="scope">{{ scope.row.nodeName || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="执行动作" align="center" prop="execAction" min-width="140" show-overflow-tooltip>
-          <template slot-scope="scope">{{ scope.row.execAction || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="执行结果" align="center" width="90">
-          <template slot-scope="scope">
-            <el-tag size="mini" :type="String(scope.row.execResult) === '1' ? 'success' : 'danger'">
-              {{ String(scope.row.execResult) === '1' ? '成功' : '失败' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="耗时(ms)" align="center" prop="costMs" width="100">
-          <template slot-scope="scope">{{ scope.row.costMs != null ? scope.row.costMs : '-' }}</template>
-        </el-table-column>
-        <el-table-column label="执行时间" align="center" prop="createTime" width="170">
-          <template slot-scope="scope">{{ parseTime(scope.row.createTime) }}</template>
-        </el-table-column>
-        <el-table-column label="操作" align="center" width="100" fixed="right">
-          <template slot-scope="scope">
-            <el-button type="text" size="mini" icon="el-icon-view" @click="handleDetail(scope.row)">详情</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <pagination
-        v-show="total > 0"
-        :total="total"
-        :page.sync="queryParams.pageNum"
-        :limit.sync="queryParams.pageSize"
-        @pagination="getList"
-      />
-    </el-card>
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="logList"
+      :loading="loading"
+      :total="total"
+      :show-search.sync="showSearch"
+      label-width="80px"
+      empty-text="暂无 IVR 执行日志"
+      empty-hint="流程执行后，每个节点的执行轨迹会在此留痕"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList">
+      <!-- 日期区间沿用独立 dateRange + addDateRange，走自定义查询插槽 -->
+      <template #query-dateRange>
+        <el-date-picker
+          v-model="dateRange"
+          style="width: 260px"
+          value-format="yyyy-MM-dd"
+          type="daterange"
+          range-separator="-"
+          start-placeholder="开始日期"
+          end-placeholder="结束日期"
+        />
+      </template>
+      <template #column-nodeType="{ row }">
+        <el-tag size="mini" :type="nodeTypeTag(row.nodeType)">{{ nodeTypeLabel(row.nodeType) }}</el-tag>
+      </template>
+      <template #column-nodeName="{ row }">{{ row.nodeName || '-' }}</template>
+      <template #column-execAction="{ row }">{{ row.execAction || '-' }}</template>
+      <template #column-execResult="{ row }">
+        <el-tag size="mini" :type="String(row.execResult) === '1' ? 'success' : 'danger'">
+          {{ String(row.execResult) === '1' ? '成功' : '失败' }}
+        </el-tag>
+      </template>
+      <template #column-costMs="{ row }">{{ row.costMs != null ? row.costMs : '-' }}</template>
+      <template #column-createTime="{ row }">{{ parseTime(row.createTime) }}</template>
+      <template #column-action="{ row }">
+        <el-button type="text" size="mini" icon="el-icon-view" @click="handleDetail(row)">详情</el-button>
+      </template>
+    </ProTable>
 
     <!-- 详情对话框：显示完整日志 JSON -->
     <el-dialog title="执行日志详情" :visible.sync="detailOpen" width="720px" append-to-body>
@@ -117,8 +83,21 @@ export default {
     return {
       loading: false,
       detailLoading: false,
+      showSearch: true,
       total: 0,
       logList: [],
+      // V3：ProTable 列定义（节点类型/结果/耗时/时间/操作走插槽）
+      columns: [
+        { prop: 'execId', label: '日志ID', width: 90, align: 'center' },
+        { prop: 'sessionId', label: '会话ID', width: 220, align: 'center', showOverflowTooltip: true },
+        { prop: 'nodeType', label: '节点类型', width: 120, align: 'center', slot: true },
+        { prop: 'nodeName', label: '节点名称', minWidth: 140, align: 'center', slot: true, showOverflowTooltip: true },
+        { prop: 'execAction', label: '执行动作', minWidth: 140, align: 'center', slot: true, showOverflowTooltip: true },
+        { prop: 'execResult', label: '执行结果', width: 90, align: 'center', slot: true },
+        { prop: 'costMs', label: '耗时(ms)', width: 100, align: 'center', slot: true },
+        { prop: 'createTime', label: '执行时间', width: 170, align: 'center', slot: true },
+        { prop: 'action', label: '操作', width: 100, align: 'center', slot: true, className: 'small-padding fixed-width' }
+      ],
       dateRange: [],
       detailOpen: false,
       detailForm: {},
@@ -145,6 +124,24 @@ export default {
     }
   },
   computed: {
+    queryFormItems() {
+      return [
+        { prop: 'sessionId', label: '会话ID', placeholder: '请输入会话ID', width: 220 },
+        { prop: 'nodeType', label: '节点类型', type: 'select', placeholder: '全部', width: 160, options: this.nodeTypeOptions },
+        {
+          prop: 'execResult',
+          label: '执行结果',
+          type: 'select',
+          placeholder: '全部',
+          width: 140,
+          options: [
+            { label: '成功', value: '1' },
+            { label: '失败', value: '0' }
+          ]
+        },
+        { prop: 'dateRange', label: '执行时间', slot: true }
+      ]
+    },
     detailJson() {
       try {
         return JSON.stringify(this.detailForm, null, 2)
@@ -174,10 +171,10 @@ export default {
       this.getList()
     },
     resetQuery() {
+      // ProTable 已复位查询表单，页面只需恢复筛选初值（含独立日期区间）并重查
       this.dateRange = []
-      this.resetForm('queryForm')
       this.queryParams = { pageNum: 1, pageSize: 10, sessionId: undefined, nodeType: undefined, execResult: undefined }
-      this.handleQuery()
+      this.getList()
     },
     nodeTypeLabel(t) {
       if (!t) return '-'
