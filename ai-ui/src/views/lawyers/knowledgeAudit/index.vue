@@ -4,126 +4,81 @@
       <el-tabs v-model="activeTab" @tab-click="handleTabChange">
         <!-- 知识审核 -->
         <el-tab-pane label="知识审核" name="knowledge">
-          <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" label-width="90px">
-            <el-form-item label="标题" prop="title">
-              <el-input v-model="queryParams.title" placeholder="知识标题" clearable style="width: 200px" @keyup.enter.native="handleQuery" />
-            </el-form-item>
-            <el-form-item label="审核状态" prop="auditStatus">
-              <el-select v-model="queryParams.auditStatus" placeholder="全部" clearable style="width: 130px">
-                <el-option label="待审核" value="0" />
-                <el-option label="审核通过" value="1" />
-                <el-option label="审核不通过" value="2" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="效力状态" prop="validStatus">
-              <el-select v-model="queryParams.validStatus" placeholder="全部" clearable style="width: 130px">
-                <el-option label="现行有效" value="1" />
-                <el-option label="已修订" value="2" />
-                <el-option label="已失效" value="3" />
-              </el-select>
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">查询</el-button>
-              <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-            </el-form-item>
-          </el-form>
-
-          <el-table v-loading="loading" :data="knowledgeList" border size="small">
-            <el-table-column label="ID" align="center" prop="knowledgeId" width="70" />
-            <el-table-column label="标题" align="center" prop="title" min-width="200" show-overflow-tooltip />
-            <el-table-column label="法律法规" align="center" prop="lawName" width="160" show-overflow-tooltip>
-              <template slot-scope="scope">{{ scope.row.lawName || '-' }}</template>
-            </el-table-column>
-            <el-table-column label="条款号" align="center" prop="articleNo" width="100">
-              <template slot-scope="scope">{{ scope.row.articleNo || '-' }}</template>
-            </el-table-column>
-            <el-table-column label="版本" align="center" prop="publishVersion" width="70">
-              <template slot-scope="scope">v{{ scope.row.publishVersion || 1 }}</template>
-            </el-table-column>
-            <el-table-column label="审核状态" align="center" width="100">
-              <template slot-scope="scope">
-                <el-tag size="mini" :type="auditTag(scope.row.auditStatus)">{{ auditText(scope.row.auditStatus) }}</el-tag>
+          <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable；同页两张表各自 persist-key -->
+          <ProTable
+            :columns="columns"
+            :query-form-items="queryFormItems"
+            :query-params="queryParams"
+            :data="knowledgeList"
+            :loading="loading"
+            :total="total"
+            :show-search.sync="showSearch"
+            :table-attrs="{ border: true }"
+            persist-key="knowledgeAudit:knowledge"
+            label-width="90px"
+            empty-text="暂无待审核知识"
+            empty-hint="知识提交审核后将在此排队，通过后才对 AI 回答生效"
+            @query="handleQuery"
+            @reset="resetQuery"
+            @pagination="getList">
+            <template #column-lawName="{ row }">{{ row.lawName || '-' }}</template>
+            <template #column-articleNo="{ row }">{{ row.articleNo || '-' }}</template>
+            <template #column-publishVersion="{ row }">v{{ row.publishVersion || 1 }}</template>
+            <template #column-auditStatus="{ row }">
+              <el-tag size="mini" :type="auditTag(row.auditStatus)">{{ auditText(row.auditStatus) }}</el-tag>
+            </template>
+            <template #column-status="{ row }">
+              <el-tag size="mini" :type="row.status === '0' ? 'success' : 'info'">{{ row.status === '0' ? '上架' : '下架' }}</el-tag>
+            </template>
+            <template #column-validStatus="{ row }">
+              <el-tag size="mini" :type="validTag(row.validStatus)">{{ validText(row.validStatus) }}</el-tag>
+            </template>
+            <template #column-effectiveDate="{ row }">{{ row.effectiveDate ? row.effectiveDate.substring(0, 10) : '-' }}</template>
+            <template #column-action="{ row }">
+              <el-button v-if="row.auditStatus !== '0'" v-hasPermi="['lawyers:knowledge:audit:submit']" type="text" size="mini" @click="handleSubmit(row)">提交审核</el-button>
+              <template v-if="row.auditStatus === '0'">
+                <el-button v-hasPermi="['lawyers:knowledge:audit:approve']" type="text" size="mini" style="color:#2B8C6E" @click="openOpinion('approve', row)">通过</el-button>
+                <el-button v-hasPermi="['lawyers:knowledge:audit:approve']" type="text" size="mini" style="color:#C63D4A" @click="openOpinion('reject', row)">驳回</el-button>
               </template>
-            </el-table-column>
-            <el-table-column label="上架" align="center" width="80">
-              <template slot-scope="scope">
-                <el-tag size="mini" :type="scope.row.status === '0' ? 'success' : 'info'">{{ scope.row.status === '0' ? '上架' : '下架' }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="效力" align="center" width="90">
-              <template slot-scope="scope">
-                <el-tag size="mini" :type="validTag(scope.row.validStatus)">{{ validText(scope.row.validStatus) }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="生效日期" align="center" prop="effectiveDate" width="110">
-              <template slot-scope="scope">{{ scope.row.effectiveDate ? scope.row.effectiveDate.substring(0, 10) : '-' }}</template>
-            </el-table-column>
-            <el-table-column label="操作" align="center" width="320" fixed="right">
-              <template slot-scope="scope">
-                <el-button v-if="scope.row.auditStatus !== '0'" v-hasPermi="['lawyers:knowledge:audit:submit']" type="text" size="mini" @click="handleSubmit(scope.row)">提交审核</el-button>
-                <template v-if="scope.row.auditStatus === '0'">
-                  <el-button v-hasPermi="['lawyers:knowledge:audit:approve']" type="text" size="mini" style="color:#2B8C6E" @click="openOpinion('approve', scope.row)">通过</el-button>
-                  <el-button v-hasPermi="['lawyers:knowledge:audit:approve']" type="text" size="mini" style="color:#C63D4A" @click="openOpinion('reject', scope.row)">驳回</el-button>
-                </template>
-                <el-button
-                  v-if="scope.row.auditStatus === '1' && scope.row.status !== '0'"
-                  v-hasPermi="['lawyers:knowledge:audit:approve']"
-                  type="text" size="mini" @click="openOpinion('publish', scope.row)">发布</el-button>
-                <el-button
-                  v-if="scope.row.status === '0'"
-                  v-hasPermi="['lawyers:knowledge:audit:offline']"
-                  type="text" size="mini" @click="openOpinion('offline', scope.row)">下线</el-button>
-                <el-button
-                  v-hasPermi="['lawyers:knowledge:edit']"
-                  type="text" size="mini" @click="openValid(scope.row)">标记效力</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <pagination v-show="total > 0" :total="total" :page.sync="queryParams.pageNum" :limit.sync="queryParams.pageSize" @pagination="getList" />
+              <el-button
+                v-if="row.auditStatus === '1' && row.status !== '0'"
+                v-hasPermi="['lawyers:knowledge:audit:approve']"
+                type="text" size="mini" @click="openOpinion('publish', row)">发布</el-button>
+              <el-button
+                v-if="row.status === '0'"
+                v-hasPermi="['lawyers:knowledge:audit:offline']"
+                type="text" size="mini" @click="openOpinion('offline', row)">下线</el-button>
+              <el-button
+                v-hasPermi="['lawyers:knowledge:edit']"
+                type="text" size="mini" @click="openValid(row)">标记效力</el-button>
+            </template>
+          </ProTable>
         </el-tab-pane>
 
         <!-- 审核流水 -->
         <el-tab-pane label="审核发布流水" name="log">
-          <el-form size="small" :inline="true">
-            <el-form-item label="知识ID">
-              <el-input v-model="logQuery.knowledgeId" placeholder="知识ID" clearable style="width: 130px" @keyup.enter.native="getLogs" />
-            </el-form-item>
-            <el-form-item label="动作">
-              <el-select v-model="logQuery.action" placeholder="全部" clearable style="width: 130px">
-                <el-option label="提交" value="SUBMIT" />
-                <el-option label="通过" value="APPROVE" />
-                <el-option label="驳回" value="REJECT" />
-                <el-option label="发布" value="PUBLISH" />
-                <el-option label="下线" value="OFFLINE" />
-              </el-select>
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" size="mini" icon="el-icon-search" @click="getLogs">查询</el-button>
-            </el-form-item>
-          </el-form>
-          <el-table v-loading="logLoading" :data="logList" border size="small">
-            <el-table-column label="ID" align="center" prop="auditId" width="80" />
-            <el-table-column label="知识ID" align="center" prop="knowledgeId" width="90" />
-            <el-table-column label="标题" align="center" prop="title" min-width="180" show-overflow-tooltip />
-            <el-table-column label="动作" align="center" width="90">
-              <template slot-scope="scope">
-                <el-tag size="mini" :type="actionTag(scope.row.action)">{{ actionText(scope.row.action) }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="版本" align="center" prop="publishVersion" width="70" />
-            <el-table-column label="状态变化" align="center" width="120">
-              <template slot-scope="scope">{{ scope.row.fromStatus || '-' }} → {{ scope.row.toStatus || '-' }}</template>
-            </el-table-column>
-            <el-table-column label="审核意见" align="center" prop="auditOpinion" min-width="180" show-overflow-tooltip>
-              <template slot-scope="scope">{{ scope.row.auditOpinion || '-' }}</template>
-            </el-table-column>
-            <el-table-column label="审核人" align="center" prop="auditor" width="120" />
-            <el-table-column label="审核时间" align="center" prop="auditTime" width="160">
-              <template slot-scope="scope">{{ parseTime(scope.row.auditTime) }}</template>
-            </el-table-column>
-          </el-table>
-          <pagination v-show="logTotal > 0" :total="logTotal" :page.sync="logQuery.pageNum" :limit.sync="logQuery.pageSize" @pagination="getLogs" />
+          <ProTable
+            :columns="logColumns"
+            :query-form-items="logQueryFormItems"
+            :query-params="logQuery"
+            :data="logList"
+            :loading="logLoading"
+            :total="logTotal"
+            :table-attrs="{ border: true }"
+            persist-key="knowledgeAudit:log"
+            label-width="90px"
+            empty-text="暂无审核流水"
+            empty-hint="提交/通过/驳回/发布/下线操作都会在此留痕"
+            @query="getLogs"
+            @reset="resetLogQuery"
+            @pagination="getLogs">
+            <template #column-action="{ row }">
+              <el-tag size="mini" :type="actionTag(row.action)">{{ actionText(row.action) }}</el-tag>
+            </template>
+            <template #column-statusChange="{ row }">{{ row.fromStatus || '-' }} → {{ row.toStatus || '-' }}</template>
+            <template #column-auditOpinion="{ row }">{{ row.auditOpinion || '-' }}</template>
+            <template #column-auditTime="{ row }">{{ parseTime(row.auditTime) }}</template>
+          </ProTable>
         </el-tab-pane>
       </el-tabs>
     </el-card>
@@ -179,12 +134,38 @@ export default {
     return {
       activeTab: 'knowledge',
       loading: false,
+      showSearch: true,
       total: 0,
       knowledgeList: [],
+      // V3：ProTable 列定义（审核/上架/效力/生效日期/操作走插槽）
+      columns: [
+        { prop: 'knowledgeId', label: 'ID', width: 70, align: 'center' },
+        { prop: 'title', label: '标题', minWidth: 200, align: 'center', showOverflowTooltip: true },
+        { prop: 'lawName', label: '法律法规', width: 160, align: 'center', slot: true, showOverflowTooltip: true },
+        { prop: 'articleNo', label: '条款号', width: 100, align: 'center', slot: true },
+        { prop: 'publishVersion', label: '版本', width: 70, align: 'center', slot: true },
+        { prop: 'auditStatus', label: '审核状态', width: 100, align: 'center', slot: true },
+        { prop: 'status', label: '上架', width: 80, align: 'center', slot: true },
+        { prop: 'validStatus', label: '效力', width: 90, align: 'center', slot: true },
+        { prop: 'effectiveDate', label: '生效日期', width: 110, align: 'center', slot: true },
+        { prop: 'action', label: '操作', width: 320, align: 'center', slot: true, className: 'small-padding fixed-width' }
+      ],
       queryParams: { pageNum: 1, pageSize: 10, title: undefined, auditStatus: '0', validStatus: undefined },
       logLoading: false,
       logTotal: 0,
       logList: [],
+      // V3：审核流水列定义（动作/状态变化/意见/时间走插槽）
+      logColumns: [
+        { prop: 'auditId', label: 'ID', width: 80, align: 'center' },
+        { prop: 'knowledgeId', label: '知识ID', width: 90, align: 'center' },
+        { prop: 'title', label: '标题', minWidth: 180, align: 'center', showOverflowTooltip: true },
+        { prop: 'action', label: '动作', width: 90, align: 'center', slot: true },
+        { prop: 'publishVersion', label: '版本', width: 70, align: 'center' },
+        { prop: 'statusChange', label: '状态变化', width: 120, align: 'center', slot: true },
+        { prop: 'auditOpinion', label: '审核意见', minWidth: 180, align: 'center', slot: true, showOverflowTooltip: true },
+        { prop: 'auditor', label: '审核人', width: 120, align: 'center' },
+        { prop: 'auditTime', label: '审核时间', width: 160, align: 'center', slot: true }
+      ],
       logQuery: { pageNum: 1, pageSize: 10, knowledgeId: undefined, action: undefined },
       opinionOpen: false,
       opinionAction: '',
@@ -201,6 +182,54 @@ export default {
   },
   created() { this.getList() },
   computed: {
+    queryFormItems() {
+      return [
+        { prop: 'title', label: '标题', placeholder: '知识标题', width: 200 },
+        {
+          prop: 'auditStatus',
+          label: '审核状态',
+          type: 'select',
+          placeholder: '全部',
+          width: 130,
+          options: [
+            { label: '待审核', value: '0' },
+            { label: '审核通过', value: '1' },
+            { label: '审核不通过', value: '2' }
+          ]
+        },
+        {
+          prop: 'validStatus',
+          label: '效力状态',
+          type: 'select',
+          placeholder: '全部',
+          width: 130,
+          options: [
+            { label: '现行有效', value: '1' },
+            { label: '已修订', value: '2' },
+            { label: '已失效', value: '3' }
+          ]
+        }
+      ]
+    },
+    logQueryFormItems() {
+      return [
+        { prop: 'knowledgeId', label: '知识ID', placeholder: '知识ID', width: 130 },
+        {
+          prop: 'action',
+          label: '动作',
+          type: 'select',
+          placeholder: '全部',
+          width: 130,
+          options: [
+            { label: '提交', value: 'SUBMIT' },
+            { label: '通过', value: 'APPROVE' },
+            { label: '驳回', value: 'REJECT' },
+            { label: '发布', value: 'PUBLISH' },
+            { label: '下线', value: 'OFFLINE' }
+          ]
+        }
+      ]
+    },
     opinionTitle() {
       return { approve: '审核通过', reject: '审核驳回', publish: '发布上架', offline: '知识下线' }[this.opinionAction] || '审核'
     }
@@ -222,9 +251,13 @@ export default {
     },
     handleQuery() { this.queryParams.pageNum = 1; this.getList() },
     resetQuery() {
-      this.resetForm('queryForm')
+      // ProTable 已复位查询表单，页面只需恢复筛选初值并重查
       this.queryParams = { pageNum: 1, pageSize: 10, title: undefined, auditStatus: '0', validStatus: undefined }
-      this.handleQuery()
+      this.getList()
+    },
+    resetLogQuery() {
+      this.logQuery = { pageNum: 1, pageSize: 10, knowledgeId: undefined, action: undefined }
+      this.getLogs()
     },
     handleTabChange(tab) {
       if (tab.name === 'log' && !this.logList.length) { this.getLogs() }

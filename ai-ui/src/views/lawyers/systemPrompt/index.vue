@@ -1,143 +1,56 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="提示词名称" prop="promptName">
-        <el-input
-          v-model="queryParams.promptName"
-          placeholder="请输入提示词名称"
-          clearable
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="提示词类型" prop="promptType">
-        <el-select v-model="queryParams.promptType" placeholder="请选择提示词类型" clearable>
-          <el-option
-            v-for="dict in dict.type.ai_prompt_type"
-            :key="dict.value"
-            :label="dict.label"
-            :value="dict.value"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="状态" prop="status">
-        <el-select v-model="queryParams.status" placeholder="请选择状态" clearable>
-          <el-option
-            v-for="dict in dict.type.sys_normal_disable"
-            :key="dict.value"
-            :label="dict.label"
-            :value="dict.value"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
-
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
-        <el-button
-          type="primary"
-          plain
-          icon="el-icon-plus"
-          size="mini"
-          @click="handleAdd"
-          v-hasPermi="['lawyers:systemPrompt:add']"
-        >新增</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="success"
-          plain
-          icon="el-icon-edit"
-          size="mini"
-          :disabled="single"
-          @click="handleUpdate"
-          v-hasPermi="['lawyers:systemPrompt:edit']"
-        >修改</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="danger"
-          plain
-          icon="el-icon-delete"
-          size="mini"
-          :disabled="multiple"
-          @click="handleDelete"
-          v-hasPermi="['lawyers:systemPrompt:remove']"
-        >删除</el-button>
-      </el-col>
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
-    </el-row>
-
-    <el-table v-loading="loading" :data="systemPromptList" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="提示词ID" align="center" prop="promptId" />
-      <el-table-column label="提示词名称" align="center" prop="promptName" />
-      <el-table-column label="提示词类型" align="center" prop="promptType">
-        <template slot-scope="scope">
-          <dict-tag :options="dict.type.ai_prompt_type" :value="scope.row.promptType"/>
-        </template>
-      </el-table-column>
-      <el-table-column label="适用场景" align="center" prop="sceneType" />
-      <el-table-column label="内容" align="center" prop="content" show-overflow-tooltip>
-        <template slot-scope="scope">
-          <span>{{ scope.row.content.substring(0, 50) }}{{ scope.row.content.length > 50 ? '...' : '' }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="默认配置" align="center" prop="isDefault">
-        <template slot-scope="scope">
-          <dict-tag :options="dict.type.sys_yes_no" :value="scope.row.isDefault"/>
-        </template>
-      </el-table-column>
-      <el-table-column label="状态" align="center" prop="status">
-        <template slot-scope="scope">
-          <dict-tag :options="dict.type.sys_normal_disable" :value="scope.row.status"/>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
-        <template slot-scope="scope">
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-edit"
-            @click="handleUpdate(scope.row)"
-            v-hasPermi="['lawyers:systemPrompt:edit']"
-          >修改</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-delete"
-            @click="handleDelete(scope.row)"
-            v-hasPermi="['lawyers:systemPrompt:remove']"
-          >删除</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-view"
-            @click="handlePreview(scope.row)"
-            v-hasPermi="['lawyers:systemPrompt:query']"
-          >预览</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-star-on"
-            @click="handleSetDefault(scope.row)"
-            v-if="scope.row.isDefault === 'N'"
-            v-hasPermi="['lawyers:systemPrompt:edit']"
-          >设为默认</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-    
-    <pagination
-      v-show="total>0"
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="systemPromptList"
+      :loading="loading"
       :total="total"
-      :page.sync="queryParams.pageNum"
-      :limit.sync="queryParams.pageSize"
+      :show-search.sync="showSearch"
+      has-selection
+      label-width="68px"
+      empty-text="暂无系统提示词配置"
+      empty-hint="新建提示词后可绑定智能体与场景，并可用「预览」验证参数替换效果"
+      empty-action-text="新增提示词"
+      empty-action-icon="el-icon-plus"
+      @query="handleQuery"
+      @reset="resetQuery"
       @pagination="getList"
-    />
+      @selection-change="handleSelectionChange"
+      @empty-action="handleAdd">
+      <template #toolbar-left>
+        <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd"
+          v-hasPermi="['lawyers:systemPrompt:add']">新增</el-button>
+        <el-button type="success" plain icon="el-icon-edit" size="mini" :disabled="single" @click="handleUpdate"
+          v-hasPermi="['lawyers:systemPrompt:edit']">修改</el-button>
+        <el-button type="danger" plain icon="el-icon-delete" size="mini" :disabled="multiple" @click="handleDelete"
+          v-hasPermi="['lawyers:systemPrompt:remove']">删除</el-button>
+      </template>
+      <template #column-promptType="{ row }">
+        <dict-tag :options="dict.type.ai_prompt_type" :value="row.promptType"/>
+      </template>
+      <template #column-content="{ row }">
+        <span>{{ (row.content || '').substring(0, 50) }}{{ (row.content || '').length > 50 ? '...' : '' }}</span>
+      </template>
+      <template #column-isDefault="{ row }">
+        <dict-tag :options="dict.type.sys_yes_no" :value="row.isDefault"/>
+      </template>
+      <template #column-status="{ row }">
+        <dict-tag :options="dict.type.sys_normal_disable" :value="row.status"/>
+      </template>
+      <template #column-action="{ row }">
+        <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(row)"
+          v-hasPermi="['lawyers:systemPrompt:edit']">修改</el-button>
+        <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(row)"
+          v-hasPermi="['lawyers:systemPrompt:remove']">删除</el-button>
+        <el-button size="mini" type="text" icon="el-icon-view" @click="handlePreview(row)"
+          v-hasPermi="['lawyers:systemPrompt:query']">预览</el-button>
+        <el-button size="mini" type="text" icon="el-icon-star-on" @click="handleSetDefault(row)"
+          v-if="row.isDefault === 'N'" v-hasPermi="['lawyers:systemPrompt:edit']">设为默认</el-button>
+      </template>
+    </ProTable>
 
     <!-- 添加或修改系统提示词配置对话框 -->
     <el-dialog :title="title" :visible.sync="open" width="800px" append-to-body>
@@ -240,6 +153,17 @@ export default {
       total: 0,
       // 系统提示词配置表格数据
       systemPromptList: [],
+      // V3：ProTable 列定义（类型/内容/默认/状态/操作走插槽）
+      columns: [
+        { prop: 'promptId', label: '提示词ID', width: 100, align: 'center' },
+        { prop: 'promptName', label: '提示词名称', minWidth: 160, align: 'center' },
+        { prop: 'promptType', label: '提示词类型', width: 120, align: 'center', slot: true },
+        { prop: 'sceneType', label: '适用场景', width: 140, align: 'center' },
+        { prop: 'content', label: '内容', minWidth: 260, align: 'center', slot: true, showOverflowTooltip: true },
+        { prop: 'isDefault', label: '默认配置', width: 100, align: 'center', slot: true },
+        { prop: 'status', label: '状态', width: 100, align: 'center', slot: true },
+        { prop: 'action', label: '操作', width: 260, align: 'center', slot: true, className: 'small-padding fixed-width' }
+      ],
       // 弹出层标题
       title: "",
       // 是否显示弹出层
@@ -289,6 +213,17 @@ export default {
   created() {
     this.getList();
   },
+  computed: {
+    queryFormItems() {
+      const promptTypes = (this.dict.type.ai_prompt_type || []).map(d => ({ label: d.label, value: d.value }))
+      const statusOptions = (this.dict.type.sys_normal_disable || []).map(d => ({ label: d.label, value: d.value }))
+      return [
+        { prop: 'promptName', label: '提示词名称', placeholder: '请输入提示词名称', width: 240 },
+        { prop: 'promptType', label: '提示词类型', type: 'select', placeholder: '请选择提示词类型', width: 160, options: promptTypes },
+        { prop: 'status', label: '状态', type: 'select', placeholder: '请选择状态', width: 120, options: statusOptions }
+      ]
+    }
+  },
   methods: {
     /** 查询系统提示词配置列表 */
     getList() {
@@ -326,8 +261,9 @@ export default {
     },
     /** 重置按钮操作 */
     resetQuery() {
-      this.resetForm("queryForm");
-      this.handleQuery();
+      // ProTable 已复位查询表单，页面只需恢复筛选初值并重查
+      this.queryParams = { pageNum: 1, pageSize: 10, promptName: undefined, promptType: undefined, status: undefined }
+      this.getList()
     },
     // 多选框选中数据
     handleSelectionChange(selection) {

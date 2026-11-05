@@ -1,97 +1,51 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="88px">
-      <el-form-item label="智能体名称" prop="agentName">
-        <el-input
-          v-model="queryParams.agentName"
-          placeholder="请输入智能体名称"
-          clearable
-          style="width: 220px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="平台" prop="provider">
-        <el-select v-model="queryParams.provider" placeholder="请选择平台" clearable style="width: 160px">
-          <el-option label="本地知识库" value="local" />
-          <el-option label="MaxKB" value="maxkb" />
-          <el-option label="Dify" value="dify" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="状态" prop="status">
-        <el-select v-model="queryParams.status" placeholder="请选择状态" clearable>
-          <el-option label="启用" value="1" />
-          <el-option label="停用" value="0" />
-        </el-select>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
-
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="agentList"
+      :loading="loading"
+      :total="total"
+      :show-search.sync="showSearch"
+      has-selection
+      label-width="88px"
+      empty-text="还没有 AI 智能体"
+      empty-hint="新增智能体后可作为 AI 应答入口，支持本地知识库或 MaxKB/Dify 外部平台"
+      empty-action-text="新增智能体"
+      empty-action-icon="el-icon-plus"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList"
+      @selection-change="handleSelectionChange"
+      @empty-action="handleAdd">
+      <template #toolbar-left>
         <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd"
           v-hasPermi="['lawyers:agent:config:add']">新增</el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button type="success" plain icon="el-icon-edit" size="mini" :disabled="single" @click="handleUpdate"
           v-hasPermi="['lawyers:agent:config:edit']">修改</el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button type="danger" plain icon="el-icon-delete" size="mini" :disabled="multiple" @click="handleDelete"
           v-hasPermi="['lawyers:agent:config:remove']">删除</el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button type="warning" plain icon="el-icon-download" size="mini" @click="handleExport"
           v-hasPermi="['lawyers:agent:config:export']">导出</el-button>
-      </el-col>
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
-    </el-row>
-
-    <el-table v-loading="loading" :data="agentList" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="ID" prop="agentId" width="70" />
-      <el-table-column label="智能体名称" prop="agentName" :show-overflow-tooltip="true" />
-      <el-table-column label="平台" prop="provider" width="120">
-        <template slot-scope="scope">
-          <el-tag :type="providerTag(scope.row.provider)" size="small">{{ providerLabel(scope.row.provider) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="多轮上下文" prop="enableContext" width="100" align="center">
-        <template slot-scope="scope">{{ scope.row.enableContext === '1' ? '开启' : '关闭' }}</template>
-      </el-table-column>
-      <el-table-column label="上下文轮数" prop="contextRounds" width="90" align="center" />
-      <el-table-column label="欢迎语" prop="welcome" :show-overflow-tooltip="true" />
-      <el-table-column label="状态" prop="status" width="80" align="center">
-        <template slot-scope="scope">
-          <el-switch
-            v-model="scope.row.status"
-            active-value="1"
-            inactive-value="0"
-            @change="handleStatusChange(scope.row)"
-          ></el-switch>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="220" align="center">
-        <template slot-scope="scope">
-          <el-button size="mini" type="text" icon="el-icon-connection"
-            @click="handleTest(scope.row)" v-hasPermi="['lawyers:agent:config:test']">测试</el-button>
-          <el-button size="mini" type="text" icon="el-icon-edit"
-            @click="handleUpdate(scope.row)" v-hasPermi="['lawyers:agent:config:edit']">修改</el-button>
-          <el-button size="mini" type="text" icon="el-icon-delete"
-            @click="handleDelete(scope.row)" v-hasPermi="['lawyers:agent:config:remove']">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <pagination
-      v-show="total > 0"
-      :total="total"
-      :page.sync="queryParams.pageNum"
-      :limit.sync="queryParams.pageSize"
-      @pagination="getList"
-    />
+      </template>
+      <template #column-provider="{ row }">
+        <el-tag :type="providerTag(row.provider)" size="small">{{ providerLabel(row.provider) }}</el-tag>
+      </template>
+      <template #column-enableContext="{ row }">{{ row.enableContext === '1' ? '开启' : '关闭' }}</template>
+      <template #column-status="{ row }">
+        <el-switch v-model="row.status" active-value="1" inactive-value="0" @change="handleStatusChange(row)" />
+      </template>
+      <template #column-action="{ row }">
+        <el-button size="mini" type="text" icon="el-icon-connection" @click="handleTest(row)"
+          v-hasPermi="['lawyers:agent:config:test']">测试</el-button>
+        <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(row)"
+          v-hasPermi="['lawyers:agent:config:edit']">修改</el-button>
+        <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(row)"
+          v-hasPermi="['lawyers:agent:config:remove']">删除</el-button>
+      </template>
+    </ProTable>
 
     <!-- 新增/修改对话框 -->
     <el-dialog :title="title" :visible.sync="open" width="680px" append-to-body>
@@ -193,6 +147,17 @@ export default {
       showSearch: true,
       total: 0,
       agentList: [],
+      // V3：ProTable 列定义（平台/上下文/状态开关/操作走插槽）
+      columns: [
+        { prop: 'agentId', label: 'ID', width: 70, align: 'center' },
+        { prop: 'agentName', label: '智能体名称', minWidth: 180, align: 'center', showOverflowTooltip: true },
+        { prop: 'provider', label: '平台', width: 120, align: 'center', slot: true },
+        { prop: 'enableContext', label: '多轮上下文', width: 100, align: 'center', slot: true },
+        { prop: 'contextRounds', label: '上下文轮数', width: 90, align: 'center' },
+        { prop: 'welcome', label: '欢迎语', minWidth: 200, align: 'center', showOverflowTooltip: true },
+        { prop: 'status', label: '状态', width: 80, align: 'center', slot: true },
+        { prop: 'action', label: '操作', width: 220, align: 'center', slot: true, className: 'small-padding fixed-width' }
+      ],
       title: "",
       open: false,
       queryParams: {
@@ -211,6 +176,36 @@ export default {
   },
   created() {
     this.getList();
+  },
+  computed: {
+    queryFormItems() {
+      return [
+        { prop: 'agentName', label: '智能体名称', placeholder: '请输入智能体名称', width: 220 },
+        {
+          prop: 'provider',
+          label: '平台',
+          type: 'select',
+          placeholder: '请选择平台',
+          width: 160,
+          options: [
+            { label: '本地知识库', value: 'local' },
+            { label: 'MaxKB', value: 'maxkb' },
+            { label: 'Dify', value: 'dify' }
+          ]
+        },
+        {
+          prop: 'status',
+          label: '状态',
+          type: 'select',
+          placeholder: '请选择状态',
+          width: 120,
+          options: [
+            { label: '启用', value: '1' },
+            { label: '停用', value: '0' }
+          ]
+        }
+      ]
+    }
   },
   methods: {
     getList() {
@@ -244,8 +239,9 @@ export default {
       this.getList();
     },
     resetQuery() {
-      this.$refs["queryForm"].resetFields();
-      this.handleQuery();
+      // ProTable 已复位查询表单，页面只需恢复筛选初值并重查
+      this.queryParams = { pageNum: 1, pageSize: 10, agentName: undefined, provider: undefined, status: undefined };
+      this.getList();
     },
     handleSelectionChange(selection) {
       this.ids = selection.map(item => item.agentId);
