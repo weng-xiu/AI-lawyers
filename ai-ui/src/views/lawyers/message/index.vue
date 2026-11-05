@@ -1,84 +1,60 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="72px">
-      <el-form-item label="消息类型" prop="msgType">
-        <el-select v-model="queryParams.msgType" placeholder="全部类型" clearable style="width: 150px">
-          <el-option v-for="t in typeOptions" :key="t.value" :label="t.label" :value="t.value" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="阅读状态" prop="isRead">
-        <el-select v-model="queryParams.isRead" placeholder="全部状态" clearable style="width: 140px">
-          <el-option label="未读" value="0" />
-          <el-option label="已读" value="1" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="标题" prop="title">
-        <el-input v-model="queryParams.title" placeholder="请输入标题关键字" clearable style="width: 200px" @keyup.enter.native="handleQuery" />
-      </el-form-item>
-      <el-form-item label="发送时间">
-        <el-date-picker v-model="dateRange" style="width: 240px" value-format="yyyy-MM-dd" type="daterange" range-separator="-" start-placeholder="开始日期" end-placeholder="结束日期" />
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
-
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
-        <el-button type="success" plain icon="el-icon-check" size="mini" @click="handleReadAll" v-hasPermi="['lawyers:message:read']">全部已读</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button type="danger" plain icon="el-icon-delete" size="mini" :disabled="multiple" @click="handleDelete" v-hasPermi="['lawyers:message:remove']">删除</el-button>
-      </el-col>
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
-    </el-row>
-
-    <el-table v-loading="loading" :data="messageList" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="类型" align="center" prop="msgType" width="90">
-        <template slot-scope="scope">
-          <el-tag size="mini" :type="msgTagType(scope.row.msgType)">{{ msgTypeText(scope.row.msgType) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="标题" align="left" prop="title" show-overflow-tooltip>
-        <template slot-scope="scope">
-          <el-link :underline="false" @click="handleDetail(scope.row)"
-            :style="{ fontWeight: scope.row.isRead === '0' ? 'bold' : 'normal', color: scope.row.isRead === '0' ? '#303133' : '#909399' }">
-            <i v-if="scope.row.isRead === '0'" class="el-icon-chat-dot-round" style="color:#F56C6C; margin-right:4px"></i>{{ scope.row.title }}
-          </el-link>
-        </template>
-      </el-table-column>
-      <el-table-column label="优先级" align="center" prop="priority" width="90">
-        <template slot-scope="scope">
-          <el-tag v-if="scope.row.priority === '1'" size="mini" type="danger">紧急</el-tag>
-          <el-tag v-else-if="scope.row.priority === '2'" size="mini" type="warning">普通</el-tag>
-          <el-tag v-else size="mini" type="info">低</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="发送方" align="center" prop="sender" width="110" />
-      <el-table-column label="状态" align="center" prop="isRead" width="80">
-        <template slot-scope="scope">
-          <el-tag size="mini" :type="scope.row.isRead === '0' ? 'danger' : 'info'">{{ scope.row.isRead === '0' ? '未读' : '已读' }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="发送时间" align="center" prop="createTime" width="160" />
-      <el-table-column label="操作" align="center" width="150" class-name="small-padding fixed-width">
-        <template slot-scope="scope">
-          <el-button size="mini" type="text" icon="el-icon-view" @click="handleDetail(scope.row)" v-hasPermi="['lawyers:message:query']">查看</el-button>
-          <el-button v-if="scope.row.isRead === '0'" size="mini" type="text" icon="el-icon-check" @click="handleRead(scope.row)" v-hasPermi="['lawyers:message:read']">已读</el-button>
-          <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(scope.row)" v-hasPermi="['lawyers:message:remove']">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <pagination
-      v-show="total>0"
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="messageList"
+      :loading="loading"
       :total="total"
-      :page.sync="queryParams.pageNum"
-      :limit.sync="queryParams.pageSize"
+      :show-search.sync="showSearch"
+      :stripe="false"
+      has-selection
+      label-width="72px"
+      empty-text="暂无站内消息"
+      empty-hint="系统通知、待办提醒与风险预警将在此汇总"
+      @query="handleQuery"
+      @reset="resetQuery"
       @pagination="getList"
-    />
+      @selection-change="handleSelectionChange">
+      <template #toolbar-left>
+        <el-button type="success" plain icon="el-icon-check" size="mini" @click="handleReadAll"
+          v-hasPermi="['lawyers:message:read']">全部已读</el-button>
+        <el-button type="danger" plain icon="el-icon-delete" size="mini" :disabled="multiple" @click="handleDelete"
+          v-hasPermi="['lawyers:message:remove']">删除</el-button>
+      </template>
+      <!-- 发送时间沿用独立 dateRange + addDateRange，走自定义查询插槽 -->
+      <template #query-dateRange>
+        <el-date-picker v-model="dateRange" style="width: 240px" value-format="yyyy-MM-dd" type="daterange"
+          range-separator="-" start-placeholder="开始日期" end-placeholder="结束日期" />
+      </template>
+      <template #column-msgType="{ row }">
+        <el-tag size="mini" :type="msgTagType(row.msgType)">{{ msgTypeText(row.msgType) }}</el-tag>
+      </template>
+      <template #column-title="{ row }">
+        <el-link :underline="false" @click="handleDetail(row)"
+          :style="{ fontWeight: row.isRead === '0' ? 'bold' : 'normal', color: row.isRead === '0' ? '#303133' : '#909399' }">
+          <i v-if="row.isRead === '0'" class="el-icon-chat-dot-round" style="color:#F56C6C; margin-right:4px"></i>{{ row.title }}
+        </el-link>
+      </template>
+      <template #column-priority="{ row }">
+        <el-tag v-if="row.priority === '1'" size="mini" type="danger">紧急</el-tag>
+        <el-tag v-else-if="row.priority === '2'" size="mini" type="warning">普通</el-tag>
+        <el-tag v-else size="mini" type="info">低</el-tag>
+      </template>
+      <template #column-isRead="{ row }">
+        <el-tag size="mini" :type="row.isRead === '0' ? 'danger' : 'info'">{{ row.isRead === '0' ? '未读' : '已读' }}</el-tag>
+      </template>
+      <template #column-action="{ row }">
+        <el-button size="mini" type="text" icon="el-icon-view" @click="handleDetail(row)"
+          v-hasPermi="['lawyers:message:query']">查看</el-button>
+        <el-button v-if="row.isRead === '0'" size="mini" type="text" icon="el-icon-check" @click="handleRead(row)"
+          v-hasPermi="['lawyers:message:read']">已读</el-button>
+        <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(row)"
+          v-hasPermi="['lawyers:message:remove']">删除</el-button>
+      </template>
+    </ProTable>
 
     <!-- 消息详情对话框（打开即标记已读） -->
     <el-dialog :title="detailForm.title || '消息详情'" :visible.sync="detailOpen" width="600px" append-to-body>
@@ -117,6 +93,16 @@ export default {
       showSearch: true,
       total: 0,
       messageList: [],
+      // V3：ProTable 列定义（类型/标题/优先级/状态/操作走插槽）
+      columns: [
+        { prop: 'msgType', label: '类型', width: 90, align: 'center', slot: true },
+        { prop: 'title', label: '标题', minWidth: 200, align: 'left', slot: true, showOverflowTooltip: true },
+        { prop: 'priority', label: '优先级', width: 90, align: 'center', slot: true },
+        { prop: 'sender', label: '发送方', width: 110, align: 'center' },
+        { prop: 'isRead', label: '状态', width: 80, align: 'center', slot: true },
+        { prop: 'createTime', label: '发送时间', width: 160, align: 'center' },
+        { prop: 'action', label: '操作', width: 150, align: 'center', slot: true, className: 'small-padding fixed-width' }
+      ],
       detailOpen: false,
       detailForm: {},
       dateRange: [],
@@ -137,6 +123,26 @@ export default {
       }
     };
   },
+  computed: {
+    queryFormItems() {
+      return [
+        { prop: 'msgType', label: '消息类型', type: 'select', placeholder: '全部类型', width: 150, options: this.typeOptions },
+        {
+          prop: 'isRead',
+          label: '阅读状态',
+          type: 'select',
+          placeholder: '全部状态',
+          width: 140,
+          options: [
+            { label: '未读', value: '0' },
+            { label: '已读', value: '1' }
+          ]
+        },
+        { prop: 'title', label: '标题', placeholder: '请输入标题关键字', width: 200 },
+        { prop: 'dateRange', label: '发送时间', slot: true }
+      ];
+    }
+  },
   created() {
     this.getList();
   },
@@ -154,9 +160,16 @@ export default {
       this.getList();
     },
     resetQuery() {
+      // ProTable 已复位查询表单，页面只需恢复筛选初值（含独立日期区间）并重查
       this.dateRange = [];
-      this.resetForm("queryForm");
-      this.handleQuery();
+      this.queryParams = {
+        pageNum: 1,
+        pageSize: 10,
+        msgType: undefined,
+        isRead: undefined,
+        title: undefined
+      };
+      this.getList();
     },
     handleSelectionChange(selection) {
       this.ids = selection.map(item => item.messageId);

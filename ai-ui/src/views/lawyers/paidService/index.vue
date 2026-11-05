@@ -1,184 +1,58 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="80px">
-      <el-form-item label="服务编号" prop="serviceNo">
-        <el-input
-          v-model="queryParams.serviceNo"
-          placeholder="请输入服务编号"
-          clearable
-          style="width: 200px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="客户姓名" prop="customerName">
-        <el-input
-          v-model="queryParams.customerName"
-          placeholder="请输入客户姓名"
-          clearable
-          style="width: 200px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="客户电话" prop="customerPhone">
-        <el-input
-          v-model="queryParams.customerPhone"
-          placeholder="请输入客户电话"
-          clearable
-          style="width: 200px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="服务类型" prop="serviceType">
-        <el-select v-model="queryParams.serviceType" placeholder="请选择服务类型" clearable style="width: 160px">
-          <el-option label="代书" value="代书" />
-          <el-option label="调解" value="调解" />
-          <el-option label="诉讼代理" value="诉讼代理" />
-          <el-option label="法律顾问" value="法律顾问" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="支付状态" prop="paymentStatus">
-        <el-select v-model="queryParams.paymentStatus" placeholder="请选择支付状态" clearable style="width: 140px">
-          <el-option label="未付" value="0" />
-          <el-option label="已付" value="1" />
-          <el-option label="部分付" value="2" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="服务状态" prop="serviceStatus">
-        <el-select v-model="queryParams.serviceStatus" placeholder="请选择服务状态" clearable style="width: 140px">
-          <el-option label="待受理" value="0" />
-          <el-option label="处理中" value="1" />
-          <el-option label="已完成" value="2" />
-          <el-option label="已关闭" value="3" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="创建时间">
-        <el-date-picker
-          v-model="dateRange"
-          style="width: 240px"
-          value-format="yyyy-MM-dd"
-          type="daterange"
-          range-separator="-"
-          start-placeholder="开始日期"
-          end-placeholder="结束日期"
-        ></el-date-picker>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
-
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
-        <el-button
-          type="primary"
-          plain
-          icon="el-icon-plus"
-          size="mini"
-          @click="handleAdd"
-          v-hasPermi="['lawyers:paidService:add']"
-        >新增</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="success"
-          plain
-          icon="el-icon-edit"
-          size="mini"
-          :disabled="single"
-          @click="handleUpdate"
-          v-hasPermi="['lawyers:paidService:edit']"
-        >修改</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="danger"
-          plain
-          icon="el-icon-delete"
-          size="mini"
-          :disabled="multiple"
-          @click="handleDelete"
-          v-hasPermi="['lawyers:paidService:remove']"
-        >删除</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="warning"
-          plain
-          icon="el-icon-download"
-          size="mini"
-          @click="handleExport"
-          v-hasPermi="['lawyers:paidService:export']"
-        >导出</el-button>
-      </el-col>
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
-    </el-row>
-
-    <el-table v-loading="loading" :data="paidServiceList" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="服务编号" align="center" prop="serviceNo" />
-      <el-table-column label="客户姓名" align="center" prop="customerName" />
-      <el-table-column label="客户电话" align="center" prop="customerPhone" />
-      <el-table-column label="服务类型" align="center" prop="serviceType" width="100">
-        <template slot-scope="scope">
-          <el-tag size="mini" :type="serviceTypeTagType(scope.row.serviceType)">{{ scope.row.serviceType }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="服务金额" align="center" prop="amount" width="120">
-        <template slot-scope="scope">
-          <span>{{ scope.row.amount != null ? '¥' + scope.row.amount.toFixed(2) : '-' }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="支付状态" align="center" prop="paymentStatus" width="90">
-        <template slot-scope="scope">
-          <el-tag size="mini" :type="paymentStatusTagType(scope.row.paymentStatus)">{{ paymentStatusText(scope.row.paymentStatus) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="服务状态" align="center" prop="serviceStatus" width="90">
-        <template slot-scope="scope">
-          <el-tag size="mini" :type="serviceStatusTagType(scope.row.serviceStatus)">{{ serviceStatusText(scope.row.serviceStatus) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="处理人" align="center" prop="handlerName" />
-      <el-table-column label="创建时间" align="center" prop="createTime" width="180">
-        <template slot-scope="scope">
-          <span>{{ parseTime(scope.row.createTime) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
-        <template slot-scope="scope">
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-view"
-            @click="handleDetail(scope.row)"
-            v-hasPermi="['lawyers:paidService:query']"
-          >详情</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-edit"
-            @click="handleUpdate(scope.row)"
-            v-hasPermi="['lawyers:paidService:edit']"
-          >修改</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-delete"
-            @click="handleDelete(scope.row)"
-            v-hasPermi="['lawyers:paidService:remove']"
-          >删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <pagination
-      v-show="total>0"
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="paidServiceList"
+      :loading="loading"
       :total="total"
-      :page.sync="queryParams.pageNum"
-      :limit.sync="queryParams.pageSize"
+      :show-search.sync="showSearch"
+      :stripe="false"
+      has-selection
+      label-width="80px"
+      empty-text="暂无有偿法律服务记录"
+      empty-hint="新增服务订单后，支付与服务进度将在此跟踪"
+      @query="handleQuery"
+      @reset="resetQuery"
       @pagination="getList"
-    />
+      @selection-change="handleSelectionChange">
+      <template #toolbar-left>
+        <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd"
+          v-hasPermi="['lawyers:paidService:add']">新增</el-button>
+        <el-button type="success" plain icon="el-icon-edit" size="mini" :disabled="single" @click="handleUpdate"
+          v-hasPermi="['lawyers:paidService:edit']">修改</el-button>
+        <el-button type="danger" plain icon="el-icon-delete" size="mini" :disabled="multiple" @click="handleDelete"
+          v-hasPermi="['lawyers:paidService:remove']">删除</el-button>
+        <el-button type="warning" plain icon="el-icon-download" size="mini" @click="handleExport"
+          v-hasPermi="['lawyers:paidService:export']">导出</el-button>
+      </template>
+      <!-- 创建时间沿用独立 dateRange + addDateRange，走自定义查询插槽 -->
+      <template #query-dateRange>
+        <el-date-picker v-model="dateRange" style="width: 240px" value-format="yyyy-MM-dd" type="daterange"
+          range-separator="-" start-placeholder="开始日期" end-placeholder="结束日期" />
+      </template>
+      <template #column-serviceType="{ row }">
+        <el-tag size="mini" :type="serviceTypeTagType(row.serviceType)">{{ row.serviceType }}</el-tag>
+      </template>
+      <template #column-amount="{ row }">{{ row.amount != null ? '¥' + row.amount.toFixed(2) : '-' }}</template>
+      <template #column-paymentStatus="{ row }">
+        <el-tag size="mini" :type="paymentStatusTagType(row.paymentStatus)">{{ paymentStatusText(row.paymentStatus) }}</el-tag>
+      </template>
+      <template #column-serviceStatus="{ row }">
+        <el-tag size="mini" :type="serviceStatusTagType(row.serviceStatus)">{{ serviceStatusText(row.serviceStatus) }}</el-tag>
+      </template>
+      <template #column-createTime="{ row }">{{ parseTime(row.createTime) }}</template>
+      <template #column-action="{ row }">
+        <el-button size="mini" type="text" icon="el-icon-view" @click="handleDetail(row)"
+          v-hasPermi="['lawyers:paidService:query']">详情</el-button>
+        <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(row)"
+          v-hasPermi="['lawyers:paidService:edit']">修改</el-button>
+        <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(row)"
+          v-hasPermi="['lawyers:paidService:remove']">删除</el-button>
+      </template>
+    </ProTable>
 
     <!-- 添加或修改有偿法律服务对话框 -->
     <el-dialog :title="title" :visible.sync="open" width="650px" append-to-body>
@@ -284,6 +158,19 @@ export default {
       total: 0,
       // 有偿法律服务表格数据
       paidServiceList: [],
+      // V3：ProTable 列定义（服务类型/金额/支付状态/服务状态/时间/操作走插槽）
+      columns: [
+        { prop: 'serviceNo', label: '服务编号', minWidth: 140, align: 'center', showOverflowTooltip: true },
+        { prop: 'customerName', label: '客户姓名', minWidth: 110, align: 'center' },
+        { prop: 'customerPhone', label: '客户电话', minWidth: 130, align: 'center' },
+        { prop: 'serviceType', label: '服务类型', width: 100, align: 'center', slot: true },
+        { prop: 'amount', label: '服务金额', width: 120, align: 'center', slot: true },
+        { prop: 'paymentStatus', label: '支付状态', width: 90, align: 'center', slot: true },
+        { prop: 'serviceStatus', label: '服务状态', width: 90, align: 'center', slot: true },
+        { prop: 'handlerName', label: '处理人', minWidth: 100, align: 'center' },
+        { prop: 'createTime', label: '创建时间', width: 180, align: 'center', slot: true },
+        { prop: 'action', label: '操作', minWidth: 170, align: 'center', slot: true, className: 'small-padding fixed-width' }
+      ],
       // 弹出层标题
       title: "",
       // 是否显示弹出层
@@ -316,6 +203,54 @@ export default {
           { required: true, message: "服务类型不能为空", trigger: "change" }
         ]
       }
+    }
+  },
+  computed: {
+    queryFormItems() {
+      return [
+        { prop: 'serviceNo', label: '服务编号', placeholder: '请输入服务编号', width: 200 },
+        { prop: 'customerName', label: '客户姓名', placeholder: '请输入客户姓名', width: 200 },
+        { prop: 'customerPhone', label: '客户电话', placeholder: '请输入客户电话', width: 200 },
+        {
+          prop: 'serviceType',
+          label: '服务类型',
+          type: 'select',
+          placeholder: '请选择服务类型',
+          width: 160,
+          options: [
+            { label: '代书', value: '代书' },
+            { label: '调解', value: '调解' },
+            { label: '诉讼代理', value: '诉讼代理' },
+            { label: '法律顾问', value: '法律顾问' }
+          ]
+        },
+        {
+          prop: 'paymentStatus',
+          label: '支付状态',
+          type: 'select',
+          placeholder: '请选择支付状态',
+          width: 140,
+          options: [
+            { label: '未付', value: '0' },
+            { label: '已付', value: '1' },
+            { label: '部分付', value: '2' }
+          ]
+        },
+        {
+          prop: 'serviceStatus',
+          label: '服务状态',
+          type: 'select',
+          placeholder: '请选择服务状态',
+          width: 140,
+          options: [
+            { label: '待受理', value: '0' },
+            { label: '处理中', value: '1' },
+            { label: '已完成', value: '2' },
+            { label: '已关闭', value: '3' }
+          ]
+        },
+        { prop: 'dateRange', label: '创建时间', slot: true }
+      ]
     }
   },
   created() {
@@ -394,9 +329,19 @@ export default {
     },
     /** 重置按钮操作 */
     resetQuery() {
+      // ProTable 已复位查询表单，页面只需恢复筛选初值（含独立日期区间）并重查
       this.dateRange = []
-      this.resetForm("queryForm")
-      this.handleQuery()
+      this.queryParams = {
+        pageNum: 1,
+        pageSize: 10,
+        serviceNo: undefined,
+        customerName: undefined,
+        customerPhone: undefined,
+        serviceType: undefined,
+        paymentStatus: undefined,
+        serviceStatus: undefined
+      }
+      this.getList()
     },
     /** 新增按钮操作 */
     handleAdd() {

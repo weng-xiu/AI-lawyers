@@ -1,126 +1,73 @@
 <template>
   <div class="app-container recording-page">
-    <el-card class="search-card" shadow="never">
-      <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" label-width="80px">
-        <el-form-item label="主叫号码" prop="callerNumber">
-          <el-input
-            v-model="queryParams.callerNumber"
-            placeholder="请输入主叫号码"
-            clearable
-            style="width: 180px"
-            @keyup.enter.native="handleQuery"
-          />
-        </el-form-item>
-        <el-form-item label="被叫号码" prop="calleeNumber">
-          <el-input
-            v-model="queryParams.calleeNumber"
-            placeholder="请输入被叫号码"
-            clearable
-            style="width: 180px"
-            @keyup.enter.native="handleQuery"
-          />
-        </el-form-item>
-        <el-form-item label="ASR转写" prop="asrStatus">
-          <el-select v-model="queryParams.asrStatus" placeholder="全部" clearable style="width: 140px">
-            <el-option label="已转写" value="1" />
-            <el-option label="未转写" value="0" />
-            <el-option label="转写中" value="2" />
-            <el-option label="转写失败" value="3" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="通话日期">
-          <el-date-picker
-            v-model="dateRange"
-            style="width: 240px"
-            value-format="yyyy-MM-dd"
-            type="daterange"
-            range-separator="-"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-          ></el-date-picker>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">查询</el-button>
-          <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
-
-    <el-card shadow="never" class="table-card">
-      <el-table v-loading="loading" :data="recordingList" border size="small">
-        <el-table-column label="录音ID" align="center" prop="recordId" width="90" />
-        <el-table-column label="主叫号码" align="center" prop="callerNumber" width="130" />
-        <el-table-column label="被叫号码" align="center" prop="calleeNumber" width="130">
-          <template slot-scope="scope">{{ scope.row.calleeNumber || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="坐席" align="center" prop="agentName" width="110">
-          <template slot-scope="scope">{{ scope.row.agentName || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="通话时长" align="center" width="100">
-          <template slot-scope="scope">{{ formatDuration(scope.row.callDuration) }}</template>
-        </el-table-column>
-        <el-table-column label="录音时长" align="center" width="100">
-          <template slot-scope="scope">{{ formatDuration(scope.row.recordDuration) }}</template>
-        </el-table-column>
-        <el-table-column label="ASR状态" align="center" width="100">
-          <template slot-scope="scope">
-            <el-tag :type="asrTagType(scope.row.asrStatus)" size="mini">{{ asrLabel(scope.row.asrStatus) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="通话时间" align="center" prop="callTime" width="160">
-          <template slot-scope="scope">{{ parseTime(scope.row.callTime) }}</template>
-        </el-table-column>
-        <el-table-column label="录音文件" align="center" width="280">
-          <template slot-scope="scope">
-            <div class="audio-cell">
-              <el-button
-                v-if="!playingId || playingId !== scope.row.recordId"
-                type="primary"
-                size="mini"
-                icon="el-icon-video-play"
-                @click="handlePlay(scope.row)"
-              >播放</el-button>
-              <el-button
-                v-else
-                type="danger"
-                size="mini"
-                icon="el-icon-video-pause"
-                @click="handleStop"
-              >停止</el-button>
-              <audio
-                v-if="playingId === scope.row.recordId"
-                ref="audioPlayer"
-                :src="audioUrl"
-                controls
-                autoplay
-                style="height: 28px; margin-left: 8px; vertical-align: middle;"
-                @ended="handleStop"
-              ></audio>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" align="center" width="180" fixed="right">
-          <template slot-scope="scope">
-            <el-button type="text" size="mini" icon="el-icon-download" @click="handleDownload(scope.row)">下载</el-button>
-            <el-button
-              type="text"
-              size="mini"
-              icon="el-icon-document"
-              :disabled="scope.row.asrStatus !== '1' || !scope.row.transcript"
-              @click="handleViewTranscript(scope.row)"
-            >查看转写</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <pagination
-        v-show="total > 0"
-        :total="total"
-        :page.sync="queryParams.pageNum"
-        :limit.sync="queryParams.pageSize"
-        @pagination="getList"
-      />
-    </el-card>
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="recordingList"
+      :loading="loading"
+      :total="total"
+      :show-search.sync="showSearch"
+      :stripe="false"
+      :table-attrs="{ border: true }"
+      label-width="80px"
+      empty-text="暂无录音记录"
+      empty-hint="通话结束后，录音文件与 ASR 转写结果将在此留存"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList">
+      <!-- 通话日期沿用独立 dateRange + addDateRange，走自定义查询插槽 -->
+      <template #query-dateRange>
+        <el-date-picker v-model="dateRange" style="width: 240px" value-format="yyyy-MM-dd" type="daterange"
+          range-separator="-" start-placeholder="开始日期" end-placeholder="结束日期" />
+      </template>
+      <template #column-calleeNumber="{ row }">{{ row.calleeNumber || '-' }}</template>
+      <template #column-agentName="{ row }">{{ row.agentName || '-' }}</template>
+      <template #column-callDuration="{ row }">{{ formatDuration(row.callDuration) }}</template>
+      <template #column-recordDuration="{ row }">{{ formatDuration(row.recordDuration) }}</template>
+      <template #column-asrStatus="{ row }">
+        <el-tag :type="asrTagType(row.asrStatus)" size="mini">{{ asrLabel(row.asrStatus) }}</el-tag>
+      </template>
+      <template #column-callTime="{ row }">{{ parseTime(row.callTime) }}</template>
+      <template #column-audio="{ row }">
+        <div class="audio-cell">
+          <el-button
+            v-if="!playingId || playingId !== row.recordId"
+            type="primary"
+            size="mini"
+            icon="el-icon-video-play"
+            @click="handlePlay(row)"
+          >播放</el-button>
+          <el-button
+            v-else
+            type="danger"
+            size="mini"
+            icon="el-icon-video-pause"
+            @click="handleStop"
+          >停止</el-button>
+          <audio
+            v-if="playingId === row.recordId"
+            ref="audioPlayer"
+            :src="audioUrl"
+            controls
+            autoplay
+            style="height: 28px; margin-left: 8px; vertical-align: middle;"
+            @ended="handleStop"
+          ></audio>
+        </div>
+      </template>
+      <template #column-action="{ row }">
+        <el-button type="text" size="mini" icon="el-icon-download" @click="handleDownload(row)">下载</el-button>
+        <el-button
+          type="text"
+          size="mini"
+          icon="el-icon-document"
+          :disabled="row.asrStatus !== '1' || !row.transcript"
+          @click="handleViewTranscript(row)"
+        >查看转写</el-button>
+      </template>
+    </ProTable>
 
     <!-- ASR 转写详情对话框 -->
     <el-dialog title="ASR转写内容" :visible.sync="transcriptOpen" width="680px" append-to-body>
@@ -149,8 +96,22 @@ export default {
   data() {
     return {
       loading: false,
+      showSearch: true,
       total: 0,
       recordingList: [],
+      // V3：ProTable 列定义（被叫/坐席/时长/ASR/时间/录音文件/操作走插槽）
+      columns: [
+        { prop: 'recordId', label: '录音ID', width: 90, align: 'center' },
+        { prop: 'callerNumber', label: '主叫号码', width: 130, align: 'center' },
+        { prop: 'calleeNumber', label: '被叫号码', width: 130, align: 'center', slot: true },
+        { prop: 'agentName', label: '坐席', width: 110, align: 'center', slot: true },
+        { prop: 'callDuration', label: '通话时长', width: 100, align: 'center', slot: true },
+        { prop: 'recordDuration', label: '录音时长', width: 100, align: 'center', slot: true },
+        { prop: 'asrStatus', label: 'ASR状态', width: 100, align: 'center', slot: true },
+        { prop: 'callTime', label: '通话时间', width: 160, align: 'center', slot: true },
+        { prop: 'audio', label: '录音文件', width: 280, align: 'center', slot: true },
+        { prop: 'action', label: '操作', width: 180, align: 'center', slot: true, className: 'small-padding fixed-width' }
+      ],
       dateRange: [],
       onlyRecording: true,
       queryParams: {
@@ -166,6 +127,28 @@ export default {
       transcriptOpen: false,
       transcriptLoading: false,
       currentRow: {}
+    }
+  },
+  computed: {
+    queryFormItems() {
+      return [
+        { prop: 'callerNumber', label: '主叫号码', placeholder: '请输入主叫号码', width: 180 },
+        { prop: 'calleeNumber', label: '被叫号码', placeholder: '请输入被叫号码', width: 180 },
+        {
+          prop: 'asrStatus',
+          label: 'ASR转写',
+          type: 'select',
+          placeholder: '全部',
+          width: 140,
+          options: [
+            { label: '已转写', value: '1' },
+            { label: '未转写', value: '0' },
+            { label: '转写中', value: '2' },
+            { label: '转写失败', value: '3' }
+          ]
+        },
+        { prop: 'dateRange', label: '通话日期', slot: true }
+      ]
     }
   },
   created() {
@@ -196,8 +179,8 @@ export default {
       this.getList()
     },
     resetQuery() {
+      // ProTable 已复位查询表单，页面只需恢复筛选初值（含独立日期区间）并重查
       this.dateRange = []
-      this.resetForm('queryForm')
       this.queryParams = {
         pageNum: 1,
         pageSize: 10,
