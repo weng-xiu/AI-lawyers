@@ -64,6 +64,7 @@
             :data="logList"
             :loading="logLoading"
             :total="logTotal"
+            :show-search.sync="logShowSearch"
             :table-attrs="{ border: true }"
             persist-key="knowledgeAudit:log"
             label-width="90px"
@@ -152,6 +153,7 @@ export default {
       ],
       queryParams: { pageNum: 1, pageSize: 10, title: undefined, auditStatus: '0', validStatus: undefined },
       logLoading: false,
+      logShowSearch: true,
       logTotal: 0,
       logList: [],
       // V3：审核流水列定义（动作/状态变化/意见/时间走插槽）
