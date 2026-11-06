@@ -1,70 +1,71 @@
 <template>
   <div class="app-container queue-monitor-page">
-    <el-card shadow="never" class="table-card">
-      <div slot="header" class="card-header">
-        <span>Stream 队列水位（每 10 秒自动刷新）</span>
-        <el-button style="float: right; padding: 3px 0" type="text" icon="el-icon-refresh" @click="getList">刷新</el-button>
-      </div>
-      <el-table v-loading="loading" :data="queueList" border size="small">
-        <el-table-column label="队列" align="center" prop="queue" min-width="140">
-          <template slot-scope="scope">
-            <el-tag size="mini">{{ scope.row.queue }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="Stream Key" align="center" prop="streamKey" min-width="180" show-overflow-tooltip />
-        <el-table-column label="Stream 长度" align="center" width="120">
-          <template slot-scope="scope">{{ formatCount(scope.row.streamLen) }}</template>
-        </el-table-column>
-        <el-table-column label="积压(未ACK)" align="center" width="120">
-          <template slot-scope="scope">
-            <span :style="{ color: scope.row.pending > 0 ? '#E6A23C' : 'inherit', fontWeight: scope.row.pending > 0 ? 600 : 400 }">
-              {{ formatCount(scope.row.pending) }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column label="死信数" align="center" width="100">
-          <template slot-scope="scope">
-            <span :style="{ color: scope.row.dead > 0 ? '#C63D4A' : 'inherit', fontWeight: scope.row.dead > 0 ? 600 : 400 }">
-              {{ formatCount(scope.row.dead) }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" align="center" width="140" fixed="right">
-          <template slot-scope="scope">
-            <el-button type="text" size="mini" icon="el-icon-warning-outline" @click="openDeadDialog(scope.row)">死信管理</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+    <!-- V3/U：队列水位表收敛到 ProTable（无查询区、无分页，保留 10 秒轮询与手动刷新） -->
+    <ProTable
+      :columns="queueColumns"
+      :query-params="queueQuery"
+      :data="queueList"
+      :loading="loading"
+      :show-search="false"
+      :show-toolbar="false"
+      :stripe="false"
+      :table-attrs="{ border: true }"
+      hide-pagination
+      persist-key="queueMonitor:queue"
+      empty-text="暂无队列水位数据"
+      empty-hint="后端 Stream 队列无积压时此处为空"
+      @query="getList">
+      <template #toolbar-left>
+        <span class="queue-refresh-hint">Stream 队列水位（每 10 秒自动刷新）</span>
+        <el-button type="text" icon="el-icon-refresh" @click="getList()">刷新</el-button>
+      </template>
+      <template #column-queue="{ row }">
+        <el-tag size="mini">{{ row.queue }}</el-tag>
+      </template>
+      <template #column-streamLen="{ row }">{{ formatCount(row.streamLen) }}</template>
+      <template #column-pending="{ row }">
+        <span :style="{ color: row.pending > 0 ? '#E6A23C' : 'inherit', fontWeight: row.pending > 0 ? 600 : 400 }">
+          {{ formatCount(row.pending) }}
+        </span>
+      </template>
+      <template #column-dead="{ row }">
+        <span :style="{ color: row.dead > 0 ? '#C63D4A' : 'inherit', fontWeight: row.dead > 0 ? 600 : 400 }">
+          {{ formatCount(row.dead) }}
+        </span>
+      </template>
+      <template #column-action="{ row }">
+        <el-button type="text" size="mini" icon="el-icon-warning-outline" @click="openDeadDialog(row)">死信管理</el-button>
+      </template>
+    </ProTable>
 
     <!-- 死信管理对话框 -->
     <el-dialog :title="'死信管理 - ' + currentQueue" :visible.sync="deadOpen" width="860px" append-to-body>
-      <el-table v-loading="deadLoading" :data="deadList" border size="mini" max-height="420">
-        <el-table-column label="死信ID" align="center" prop="id" width="160" show-overflow-tooltip />
-        <el-table-column label="原始消息ID" align="center" prop="originId" width="160" show-overflow-tooltip />
-        <el-table-column label="失败原因" align="center" prop="error" min-width="160" show-overflow-tooltip />
-        <el-table-column label="消息体" align="center" min-width="220">
-          <template slot-scope="scope">
-            <el-popover trigger="hover" placement="left" width="500">
-              <pre class="payload-preview">{{ prettyPayload(scope.row) }}</pre>
-              <span slot="reference" class="payload-cell">{{ scope.row.payload || scope.row.raw }}</span>
-            </el-popover>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" align="center" width="130" fixed="right">
-          <template slot-scope="scope">
-            <el-button v-hasPermi="['lawyers:queueMonitor:replay']" type="text" size="mini" icon="el-icon-refresh-left" @click="handleReplay(scope.row)">重投</el-button>
-            <el-button v-hasPermi="['lawyers:queueMonitor:replay']" type="text" size="mini" icon="el-icon-delete" style="color:#C63D4A" @click="handleRemove(scope.row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-      <pagination
-        v-show="deadTotal > 0"
+      <!-- 死信表同样收敛到 ProTable（独立 persist-key，弹窗内固定高度） -->
+      <ProTable
+        :columns="deadColumns"
+        :query-params="deadQuery"
+        :data="deadList"
+        :loading="deadLoading"
         :total="deadTotal"
-        :page.sync="deadQuery.pageNum"
-        :limit.sync="deadQuery.pageSize"
-        @pagination="getDeadList"
-      />
+        :show-search="false"
+        :show-toolbar="false"
+        :stripe="false"
+        :table-attrs="{ border: true, maxHeight: '420px' }"
+        persist-key="queueMonitor:dead"
+        empty-text="该队列暂无死信消息"
+        empty-hint="消费失败进入死信后可在此重投或删除"
+        @pagination="getDeadList">
+        <template #column-payload="{ row }">
+          <el-popover trigger="hover" placement="left" width="500">
+            <pre class="payload-preview">{{ prettyPayload(row) }}</pre>
+            <span slot="reference" class="payload-cell">{{ row.payload || row.raw }}</span>
+          </el-popover>
+        </template>
+        <template #column-action="{ row }">
+          <el-button v-hasPermi="['lawyers:queueMonitor:replay']" type="text" size="mini" icon="el-icon-refresh-left" @click="handleReplay(row)">重投</el-button>
+          <el-button v-hasPermi="['lawyers:queueMonitor:replay']" type="text" size="mini" icon="el-icon-delete" style="color:#C63D4A" @click="handleRemove(row)">删除</el-button>
+        </template>
+      </ProTable>
       <div slot="footer">
         <el-button size="small" @click="deadOpen = false">关 闭</el-button>
       </div>
@@ -82,6 +83,25 @@ export default {
     return {
       loading: false,
       queueList: [],
+      // 无查询条件/分页，仅为满足 ProTable 的 queryParams 契约
+      queueQuery: { pageNum: 1, pageSize: 10 },
+      // V3：队列水位列定义（队列/长度/积压/死信/操作走插槽，移除原 fixed="right"）
+      queueColumns: [
+        { prop: 'queue', label: '队列', minWidth: 140, slot: true },
+        { prop: 'streamKey', label: 'Stream Key', minWidth: 180, showOverflowTooltip: true },
+        { prop: 'streamLen', label: 'Stream 长度', width: 120, slot: true },
+        { prop: 'pending', label: '积压(未ACK)', width: 120, slot: true },
+        { prop: 'dead', label: '死信数', width: 100, slot: true },
+        { prop: 'action', label: '操作', width: 140, slot: true }
+      ],
+      // 死信表列定义（消息体/操作走插槽）
+      deadColumns: [
+        { prop: 'id', label: '死信ID', width: 160, showOverflowTooltip: true },
+        { prop: 'originId', label: '原始消息ID', width: 160, showOverflowTooltip: true },
+        { prop: 'error', label: '失败原因', minWidth: 160, showOverflowTooltip: true },
+        { prop: 'payload', label: '消息体', minWidth: 220, slot: true },
+        { prop: 'action', label: '操作', width: 130, slot: true }
+      ],
       deadOpen: false,
       deadLoading: false,
       currentQueue: '',
@@ -175,8 +195,10 @@ export default {
 </script>
 
 <style scoped>
-.card-header {
+.queue-refresh-hint {
+  margin-right: 8px;
   font-weight: 600;
+  color: #606266;
 }
 .payload-cell {
   display: inline-block;

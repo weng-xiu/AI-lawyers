@@ -3,145 +3,105 @@
     <el-tabs v-model="activeTab" type="card" @tab-click="handleTabClick">
       <!-- ========== Tab1: 班次管理 ========== -->
       <el-tab-pane label="班次管理" name="shift">
-        <el-card shadow="never" class="table-card">
-          <el-row :gutter="10" class="mb8">
-            <el-col :span="1.5">
-              <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAddShift">新增班次</el-button>
-            </el-col>
-          </el-row>
-
-          <el-table v-loading="shiftLoading" :data="shiftList" border size="small">
-            <el-table-column label="班次名称" align="center" prop="shiftName" min-width="140" />
-            <el-table-column label="上班时间" align="center" prop="startTime" width="110" />
-            <el-table-column label="下班时间" align="center" prop="endTime" width="110" />
-            <el-table-column label="是否跨天" align="center" width="100">
-              <template slot-scope="scope">
-                <el-tag :type="scope.row.crossDay === '1' || scope.row.crossDay === 1 ? 'warning' : 'info'" size="mini">
-                  {{ (scope.row.crossDay === '1' || scope.row.crossDay === 1) ? '跨天' : '当日' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="休息时间(分)" align="center" prop="breakMinutes" width="110">
-              <template slot-scope="scope">{{ scope.row.breakMinutes != null ? scope.row.breakMinutes : '-' }}</template>
-            </el-table-column>
-            <el-table-column label="状态" align="center" width="90">
-              <template slot-scope="scope">
-                <el-switch
-                  v-model="scope.row.status"
-                  active-value="1"
-                  inactive-value="0"
-                  @change="handleShiftStatusChange(scope.row)"
-                />
-              </template>
-            </el-table-column>
-            <el-table-column label="备注" align="center" prop="remark" show-overflow-tooltip>
-              <template slot-scope="scope">{{ scope.row.remark || '-' }}</template>
-            </el-table-column>
-            <el-table-column label="操作" align="center" width="160" fixed="right">
-              <template slot-scope="scope">
-                <el-button type="text" size="mini" icon="el-icon-edit" @click="handleUpdateShift(scope.row)">编辑</el-button>
-                <el-button type="text" size="mini" icon="el-icon-delete" style="color:#C63D4A" @click="handleDeleteShift(scope.row)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
+        <!-- V3/U：班次表收敛到 ProTable（无查询区、无分页，移除原 fixed="right"） -->
+        <ProTable
+          :columns="shiftColumns"
+          :query-params="shiftQuery"
+          :data="shiftList"
+          :loading="shiftLoading"
+          :show-search="false"
+          :stripe="false"
+          :table-attrs="{ border: true }"
+          hide-pagination
+          persist-key="schedule:shift"
+          empty-text="暂无班次"
+          empty-hint="新增班次后可用于批量排班与签到签退"
+          @query="getShiftList">
+          <template #toolbar-left>
+            <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAddShift">新增班次</el-button>
+          </template>
+          <template #column-crossDay="{ row }">
+            <el-tag :type="row.crossDay === '1' || row.crossDay === 1 ? 'warning' : 'info'" size="mini">
+              {{ (row.crossDay === '1' || row.crossDay === 1) ? '跨天' : '当日' }}
+            </el-tag>
+          </template>
+          <template #column-breakMinutes="{ row }">{{ row.breakMinutes != null ? row.breakMinutes : '-' }}</template>
+          <template #column-status="{ row }">
+            <el-switch v-model="row.status" active-value="1" inactive-value="0" @change="handleShiftStatusChange(row)" />
+          </template>
+          <template #column-remark="{ row }">{{ row.remark || '-' }}</template>
+          <template #column-action="{ row }">
+            <el-button type="text" size="mini" icon="el-icon-edit" @click="handleUpdateShift(row)">编辑</el-button>
+            <el-button type="text" size="mini" icon="el-icon-delete" style="color:#C63D4A" @click="handleDeleteShift(row)">删除</el-button>
+          </template>
+        </ProTable>
       </el-tab-pane>
 
       <!-- ========== Tab2: 排班日历 ========== -->
       <el-tab-pane label="排班管理" name="schedule">
-        <el-card shadow="never" class="search-card">
-          <el-form :model="scheduleQuery" ref="scheduleForm" size="small" :inline="true" label-width="80px">
-            <el-form-item label="班次">
-              <el-select v-model="scheduleQuery.shiftId" placeholder="全部" clearable filterable style="width:160px">
-                <el-option v-for="s in enabledShiftList" :key="s.shiftId" :label="s.shiftName" :value="s.shiftId" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="坐席">
-              <el-select v-model="scheduleQuery.agentId" placeholder="全部坐席" clearable filterable style="width:160px">
-                <el-option v-for="a in agentList" :key="a.agentId" :label="a.agentName" :value="a.agentId" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="日期范围">
-              <el-date-picker
-                v-model="scheduleDateRange"
-                style="width: 260px"
-                value-format="yyyy-MM-dd"
-                type="daterange"
-                range-separator="-"
-                start-placeholder="开始日期"
-                end-placeholder="结束日期"
-              ></el-date-picker>
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" icon="el-icon-search" size="mini" @click="getScheduleList">查询</el-button>
-              <el-button icon="el-icon-refresh" size="mini" @click="resetScheduleQuery">重置</el-button>
-              <el-button type="success" icon="el-icon-date" size="mini" @click="loadToday">今日排班</el-button>
-            </el-form-item>
-          </el-form>
-        </el-card>
-
-        <el-card shadow="never" class="table-card">
-          <el-row :gutter="10" class="mb8">
-            <el-col :span="1.5">
-              <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="openBatchDialog">批量排班</el-button>
-            </el-col>
-          </el-row>
-
-          <el-table v-loading="scheduleLoading" :data="scheduleList" border size="small">
-            <el-table-column label="排班ID" align="center" prop="scheduleId" width="90" />
-            <el-table-column label="坐席" align="center" prop="agentName" width="120">
-              <template slot-scope="scope">{{ scope.row.agentName || '-' }}</template>
-            </el-table-column>
-            <el-table-column label="班次" align="center" prop="shiftName" width="140">
-              <template slot-scope="scope">{{ scope.row.shiftName || '-' }}</template>
-            </el-table-column>
-            <el-table-column label="排班日期" align="center" prop="scheduleDate" width="120" />
-            <el-table-column label="排班类型" align="center" width="100">
-              <template slot-scope="scope">
-                <el-tag size="mini" :type="scheduleTypeTag(scope.row.scheduleType)">{{ scheduleTypeLabel(scope.row.scheduleType) }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="签到时间" align="center" prop="checkInTime" width="160">
-              <template slot-scope="scope">{{ scope.row.checkInTime || '-' }}</template>
-            </el-table-column>
-            <el-table-column label="签退时间" align="center" prop="checkOutTime" width="160">
-              <template slot-scope="scope">{{ scope.row.checkOutTime || '-' }}</template>
-            </el-table-column>
-            <el-table-column label="状态" align="center" width="100">
-              <template slot-scope="scope">
-                <el-tag size="mini" :type="scheduleStatusTag(scope.row.status)">{{ scheduleStatusLabel(scope.row.status) }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" align="center" width="220" fixed="right">
-              <template slot-scope="scope">
-                <el-button
-                  v-if="!scope.row.checkInTime"
-                  type="text"
-                  size="mini"
-                  icon="el-icon-right"
-                  @click="handleCheckIn(scope.row)"
-                >签到</el-button>
-                <el-button
-                  v-if="scope.row.checkInTime && !scope.row.checkOutTime"
-                  type="text"
-                  size="mini"
-                  icon="el-icon-back"
-                  @click="handleCheckOut(scope.row)"
-                >签退</el-button>
-                <el-button type="text" size="mini" icon="el-icon-edit" @click="handleUpdateSchedule(scope.row)">编辑</el-button>
-                <el-button type="text" size="mini" icon="el-icon-delete" style="color:#C63D4A" @click="handleDeleteSchedule(scope.row)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <pagination
-            v-show="scheduleTotal > 0"
-            :total="scheduleTotal"
-            :page.sync="scheduleQuery.pageNum"
-            :limit.sync="scheduleQuery.pageSize"
-            @pagination="getScheduleList"
-          />
-        </el-card>
+        <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+        <ProTable
+          :columns="scheduleColumns"
+          :query-form-items="scheduleQueryFormItems"
+          :query-params="scheduleQuery"
+          :data="scheduleList"
+          :loading="scheduleLoading"
+          :total="scheduleTotal"
+          :stripe="false"
+          :table-attrs="{ border: true }"
+          label-width="80px"
+          persist-key="schedule:list"
+          empty-text="暂无排班记录"
+          empty-hint="可按班次与坐席筛选，或使用批量排班创建"
+          @query="getScheduleList"
+          @reset="resetScheduleQuery"
+          @pagination="getScheduleList">
+          <template #query-scheduleDateRange>
+            <el-date-picker
+              v-model="scheduleDateRange"
+              style="width: 260px"
+              value-format="yyyy-MM-dd"
+              type="daterange"
+              range-separator="-"
+              start-placeholder="开始日期"
+              end-placeholder="结束日期"
+            />
+          </template>
+          <template #query-extra>
+            <el-button type="success" icon="el-icon-date" size="mini" @click="loadToday">今日排班</el-button>
+          </template>
+          <template #toolbar-left>
+            <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="openBatchDialog">批量排班</el-button>
+          </template>
+          <template #column-agentName="{ row }">{{ row.agentName || '-' }}</template>
+          <template #column-shiftName="{ row }">{{ row.shiftName || '-' }}</template>
+          <template #column-scheduleType="{ row }">
+            <el-tag size="mini" :type="scheduleTypeTag(row.scheduleType)">{{ scheduleTypeLabel(row.scheduleType) }}</el-tag>
+          </template>
+          <template #column-checkInTime="{ row }">{{ row.checkInTime || '-' }}</template>
+          <template #column-checkOutTime="{ row }">{{ row.checkOutTime || '-' }}</template>
+          <template #column-status="{ row }">
+            <el-tag size="mini" :type="scheduleStatusTag(row.status)">{{ scheduleStatusLabel(row.status) }}</el-tag>
+          </template>
+          <template #column-action="{ row }">
+            <el-button
+              v-if="!row.checkInTime"
+              type="text"
+              size="mini"
+              icon="el-icon-right"
+              @click="handleCheckIn(row)"
+            >签到</el-button>
+            <el-button
+              v-if="row.checkInTime && !row.checkOutTime"
+              type="text"
+              size="mini"
+              icon="el-icon-back"
+              @click="handleCheckOut(row)"
+            >签退</el-button>
+            <el-button type="text" size="mini" icon="el-icon-edit" @click="handleUpdateSchedule(row)">编辑</el-button>
+            <el-button type="text" size="mini" icon="el-icon-delete" style="color:#C63D4A" @click="handleDeleteSchedule(row)">删除</el-button>
+          </template>
+        </ProTable>
       </el-tab-pane>
 
       <!-- ========== Tab3: 15 分钟预测与对比验收（F9） ========== -->
@@ -266,6 +226,19 @@ export default {
       // 班次
       shiftLoading: false,
       shiftList: [],
+      // 班次表无查询区/分页，仅为满足 ProTable 的 queryParams 契约
+      shiftQuery: { pageNum: 1, pageSize: 10 },
+      // V3：班次表列定义（跨天/休息时长/状态/备注/操作走插槽）
+      shiftColumns: [
+        { prop: 'shiftName', label: '班次名称', minWidth: 140 },
+        { prop: 'startTime', label: '上班时间', width: 110 },
+        { prop: 'endTime', label: '下班时间', width: 110 },
+        { prop: 'crossDay', label: '是否跨天', width: 100, slot: true },
+        { prop: 'breakMinutes', label: '休息时间(分)', width: 110, slot: true },
+        { prop: 'status', label: '状态', width: 90, slot: true },
+        { prop: 'remark', label: '备注', minWidth: 120, showOverflowTooltip: true, slot: true },
+        { prop: 'action', label: '操作', width: 160, slot: true }
+      ],
       enabledShiftList: [],
       shiftOpen: false,
       shiftTitle: '',
@@ -279,6 +252,18 @@ export default {
       scheduleLoading: false,
       scheduleList: [],
       scheduleTotal: 0,
+      // V3：排班表列定义（坐席/班次/类型/签到签退/状态/操作走插槽，移除原 fixed="right"）
+      scheduleColumns: [
+        { prop: 'scheduleId', label: '排班ID', width: 90 },
+        { prop: 'agentName', label: '坐席', width: 120, slot: true },
+        { prop: 'shiftName', label: '班次', width: 140, slot: true },
+        { prop: 'scheduleDate', label: '排班日期', width: 120 },
+        { prop: 'scheduleType', label: '排班类型', width: 100, slot: true },
+        { prop: 'checkInTime', label: '签到时间', width: 160, slot: true },
+        { prop: 'checkOutTime', label: '签退时间', width: 160, slot: true },
+        { prop: 'status', label: '状态', width: 100, slot: true },
+        { prop: 'action', label: '操作', width: 220, slot: true }
+      ],
       scheduleDateRange: [],
       scheduleQuery: {
         pageNum: 1,
@@ -296,6 +281,22 @@ export default {
         scheduleType: [{ required: true, message: '请选择排班类型', trigger: 'change' }]
       },
       agentList: []
+    }
+  },
+  computed: {
+    /** V3：排班查询项（班次/坐席下拉取自启用班次与坐席清单，日期范围走查询插槽） */
+    scheduleQueryFormItems() {
+      return [
+        {
+          prop: 'shiftId', label: '班次', type: 'select', placeholder: '全部', width: 160, filterable: true,
+          options: (this.enabledShiftList || []).map(s => ({ label: s.shiftName, value: s.shiftId }))
+        },
+        {
+          prop: 'agentId', label: '坐席', type: 'select', placeholder: '全部坐席', width: 160, filterable: true,
+          options: (this.agentList || []).map(a => ({ label: a.agentName, value: a.agentId }))
+        },
+        { prop: 'scheduleDateRange', label: '日期范围', slot: true }
+      ]
     }
   },
   created() {
