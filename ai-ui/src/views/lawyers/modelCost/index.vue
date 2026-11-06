@@ -71,86 +71,74 @@
       </el-col>
     </el-row>
 
-    <!-- 场景分布 -->
+    <!-- 场景分布（V3：收敛到 ProTable，无查询区/工具条/分页） -->
     <el-card shadow="never" class="mc-panel">
       <div slot="header"><span>调用类型 / 业务场景分布</span></div>
-      <el-table :data="sceneRows" size="small" border>
-        <el-table-column label="调用类型" prop="kind" width="100" align="center">
-          <template slot-scope="s">{{ kindLabel(s.row.kind) }}</template>
-        </el-table-column>
-        <el-table-column label="业务场景" prop="scene" min-width="120">
-          <template slot-scope="s">{{ sceneLabel(s.row.scene) }}</template>
-        </el-table-column>
-        <el-table-column label="调用量" prop="totalCalls" width="90" align="right" />
-        <el-table-column label="成功" prop="successCalls" width="80" align="right" />
-        <el-table-column label="失败" prop="failCalls" width="80" align="right" />
-        <el-table-column label="拒绝" prop="rejectCalls" width="80" align="right" />
-        <el-table-column label="成功率" width="100" align="right">
-          <template slot-scope="s">{{ rate(s.row.successCalls, s.row.totalCalls) }}%</template>
-        </el-table-column>
-        <el-table-column label="总Token" prop="totalTokens" width="110" align="right" />
-        <el-table-column label="估算费用(元)" prop="costAmount" width="120" align="right">
-          <template slot-scope="s">{{ money(s.row.costAmount) }}</template>
-        </el-table-column>
-        <el-table-column label="平均耗时(ms)" prop="avgElapsedMs" width="110" align="right" />
-      </el-table>
+      <ProTable
+        :columns="sceneColumns"
+        :query-params="sceneQuery"
+        :data="sceneRows"
+        :show-search="false"
+        :show-toolbar="false"
+        :stripe="false"
+        :table-attrs="{ border: true }"
+        hide-pagination
+        persist-key="modelCost:scene"
+        empty-text="暂无场景分布数据"
+        empty-hint="所选时间范围内无大模型调用"
+      >
+        <template #column-kind="{ row }">{{ kindLabel(row.kind) }}</template>
+        <template #column-scene="{ row }">{{ sceneLabel(row.scene) }}</template>
+        <template #column-successRate="{ row }">{{ rate(row.successCalls, row.totalCalls) }}%</template>
+        <template #column-costAmount="{ row }">{{ money(row.costAmount) }}</template>
+      </ProTable>
     </el-card>
 
-    <!-- 模型明细分布 -->
+    <!-- 模型明细分布（V3：收敛到 ProTable，无查询区/工具条/分页） -->
     <el-card shadow="never" class="mc-panel">
       <div slot="header"><span>模型维度明细</span></div>
-      <el-table :data="modelRows" size="small" border>
-        <el-table-column label="模型名称" prop="modelName" min-width="160" show-overflow-tooltip />
-        <el-table-column label="类型" prop="modelType" width="100" align="center" />
-        <el-table-column label="调用量" prop="totalCalls" width="90" align="right" />
-        <el-table-column label="成功" prop="successCalls" width="80" align="right" />
-        <el-table-column label="失败" prop="failCalls" width="80" align="right" />
-        <el-table-column label="拒绝" prop="rejectCalls" width="80" align="right" />
-        <el-table-column label="成功率" width="100" align="right">
-          <template slot-scope="s">{{ rate(s.row.successCalls, s.row.totalCalls) }}%</template>
-        </el-table-column>
-        <el-table-column label="总Token" prop="totalTokens" width="120" align="right" />
-        <el-table-column label="估算费用(元)" prop="costAmount" width="130" align="right">
-          <template slot-scope="s">{{ money(s.row.costAmount) }}</template>
-        </el-table-column>
-        <el-table-column label="平均耗时(ms)" prop="avgElapsedMs" width="120" align="right" />
-      </el-table>
+      <ProTable
+        :columns="modelColumns"
+        :query-params="modelQuery"
+        :data="modelRows"
+        :show-search="false"
+        :show-toolbar="false"
+        :stripe="false"
+        :table-attrs="{ border: true }"
+        hide-pagination
+        persist-key="modelCost:model"
+        empty-text="暂无模型维度数据"
+        empty-hint="所选时间范围内无大模型调用"
+      >
+        <template #column-successRate="{ row }">{{ rate(row.successCalls, row.totalCalls) }}%</template>
+        <template #column-costAmount="{ row }">{{ money(row.costAmount) }}</template>
+      </ProTable>
     </el-card>
 
-    <!-- 调用明细 -->
+    <!-- 调用明细（V3：收敛到 ProTable，保留分页） -->
     <el-card shadow="never" class="mc-panel">
       <div slot="header"><span>大模型调用明细</span></div>
-      <el-table :data="logList" size="small" border>
-        <el-table-column label="调用时间" prop="callTime" width="160" />
-        <el-table-column label="类型" prop="kind" width="70" align="center">
-          <template slot-scope="s">{{ kindLabel(s.row.kind) }}</template>
-        </el-table-column>
-        <el-table-column label="场景" prop="scene" width="90" align="center">
-          <template slot-scope="s">{{ sceneLabel(s.row.scene) }}</template>
-        </el-table-column>
-        <el-table-column label="模型配置" prop="configName" min-width="130" show-overflow-tooltip />
-        <el-table-column label="模型名称" prop="modelName" min-width="150" show-overflow-tooltip />
-        <el-table-column label="输入Tok" prop="promptTokens" width="85" align="right" />
-        <el-table-column label="输出Tok" prop="completionTokens" width="85" align="right" />
-        <el-table-column label="费用(元)" prop="costAmount" width="100" align="right">
-          <template slot-scope="s">{{ money(s.row.costAmount) }}</template>
-        </el-table-column>
-        <el-table-column label="耗时(ms)" prop="elapsedMs" width="90" align="right" />
-        <el-table-column label="尝试" prop="attempts" width="60" align="center" />
-        <el-table-column label="结果" prop="result" width="90" align="center">
-          <template slot-scope="s">
-            <el-tag size="mini" :type="resultTag(s.row.result)">{{ resultLabel(s.row.result) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="失败原因" prop="failReason" min-width="180" show-overflow-tooltip />
-      </el-table>
-      <pagination
-        v-show="logTotal > 0"
+      <ProTable
+        :columns="logColumns"
+        :query-params="logQuery"
+        :data="logList"
         :total="logTotal"
-        :page.sync="logQuery.pageNum"
-        :limit.sync="logQuery.pageSize"
+        :show-search="false"
+        :show-toolbar="false"
+        :stripe="false"
+        :table-attrs="{ border: true }"
+        persist-key="modelCost:log"
+        empty-text="暂无大模型调用明细"
+        empty-hint="可调整时间范围或筛选条件后重试"
         @pagination="loadLogList"
-      />
+      >
+        <template #column-kind="{ row }">{{ kindLabel(row.kind) }}</template>
+        <template #column-scene="{ row }">{{ sceneLabel(row.scene) }}</template>
+        <template #column-costAmount="{ row }">{{ money(row.costAmount) }}</template>
+        <template #column-result="{ row }">
+          <el-tag size="mini" :type="resultTag(row.result)">{{ resultLabel(row.result) }}</el-tag>
+        </template>
+      </ProTable>
     </el-card>
   </div>
 </template>
@@ -214,6 +202,50 @@ export default {
         { value: 'other', label: '其他' }
       ],
       overview: {},
+      // 三张报表均无独立查询区/工具条，仅为满足 ProTable 的 queryParams 契约
+      sceneQuery: { pageNum: 1, pageSize: 10 },
+      modelQuery: { pageNum: 1, pageSize: 10 },
+      // V3：场景分布列定义（调用类型/业务场景/成功率/费用走插槽）
+      sceneColumns: [
+        { prop: 'kind', label: '调用类型', width: 100, slot: true },
+        { prop: 'scene', label: '业务场景', minWidth: 120, slot: true },
+        { prop: 'totalCalls', label: '调用量', width: 90, align: 'right' },
+        { prop: 'successCalls', label: '成功', width: 80, align: 'right' },
+        { prop: 'failCalls', label: '失败', width: 80, align: 'right' },
+        { prop: 'rejectCalls', label: '拒绝', width: 80, align: 'right' },
+        { prop: 'successRate', label: '成功率', width: 100, align: 'right', slot: true },
+        { prop: 'totalTokens', label: '总Token', width: 110, align: 'right' },
+        { prop: 'costAmount', label: '估算费用(元)', width: 120, align: 'right', slot: true },
+        { prop: 'avgElapsedMs', label: '平均耗时(ms)', width: 110, align: 'right' }
+      ],
+      // V3：模型维度列定义（成功率/费用走插槽）
+      modelColumns: [
+        { prop: 'modelName', label: '模型名称', minWidth: 160, showOverflowTooltip: true },
+        { prop: 'modelType', label: '类型', width: 100 },
+        { prop: 'totalCalls', label: '调用量', width: 90, align: 'right' },
+        { prop: 'successCalls', label: '成功', width: 80, align: 'right' },
+        { prop: 'failCalls', label: '失败', width: 80, align: 'right' },
+        { prop: 'rejectCalls', label: '拒绝', width: 80, align: 'right' },
+        { prop: 'successRate', label: '成功率', width: 100, align: 'right', slot: true },
+        { prop: 'totalTokens', label: '总Token', width: 120, align: 'right' },
+        { prop: 'costAmount', label: '估算费用(元)', width: 130, align: 'right', slot: true },
+        { prop: 'avgElapsedMs', label: '平均耗时(ms)', width: 120, align: 'right' }
+      ],
+      // V3：调用明细列定义（类型/场景/费用/结果走插槽）
+      logColumns: [
+        { prop: 'callTime', label: '调用时间', width: 160 },
+        { prop: 'kind', label: '类型', width: 70, slot: true },
+        { prop: 'scene', label: '场景', width: 90, slot: true },
+        { prop: 'configName', label: '模型配置', minWidth: 130, showOverflowTooltip: true },
+        { prop: 'modelName', label: '模型名称', minWidth: 150, showOverflowTooltip: true },
+        { prop: 'promptTokens', label: '输入Tok', width: 85, align: 'right' },
+        { prop: 'completionTokens', label: '输出Tok', width: 85, align: 'right' },
+        { prop: 'costAmount', label: '费用(元)', width: 100, align: 'right', slot: true },
+        { prop: 'elapsedMs', label: '耗时(ms)', width: 90, align: 'right' },
+        { prop: 'attempts', label: '尝试', width: 60 },
+        { prop: 'result', label: '结果', width: 90, slot: true },
+        { prop: 'failReason', label: '失败原因', minWidth: 180, showOverflowTooltip: true }
+      ],
       trendRows: [],
       modelRows: [],
       sceneRows: [],

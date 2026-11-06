@@ -1,29 +1,25 @@
 <template>
   <div class="app-container">
-    <!-- ==================== 查询条件 ==================== -->
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="80px">
-      <el-form-item label="坐席ID" prop="agentId">
-        <el-input v-model="queryParams.agentId" placeholder="请输入坐席ID" clearable style="width: 150px" @keyup.enter.native="handleQuery" />
-      </el-form-item>
-      <el-form-item label="主叫号码" prop="callerNumber">
-        <el-input v-model="queryParams.callerNumber" placeholder="请输入主叫号码" clearable style="width: 180px" @keyup.enter.native="handleQuery" />
-      </el-form-item>
-      <el-form-item label="AI状态" prop="aiStatus">
-        <el-select v-model="queryParams.aiStatus" placeholder="请选择AI状态" clearable style="width: 140px">
-          <el-option label="待检" value="0" />
-          <el-option label="检中" value="1" />
-          <el-option label="完成" value="2" />
-          <el-option label="失败" value="3" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="复核状态" prop="reviewStatus">
-        <el-select v-model="queryParams.reviewStatus" placeholder="请选择复核状态" clearable style="width: 140px">
-          <el-option label="未复核" value="0" />
-          <el-option label="通过" value="1" />
-          <el-option label="驳回整改" value="2" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="质检时间">
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ErrorRetry v-if="loadError" @retry="getList" />
+    <ProTable
+      v-else
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="qualityList"
+      :loading="loading"
+      :total="total"
+      :stripe="false"
+      :table-attrs="{ border: true }"
+      label-width="80px"
+      persist-key="quality:inspection"
+      empty-text="暂无质检记录"
+      empty-hint="通话完成并转写后将自动进入质检"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList">
+      <template #query-qualityDateRange>
         <el-date-picker
           v-model="dateRange"
           type="datetimerange"
@@ -32,17 +28,9 @@
           end-placeholder="结束时间"
           value-format="yyyy-MM-dd HH:mm:ss"
           :default-time="['00:00:00', '23:59:59']"
-        >
-        </el-date-picker>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
-
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
+        />
+      </template>
+      <template #toolbar-left>
         <el-button
           type="warning"
           plain
@@ -51,8 +39,6 @@
           @click="handleExport"
           v-hasPermi="['lawyers:quality:export']"
         >导出</el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button
           type="primary"
           plain
@@ -61,105 +47,62 @@
           @click="handleTemplate"
           v-hasPermi="['lawyers:quality:review']"
         >质检模板</el-button>
-      </el-col>
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
-    </el-row>
-
-    <!-- ==================== 质检列表 ==================== -->
-    <ErrorRetry v-if="loadError" @retry="getList" />
-    <el-table v-else v-loading="loading" :data="qualityList">
-      <template slot="empty">
-        <TableEmpty text="暂无质检记录" hint="通话完成并转写后将自动进入质检" />
       </template>
-      <el-table-column label="质检ID" align="center" prop="inspectionId" width="80" />
-      <el-table-column label="坐席" align="center" min-width="100">
-        <template slot-scope="scope">
-          {{ scope.row.agentName || ('坐席' + scope.row.agentId) }}
-        </template>
-      </el-table-column>
-      <el-table-column label="主叫号码" align="center" prop="callerNumber" width="130" :show-overflow-tooltip="true" />
-      <el-table-column label="话单ID" align="center" prop="recordId" width="90" />
-      <el-table-column label="AI总分" align="center" prop="totalScore" width="90">
-        <template slot-scope="scope">
-          <el-tag v-if="scope.row.totalScore != null" :type="scoreTagType(scope.row.totalScore)" size="small">
-            {{ scope.row.totalScore }}
-          </el-tag>
-          <span v-else>-</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="AI状态" align="center" prop="aiStatus" width="90">
-        <template slot-scope="scope">
-          <el-tag v-if="scope.row.aiStatus == '0'" type="info" size="small">待检</el-tag>
-          <el-tag v-else-if="scope.row.aiStatus == '1'" type="warning" size="small">检中</el-tag>
-          <el-tag v-else-if="scope.row.aiStatus == '2'" type="success" size="small">完成</el-tag>
-          <el-tag v-else-if="scope.row.aiStatus == '3'" type="danger" size="small">失败</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="风险预警" align="center" width="90">
-        <template slot-scope="scope">
-          <el-tag v-if="scope.row.riskWarningId != null" type="danger" size="small">已联动</el-tag>
-          <span v-else>-</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="复核状态" align="center" prop="reviewStatus" width="100">
-        <template slot-scope="scope">
-          <el-tag v-if="scope.row.reviewStatus == '1'" type="success" size="small">通过</el-tag>
-          <el-tag v-else-if="scope.row.reviewStatus == '2'" type="danger" size="small">驳回整改</el-tag>
-          <el-tag v-else type="info" size="small">未复核</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="申诉状态" align="center" prop="appealStatus" width="100">
-        <template slot-scope="scope">
-          <el-tag v-if="scope.row.appealStatus == '1'" type="warning" size="small">待复核</el-tag>
-          <el-tag v-else-if="scope.row.appealStatus == '2'" type="info" size="small">维持</el-tag>
-          <el-tag v-else-if="scope.row.appealStatus == '3'" type="success" size="small">已改分</el-tag>
-          <span v-else>-</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="复核人" align="center" prop="reviewerName" width="90" />
-      <el-table-column label="质检时间" align="center" prop="createTime" width="160">
-        <template slot-scope="scope">
-          <span>{{ parseTime(scope.row.createTime) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="280">
-        <template slot-scope="scope">
-          <el-button size="mini" type="text" icon="el-icon-view" @click="handleDetail(scope.row)" v-hasPermi="['lawyers:quality:query']">详情</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-finished"
-            :disabled="scope.row.aiStatus != '2'"
-            @click="handleReview(scope.row)"
-            v-hasPermi="['lawyers:quality:review']"
-          >复核</el-button>
-          <el-button size="mini" type="text" icon="el-icon-refresh-right" @click="handleInspect(scope.row)" v-hasPermi="['lawyers:quality:inspect']">重检</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-warning-outline"
-            :disabled="scope.row.aiStatus != '2' || scope.row.appealStatus == '1'"
-            @click="handleAppeal(scope.row)"
-          >申诉</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-s-check"
-            :disabled="scope.row.appealStatus != '1'"
-            @click="handleAppealReview(scope.row)"
-            v-hasPermi="['lawyers:quality:review']"
-          >申诉复核</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <pagination
-      v-show="total>0"
-      :total="total"
-      :page.sync="queryParams.pageNum"
-      :limit.sync="queryParams.pageSize"
-      @pagination="getList"
-    />
+      <template #column-agentName="{ row }">{{ row.agentName || ('坐席' + row.agentId) }}</template>
+      <template #column-totalScore="{ row }">
+        <el-tag v-if="row.totalScore != null" :type="scoreTagType(row.totalScore)" size="small">{{ row.totalScore }}</el-tag>
+        <span v-else>-</span>
+      </template>
+      <template #column-aiStatus="{ row }">
+        <el-tag v-if="row.aiStatus == '0'" type="info" size="small">待检</el-tag>
+        <el-tag v-else-if="row.aiStatus == '1'" type="warning" size="small">检中</el-tag>
+        <el-tag v-else-if="row.aiStatus == '2'" type="success" size="small">完成</el-tag>
+        <el-tag v-else-if="row.aiStatus == '3'" type="danger" size="small">失败</el-tag>
+      </template>
+      <template #column-riskWarningId="{ row }">
+        <el-tag v-if="row.riskWarningId != null" type="danger" size="small">已联动</el-tag>
+        <span v-else>-</span>
+      </template>
+      <template #column-reviewStatus="{ row }">
+        <el-tag v-if="row.reviewStatus == '1'" type="success" size="small">通过</el-tag>
+        <el-tag v-else-if="row.reviewStatus == '2'" type="danger" size="small">驳回整改</el-tag>
+        <el-tag v-else type="info" size="small">未复核</el-tag>
+      </template>
+      <template #column-appealStatus="{ row }">
+        <el-tag v-if="row.appealStatus == '1'" type="warning" size="small">待复核</el-tag>
+        <el-tag v-else-if="row.appealStatus == '2'" type="info" size="small">维持</el-tag>
+        <el-tag v-else-if="row.appealStatus == '3'" type="success" size="small">已改分</el-tag>
+        <span v-else>-</span>
+      </template>
+      <template #column-createTime="{ row }">{{ parseTime(row.createTime) }}</template>
+      <template #column-action="{ row }">
+        <el-button size="mini" type="text" icon="el-icon-view" @click="handleDetail(row)" v-hasPermi="['lawyers:quality:query']">详情</el-button>
+        <el-button
+          size="mini"
+          type="text"
+          icon="el-icon-finished"
+          :disabled="row.aiStatus != '2'"
+          @click="handleReview(row)"
+          v-hasPermi="['lawyers:quality:review']"
+        >复核</el-button>
+        <el-button size="mini" type="text" icon="el-icon-refresh-right" @click="handleInspect(row)" v-hasPermi="['lawyers:quality:inspect']">重检</el-button>
+        <el-button
+          size="mini"
+          type="text"
+          icon="el-icon-warning-outline"
+          :disabled="row.aiStatus != '2' || row.appealStatus == '1'"
+          @click="handleAppeal(row)"
+        >申诉</el-button>
+        <el-button
+          size="mini"
+          type="text"
+          icon="el-icon-s-check"
+          :disabled="row.appealStatus != '1'"
+          @click="handleAppealReview(row)"
+          v-hasPermi="['lawyers:quality:review']"
+        >申诉复核</el-button>
+      </template>
+    </ProTable>
 
     <!-- ==================== 详情对话框（转写/评分/违禁明细） ==================== -->
     <el-dialog title="质检详情" :visible.sync="detailOpen" width="860px" append-to-body>
@@ -193,11 +136,18 @@
       </el-row>
 
       <el-divider content-position="left">命中问题</el-divider>
-      <el-table :data="violations" size="small" border max-height="180" v-if="violations.length">
-        <el-table-column label="命中关键词/问题" prop="keyword" min-width="160" :show-overflow-tooltip="true" />
-        <el-table-column label="原因说明" prop="reason" min-width="260" :show-overflow-tooltip="true" />
-      </el-table>
-      <el-empty v-else description="未命中违禁/敏感/情绪问题" :image-size="60"></el-empty>
+      <ProTable
+        :columns="violationColumns"
+        :query-params="violationQuery"
+        :data="violations"
+        :show-search="false"
+        :show-toolbar="false"
+        :stripe="false"
+        :table-attrs="{ border: true, maxHeight: '180px' }"
+        hide-pagination
+        persist-key="quality:violation"
+        empty-text="未命中违禁/敏感/情绪问题"
+      />
 
       <el-divider content-position="left">通话转写</el-divider>
       <div class="transcript-box">{{ detail.transcript || '暂无转写文本（录音缺失或 ASR 未配置）' }}</div>
@@ -278,40 +228,40 @@
 
     <!-- ==================== 质检模板管理对话框 ==================== -->
     <el-dialog title="质检模板管理" :visible.sync="templateOpen" width="900px" append-to-body>
-      <el-row :gutter="10" class="mb8">
-        <el-col :span="1.5">
+      <ProTable
+        :columns="templateColumns"
+        :query-params="templateQuery"
+        :data="templateList"
+        :loading="templateLoading"
+        :show-search="false"
+        :show-toolbar="false"
+        :stripe="false"
+        :table-attrs="{ border: true, maxHeight: '360px' }"
+        hide-pagination
+        persist-key="quality:template"
+        empty-text="暂无质检模板"
+        empty-hint="新增模板后可设为默认质检模板">
+        <template #toolbar-left>
           <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAddTemplate">新增模板</el-button>
-        </el-col>
-      </el-row>
-      <el-table v-loading="templateLoading" :data="templateList" size="small" border max-height="360">
-        <el-table-column label="ID" align="center" prop="templateId" width="60" />
-        <el-table-column label="模板名称" prop="templateName" min-width="150" :show-overflow-tooltip="true" />
-        <el-table-column label="维度权重" min-width="240">
-          <template slot-scope="scope">
-            <el-tag v-for="d in safeJsonArray(scope.row.dimensions)" :key="d.key" size="mini" class="dim-tag">
-              {{ dimName(d.key) }} {{ d.weight }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="默认" align="center" width="70">
-          <template slot-scope="scope">
-            <el-tag v-if="scope.row.isDefault === '1'" type="success" size="mini">默认</el-tag>
-            <span v-else>-</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="状态" align="center" width="80">
-          <template slot-scope="scope">
-            <el-tag v-if="scope.row.status == '1'" type="success" size="mini">启用</el-tag>
-            <el-tag v-else type="info" size="mini">停用</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" align="center" width="170" class-name="small-padding fixed-width">
-          <template slot-scope="scope">
-            <el-button size="mini" type="text" icon="el-icon-edit" @click="handleEditTemplate(scope.row)">编辑</el-button>
-            <el-button size="mini" type="text" icon="el-icon-star-off" :disabled="scope.row.isDefault === '1'" @click="handleSetDefault(scope.row)">设默认</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+        </template>
+        <template #column-dimensions="{ row }">
+          <el-tag v-for="d in safeJsonArray(row.dimensions)" :key="d.key" size="mini" class="dim-tag">
+            {{ dimName(d.key) }} {{ d.weight }}
+          </el-tag>
+        </template>
+        <template #column-isDefault="{ row }">
+          <el-tag v-if="row.isDefault === '1'" type="success" size="mini">默认</el-tag>
+          <span v-else>-</span>
+        </template>
+        <template #column-status="{ row }">
+          <el-tag v-if="row.status == '1'" type="success" size="mini">启用</el-tag>
+          <el-tag v-else type="info" size="mini">停用</el-tag>
+        </template>
+        <template #column-action="{ row }">
+          <el-button size="mini" type="text" icon="el-icon-edit" @click="handleEditTemplate(row)">编辑</el-button>
+          <el-button size="mini" type="text" icon="el-icon-star-off" :disabled="row.isDefault === '1'" @click="handleSetDefault(row)">设默认</el-button>
+        </template>
+      </ProTable>
 
       <!-- 模板新增/编辑 -->
       <el-dialog
@@ -385,6 +335,38 @@ export default {
       showSearch: true,
       total: 0,
       qualityList: [],
+      // V3：质检列表列定义（坐席/总分/AI状态/风险预警/复核/申诉/时间/操作走插槽，移除原 fixed="right"）
+      columns: [
+        { prop: 'inspectionId', label: '质检ID', width: 80 },
+        { prop: 'agentName', label: '坐席', minWidth: 100, slot: true },
+        { prop: 'callerNumber', label: '主叫号码', width: 130, showOverflowTooltip: true },
+        { prop: 'recordId', label: '话单ID', width: 90 },
+        { prop: 'totalScore', label: 'AI总分', width: 90, slot: true },
+        { prop: 'aiStatus', label: 'AI状态', width: 90, slot: true },
+        { prop: 'riskWarningId', label: '风险预警', width: 90, slot: true },
+        { prop: 'reviewStatus', label: '复核状态', width: 100, slot: true },
+        { prop: 'appealStatus', label: '申诉状态', width: 100, slot: true },
+        { prop: 'reviewerName', label: '复核人', width: 90 },
+        { prop: 'createTime', label: '质检时间', width: 160, slot: true },
+        { prop: 'action', label: '操作', width: 280, slot: true, className: 'small-padding fixed-width' }
+      ],
+      // 详情弹窗「命中问题」表列定义
+      violationColumns: [
+        { prop: 'keyword', label: '命中关键词/问题', minWidth: 160, showOverflowTooltip: true },
+        { prop: 'reason', label: '原因说明', minWidth: 260, showOverflowTooltip: true }
+      ],
+      // 质检模板表列定义（维度权重/默认/状态/操作走插槽）
+      templateColumns: [
+        { prop: 'templateId', label: 'ID', width: 60 },
+        { prop: 'templateName', label: '模板名称', minWidth: 150, showOverflowTooltip: true },
+        { prop: 'dimensions', label: '维度权重', minWidth: 240, slot: true },
+        { prop: 'isDefault', label: '默认', width: 70, slot: true },
+        { prop: 'status', label: '状态', width: 80, slot: true },
+        { prop: 'action', label: '操作', width: 170, slot: true, className: 'small-padding fixed-width' }
+      ],
+      // 弹窗内小表无查询/分页，仅为满足 ProTable 的 queryParams 契约
+      violationQuery: { pageNum: 1, pageSize: 10 },
+      templateQuery: { pageNum: 1, pageSize: 10 },
       dateRange: [],
       queryParams: {
         pageNum: 1,
@@ -429,6 +411,33 @@ export default {
         dimensions: [{ required: true, type: "array", validator: this.validateDimensions, trigger: "change" }],
         status: [{ required: true, message: "请选择状态", trigger: "change" }]
       }
+    }
+  },
+  computed: {
+    /** V3：ProTable 查询项（AI状态/复核状态字典化下拉，质检时间走查询插槽） */
+    queryFormItems() {
+      return [
+        { prop: 'agentId', label: '坐席ID', type: 'input', placeholder: '请输入坐席ID', width: 150 },
+        { prop: 'callerNumber', label: '主叫号码', type: 'input', placeholder: '请输入主叫号码', width: 180 },
+        {
+          prop: 'aiStatus', label: 'AI状态', type: 'select', placeholder: '全部', width: 140,
+          options: [
+            { label: '待检', value: '0' },
+            { label: '检中', value: '1' },
+            { label: '完成', value: '2' },
+            { label: '失败', value: '3' }
+          ]
+        },
+        {
+          prop: 'reviewStatus', label: '复核状态', type: 'select', placeholder: '全部', width: 140,
+          options: [
+            { label: '未复核', value: '0' },
+            { label: '通过', value: '1' },
+            { label: '驳回整改', value: '2' }
+          ]
+        },
+        { prop: 'qualityDateRange', label: '质检时间', slot: true }
+      ]
     }
   },
   created() {
@@ -648,9 +657,18 @@ export default {
       this.getList()
     },
     resetQuery() {
+      // ProTable 已复位查询表单，这里只清空日期区间并重设查询参数后重查（避免重复 resetForm）
       this.dateRange = []
-      this.resetForm("queryForm")
-      this.handleQuery()
+      this.queryParams = {
+        pageNum: 1,
+        pageSize: 10,
+        agentId: undefined,
+        callerNumber: undefined,
+        aiStatus: undefined,
+        reviewStatus: undefined,
+        params: {}
+      }
+      this.getList()
     },
     safeJson(str) {
       try { return str ? JSON.parse(str) : {} } catch (e) { return {} }
