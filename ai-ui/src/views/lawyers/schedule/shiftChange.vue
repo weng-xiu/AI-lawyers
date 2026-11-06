@@ -1,110 +1,74 @@
 <template>
   <div class="shift-change">
-    <el-card shadow="never" class="search-card">
-      <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" label-width="80px">
-        <el-form-item label="审批视角">
-          <el-radio-group v-model="scope" size="small" aria-label="审批视角" @change="handleScopeChange">
-            <el-radio-button label="all">全部申请</el-radio-button>
-            <el-radio-button label="mine">我的申请</el-radio-button>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="queryParams.status" placeholder="全部" clearable style="width:130px">
-            <el-option label="待审批" value="0" />
-            <el-option label="已通过" value="1" />
-            <el-option label="已驳回" value="2" />
-            <el-option label="已撤销" value="3" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="类型">
-          <el-select v-model="queryParams.changeType" placeholder="全部" clearable style="width:130px">
-            <el-option label="互换换班" value="SWAP" />
-            <el-option label="转班" value="TRANSFER" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="申请时间">
-          <el-date-picker
-            v-model="dateRange"
-            style="width:250px"
-            value-format="yyyy-MM-dd"
-            type="daterange"
-            range-separator="-"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-          ></el-date-picker>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">查询</el-button>
-          <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-          <el-button type="success" plain icon="el-icon-plus" size="mini" @click="openApply">申请换班</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
-
-    <el-card shadow="never" class="table-card">
-      <el-table v-loading="loading" :data="requestList" border size="small">
-        <el-table-column label="申请ID" align="center" prop="requestId" width="80" />
-        <el-table-column label="申请人 / 原班次" align="center" min-width="180">
-          <template slot-scope="scope">
-            <div>{{ scope.row.applicantAgentName || '-' }}</div>
-            <div class="sc-sub">
-              {{ scope.row.applicantScheduleDate || '-' }}
-              <span v-if="scope.row.applicantShiftName"> · {{ scope.row.applicantShiftName }}</span>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="类型" align="center" width="100">
-          <template slot-scope="scope">
-            <el-tag size="mini" :type="typeTag(scope.row.changeType)">{{ typeLabel(scope.row.changeType) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="接收坐席 / 目标班次" align="center" min-width="180">
-          <template slot-scope="scope">
-            <div>{{ scope.row.targetAgentName || '-' }}</div>
-            <div class="sc-sub">
-              <span v-if="scope.row.targetShiftName">{{ scope.row.targetScheduleDate }} · {{ scope.row.targetShiftName }}</span>
-              <span v-else-if="scope.row.changeType === 'TRANSFER'">接收当日无排班</span>
-              <span v-else>-</span>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="申请原因" align="center" prop="reason" show-overflow-tooltip min-width="150">
-          <template slot-scope="scope">{{ scope.row.reason || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="状态" align="center" width="100">
-          <template slot-scope="scope">
-            <el-tag size="mini" :type="statusTag(scope.row.status)">{{ statusLabel(scope.row.status) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="审批信息" align="center" min-width="160">
-          <template slot-scope="scope">
-            <div v-if="scope.row.approver">{{ scope.row.approver }}</div>
-            <div class="sc-sub">{{ scope.row.approveTime || scope.row.approveRemark || '待审批' }}</div>
-          </template>
-        </el-table-column>
-        <el-table-column label="申请时间" align="center" prop="createTime" width="160">
-          <template slot-scope="scope">{{ scope.row.createTime || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="操作" align="center" width="200">
-          <template slot-scope="scope">
-            <template v-if="isPending(scope.row.status)">
-              <el-button type="text" size="mini" icon="el-icon-check" @click="openApprove(scope.row, 'approve')">通过</el-button>
-              <el-button type="text" size="mini" icon="el-icon-close" style="color:#C63D4A" @click="openApprove(scope.row, 'reject')">驳回</el-button>
-              <el-button type="text" size="mini" icon="el-icon-refresh-left" @click="handleCancel(scope.row)">撤销</el-button>
-            </template>
-            <span v-else class="sc-sub">已处理</span>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <pagination
-        v-show="total > 0"
-        :total="total"
-        :page.sync="queryParams.pageNum"
-        :limit.sync="queryParams.pageSize"
-        @pagination="getList"
-      />
-    </el-card>
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="requestList"
+      :loading="loading"
+      :total="total"
+      :show-search.sync="showSearch"
+      :show-toolbar="false"
+      :stripe="false"
+      :table-attrs="{ border: true }"
+      label-width="80px"
+      empty-text="暂无换班申请"
+      empty-hint="坐席提交换班申请后，可在此审批或查看处理结果"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList">
+      <!-- 审批视角是按钮组，走查询插槽；申请入口沿用原查询区末尾按钮位 -->
+      <template #query-scope>
+        <el-radio-group v-model="scope" size="small" aria-label="审批视角" @change="handleScopeChange">
+          <el-radio-button label="all">全部申请</el-radio-button>
+          <el-radio-button label="mine">我的申请</el-radio-button>
+        </el-radio-group>
+      </template>
+      <template #query-extra>
+        <el-button type="success" plain icon="el-icon-plus" size="mini" @click="openApply">申请换班</el-button>
+      </template>
+      <!-- 申请时间沿用独立 dateRange + addDateRange，走自定义查询插槽 -->
+      <template #query-dateRange>
+        <el-date-picker v-model="dateRange" style="width: 250px" value-format="yyyy-MM-dd" type="daterange"
+          range-separator="-" start-placeholder="开始日期" end-placeholder="结束日期" />
+      </template>
+      <template #column-applicant="{ row }">
+        <div>{{ row.applicantAgentName || '-' }}</div>
+        <div class="sc-sub">
+          {{ row.applicantScheduleDate || '-' }}
+          <span v-if="row.applicantShiftName"> · {{ row.applicantShiftName }}</span>
+        </div>
+      </template>
+      <template #column-changeType="{ row }">
+        <el-tag size="mini" :type="typeTag(row.changeType)">{{ typeLabel(row.changeType) }}</el-tag>
+      </template>
+      <template #column-target="{ row }">
+        <div>{{ row.targetAgentName || '-' }}</div>
+        <div class="sc-sub">
+          <span v-if="row.targetShiftName">{{ row.targetScheduleDate }} · {{ row.targetShiftName }}</span>
+          <span v-else-if="row.changeType === 'TRANSFER'">接收当日无排班</span>
+          <span v-else>-</span>
+        </div>
+      </template>
+      <template #column-reason="{ row }">{{ row.reason || '-' }}</template>
+      <template #column-status="{ row }">
+        <el-tag size="mini" :type="statusTag(row.status)">{{ statusLabel(row.status) }}</el-tag>
+      </template>
+      <template #column-approveInfo="{ row }">
+        <div v-if="row.approver">{{ row.approver }}</div>
+        <div class="sc-sub">{{ row.approveTime || row.approveRemark || '待审批' }}</div>
+      </template>
+      <template #column-createTime="{ row }">{{ row.createTime || '-' }}</template>
+      <template #column-action="{ row }">
+        <template v-if="isPending(row.status)">
+          <el-button type="text" size="mini" icon="el-icon-check" @click="openApprove(row, 'approve')">通过</el-button>
+          <el-button type="text" size="mini" icon="el-icon-close" style="color:#C63D4A" @click="openApprove(row, 'reject')">驳回</el-button>
+          <el-button type="text" size="mini" icon="el-icon-refresh-left" @click="handleCancel(row)">撤销</el-button>
+        </template>
+        <span v-else class="sc-sub">已处理</span>
+      </template>
+    </ProTable>
 
     <!-- 申请换班 -->
     <el-dialog title="申请换班" :visible.sync="applyOpen" width="560px" append-to-body>
@@ -196,8 +160,21 @@ export default {
       scope: 'all',
       loading: false,
       submitting: false,
+      showSearch: true,
       requestList: [],
       total: 0,
+      // V3：ProTable 列定义（申请人/类型/接收人/原因/状态/审批信息/时间/操作走插槽）
+      columns: [
+        { prop: 'requestId', label: '申请ID', width: 80, align: 'center' },
+        { prop: 'applicant', label: '申请人 / 原班次', minWidth: 180, align: 'center', slot: true },
+        { prop: 'changeType', label: '类型', width: 100, align: 'center', slot: true },
+        { prop: 'target', label: '接收坐席 / 目标班次', minWidth: 180, align: 'center', slot: true },
+        { prop: 'reason', label: '申请原因', minWidth: 150, align: 'center', slot: true, showOverflowTooltip: true },
+        { prop: 'status', label: '状态', width: 100, align: 'center', slot: true },
+        { prop: 'approveInfo', label: '审批信息', minWidth: 160, align: 'center', slot: true },
+        { prop: 'createTime', label: '申请时间', width: 160, align: 'center', slot: true },
+        { prop: 'action', label: '操作', width: 200, align: 'center', slot: true }
+      ],
       dateRange: [],
       queryParams: {
         pageNum: 1,
@@ -224,6 +201,39 @@ export default {
   },
   created() {
     this.getList()
+  },
+  computed: {
+    queryFormItems() {
+      return [
+        // 审批视角为按钮组，走查询插槽
+        { prop: 'scope', label: '审批视角', slot: true },
+        {
+          prop: 'status',
+          label: '状态',
+          type: 'select',
+          placeholder: '全部',
+          width: 130,
+          options: [
+            { label: '待审批', value: '0' },
+            { label: '已通过', value: '1' },
+            { label: '已驳回', value: '2' },
+            { label: '已撤销', value: '3' }
+          ]
+        },
+        {
+          prop: 'changeType',
+          label: '类型',
+          type: 'select',
+          placeholder: '全部',
+          width: 130,
+          options: [
+            { label: '互换换班', value: 'SWAP' },
+            { label: '转班', value: 'TRANSFER' }
+          ]
+        },
+        { prop: 'dateRange', label: '申请时间', slot: true }
+      ]
+    }
   },
   methods: {
     // ==================== 列表 ====================
@@ -256,6 +266,7 @@ export default {
       this.getList()
     },
     resetQuery() {
+      // ProTable 已复位查询表单；审批视角沿用原行为不复位，仅清筛选与日期区间
       this.dateRange = []
       this.queryParams.status = undefined
       this.queryParams.changeType = undefined
@@ -410,7 +421,6 @@ export default {
 
 <style scoped>
 .shift-change { padding: 4px 0; }
-.search-card { margin-bottom: 12px; }
 .sc-sub { color: #909399; font-size: 12px; }
 .sc-alert { margin-bottom: 12px; }
 </style>

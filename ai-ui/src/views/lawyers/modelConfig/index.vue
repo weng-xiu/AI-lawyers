@@ -1,139 +1,53 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="模型类型" prop="modelType">
-        <el-select v-model="queryParams.modelType" placeholder="请选择模型类型" clearable>
-          <el-option
-            v-for="dict in dict.type.ai_model_type"
-            :key="dict.value"
-            :label="dict.label"
-            :value="dict.value"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="状态" prop="status">
-        <el-select v-model="queryParams.status" placeholder="请选择状态" clearable>
-          <el-option
-            v-for="dict in dict.type.sys_normal_disable"
-            :key="dict.value"
-            :label="dict.label"
-            :value="dict.value"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
-
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
-        <el-button
-          type="primary"
-          plain
-          icon="el-icon-plus"
-          size="mini"
-          @click="handleAdd"
-          v-hasPermi="['lawyers:modelConfig:add']"
-        >新增</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="success"
-          plain
-          icon="el-icon-edit"
-          size="mini"
-          :disabled="single"
-          @click="handleUpdate"
-          v-hasPermi="['lawyers:modelConfig:edit']"
-        >修改</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="danger"
-          plain
-          icon="el-icon-delete"
-          size="mini"
-          :disabled="multiple"
-          @click="handleDelete"
-          v-hasPermi="['lawyers:modelConfig:remove']"
-        >删除</el-button>
-      </el-col>
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
-    </el-row>
-
-    <el-table v-loading="loading" :data="modelConfigList" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="配置ID" align="center" prop="configId" />
-      <el-table-column label="模型类型" align="center" prop="modelType">
-        <template slot-scope="scope">
-          <dict-tag :options="dict.type.ai_model_type" :value="scope.row.modelType"/>
-        </template>
-      </el-table-column>
-      <el-table-column label="模型名称" align="center" prop="modelName" />
-      <el-table-column label="API地址" align="center" prop="apiUrl" show-overflow-tooltip />
-      <el-table-column label="API密钥" align="center" prop="apiKey" show-overflow-tooltip />
-      <el-table-column label="最大Token数" align="center" prop="maxTokens" />
-      <el-table-column label="输入单价(元/千Token)" align="center" prop="inputPrice" width="150">
-        <template slot-scope="scope">{{ scope.row.inputPrice != null ? scope.row.inputPrice : '—' }}</template>
-      </el-table-column>
-      <el-table-column label="输出单价(元/千Token)" align="center" prop="outputPrice" width="150">
-        <template slot-scope="scope">{{ scope.row.outputPrice != null ? scope.row.outputPrice : '—' }}</template>
-      </el-table-column>
-      <el-table-column label="温度" align="center" prop="temperature" />
-      <el-table-column label="默认配置" align="center" prop="isDefault">
-        <template slot-scope="scope">
-          <dict-tag :options="dict.type.sys_yes_no" :value="scope.row.isDefault"/>
-        </template>
-      </el-table-column>
-      <el-table-column label="状态" align="center" prop="status">
-        <template slot-scope="scope">
-          <dict-tag :options="dict.type.sys_normal_disable" :value="scope.row.status"/>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
-        <template slot-scope="scope">
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-edit"
-            @click="handleUpdate(scope.row)"
-            v-hasPermi="['lawyers:modelConfig:edit']"
-          >修改</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-delete"
-            @click="handleDelete(scope.row)"
-            v-hasPermi="['lawyers:modelConfig:remove']"
-          >删除</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-connection"
-            @click="handleTestConnection(scope.row)"
-            v-hasPermi="['lawyers:modelConfig:edit']"
-          >测试连接</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-star-on"
-            @click="handleSetDefault(scope.row)"
-            v-if="scope.row.isDefault === 'N'"
-            v-hasPermi="['lawyers:modelConfig:edit']"
-          >设为默认</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-    
-    <pagination
-      v-show="total>0"
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="modelConfigList"
+      :loading="loading"
       :total="total"
-      :page.sync="queryParams.pageNum"
-      :limit.sync="queryParams.pageSize"
+      :show-search.sync="showSearch"
+      :stripe="false"
+      has-selection
+      label-width="68px"
+      empty-text="暂无AI模型配置"
+      empty-hint="新增模型配置后可将其中一条设为默认，并测试 API 连通性"
+      @query="handleQuery"
+      @reset="resetQuery"
       @pagination="getList"
-    />
+      @selection-change="handleSelectionChange">
+      <template #toolbar-left>
+        <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd"
+          v-hasPermi="['lawyers:modelConfig:add']">新增</el-button>
+        <el-button type="success" plain icon="el-icon-edit" size="mini" :disabled="single" @click="handleUpdate"
+          v-hasPermi="['lawyers:modelConfig:edit']">修改</el-button>
+        <el-button type="danger" plain icon="el-icon-delete" size="mini" :disabled="multiple" @click="handleDelete"
+          v-hasPermi="['lawyers:modelConfig:remove']">删除</el-button>
+      </template>
+      <template #column-modelType="{ row }">
+        <dict-tag :options="dict.type.ai_model_type" :value="row.modelType"/>
+      </template>
+      <template #column-inputPrice="{ row }">{{ row.inputPrice != null ? row.inputPrice : '—' }}</template>
+      <template #column-outputPrice="{ row }">{{ row.outputPrice != null ? row.outputPrice : '—' }}</template>
+      <template #column-isDefault="{ row }">
+        <dict-tag :options="dict.type.sys_yes_no" :value="row.isDefault"/>
+      </template>
+      <template #column-status="{ row }">
+        <dict-tag :options="dict.type.sys_normal_disable" :value="row.status"/>
+      </template>
+      <template #column-action="{ row }">
+        <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(row)"
+          v-hasPermi="['lawyers:modelConfig:edit']">修改</el-button>
+        <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(row)"
+          v-hasPermi="['lawyers:modelConfig:remove']">删除</el-button>
+        <el-button size="mini" type="text" icon="el-icon-connection" @click="handleTestConnection(row)"
+          v-hasPermi="['lawyers:modelConfig:edit']">测试连接</el-button>
+        <el-button size="mini" type="text" icon="el-icon-star-on" @click="handleSetDefault(row)"
+          v-if="row.isDefault === 'N'" v-hasPermi="['lawyers:modelConfig:edit']">设为默认</el-button>
+      </template>
+    </ProTable>
 
     <!-- 添加或修改AI模型参数配置对话框（V3 ProDialog + ProForm 集成） -->
     <pro-dialog
@@ -178,6 +92,21 @@ export default {
       total: 0,
       // AI模型参数配置表格数据
       modelConfigList: [],
+      // V3：ProTable 列定义（类型/单价/默认/状态/操作走插槽）
+      columns: [
+        { prop: 'configId', label: '配置ID', align: 'center' },
+        { prop: 'modelType', label: '模型类型', align: 'center', slot: true },
+        { prop: 'modelName', label: '模型名称', align: 'center' },
+        { prop: 'apiUrl', label: 'API地址', align: 'center', showOverflowTooltip: true },
+        { prop: 'apiKey', label: 'API密钥', align: 'center', showOverflowTooltip: true },
+        { prop: 'maxTokens', label: '最大Token数', align: 'center' },
+        { prop: 'inputPrice', label: '输入单价(元/千Token)', width: 150, align: 'center', slot: true },
+        { prop: 'outputPrice', label: '输出单价(元/千Token)', width: 150, align: 'center', slot: true },
+        { prop: 'temperature', label: '温度', align: 'center' },
+        { prop: 'isDefault', label: '默认配置', align: 'center', slot: true },
+        { prop: 'status', label: '状态', align: 'center', slot: true },
+        { prop: 'action', label: '操作', align: 'center', slot: true, className: 'small-padding fixed-width' }
+      ],
       // 弹出层标题
       title: "",
       // 是否显示弹出层
@@ -222,6 +151,16 @@ export default {
   created() {
     this.getList();
   },
+  computed: {
+    queryFormItems() {
+      const modelTypes = (this.dict.type.ai_model_type || []).map(d => ({ label: d.label, value: d.value }))
+      const statusOptions = (this.dict.type.sys_normal_disable || []).map(d => ({ label: d.label, value: d.value }))
+      return [
+        { prop: 'modelType', label: '模型类型', type: 'select', placeholder: '请选择模型类型', width: 160, options: modelTypes },
+        { prop: 'status', label: '状态', type: 'select', placeholder: '请选择状态', width: 120, options: statusOptions }
+      ]
+    }
+  },
   methods: {
     /** 查询AI模型参数配置列表 */
     getList() {
@@ -258,8 +197,9 @@ export default {
     },
     /** 重置按钮操作 */
     resetQuery() {
-      this.resetForm("queryForm");
-      this.handleQuery();
+      // ProTable 已复位查询表单，页面只需恢复筛选初值并重查
+      this.queryParams = { pageNum: 1, pageSize: 10, modelType: undefined, status: undefined }
+      this.getList()
     },
     // 多选框选中数据
     handleSelectionChange(selection) {

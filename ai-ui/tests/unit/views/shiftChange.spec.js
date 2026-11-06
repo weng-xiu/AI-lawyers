@@ -7,6 +7,7 @@
  */
 import { mount, createLocalVue } from '@vue/test-utils'
 import ElementUI from 'element-ui'
+import ProTable from '@/components/ProTable/index.vue'
 import ShiftChange from '@/views/lawyers/schedule/shiftChange.vue'
 import { addDateRange } from '@/utils/ruoyi'
 import {
@@ -38,6 +39,7 @@ jest.mock('@/api/lawyers/callCenter', () => ({
 
 const localVue = createLocalVue()
 localVue.use(ElementUI)
+localVue.component('ProTable', ProTable)
 localVue.directive('hasPermi', {})
 // main.js 全局挂载的工具方法
 localVue.prototype.addDateRange = addDateRange
@@ -90,8 +92,12 @@ function mountPage(rows = [requestRow()]) {
   listMyShiftChange.mockResolvedValue({ rows, total: rows.length })
   return mount(ShiftChange, {
     localVue,
-    stubs: { pagination: { template: '<div class="pagination-stub" />' } },
-    mocks: { $modal: modal }
+    stubs: {
+      pagination: { template: '<div class="pagination-stub" />' },
+      'right-toolbar': true,
+      TableEmpty: { template: '<div class="table-empty-stub" />', props: ['text', 'hint', 'actionText', 'actionIcon'] }
+    },
+    mocks: { $modal: modal, $route: { path: '/lawyers/schedule/shiftChange', query: {} } }
   })
 }
 
