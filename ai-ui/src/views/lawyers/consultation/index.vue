@@ -44,213 +44,69 @@
       </el-col>
     </el-row>
 
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="用户ID" prop="userId">
-        <el-input
-          v-model="queryParams.userId"
-          placeholder="请输入用户ID"
-          clearable
-          style="width: 240px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="咨询分类" prop="categoryId">
-        <el-select v-model="queryParams.categoryId" placeholder="请选择咨询分类" clearable>
-          <el-option
-            v-for="item in categoryOptions"
-            :key="item.categoryId"
-            :label="item.categoryName"
-            :value="item.categoryId"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="咨询渠道" prop="consultationChannel">
-        <el-select v-model="queryParams.consultationChannel" placeholder="请选择渠道" clearable style="width: 140px">
-          <el-option label="语音" value="1" />
-          <el-option label="图文" value="2" />
-          <el-option label="视频" value="3" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="状态" prop="status">
-        <el-select v-model="queryParams.status" placeholder="请选择状态" clearable>
-          <el-option
-            v-for="dict in dict.type.consultation_status"
-            :key="dict.value"
-            :label="dict.label"
-            :value="dict.value"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="问题关键词" prop="questionKeyword">
-        <el-input
-          v-model="queryParams.questionKeyword"
-          placeholder="请输入问题关键词"
-          clearable
-          style="width: 240px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="回答关键词" prop="answerKeyword">
-        <el-input
-          v-model="queryParams.answerKeyword"
-          placeholder="请输入回答关键词"
-          clearable
-          style="width: 240px"
-          @keyup.enter.native="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="评分范围" prop="ratingRange">
-        <el-slider
-          v-model="queryParams.ratingRange"
-          range
-          :max="5"
-          :step="0.5"
-          :marks="{ 0: '0', 1: '1', 2: '2', 3: '3', 4: '4', 5: '5' }"
-          style="width: 240px"
-          @change="handleQuery"
-        ></el-slider>
-      </el-form-item>
-      <el-form-item label="创建时间">
-        <el-date-picker
-          v-model="dateRange"
-          style="width: 240px"
-          value-format="yyyy-MM-dd"
-          type="daterange"
-          range-separator="-"
-          start-placeholder="开始日期"
-          end-placeholder="结束日期"
-        ></el-date-picker>
-      </el-form-item>
-      <el-form-item label="更新时间">
-        <el-date-picker
-          v-model="updateDateRange"
-          style="width: 240px"
-          value-format="yyyy-MM-dd"
-          type="daterange"
-          range-separator="-"
-          start-placeholder="开始日期"
-          end-placeholder="结束日期"
-        ></el-date-picker>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-        <el-button type="success" icon="el-icon-search" size="mini" @click="toggleAdvancedSearch">高级搜索</el-button>
-      </el-form-item>
-    </el-form>
-
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
-        <el-button
-          type="primary"
-          plain
-          icon="el-icon-plus"
-          size="mini"
-          @click="handleAdd"
-          v-hasPermi="['lawyers:consultation:add']"
-        >新增</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="success"
-          plain
-          icon="el-icon-edit"
-          size="mini"
-          :disabled="single"
-          @click="handleUpdate"
-          v-hasPermi="['lawyers:consultation:edit']"
-        >修改</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="danger"
-          plain
-          icon="el-icon-delete"
-          size="mini"
-          :disabled="multiple"
-          @click="handleDelete"
-          v-hasPermi="['lawyers:consultation:remove']"
-        >删除</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="warning"
-          plain
-          icon="el-icon-download"
-          size="mini"
-          @click="handleExport"
-          v-hasPermi="['lawyers:consultation:export']"
-        >导出</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="info"
-          plain
-          icon="el-icon-data-line"
-          size="mini"
-          @click="handleStatistics"
-          v-hasPermi="['lawyers:consultation:list']"
-        >统计分析</el-button>
-      </el-col>
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
-    </el-row>
-
-    <el-table v-loading="loading" :data="consultationList" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="咨询ID" align="center" prop="consultationId" />
-      <el-table-column label="用户ID" align="center" prop="userId" />
-      <el-table-column label="咨询分类" align="center" prop="categoryName" />
-      <el-table-column label="咨询渠道" align="center" prop="consultationChannel" width="90">
-        <template slot-scope="scope">
-          <el-tag size="mini" :type="channelTagType(scope.row.consultationChannel)">{{ channelText(scope.row.consultationChannel) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="咨询问题" align="center" prop="question" :show-overflow-tooltip="true" />
-      <el-table-column label="AI回答" align="center" prop="answer" :show-overflow-tooltip="true" />
-      <el-table-column label="状态" align="center" prop="status">
-        <template slot-scope="scope">
-          <dict-tag :options="dict.type.consultation_status" :value="scope.row.status"/>
-        </template>
-      </el-table-column>
-      <el-table-column label="创建时间" align="center" prop="createTime" width="180">
-        <template slot-scope="scope">
-          <span>{{ parseTime(scope.row.createTime) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
-        <template slot-scope="scope">
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-view"
-            @click="handleDetail(scope.row)"
-            v-hasPermi="['lawyers:consultation:query']"
-          >详情</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-edit"
-            @click="handleUpdate(scope.row)"
-            v-hasPermi="['lawyers:consultation:edit']"
-          >修改</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-delete"
-            @click="handleDelete(scope.row)"
-            v-hasPermi="['lawyers:consultation:remove']"
-          >删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <pagination
-      v-show="total>0"
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="consultationList"
+      :loading="loading"
       :total="total"
-      :page.sync="queryParams.pageNum"
-      :limit.sync="queryParams.pageSize"
+      :show-search.sync="showSearch"
+      :stripe="false"
+      has-selection
+      label-width="68px"
+      empty-text="暂无咨询记录"
+      empty-hint="公众端发起咨询后在此查看，可按渠道/状态/评分区间筛选"
+      @query="handleQuery"
+      @reset="resetQuery"
       @pagination="getList"
-    />
+      @selection-change="handleSelectionChange">
+      <template #toolbar-left>
+        <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd"
+          v-hasPermi="['lawyers:consultation:add']">新增</el-button>
+        <el-button type="success" plain icon="el-icon-edit" size="mini" :disabled="single" @click="handleUpdate"
+          v-hasPermi="['lawyers:consultation:edit']">修改</el-button>
+        <el-button type="danger" plain icon="el-icon-delete" size="mini" :disabled="multiple" @click="handleDelete"
+          v-hasPermi="['lawyers:consultation:remove']">删除</el-button>
+        <el-button type="warning" plain icon="el-icon-download" size="mini" @click="handleExport"
+          v-hasPermi="['lawyers:consultation:export']">导出</el-button>
+        <el-button type="info" plain icon="el-icon-data-line" size="mini" @click="handleStatistics"
+          v-hasPermi="['lawyers:consultation:list']">统计分析</el-button>
+      </template>
+      <template #query-extra>
+        <el-button type="success" icon="el-icon-search" size="mini" @click="toggleAdvancedSearch">高级搜索</el-button>
+      </template>
+      <!-- 评分区间为 slider，无法由 ProTable 内建控件表达，走查询插槽 -->
+      <template #query-ratingRange>
+        <el-slider v-model="queryParams.ratingRange" range :max="5" :step="0.5"
+          :marks="{ 0: '0', 1: '1', 2: '2', 3: '3', 4: '4', 5: '5' }" style="width: 240px"
+          @change="handleQuery" />
+      </template>
+      <template #query-dateRange>
+        <el-date-picker v-model="dateRange" style="width: 240px" value-format="yyyy-MM-dd" type="daterange"
+          range-separator="-" start-placeholder="开始日期" end-placeholder="结束日期" />
+      </template>
+      <template #query-updateDateRange>
+        <el-date-picker v-model="updateDateRange" style="width: 240px" value-format="yyyy-MM-dd" type="daterange"
+          range-separator="-" start-placeholder="开始日期" end-placeholder="结束日期" />
+      </template>
+      <template #column-consultationChannel="{ row }">
+        <el-tag size="mini" :type="channelTagType(row.consultationChannel)">{{ channelText(row.consultationChannel) }}</el-tag>
+      </template>
+      <template #column-status="{ row }">
+        <dict-tag :options="dict.type.consultation_status" :value="row.status"/>
+      </template>
+      <template #column-createTime="{ row }">{{ parseTime(row.createTime) }}</template>
+      <template #column-action="{ row }">
+        <el-button size="mini" type="text" icon="el-icon-view" @click="handleDetail(row)"
+          v-hasPermi="['lawyers:consultation:query']">详情</el-button>
+        <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(row)"
+          v-hasPermi="['lawyers:consultation:edit']">修改</el-button>
+        <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(row)"
+          v-hasPermi="['lawyers:consultation:remove']">删除</el-button>
+      </template>
+    </ProTable>
 
     <!-- 添加或修改法律咨询记录对话框 -->
     <el-dialog :title="title" :visible.sync="open" width="800px" append-to-body>
@@ -478,6 +334,18 @@ export default {
       total: 0,
       // 法律咨询记录表格数据
       consultationList: [],
+      // V3：ProTable 列定义（渠道/状态/创建时间/操作走插槽）
+      columns: [
+        { prop: 'consultationId', label: '咨询ID', align: 'center' },
+        { prop: 'userId', label: '用户ID', align: 'center' },
+        { prop: 'categoryName', label: '咨询分类', align: 'center' },
+        { prop: 'consultationChannel', label: '咨询渠道', width: 90, align: 'center', slot: true },
+        { prop: 'question', label: '咨询问题', align: 'center', showOverflowTooltip: true },
+        { prop: 'answer', label: 'AI回答', align: 'center', showOverflowTooltip: true },
+        { prop: 'status', label: '状态', align: 'center', slot: true },
+        { prop: 'createTime', label: '创建时间', width: 180, align: 'center', slot: true },
+        { prop: 'action', label: '操作', align: 'center', slot: true, className: 'small-padding fixed-width' }
+      ],
       // 咨询分类选项
       categoryOptions: [],
       // 渠道统计数据
@@ -544,6 +412,38 @@ export default {
     this.loadChannelStats()
     // 初始化评分范围
     this.queryParams.ratingRange = [0, 5]
+  },
+  computed: {
+    queryFormItems() {
+      const categorySelectOptions = (this.categoryOptions || []).map(c => ({
+        label: c.categoryName,
+        value: c.categoryId
+      }))
+      const statusOptions = (this.dict.type.consultation_status || []).map(d => ({ label: d.label, value: d.value }))
+      return [
+        { prop: 'userId', label: '用户ID', type: 'input', placeholder: '请输入用户ID', width: 240 },
+        { prop: 'categoryId', label: '咨询分类', type: 'select', placeholder: '请选择咨询分类', width: 180, options: categorySelectOptions },
+        {
+          prop: 'consultationChannel',
+          label: '咨询渠道',
+          type: 'select',
+          placeholder: '请选择渠道',
+          width: 140,
+          options: [
+            { label: '语音', value: '1' },
+            { label: '图文', value: '2' },
+            { label: '视频', value: '3' }
+          ]
+        },
+        { prop: 'status', label: '状态', type: 'select', placeholder: '请选择状态', width: 140, options: statusOptions },
+        { prop: 'questionKeyword', label: '问题关键词', type: 'input', placeholder: '请输入问题关键词', width: 240 },
+        { prop: 'answerKeyword', label: '回答关键词', type: 'input', placeholder: '请输入回答关键词', width: 240 },
+        // 评分区间/创建时间/更新时间使用自定义控件，走查询插槽
+        { prop: 'ratingRange', label: '评分范围', slot: true },
+        { prop: 'dateRange', label: '创建时间', slot: true },
+        { prop: 'updateDateRange', label: '更新时间', slot: true }
+      ]
+    }
   },
   methods: {
     /** 查询法律咨询记录列表 */
@@ -621,11 +521,23 @@ export default {
     },
     /** 重置按钮操作 */
     resetQuery() {
+      // ProTable 已复位查询表单，页面只需恢复筛选/评分区间/两个日期区间并重查
       this.dateRange = []
       this.updateDateRange = []
-      this.queryParams.ratingRange = [0, 5]
-      this.resetForm("queryForm")
-      this.handleQuery()
+      this.queryParams = {
+        pageNum: 1,
+        pageSize: 10,
+        userId: undefined,
+        categoryId: undefined,
+        status: undefined,
+        consultationChannel: undefined,
+        questionKeyword: undefined,
+        answerKeyword: undefined,
+        minRating: undefined,
+        maxRating: undefined,
+        ratingRange: [0, 5]
+      }
+      this.getList()
     },
     /** 切换高级搜索 */
     toggleAdvancedSearch() {

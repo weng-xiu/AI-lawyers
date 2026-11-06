@@ -1,80 +1,50 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="88px">
-      <el-form-item label="业务流水号" prop="businessNo">
-        <el-input v-model="queryParams.businessNo" placeholder="请输入业务流水号" clearable style="width: 200px" @keyup.enter.native="handleQuery" />
-      </el-form-item>
-      <el-form-item label="签署方姓名" prop="signParty">
-        <el-input v-model="queryParams.signParty" placeholder="请输入签署方姓名" clearable style="width: 200px" @keyup.enter.native="handleQuery" />
-      </el-form-item>
-      <el-form-item label="签署方电话" prop="signPartyPhone">
-        <el-input v-model="queryParams.signPartyPhone" placeholder="请输入签署方电话" clearable style="width: 200px" @keyup.enter.native="handleQuery" />
-      </el-form-item>
-      <el-form-item label="签署状态" prop="signStatus">
-        <el-select v-model="queryParams.signStatus" placeholder="请选择签署状态" clearable style="width: 160px">
-          <el-option label="待签署" value="0" />
-          <el-option label="签署中" value="1" />
-          <el-option label="已完成" value="2" />
-          <el-option label="已作废" value="3" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="签署时间">
-        <el-date-picker v-model="dateRange" style="width: 240px" value-format="yyyy-MM-dd" type="daterange" range-separator="-" start-placeholder="开始日期" end-placeholder="结束日期" />
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
-
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
-        <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd" v-hasPermi="['lawyers:signRecord:add']">新增</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button type="success" plain icon="el-icon-edit" size="mini" :disabled="single" @click="handleUpdate" v-hasPermi="['lawyers:signRecord:edit']">修改</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button type="danger" plain icon="el-icon-delete" size="mini" :disabled="multiple" @click="handleDelete" v-hasPermi="['lawyers:signRecord:remove']">删除</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button type="warning" plain icon="el-icon-download" size="mini" @click="handleExport" v-hasPermi="['lawyers:signRecord:export']">导出</el-button>
-      </el-col>
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
-    </el-row>
-
-    <el-table v-loading="loading" :data="signRecordList" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="业务流水号" align="center" prop="businessNo" width="160" show-overflow-tooltip />
-      <el-table-column label="签署模板" align="center" prop="signTemplate" width="140" show-overflow-tooltip />
-      <el-table-column label="签署方姓名" align="center" prop="signParty" width="110" />
-      <el-table-column label="签署方电话" align="center" prop="signPartyPhone" width="130" />
-      <el-table-column label="签署状态" align="center" prop="signStatus" width="100">
-        <template slot-scope="scope">
-          <el-tag size="mini" :type="statusTagType(scope.row.signStatus)">{{ statusText(scope.row.signStatus) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="签署时间" align="center" prop="signTime" width="160">
-        <template slot-scope="scope">{{ scope.row.signTime || '-' }}</template>
-      </el-table-column>
-      <el-table-column label="电子签章ID" align="center" prop="eSignId" width="160" show-overflow-tooltip />
-      <el-table-column label="存证编号" align="center" prop="certificateNo" width="160" show-overflow-tooltip />
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
-        <template slot-scope="scope">
-          <el-button size="mini" type="text" icon="el-icon-view" @click="handleDetail(scope.row)" v-hasPermi="['lawyers:signRecord:query']">详情</el-button>
-          <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(scope.row)" v-hasPermi="['lawyers:signRecord:edit']">修改</el-button>
-          <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(scope.row)" v-hasPermi="['lawyers:signRecord:remove']">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-    
-    <pagination
-      v-show="total>0"
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="signRecordList"
+      :loading="loading"
       :total="total"
-      :page.sync="queryParams.pageNum"
-      :limit.sync="queryParams.pageSize"
+      :show-search.sync="showSearch"
+      :stripe="false"
+      has-selection
+      label-width="88px"
+      empty-text="暂无签署记录"
+      empty-hint="电子材料签署完成后在此留痕，可按流水号/签署方/状态筛选"
+      @query="handleQuery"
+      @reset="resetQuery"
       @pagination="getList"
-    />
+      @selection-change="handleSelectionChange">
+      <template #toolbar-left>
+        <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd"
+          v-hasPermi="['lawyers:signRecord:add']">新增</el-button>
+        <el-button type="success" plain icon="el-icon-edit" size="mini" :disabled="single" @click="handleUpdate"
+          v-hasPermi="['lawyers:signRecord:edit']">修改</el-button>
+        <el-button type="danger" plain icon="el-icon-delete" size="mini" :disabled="multiple" @click="handleDelete"
+          v-hasPermi="['lawyers:signRecord:remove']">删除</el-button>
+        <el-button type="warning" plain icon="el-icon-download" size="mini" @click="handleExport"
+          v-hasPermi="['lawyers:signRecord:export']">导出</el-button>
+      </template>
+      <template #query-dateRange>
+        <el-date-picker v-model="dateRange" style="width: 240px" value-format="yyyy-MM-dd" type="daterange"
+          range-separator="-" start-placeholder="开始日期" end-placeholder="结束日期" />
+      </template>
+      <template #column-signStatus="{ row }">
+        <el-tag size="mini" :type="statusTagType(row.signStatus)">{{ statusText(row.signStatus) }}</el-tag>
+      </template>
+      <template #column-signTime="{ row }">{{ row.signTime || '-' }}</template>
+      <template #column-action="{ row }">
+        <el-button size="mini" type="text" icon="el-icon-view" @click="handleDetail(row)"
+          v-hasPermi="['lawyers:signRecord:query']">详情</el-button>
+        <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(row)"
+          v-hasPermi="['lawyers:signRecord:edit']">修改</el-button>
+        <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(row)"
+          v-hasPermi="['lawyers:signRecord:remove']">删除</el-button>
+      </template>
+    </ProTable>
 
     <!-- 添加或修改签署记录对话框 -->
     <el-dialog :title="title" :visible.sync="open" width="650px" append-to-body>
@@ -186,6 +156,18 @@ export default {
       showSearch: true,
       total: 0,
       signRecordList: [],
+      // V3：ProTable 列定义（签署状态/签署时间/操作走插槽）
+      columns: [
+        { prop: 'businessNo', label: '业务流水号', width: 160, align: 'center', showOverflowTooltip: true },
+        { prop: 'signTemplate', label: '签署模板', width: 140, align: 'center', showOverflowTooltip: true },
+        { prop: 'signParty', label: '签署方姓名', width: 110, align: 'center' },
+        { prop: 'signPartyPhone', label: '签署方电话', width: 130, align: 'center' },
+        { prop: 'signStatus', label: '签署状态', width: 100, align: 'center', slot: true },
+        { prop: 'signTime', label: '签署时间', width: 160, align: 'center', slot: true },
+        { prop: 'eSignId', label: '电子签章ID', width: 160, align: 'center', showOverflowTooltip: true },
+        { prop: 'certificateNo', label: '存证编号', width: 160, align: 'center', showOverflowTooltip: true },
+        { prop: 'action', label: '操作', align: 'center', slot: true, className: 'small-padding fixed-width' }
+      ],
       title: "",
       open: false,
       detailOpen: false,
@@ -223,6 +205,30 @@ export default {
   created() {
     this.getList();
   },
+  computed: {
+    queryFormItems() {
+      return [
+        { prop: 'businessNo', label: '业务流水号', type: 'input', placeholder: '请输入业务流水号', width: 200 },
+        { prop: 'signParty', label: '签署方姓名', type: 'input', placeholder: '请输入签署方姓名', width: 200 },
+        { prop: 'signPartyPhone', label: '签署方电话', type: 'input', placeholder: '请输入签署方电话', width: 200 },
+        {
+          prop: 'signStatus',
+          label: '签署状态',
+          type: 'select',
+          placeholder: '请选择签署状态',
+          width: 160,
+          options: [
+            { label: '待签署', value: '0' },
+            { label: '签署中', value: '1' },
+            { label: '已完成', value: '2' },
+            { label: '已作废', value: '3' }
+          ]
+        },
+        // 签署时间保留独立 dateRange + addDateRange，走查询插槽
+        { prop: 'dateRange', label: '签署时间', slot: true }
+      ]
+    }
+  },
   methods: {
     getList() {
       this.loading = true;
@@ -257,9 +263,17 @@ export default {
       this.getList();
     },
     resetQuery() {
+      // ProTable 已复位查询表单，页面只需清空签署时间区间并重设筛选后重查
       this.dateRange = [];
-      this.resetForm("queryForm");
-      this.handleQuery();
+      this.queryParams = {
+        pageNum: 1,
+        pageSize: 10,
+        businessNo: undefined,
+        signParty: undefined,
+        signPartyPhone: undefined,
+        signStatus: undefined
+      };
+      this.getList();
     },
     handleSelectionChange(selection) {
       this.ids = selection.map(item => item.signId)

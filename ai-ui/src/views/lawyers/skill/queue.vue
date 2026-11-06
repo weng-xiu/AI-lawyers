@@ -1,26 +1,6 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" label-width="68px">
-      <el-form-item label="技能组" prop="groupId">
-        <el-select v-model="queryParams.groupId" placeholder="全部" clearable filterable style="width:180px" @change="getList">
-          <el-option v-for="g in groupList" :key="g.groupId" :label="g.groupName" :value="g.groupId" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="主叫" prop="callerNumber">
-        <el-input v-model="queryParams.callerNumber" placeholder="主叫号码" clearable @keyup.enter.native="getList" />
-      </el-form-item>
-      <el-form-item label="状态" prop="queueStatus">
-        <el-select v-model="queryParams.queueStatus" placeholder="全部" clearable style="width:140px">
-          <el-option v-for="s in statusOptions" :key="s.value" :label="s.label" :value="s.value" />
-        </el-select>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="getList">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-        <el-button type="success" icon="el-icon-refresh" size="mini" @click="getList">刷新</el-button>
-      </el-form-item>
-    </el-form>
-
+    <!-- 今日排队实时统计卡 -->
     <el-row :gutter="16" class="mb8">
       <el-col :span="6"><el-card shadow="never" class="stat-card"><div class="stat-num" style="color:#E6A23C">{{ stat.queuing }}</div><div>当前排队</div></el-card></el-col>
       <el-col :span="6"><el-card shadow="never" class="stat-card"><div class="stat-num" style="color:#2B8C6E">{{ stat.assigned }}</div><div>今日已分配</div></el-card></el-col>
@@ -28,39 +8,48 @@
       <el-col :span="6"><el-card shadow="never" class="stat-card"><div class="stat-num" style="color:#C63D4A">{{ stat.kicked }}</div><div>今日已放弃/踢除</div></el-card></el-col>
     </el-row>
 
-    <el-table v-loading="loading" :data="queueList" border size="small">
-      <el-table-column label="排队ID" prop="queueId" width="80" />
-      <el-table-column label="主叫号码" prop="callerNumber" width="130" />
-      <el-table-column label="技能组" prop="groupName" width="120" />
-      <el-table-column label="状态" prop="queueStatus" width="100" align="center">
-        <template slot-scope="scope">
-          <el-tag size="mini" :type="statusType(scope.row.queueStatus)">{{ statusLabel(scope.row.queueStatus) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="分配坐席" prop="agentName" width="110">
-        <template slot-scope="scope">{{ scope.row.agentName || '-' }}</template>
-      </el-table-column>
-      <el-table-column label="策略" prop="strategyUsed" width="100">
-        <template slot-scope="scope">{{ strategyLabel(scope.row.strategyUsed) }}</template>
-      </el-table-column>
-      <el-table-column label="等待时长" width="100" align="center">
-        <template slot-scope="scope">
-          <span :style="{color: scope.row.waitDuration>30?'#C63D4A':'#1F2A3A'}">{{ scope.row.waitDuration || 0 }}秒</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="入队时间" prop="enqueueTime" width="160" />
-      <el-table-column label="出队时间" prop="dequeueTime" width="160" />
-      <el-table-column label="操作" width="170" fixed="right">
-        <template slot-scope="scope">
-          <el-button v-if="scope.row.queueStatus==='0'" type="text" size="mini" icon="el-icon-user"
-                     @click="openAssign(scope.row)" v-hasPermi="['lawyers:queue:assign']">手动分配</el-button>
-          <el-button v-if="scope.row.queueStatus==='0'" type="text" size="mini" icon="el-icon-close" style="color:#C63D4A"
-                     @click="handleKick(scope.row)" v-hasPermi="['lawyers:queue:kick']">踢除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <pagination v-show="total>0" :total="total" :page.sync="queryParams.pageNum" :limit.sync="queryParams.pageSize" @pagination="getList" />
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="queueList"
+      :loading="loading"
+      :total="total"
+      :show-toolbar="false"
+      :stripe="false"
+      :table-attrs="{ border: true }"
+      label-width="68px"
+      empty-text="暂无排队数据"
+      empty-hint="来电排队后实时展示，可对排队中的来电手动分配或踢除"
+      @query="getList"
+      @reset="resetQuery"
+      @pagination="getList">
+      <!-- 技能组切换即重查（原 @change="getList" 行为），走查询插槽 -->
+      <template #query-groupId>
+        <el-select v-model="queryParams.groupId" placeholder="全部" clearable filterable style="width:180px"
+          @change="getList">
+          <el-option v-for="g in groupList" :key="g.groupId" :label="g.groupName" :value="g.groupId" />
+        </el-select>
+      </template>
+      <template #query-extra>
+        <el-button type="success" icon="el-icon-refresh" size="mini" @click="getList">刷新</el-button>
+      </template>
+      <template #column-queueStatus="{ row }">
+        <el-tag size="mini" :type="statusType(row.queueStatus)">{{ statusLabel(row.queueStatus) }}</el-tag>
+      </template>
+      <template #column-agentName="{ row }">{{ row.agentName || '-' }}</template>
+      <template #column-strategyUsed="{ row }">{{ strategyLabel(row.strategyUsed) }}</template>
+      <template #column-waitDuration="{ row }">
+        <span :style="{color: row.waitDuration>30?'#C63D4A':'#1F2A3A'}">{{ row.waitDuration || 0 }}秒</span>
+      </template>
+      <template #column-action="{ row }">
+        <el-button v-if="row.queueStatus==='0'" type="text" size="mini" icon="el-icon-user"
+          @click="openAssign(row)" v-hasPermi="['lawyers:queue:assign']">手动分配</el-button>
+        <el-button v-if="row.queueStatus==='0'" type="text" size="mini" icon="el-icon-close" style="color:#C63D4A"
+          @click="handleKick(row)" v-hasPermi="['lawyers:queue:kick']">踢除</el-button>
+      </template>
+    </ProTable>
 
     <!-- 手动分配弹窗 -->
     <el-dialog title="手动分配坐席" :visible.sync="assignOpen" width="420px" append-to-body>
@@ -94,10 +83,33 @@ export default {
       queueList: [], groupList: [], freeAgents: [], currentRow: null, assignAgentId: null,
       total: 0,
       queryParams: { pageNum: 1, pageSize: 10, groupId: null, callerNumber: '', queueStatus: '' },
+      // V3：ProTable 列定义（状态/分配坐席/策略/等待时长/操作走插槽，移除原 fixed="right"）
+      columns: [
+        { prop: 'queueId', label: '排队ID', width: 80 },
+        { prop: 'callerNumber', label: '主叫号码', width: 130 },
+        { prop: 'groupName', label: '技能组', width: 120 },
+        { prop: 'queueStatus', label: '状态', width: 100, align: 'center', slot: true },
+        { prop: 'agentName', label: '分配坐席', width: 110, slot: true },
+        { prop: 'strategyUsed', label: '策略', width: 100, slot: true },
+        { prop: 'waitDuration', label: '等待时长', width: 100, align: 'center', slot: true },
+        { prop: 'enqueueTime', label: '入队时间', width: 160 },
+        { prop: 'dequeueTime', label: '出队时间', width: 160 },
+        { prop: 'action', label: '操作', width: 170, slot: true }
+      ],
       stat: { queuing: 0, assigned: 0, overflow: 0, kicked: 0 },
       statusOptions: [
         { value: '0', label: '排队中' }, { value: '1', label: '已分配' },
         { value: '2', label: '超时溢出' }, { value: '3', label: '已放弃' }, { value: '4', label: '无可用' }
+      ]
+    }
+  },
+  computed: {
+    queryFormItems() {
+      return [
+        // 技能组下拉保留 @change 即查，走查询插槽
+        { prop: 'groupId', label: '技能组', slot: true },
+        { prop: 'callerNumber', label: '主叫', type: 'input', placeholder: '主叫号码' },
+        { prop: 'queueStatus', label: '状态', type: 'select', placeholder: '全部', width: 140, options: this.statusOptions }
       ]
     }
   },

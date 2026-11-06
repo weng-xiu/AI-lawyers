@@ -1,86 +1,51 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="咨询编号" prop="consultNo">
-        <el-input v-model="queryParams.consultNo" placeholder="请输入咨询编号" clearable @keyup.enter.native="handleQuery" />
-      </el-form-item>
-      <el-form-item label="客户姓名" prop="customerName">
-        <el-input v-model="queryParams.customerName" placeholder="请输入客户姓名" clearable @keyup.enter.native="handleQuery" />
-      </el-form-item>
-      <el-form-item label="客户电话" prop="customerPhone">
-        <el-input v-model="queryParams.customerPhone" placeholder="请输入客户电话" clearable @keyup.enter.native="handleQuery" />
-      </el-form-item>
-      <el-form-item label="状态" prop="status">
-        <el-select v-model="queryParams.status" placeholder="请选择状态" clearable style="width: 140px">
-          <el-option label="等待中" value="0" />
-          <el-option label="进行中" value="1" />
-          <el-option label="已结束" value="2" />
-          <el-option label="已取消" value="3" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="开始时间">
-        <el-date-picker v-model="dateRange" style="width: 240px" value-format="yyyy-MM-dd" type="daterange"
-          range-separator="-" start-placeholder="开始日期" end-placeholder="结束日期" />
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
-
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="videoList"
+      :loading="loading"
+      :total="total"
+      :show-search.sync="showSearch"
+      :stripe="false"
+      has-selection
+      label-width="68px"
+      empty-text="暂无视频咨询"
+      empty-hint="客户发起视频咨询后在此查看，进行中的会话可点击加入"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList"
+      @selection-change="handleSelectionChange">
+      <template #toolbar-left>
         <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd"
           v-hasPermi="['lawyers:videoConsult:add']">新增</el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button type="danger" plain icon="el-icon-delete" size="mini" :disabled="multiple" @click="handleDelete"
           v-hasPermi="['lawyers:videoConsult:remove']">删除</el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button type="warning" plain icon="el-icon-download" size="mini" @click="handleExport"
           v-hasPermi="['lawyers:videoConsult:export']">导出</el-button>
-      </el-col>
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList" />
-    </el-row>
-
-    <el-table v-loading="loading" :data="videoList" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="咨询编号" align="center" prop="consultNo" width="160" />
-      <el-table-column label="客户姓名" align="center" prop="customerName" />
-      <el-table-column label="客户电话" align="center" prop="customerPhone" width="130" />
-      <el-table-column label="坐席" align="center" prop="agentName" />
-      <el-table-column label="房间号" align="center" prop="roomNo" width="120" />
-      <el-table-column label="状态" align="center" prop="status" width="90">
-        <template slot-scope="scope">
-          <el-tag size="mini" :type="statusTag(scope.row.status)">{{ statusText(scope.row.status) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="时长" align="center" prop="duration" width="90">
-        <template slot-scope="scope">{{ formatDuration(scope.row.duration) }}</template>
-      </el-table-column>
-      <el-table-column label="满意度" align="center" prop="satisfaction" width="80">
-        <template slot-scope="scope">{{ scope.row.satisfaction ? scope.row.satisfaction + '分' : '-' }}</template>
-      </el-table-column>
-      <el-table-column label="核验" align="center" prop="identityVerify" width="70">
-        <template slot-scope="scope">{{ scope.row.identityVerify === '1' ? '已核验' : '未核验' }}</template>
-      </el-table-column>
-      <el-table-column label="开始时间" align="center" prop="startTime" width="160">
-        <template slot-scope="scope">{{ parseTime(scope.row.startTime) }}</template>
-      </el-table-column>
-      <el-table-column label="操作" align="center" width="200" class-name="small-padding fixed-width">
-        <template slot-scope="scope">
-          <el-button size="mini" type="text" icon="el-icon-view" @click="handleDetail(scope.row)"
-            v-hasPermi="['lawyers:videoConsult:query']">详情</el-button>
-          <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(scope.row)"
-            v-hasPermi="['lawyers:videoConsult:edit']">修改</el-button>
-          <el-button size="mini" type="text" icon="el-icon-video-play" @click="handleJoin(scope.row)"
-            v-if="scope.row.status === '1'">加入</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <pagination v-show="total>0" :total="total" :page.sync="queryParams.pageNum" :limit.sync="queryParams.pageSize" @pagination="getList" />
+      </template>
+      <template #query-dateRange>
+        <el-date-picker v-model="dateRange" style="width: 240px" value-format="yyyy-MM-dd" type="daterange"
+          range-separator="-" start-placeholder="开始日期" end-placeholder="结束日期" />
+      </template>
+      <template #column-status="{ row }">
+        <el-tag size="mini" :type="statusTag(row.status)">{{ statusText(row.status) }}</el-tag>
+      </template>
+      <template #column-duration="{ row }">{{ formatDuration(row.duration) }}</template>
+      <template #column-satisfaction="{ row }">{{ row.satisfaction ? row.satisfaction + '分' : '-' }}</template>
+      <template #column-identityVerify="{ row }">{{ row.identityVerify === '1' ? '已核验' : '未核验' }}</template>
+      <template #column-startTime="{ row }">{{ parseTime(row.startTime) }}</template>
+      <template #column-action="{ row }">
+        <el-button size="mini" type="text" icon="el-icon-view" @click="handleDetail(row)"
+          v-hasPermi="['lawyers:videoConsult:query']">详情</el-button>
+        <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(row)"
+          v-hasPermi="['lawyers:videoConsult:edit']">修改</el-button>
+        <el-button size="mini" type="text" icon="el-icon-video-play" @click="handleJoin(row)"
+          v-if="row.status === '1'">加入</el-button>
+      </template>
+    </ProTable>
 
     <!-- 添加/修改弹窗 -->
     <el-dialog :title="title" :visible.sync="open" width="600px" append-to-body>
@@ -152,6 +117,20 @@ export default {
     return {
       loading: true, ids: [], single: true, multiple: true, showSearch: true, total: 0,
       videoList: [], title: "", open: false, detailOpen: false, dateRange: [],
+      // V3：ProTable 列定义（状态/时长/满意度/核验/开始时间/操作走插槽）
+      columns: [
+        { prop: 'consultNo', label: '咨询编号', width: 160, align: 'center' },
+        { prop: 'customerName', label: '客户姓名', align: 'center' },
+        { prop: 'customerPhone', label: '客户电话', width: 130, align: 'center' },
+        { prop: 'agentName', label: '坐席', align: 'center' },
+        { prop: 'roomNo', label: '房间号', width: 120, align: 'center' },
+        { prop: 'status', label: '状态', width: 90, align: 'center', slot: true },
+        { prop: 'duration', label: '时长', width: 90, align: 'center', slot: true },
+        { prop: 'satisfaction', label: '满意度', width: 80, align: 'center', slot: true },
+        { prop: 'identityVerify', label: '核验', width: 70, align: 'center', slot: true },
+        { prop: 'startTime', label: '开始时间', width: 160, align: 'center', slot: true },
+        { prop: 'action', label: '操作', width: 200, align: 'center', slot: true, className: 'small-padding fixed-width' }
+      ],
       agentOptions: [],
       queryParams: { pageNum: 1, pageSize: 10, consultNo: undefined, customerName: undefined, customerPhone: undefined, status: undefined },
       form: { identityVerify: '0' },
@@ -163,6 +142,30 @@ export default {
     }
   },
   created() { this.getList(); this.loadAgents() },
+  computed: {
+    queryFormItems() {
+      return [
+        { prop: 'consultNo', label: '咨询编号', type: 'input', placeholder: '请输入咨询编号' },
+        { prop: 'customerName', label: '客户姓名', type: 'input', placeholder: '请输入客户姓名' },
+        { prop: 'customerPhone', label: '客户电话', type: 'input', placeholder: '请输入客户电话' },
+        {
+          prop: 'status',
+          label: '状态',
+          type: 'select',
+          placeholder: '请选择状态',
+          width: 140,
+          options: [
+            { label: '等待中', value: '0' },
+            { label: '进行中', value: '1' },
+            { label: '已结束', value: '2' },
+            { label: '已取消', value: '3' }
+          ]
+        },
+        // 开始时间保留独立 dateRange + addDateRange，走查询插槽
+        { prop: 'dateRange', label: '开始时间', slot: true }
+      ]
+    }
+  },
   methods: {
     loadAgents() {
       listAgent({ pageNum: 1, pageSize: 1000 }).then(res => { this.agentOptions = res.rows || [] })
@@ -182,7 +185,12 @@ export default {
       this.resetForm("form")
     },
     handleQuery() { this.queryParams.pageNum = 1; this.getList() },
-    resetQuery() { this.dateRange = []; this.resetForm("queryForm"); this.handleQuery() },
+    resetQuery() {
+      // ProTable 已复位查询表单，页面只需清空开始时间区间并重设筛选后重查
+      this.dateRange = []
+      this.queryParams = { pageNum: 1, pageSize: 10, consultNo: undefined, customerName: undefined, customerPhone: undefined, status: undefined }
+      this.getList()
+    },
     handleSelectionChange(selection) { this.ids = selection.map(item => item.consultId); this.single = selection.length !== 1; this.multiple = !selection.length },
     handleAdd() { this.reset(); this.open = true; this.title = "新增视频咨询" },
     handleUpdate(row) {
