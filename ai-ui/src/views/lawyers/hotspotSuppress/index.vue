@@ -1,110 +1,48 @@
 <template>
   <div class="app-container hotspot-page">
-    <el-card class="search-card" shadow="never">
-      <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" label-width="80px">
-        <el-form-item label="规则名称" prop="ruleName">
-          <el-input
-            v-model="queryParams.ruleName"
-            placeholder="请输入规则名称"
-            clearable
-            style="width: 180px"
-            @keyup.enter.native="handleQuery"
-          />
-        </el-form-item>
-        <el-form-item label="匹配方式" prop="matchType">
-          <el-select v-model="queryParams.matchType" placeholder="全部" clearable style="width: 140px">
-            <el-option label="号码匹配" value="PHONE" />
-            <el-option label="关键词匹配" value="KEYWORD" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="处置动作" prop="action">
-          <el-select v-model="queryParams.action" placeholder="全部" clearable style="width: 140px">
-            <el-option label="降权置底" value="PRIORITY" />
-            <el-option label="直接挂断" value="REJECT" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="状态" prop="status">
-          <el-select v-model="queryParams.status" placeholder="全部" clearable style="width: 120px">
-            <el-option label="启用" value="0" />
-            <el-option label="停用" value="1" />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">查询</el-button>
-          <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
-
-    <el-card shadow="never" class="table-card">
-      <el-row :gutter="10" class="mb8">
-        <el-col :span="1.5">
-          <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd">新增</el-button>
-        </el-col>
-        <el-col :span="1.5">
-          <el-button type="warning" plain icon="el-icon-document" size="mini" @click="openLogDialog()">命中日志</el-button>
-        </el-col>
-      </el-row>
-
-      <el-table v-loading="loading" :data="ruleList" border size="small">
-        <el-table-column label="ID" align="center" prop="suppressId" width="70" />
-        <el-table-column label="规则名称" align="center" prop="ruleName" min-width="150" show-overflow-tooltip />
-        <el-table-column label="匹配方式" align="center" width="100">
-          <template slot-scope="scope">
-            <el-tag :type="scope.row.matchType === 'PHONE' ? '' : 'success'" size="mini">
-              {{ matchTypeText(scope.row.matchType) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="匹配值" align="center" prop="matchValue" min-width="140" show-overflow-tooltip />
-        <el-table-column label="处置动作" align="center" width="100">
-          <template slot-scope="scope">
-            <el-tag :type="scope.row.action === 'REJECT' ? 'danger' : 'warning'" size="mini">
-              {{ actionText(scope.row.action) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="置底优先级" align="center" prop="priorityLevel" width="100" />
-        <el-table-column label="频次阈值" align="center" width="120">
-          <template slot-scope="scope">
-            <span v-if="!scope.row.triggerCount || scope.row.triggerCount === 0">每次命中</span>
-            <span v-else>{{ scope.row.triggerCount }} 次 / {{ scope.row.windowSeconds > 0 ? scope.row.windowSeconds + ' 秒' : '不限时' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="累计命中" align="center" prop="hitCount" width="90" />
-        <el-table-column label="状态" align="center" width="90">
-          <template slot-scope="scope">
-            <el-switch
-              v-model="scope.row.status"
-              active-value="0"
-              inactive-value="1"
-              @change="handleStatusChange(scope.row)"
-            />
-          </template>
-        </el-table-column>
-        <el-table-column label="生效开始" align="center" prop="effectiveStart" width="160">
-          <template slot-scope="scope">{{ scope.row.effectiveStart ? parseTime(scope.row.effectiveStart) : '立即' }}</template>
-        </el-table-column>
-        <el-table-column label="生效结束" align="center" prop="effectiveEnd" width="160">
-          <template slot-scope="scope">{{ scope.row.effectiveEnd ? parseTime(scope.row.effectiveEnd) : '永久' }}</template>
-        </el-table-column>
-        <el-table-column label="操作" align="center" width="180" fixed="right">
-          <template slot-scope="scope">
-            <el-button type="text" size="mini" icon="el-icon-document" @click="openLogDialog(scope.row)">日志</el-button>
-            <el-button type="text" size="mini" icon="el-icon-edit" @click="handleUpdate(scope.row)">编辑</el-button>
-            <el-button type="text" size="mini" icon="el-icon-delete" style="color:#C63D4A" @click="handleDelete(scope.row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <pagination
-        v-show="total > 0"
-        :total="total"
-        :page.sync="queryParams.pageNum"
-        :limit.sync="queryParams.pageSize"
-        @pagination="getList"
-      />
-    </el-card>
+    <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+    <ProTable
+      :columns="columns"
+      :query-form-items="queryFormItems"
+      :query-params="queryParams"
+      :data="ruleList"
+      :loading="loading"
+      :total="total"
+      :show-toolbar="false"
+      :stripe="false"
+      :table-attrs="{ border: true }"
+      label-width="80px"
+      persist-key="hotspotSuppress:rule"
+      empty-text="暂无高频置底规则"
+      empty-hint="新增规则后可按主叫号码或关键词拦截、置底高频来电"
+      @query="handleQuery"
+      @reset="resetQuery"
+      @pagination="getList">
+      <template #toolbar-left>
+        <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd">新增</el-button>
+        <el-button type="warning" plain icon="el-icon-document" size="mini" @click="openLogDialog()">命中日志</el-button>
+      </template>
+      <template #column-matchType="{ row }">
+        <el-tag :type="row.matchType === 'PHONE' ? '' : 'success'" size="mini">{{ matchTypeText(row.matchType) }}</el-tag>
+      </template>
+      <template #column-action="{ row }">
+        <el-tag :type="row.action === 'REJECT' ? 'danger' : 'warning'" size="mini">{{ actionText(row.action) }}</el-tag>
+      </template>
+      <template #column-triggerCount="{ row }">
+        <span v-if="!row.triggerCount || row.triggerCount === 0">每次命中</span>
+        <span v-else>{{ row.triggerCount }} 次 / {{ row.windowSeconds > 0 ? row.windowSeconds + ' 秒' : '不限时' }}</span>
+      </template>
+      <template #column-status="{ row }">
+        <el-switch v-model="row.status" active-value="0" inactive-value="1" @change="handleStatusChange(row)" />
+      </template>
+      <template #column-effectiveStart="{ row }">{{ row.effectiveStart ? parseTime(row.effectiveStart) : '立即' }}</template>
+      <template #column-effectiveEnd="{ row }">{{ row.effectiveEnd ? parseTime(row.effectiveEnd) : '永久' }}</template>
+      <template #column-operation="{ row }">
+        <el-button type="text" size="mini" icon="el-icon-document" @click="openLogDialog(row)">日志</el-button>
+        <el-button type="text" size="mini" icon="el-icon-edit" @click="handleUpdate(row)">编辑</el-button>
+        <el-button type="text" size="mini" icon="el-icon-delete" style="color:#C63D4A" @click="handleDelete(row)">删除</el-button>
+      </template>
+    </ProTable>
 
     <!-- 新增/编辑对话框（V3 ProDialog） -->
     <pro-dialog
@@ -126,48 +64,30 @@
 
     <!-- 命中日志对话框 -->
     <el-dialog :title="logTitle" :visible.sync="logOpen" width="900px" append-to-body>
-      <el-form :inline="true" size="small" :model="logQuery" @submit.native.prevent>
-        <el-form-item label="主叫号码">
-          <el-input v-model="logQuery.callerNumber" placeholder="主叫号码" clearable style="width: 150px" @keyup.enter.native="getLogList" />
-        </el-form-item>
-        <el-form-item label="方向">
-          <el-select v-model="logQuery.direction" placeholder="全部" clearable style="width: 120px">
-            <el-option label="入站" value="INBOUND" />
-            <el-option label="出站" value="OUTBOUND" />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" icon="el-icon-search" size="mini" @click="handleLogQuery">查询</el-button>
-          <el-button icon="el-icon-refresh" size="mini" @click="resetLogQuery">重置</el-button>
-        </el-form-item>
-      </el-form>
-      <el-table v-loading="logLoading" :data="logList" border size="small" max-height="420">
-        <el-table-column label="时间" align="center" prop="hitTime" width="160">
-          <template slot-scope="scope">{{ parseTime(scope.row.hitTime) }}</template>
-        </el-table-column>
-        <el-table-column label="规则" align="center" prop="ruleName" min-width="120" show-overflow-tooltip />
-        <el-table-column label="方向" align="center" width="80">
-          <template slot-scope="scope">{{ scope.row.direction === 'INBOUND' ? '入站' : '出站' }}</template>
-        </el-table-column>
-        <el-table-column label="主叫" align="center" prop="callerNumber" width="130" />
-        <el-table-column label="被叫" align="center" prop="calleeNumber" width="130" />
-        <el-table-column label="动作" align="center" width="90">
-          <template slot-scope="scope">
-            <el-tag :type="scope.row.action === 'REJECT' ? 'danger' : 'warning'" size="mini">
-              {{ actionText(scope.row.action) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="优先级" align="center" prop="priority" width="80" />
-        <el-table-column label="通道UUID" align="center" prop="channelUuid" min-width="140" show-overflow-tooltip />
-      </el-table>
-      <pagination
-        v-show="logTotal > 0"
+      <!-- 命中日志表同样收敛到 ProTable（独立 persist-key，弹窗内固定高度） -->
+      <ProTable
+        :columns="logColumns"
+        :query-form-items="logQueryFormItems"
+        :query-params="logQuery"
+        :data="logList"
+        :loading="logLoading"
         :total="logTotal"
-        :page.sync="logQuery.pageNum"
-        :limit.sync="logQuery.pageSize"
-        @pagination="getLogList"
-      />
+        :show-toolbar="false"
+        :stripe="false"
+        :table-attrs="{ border: true, maxHeight: '420px' }"
+        label-width="80px"
+        persist-key="hotspotSuppress:log"
+        empty-text="暂无命中日志"
+        empty-hint="规则命中后在此按主叫号码与方向追溯"
+        @query="handleLogQuery"
+        @reset="resetLogQuery"
+        @pagination="getLogList">
+        <template #column-hitTime="{ row }">{{ parseTime(row.hitTime) }}</template>
+        <template #column-direction="{ row }">{{ row.direction === 'INBOUND' ? '入站' : '出站' }}</template>
+        <template #column-action="{ row }">
+          <el-tag :type="row.action === 'REJECT' ? 'danger' : 'warning'" size="mini">{{ actionText(row.action) }}</el-tag>
+        </template>
+      </ProTable>
       <div slot="footer" class="dialog-footer">
         <el-button size="small" @click="logOpen = false">关 闭</el-button>
       </div>
@@ -185,6 +105,32 @@ export default {
       loading: false,
       total: 0,
       ruleList: [],
+      // V3：ProTable 列定义（匹配方式/处置动作/频次阈值/状态/生效时间/操作走插槽，移除原 fixed="right"）
+      columns: [
+        { prop: 'suppressId', label: 'ID', width: 70 },
+        { prop: 'ruleName', label: '规则名称', minWidth: 150, showOverflowTooltip: true },
+        { prop: 'matchType', label: '匹配方式', width: 100, slot: true },
+        { prop: 'matchValue', label: '匹配值', minWidth: 140, showOverflowTooltip: true },
+        { prop: 'action', label: '处置动作', width: 100, slot: true },
+        { prop: 'priorityLevel', label: '置底优先级', width: 100 },
+        { prop: 'triggerCount', label: '频次阈值', width: 120, slot: true },
+        { prop: 'hitCount', label: '累计命中', width: 90 },
+        { prop: 'status', label: '状态', width: 90, slot: true },
+        { prop: 'effectiveStart', label: '生效开始', width: 160, slot: true },
+        { prop: 'effectiveEnd', label: '生效结束', width: 160, slot: true },
+        { prop: 'operation', label: '操作', width: 180, slot: true, className: 'small-padding fixed-width' }
+      ],
+      // 命中日志表列定义（时间/方向/动作走插槽）
+      logColumns: [
+        { prop: 'hitTime', label: '时间', width: 160, slot: true },
+        { prop: 'ruleName', label: '规则', minWidth: 120, showOverflowTooltip: true },
+        { prop: 'direction', label: '方向', width: 80, slot: true },
+        { prop: 'callerNumber', label: '主叫', width: 130 },
+        { prop: 'calleeNumber', label: '被叫', width: 130 },
+        { prop: 'action', label: '动作', width: 90, slot: true },
+        { prop: 'priority', label: '优先级', width: 80 },
+        { prop: 'channelUuid', label: '通道UUID', minWidth: 140, showOverflowTooltip: true }
+      ],
       open: false,
       title: '',
       // V3 ProDialog：提交防重锁 + 脏改动快照
@@ -214,6 +160,46 @@ export default {
     }
   },
   computed: {
+    /** V3：ProTable 查询项（匹配方式/处置动作/状态为字典化下拉） */
+    queryFormItems() {
+      return [
+        { prop: 'ruleName', label: '规则名称', type: 'input', placeholder: '请输入规则名称', width: 180 },
+        {
+          prop: 'matchType', label: '匹配方式', type: 'select', placeholder: '全部', width: 140,
+          options: [
+            { label: '号码匹配', value: 'PHONE' },
+            { label: '关键词匹配', value: 'KEYWORD' }
+          ]
+        },
+        {
+          prop: 'action', label: '处置动作', type: 'select', placeholder: '全部', width: 140,
+          options: [
+            { label: '降权置底', value: 'PRIORITY' },
+            { label: '直接挂断', value: 'REJECT' }
+          ]
+        },
+        {
+          prop: 'status', label: '状态', type: 'select', placeholder: '全部', width: 120,
+          options: [
+            { label: '启用', value: '0' },
+            { label: '停用', value: '1' }
+          ]
+        }
+      ]
+    },
+    /** 命中日志表查询项 */
+    logQueryFormItems() {
+      return [
+        { prop: 'callerNumber', label: '主叫号码', type: 'input', placeholder: '主叫号码', width: 150 },
+        {
+          prop: 'direction', label: '方向', type: 'select', placeholder: '全部', width: 120,
+          options: [
+            { label: '入站', value: 'INBOUND' },
+            { label: '出站', value: 'OUTBOUND' }
+          ]
+        }
+      ]
+    },
     /** 表单相对打开时是否有改动（供 ProDialog 关闭拦截） */
     formDirty() {
       return this.open && this.formSnapshot !== JSON.stringify(this.form)
@@ -281,9 +267,9 @@ export default {
       this.getList()
     },
     resetQuery() {
-      this.resetForm('queryForm')
+      // ProTable 已复位查询表单，这里只重设查询参数并重查（避免重复 resetForm）
       this.queryParams = { pageNum: 1, pageSize: 10, ruleName: undefined, matchType: undefined, action: undefined, status: undefined }
-      this.handleQuery()
+      this.getList()
     },
     reset() {
       this.form = {

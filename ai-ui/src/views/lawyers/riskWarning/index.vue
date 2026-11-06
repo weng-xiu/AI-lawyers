@@ -3,31 +3,27 @@
     <el-tabs v-model="activeTab" type="card" @tab-click="handleTabClick">
       <!-- ==================== 预警记录 Tab ==================== -->
       <el-tab-pane label="预警记录" name="warning">
-        <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
-          <el-form-item label="预警类型" prop="warningType">
-            <el-select v-model="queryParams.warningType" placeholder="请选择预警类型" clearable style="width: 200px">
-              <el-option label="敏感词" value="敏感词" />
-              <el-option label="情绪异常" value="情绪异常" />
-              <el-option label="异常行为" value="异常行为" />
-              <el-option label="合规风险" value="合规风险" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="预警级别" prop="warningLevel">
-            <el-select v-model="queryParams.warningLevel" placeholder="请选择预警级别" clearable style="width: 200px">
-              <el-option label="高" value="1" />
-              <el-option label="中" value="2" />
-              <el-option label="低" value="3" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="处理状态" prop="status">
-            <el-select v-model="queryParams.status" placeholder="请选择处理状态" clearable style="width: 200px">
-              <el-option label="待处理" value="0" />
-              <el-option label="处理中" value="1" />
-              <el-option label="已处理" value="2" />
-              <el-option label="已忽略" value="3" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="触发时间">
+        <!-- V3/U：查询区/工具条/表格/分页四段式骨架收敛到 ProTable -->
+        <ProTable
+          :columns="warningColumns"
+          :query-form-items="warningQueryFormItems"
+          :query-params="queryParams"
+          :data="warningList"
+          :loading="loading"
+          :total="total"
+          :show-search.sync="showSearch"
+          :stripe="false"
+          has-selection
+          label-width="68px"
+          persist-key="riskWarning:warning"
+          empty-text="暂无风险预警"
+          empty-hint="命中规则后在此查看预警，可详情、一键转办或标记处理状态"
+          @query="handleQuery"
+          @reset="resetQuery"
+          @pagination="getWarningList"
+          @selection-change="handleSelectionChange">
+          <!-- 触发时间为区间选择器，走查询插槽 -->
+          <template #query-dateRange>
             <el-date-picker
               v-model="dateRange"
               type="datetimerange"
@@ -36,17 +32,9 @@
               end-placeholder="结束时间"
               value-format="yyyy-MM-dd HH:mm:ss"
               :default-time="['00:00:00', '23:59:59']"
-            >
-            </el-date-picker>
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-            <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
-          </el-form-item>
-        </el-form>
-
-        <el-row :gutter="10" class="mb8">
-          <el-col :span="1.5">
+            />
+          </template>
+          <template #toolbar-left>
             <el-button
               type="primary"
               plain
@@ -55,8 +43,6 @@
               @click="handleAdd"
               v-hasPermi="['lawyers:riskWarning:add']"
             >新增</el-button>
-          </el-col>
-          <el-col :span="1.5">
             <el-button
               type="success"
               plain
@@ -66,8 +52,6 @@
               @click="handleUpdate"
               v-hasPermi="['lawyers:riskWarning:edit']"
             >修改</el-button>
-          </el-col>
-          <el-col :span="1.5">
             <el-button
               type="danger"
               plain
@@ -77,8 +61,6 @@
               @click="handleDelete"
               v-hasPermi="['lawyers:riskWarning:remove']"
             >删除</el-button>
-          </el-col>
-          <el-col :span="1.5">
             <el-button
               type="warning"
               plain
@@ -87,96 +69,64 @@
               @click="handleExport"
               v-hasPermi="['lawyers:riskWarning:export']"
             >导出</el-button>
-          </el-col>
-          <right-toolbar :showSearch.sync="showSearch" @queryTable="getWarningList"></right-toolbar>
-        </el-row>
-
-        <el-table v-loading="loading" :data="warningList" @selection-change="handleSelectionChange">
-          <el-table-column type="selection" width="55" align="center" />
-          <el-table-column label="预警ID" align="center" prop="warningId" width="80" />
-          <el-table-column label="预警类型" align="center" prop="warningType" width="100">
-            <template slot-scope="scope">
-              <el-tag :type="scope.row.warningType === '敏感词' ? 'danger' : scope.row.warningType === '情绪异常' ? 'warning' : scope.row.warningType === '异常行为' ? '' : 'success'" size="small">{{ scope.row.warningType }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="预警级别" align="center" prop="warningLevel" width="80">
-            <template slot-scope="scope">
-              <el-tag :type="scope.row.warningLevel == 1 ? 'danger' : scope.row.warningLevel == 2 ? 'warning' : 'info'" size="small">{{ scope.row.warningLevel == 1 ? '高' : scope.row.warningLevel == 2 ? '中' : '低' }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="来源类型" align="center" prop="sourceType" width="90" />
-          <el-table-column label="命中规则" align="center" prop="ruleName" width="120" :show-overflow-tooltip="true">
-            <template slot-scope="scope">
-              <span>{{ scope.row.ruleName || '-' }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="建议转办" align="center" prop="suggestTransferType" width="110">
-            <template slot-scope="scope">
-              <el-tag v-if="scope.row.suggestTransferType" :type="typeTag(scope.row.suggestTransferType)" size="small">{{ typeText(scope.row.suggestTransferType) }}</el-tag>
-              <span v-else>-</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="客户姓名" align="center" prop="customerName" width="100" />
-          <el-table-column label="触发内容" align="center" prop="content" min-width="200" :show-overflow-tooltip="true" />
-          <el-table-column label="处理状态" align="center" prop="status" width="90">
-            <template slot-scope="scope">
-              <el-tag v-if="scope.row.status == 0" type="danger" size="small">待处理</el-tag>
-              <el-tag v-else-if="scope.row.status == 1" type="warning" size="small">处理中</el-tag>
-              <el-tag v-else-if="scope.row.status == 2" type="success" size="small">已处理</el-tag>
-              <el-tag v-else-if="scope.row.status == 3" type="info" size="small">已忽略</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="处理人" align="center" prop="handlerName" width="90" />
-          <el-table-column label="触发时间" align="center" prop="triggerTime" width="180">
-            <template slot-scope="scope">
-              <span>{{ parseTime(scope.row.triggerTime) }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="290">
-            <template slot-scope="scope">
-              <el-button
-                size="mini"
-                type="text"
-                icon="el-icon-view"
-                @click="handleDetail(scope.row)"
-                v-hasPermi="['lawyers:riskWarning:query']"
-              >详情</el-button>
-              <el-tooltip v-if="scope.row.transferId" content="已转办，点击查看工单号" placement="top">
-                <el-button size="mini" type="text" icon="el-icon-finished" disabled>已转办 {{ scope.row.ticketNo }}</el-button>
-              </el-tooltip>
-              <el-button
-                v-else-if="scope.row.suggestTransferType"
-                size="mini"
-                type="text"
-                icon="el-icon-promotion"
-                @click="handleTransfer(scope.row)"
-                v-hasPermi="['lawyers:ticketTransfer:add']"
-              >一键转办</el-button>
-              <el-button
-                size="mini"
-                type="text"
-                icon="el-icon-edit"
-                @click="handleUpdate(scope.row)"
-                v-hasPermi="['lawyers:riskWarning:edit']"
-              >修改</el-button>
-              <el-button
-                size="mini"
-                type="text"
-                icon="el-icon-delete"
-                @click="handleDelete(scope.row)"
-                v-hasPermi="['lawyers:riskWarning:remove']"
-              >删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-
-        <pagination
-          v-show="total>0"
-          :total="total"
-          :page.sync="queryParams.pageNum"
-          :limit.sync="queryParams.pageSize"
-          @pagination="getWarningList"
-        />
+          </template>
+          <template #column-warningType="{ row }">
+            <el-tag :type="row.warningType === '敏感词' ? 'danger' : row.warningType === '情绪异常' ? 'warning' : row.warningType === '异常行为' ? '' : 'success'" size="small">{{ row.warningType }}</el-tag>
+          </template>
+          <template #column-warningLevel="{ row }">
+            <el-tag :type="row.warningLevel == 1 ? 'danger' : row.warningLevel == 2 ? 'warning' : 'info'" size="small">{{ row.warningLevel == 1 ? '高' : row.warningLevel == 2 ? '中' : '低' }}</el-tag>
+          </template>
+          <template #column-ruleName="{ row }">
+            <span>{{ row.ruleName || '-' }}</span>
+          </template>
+          <template #column-suggestTransferType="{ row }">
+            <el-tag v-if="row.suggestTransferType" :type="typeTag(row.suggestTransferType)" size="small">{{ typeText(row.suggestTransferType) }}</el-tag>
+            <span v-else>-</span>
+          </template>
+          <template #column-status="{ row }">
+            <el-tag v-if="row.status == 0" type="danger" size="small">待处理</el-tag>
+            <el-tag v-else-if="row.status == 1" type="warning" size="small">处理中</el-tag>
+            <el-tag v-else-if="row.status == 2" type="success" size="small">已处理</el-tag>
+            <el-tag v-else-if="row.status == 3" type="info" size="small">已忽略</el-tag>
+          </template>
+          <template #column-triggerTime="{ row }">
+            <span>{{ parseTime(row.triggerTime) }}</span>
+          </template>
+          <template #column-action="{ row }">
+            <el-button
+              size="mini"
+              type="text"
+              icon="el-icon-view"
+              @click="handleDetail(row)"
+              v-hasPermi="['lawyers:riskWarning:query']"
+            >详情</el-button>
+            <el-tooltip v-if="row.transferId" content="已转办，点击查看工单号" placement="top">
+              <el-button size="mini" type="text" icon="el-icon-finished" disabled>已转办 {{ row.ticketNo }}</el-button>
+            </el-tooltip>
+            <el-button
+              v-else-if="row.suggestTransferType"
+              size="mini"
+              type="text"
+              icon="el-icon-promotion"
+              @click="handleTransfer(row)"
+              v-hasPermi="['lawyers:ticketTransfer:add']"
+            >一键转办</el-button>
+            <el-button
+              size="mini"
+              type="text"
+              icon="el-icon-edit"
+              @click="handleUpdate(row)"
+              v-hasPermi="['lawyers:riskWarning:edit']"
+            >修改</el-button>
+            <el-button
+              size="mini"
+              type="text"
+              icon="el-icon-delete"
+              @click="handleDelete(row)"
+              v-hasPermi="['lawyers:riskWarning:remove']"
+            >删除</el-button>
+          </template>
+        </ProTable>
 
         <!-- 添加或修改预警记录对话框 -->
         <el-dialog :title="title" :visible.sync="open" width="700px" append-to-body>
@@ -338,39 +288,26 @@
 
       <!-- ==================== 预警规则 Tab ==================== -->
       <el-tab-pane label="预警规则" name="rule">
-        <el-form :model="ruleQueryParams" ref="ruleQueryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
-          <el-form-item label="规则名称" prop="ruleName">
-            <el-input
-              v-model="ruleQueryParams.ruleName"
-              placeholder="请输入规则名称"
-              clearable
-              style="width: 200px"
-              @keyup.enter.native="handleRuleQuery"
-            />
-          </el-form-item>
-          <el-form-item label="规则类型" prop="ruleType">
-            <el-select v-model="ruleQueryParams.ruleType" placeholder="请选择规则类型" clearable style="width: 200px">
-              <el-option label="敏感词" value="敏感词" />
-              <el-option label="情绪异常" value="情绪异常" />
-              <el-option label="异常行为" value="异常行为" />
-              <el-option label="合规风险" value="合规风险" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="规则级别" prop="ruleLevel">
-            <el-select v-model="ruleQueryParams.ruleLevel" placeholder="请选择规则级别" clearable style="width: 200px">
-              <el-option label="高" value="1" />
-              <el-option label="中" value="2" />
-              <el-option label="低" value="3" />
-            </el-select>
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" icon="el-icon-search" size="mini" @click="handleRuleQuery">搜索</el-button>
-            <el-button icon="el-icon-refresh" size="mini" @click="resetRuleQuery">重置</el-button>
-          </el-form-item>
-        </el-form>
-
-        <el-row :gutter="10" class="mb8">
-          <el-col :span="1.5">
+        <!-- 规则表同样收敛到 ProTable，独立 persist-key 与查询区显隐 -->
+        <ProTable
+          :columns="ruleColumns"
+          :query-form-items="ruleQueryFormItems"
+          :query-params="ruleQueryParams"
+          :data="ruleList"
+          :loading="ruleLoading"
+          :total="ruleTotal"
+          :show-search.sync="ruleShowSearch"
+          :stripe="false"
+          has-selection
+          label-width="68px"
+          persist-key="riskWarning:rule"
+          empty-text="暂无预警规则"
+          empty-hint="新增规则后命中关键词/情绪/行为风险时自动生成预警"
+          @query="handleRuleQuery"
+          @reset="resetRuleQuery"
+          @pagination="getRuleList"
+          @selection-change="handleRuleSelectionChange">
+          <template #toolbar-left>
             <el-button
               type="primary"
               plain
@@ -379,8 +316,6 @@
               @click="handleRuleAdd"
               v-hasPermi="['lawyers:riskWarning:add']"
             >新增</el-button>
-          </el-col>
-          <el-col :span="1.5">
             <el-button
               type="success"
               plain
@@ -390,8 +325,6 @@
               @click="handleRuleUpdate"
               v-hasPermi="['lawyers:riskWarning:edit']"
             >修改</el-button>
-          </el-col>
-          <el-col :span="1.5">
             <el-button
               type="danger"
               plain
@@ -401,73 +334,43 @@
               @click="handleRuleDelete"
               v-hasPermi="['lawyers:riskWarning:remove']"
             >删除</el-button>
-          </el-col>
-          <right-toolbar :showSearch.sync="showSearch" @queryTable="getRuleList"></right-toolbar>
-        </el-row>
-
-        <el-table v-loading="ruleLoading" :data="ruleList" @selection-change="handleRuleSelectionChange">
-          <el-table-column type="selection" width="55" align="center" />
-          <el-table-column label="规则ID" align="center" prop="ruleId" width="80" />
-          <el-table-column label="规则名称" align="center" prop="ruleName" min-width="150" :show-overflow-tooltip="true" />
-          <el-table-column label="规则类型" align="center" prop="ruleType" width="100">
-            <template slot-scope="scope">
-              <el-tag :type="scope.row.ruleType === '敏感词' ? 'danger' : scope.row.ruleType === '情绪异常' ? 'warning' : scope.row.ruleType === '异常行为' ? '' : 'success'" size="small">{{ scope.row.ruleType }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="规则级别" align="center" prop="ruleLevel" width="80">
-            <template slot-scope="scope">
-              <el-tag :type="scope.row.ruleLevel == 1 ? 'danger' : scope.row.ruleLevel == 2 ? 'warning' : 'info'" size="small">{{ scope.row.ruleLevel == 1 ? '高' : scope.row.ruleLevel == 2 ? '中' : '低' }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="关键词" align="center" prop="keywords" min-width="160" :show-overflow-tooltip="true" />
-          <el-table-column label="建议转办条线" align="center" prop="suggestTransferType" width="120">
-            <template slot-scope="scope">
-              <el-tag v-if="scope.row.suggestTransferType" :type="typeTag(scope.row.suggestTransferType)" size="small">{{ typeText(scope.row.suggestTransferType) }}</el-tag>
-              <span v-else>-</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="默认建议机构" align="center" prop="suggestOrgId" min-width="160" :show-overflow-tooltip="true">
-            <template slot-scope="scope">
-              <span>{{ scope.row.suggestOrgId ? orgNameText(scope.row.suggestOrgId) : '-' }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="是否启用" align="center" prop="isEnabled" width="90">
-            <template slot-scope="scope">
-              <el-tag :type="scope.row.isEnabled == 1 ? 'success' : 'info'" size="small">{{ scope.row.isEnabled == 1 ? '启用' : '禁用' }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="创建时间" align="center" prop="createTime" width="180">
-            <template slot-scope="scope">
-              <span>{{ parseTime(scope.row.createTime) }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="150">
-            <template slot-scope="scope">
-              <el-button
-                size="mini"
-                type="text"
-                icon="el-icon-edit"
-                @click="handleRuleUpdate(scope.row)"
-                v-hasPermi="['lawyers:riskWarning:edit']"
-              >修改</el-button>
-              <el-button
-                size="mini"
-                type="text"
-                icon="el-icon-delete"
-                @click="handleRuleDelete(scope.row)"
-                v-hasPermi="['lawyers:riskWarning:remove']"
-              >删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-
-        <pagination
-          v-show="ruleTotal>0"
-          :total="ruleTotal"
-          :page.sync="ruleQueryParams.pageNum"
-          :limit.sync="ruleQueryParams.pageSize"
-          @pagination="getRuleList"
-        />
+          </template>
+          <template #column-ruleType="{ row }">
+            <el-tag :type="row.ruleType === '敏感词' ? 'danger' : row.ruleType === '情绪异常' ? 'warning' : row.ruleType === '异常行为' ? '' : 'success'" size="small">{{ row.ruleType }}</el-tag>
+          </template>
+          <template #column-ruleLevel="{ row }">
+            <el-tag :type="row.ruleLevel == 1 ? 'danger' : row.ruleLevel == 2 ? 'warning' : 'info'" size="small">{{ row.ruleLevel == 1 ? '高' : row.ruleLevel == 2 ? '中' : '低' }}</el-tag>
+          </template>
+          <template #column-suggestTransferType="{ row }">
+            <el-tag v-if="row.suggestTransferType" :type="typeTag(row.suggestTransferType)" size="small">{{ typeText(row.suggestTransferType) }}</el-tag>
+            <span v-else>-</span>
+          </template>
+          <template #column-suggestOrgId="{ row }">
+            <span>{{ row.suggestOrgId ? orgNameText(row.suggestOrgId) : '-' }}</span>
+          </template>
+          <template #column-isEnabled="{ row }">
+            <el-tag :type="row.isEnabled == 1 ? 'success' : 'info'" size="small">{{ row.isEnabled == 1 ? '启用' : '禁用' }}</el-tag>
+          </template>
+          <template #column-createTime="{ row }">
+            <span>{{ parseTime(row.createTime) }}</span>
+          </template>
+          <template #column-action="{ row }">
+            <el-button
+              size="mini"
+              type="text"
+              icon="el-icon-edit"
+              @click="handleRuleUpdate(row)"
+              v-hasPermi="['lawyers:riskWarning:edit']"
+            >修改</el-button>
+            <el-button
+              size="mini"
+              type="text"
+              icon="el-icon-delete"
+              @click="handleRuleDelete(row)"
+              v-hasPermi="['lawyers:riskWarning:remove']"
+            >删除</el-button>
+          </template>
+        </ProTable>
 
         <!-- 添加或修改预警规则对话框 -->
         <el-dialog :title="ruleTitle" :visible.sync="ruleOpen" width="600px" append-to-body>
@@ -581,6 +484,21 @@ export default {
       total: 0,
       // 风险预警记录表格数据
       warningList: [],
+      // V3：预警记录列定义（类型/级别/规则/建议转办/状态/触发时间/操作走插槽）
+      warningColumns: [
+        { prop: 'warningId', label: '预警ID', width: 80 },
+        { prop: 'warningType', label: '预警类型', width: 100, slot: true },
+        { prop: 'warningLevel', label: '预警级别', width: 80, slot: true },
+        { prop: 'sourceType', label: '来源类型', width: 90 },
+        { prop: 'ruleName', label: '命中规则', width: 120, showOverflowTooltip: true, slot: true },
+        { prop: 'suggestTransferType', label: '建议转办', width: 110, slot: true },
+        { prop: 'customerName', label: '客户姓名', width: 100 },
+        { prop: 'content', label: '触发内容', minWidth: 200, showOverflowTooltip: true },
+        { prop: 'status', label: '处理状态', width: 90, slot: true },
+        { prop: 'handlerName', label: '处理人', width: 90 },
+        { prop: 'triggerTime', label: '触发时间', width: 180, slot: true },
+        { prop: 'action', label: '操作', width: 290, slot: true, className: 'small-padding fixed-width' }
+      ],
       // 日期范围
       dateRange: [],
       // 弹出层标题
@@ -621,8 +539,23 @@ export default {
       ruleIds: [],
       ruleSingle: true,
       ruleMultiple: true,
+      // 规则表查询区显隐（与预警记录表独立）
+      ruleShowSearch: true,
       ruleTotal: 0,
       ruleList: [],
+      // V3：预警规则列定义（类型/级别/建议转办/默认机构/启用/创建时间/操作走插槽）
+      ruleColumns: [
+        { prop: 'ruleId', label: '规则ID', width: 80 },
+        { prop: 'ruleName', label: '规则名称', minWidth: 150, showOverflowTooltip: true },
+        { prop: 'ruleType', label: '规则类型', width: 100, slot: true },
+        { prop: 'ruleLevel', label: '规则级别', width: 80, slot: true },
+        { prop: 'keywords', label: '关键词', minWidth: 160, showOverflowTooltip: true },
+        { prop: 'suggestTransferType', label: '建议转办条线', width: 120, slot: true },
+        { prop: 'suggestOrgId', label: '默认建议机构', minWidth: 160, showOverflowTooltip: true, slot: true },
+        { prop: 'isEnabled', label: '是否启用', width: 90, slot: true },
+        { prop: 'createTime', label: '创建时间', width: 180, slot: true },
+        { prop: 'action', label: '操作', width: 150, slot: true, className: 'small-padding fixed-width' }
+      ],
       ruleTitle: "",
       ruleOpen: false,
       ruleQueryParams: {
@@ -644,6 +577,63 @@ export default {
           { required: true, message: "规则级别不能为空", trigger: "change" }
         ]
       }
+    }
+  },
+  computed: {
+    /** V3：预警记录查询项（触发时间区间走查询插槽） */
+    warningQueryFormItems() {
+      return [
+        {
+          prop: 'warningType', label: '预警类型', type: 'select', placeholder: '请选择预警类型', width: 200,
+          options: [
+            { label: '敏感词', value: '敏感词' },
+            { label: '情绪异常', value: '情绪异常' },
+            { label: '异常行为', value: '异常行为' },
+            { label: '合规风险', value: '合规风险' }
+          ]
+        },
+        {
+          prop: 'warningLevel', label: '预警级别', type: 'select', placeholder: '请选择预警级别', width: 200,
+          options: [
+            { label: '高', value: '1' },
+            { label: '中', value: '2' },
+            { label: '低', value: '3' }
+          ]
+        },
+        {
+          prop: 'status', label: '处理状态', type: 'select', placeholder: '请选择处理状态', width: 200,
+          options: [
+            { label: '待处理', value: '0' },
+            { label: '处理中', value: '1' },
+            { label: '已处理', value: '2' },
+            { label: '已忽略', value: '3' }
+          ]
+        },
+        { prop: 'dateRange', label: '触发时间', slot: true }
+      ]
+    },
+    /** V3：预警规则查询项 */
+    ruleQueryFormItems() {
+      return [
+        { prop: 'ruleName', label: '规则名称', type: 'input', placeholder: '请输入规则名称', width: 200 },
+        {
+          prop: 'ruleType', label: '规则类型', type: 'select', placeholder: '请选择规则类型', width: 200,
+          options: [
+            { label: '敏感词', value: '敏感词' },
+            { label: '情绪异常', value: '情绪异常' },
+            { label: '异常行为', value: '异常行为' },
+            { label: '合规风险', value: '合规风险' }
+          ]
+        },
+        {
+          prop: 'ruleLevel', label: '规则级别', type: 'select', placeholder: '请选择规则级别', width: 200,
+          options: [
+            { label: '高', value: '1' },
+            { label: '中', value: '2' },
+            { label: '低', value: '3' }
+          ]
+        }
+      ]
     }
   },
   created() {
@@ -734,9 +724,18 @@ export default {
     },
     /** 重置按钮操作 */
     resetQuery() {
+      // ProTable 已复位查询表单，这里只清空日期区间并重设查询参数重查
       this.dateRange = []
-      this.resetForm("queryForm")
-      this.handleQuery()
+      this.queryParams = {
+        pageNum: 1,
+        pageSize: 10,
+        warningType: undefined,
+        warningLevel: undefined,
+        sourceType: undefined,
+        status: undefined,
+        customerName: undefined
+      }
+      this.getWarningList()
     },
     /** 新增按钮操作 */
     handleAdd() {
@@ -854,8 +853,9 @@ export default {
     },
     /** 重置按钮操作 */
     resetRuleQuery() {
-      this.resetForm("ruleQueryForm")
-      this.handleRuleQuery()
+      // ProTable 已复位查询表单，这里只重设查询参数重查
+      this.ruleQueryParams = { pageNum: 1, pageSize: 10, ruleName: undefined, ruleType: undefined, ruleLevel: undefined }
+      this.getRuleList()
     },
     /** 新增按钮操作 */
     handleRuleAdd() {
