@@ -78,7 +78,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         left join ai_call_agent_status a on r.agent_id = a.agent_id
         left join ai_consultation_category c on r.category_id = c.category_id
         where r.agent_id = #{agentId}
-          and date(r.call_time) = curdate()
+          and r.call_time &gt;= curdate()
+          and r.call_time &lt; date_add(curdate(), interval 1 day)
         order by r.call_time desc
         limit 100
     </select>

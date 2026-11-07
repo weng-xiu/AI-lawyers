@@ -259,7 +259,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                    ifnull(sum(duration), 0) as talkDuration,
                    ifnull(round(avg(duration), 0), 0) as avgDuration
             from ai_call_record
-            where date(call_time) = curdate()
+            where call_time &gt;= curdate()
+              and call_time &lt; date_add(curdate(), interval 1 day)
             group by agent_id
         ) cr on cr.agent_id = a.agent_id
         where a.status != '0'

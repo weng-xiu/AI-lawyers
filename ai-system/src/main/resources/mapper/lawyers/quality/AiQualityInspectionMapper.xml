@@ -70,11 +70,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="reviewStatus != null and reviewStatus != ''"> and q.review_status = #{reviewStatus}</if>
             <if test="riskWarningId != null"> and q.risk_warning_id = #{riskWarningId}</if>
             <if test="appealStatus != null and appealStatus != ''"> and q.appeal_status = #{appealStatus}</if>
+            <!-- P3：避免对 create_time 做 date_format（索引失效），按参数日期半开区间（含结束日全天） -->
             <if test="params.beginTime != null and params.beginTime != ''">
-                and date_format(q.create_time,'%Y%m%d') &gt;= date_format(#{params.beginTime},'%Y%m%d')
+                and q.create_time &gt;= date(#{params.beginTime})
             </if>
             <if test="params.endTime != null and params.endTime != ''">
-                and date_format(q.create_time,'%Y%m%d') &lt;= date_format(#{params.endTime},'%Y%m%d')
+                and q.create_time &lt; date_add(date(#{params.endTime}), interval 1 day)
             </if>
         </where>
         order by q.create_time desc

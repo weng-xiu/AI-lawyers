@@ -88,7 +88,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="agentId != null"> and cr.agent_id = #{agentId}</if>
             <if test="categoryId != null"> and cr.category_id = #{categoryId}</if>
             <if test="status != null and status != ''"> and cr.status = #{status}</if>
-            <if test="callTime != null"> and date(cr.call_time) = date(#{callTime})</if>
+            <!-- P3：避免对 call_time 做 date() 包裹导致索引失效，改为参数日期的半开区间 -->
+            <if test="callTime != null"> and cr.call_time &gt;= date(#{callTime}) and cr.call_time &lt; date_add(date(#{callTime}), interval 1 day)</if>
             <!-- F6 报表自助分析下钻：时间范围（半开区间）/未分类/语种过滤，经 params 传入 -->
             <if test="params.beginCallTime != null and params.beginCallTime != ''"> and cr.call_time &gt;= #{params.beginCallTime}</if>
             <if test="params.endCallTime != null and params.endCallTime != ''"> and cr.call_time &lt; #{params.endCallTime}</if>
@@ -151,7 +152,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select count(*) as todayCalls,
                ifnull(sum(duration), 0) as todayServiceDuration
         from ai_call_record
-        where date(call_time) = curdate()
+        where call_time &gt;= curdate()
+          and call_time &lt; date_add(curdate(), interval 1 day)
     </select>
 
     <select id="selectRecentCalls" parameterType="Integer" resultMap="AiCallRecordResult">
