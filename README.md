@@ -341,13 +341,13 @@ fs_cli -x "events plain CHANNEL_CREATE CHANNEL_ANSWER CHANNEL_HANGUP"
 
 项目文档统一维护在**语雀知识库「HMC开源」→「AI-lawyer」目录**，仓库不再存放文档正文，仅保留本索引。
 
-| 文档 | 语雀位置 |
+| 文档 | 链接 |
 |---|---|
-| AI律师话务系统综合文档 V2.0 | HMC开源 / AI-lawyer |
-| 项目操作手册 | HMC开源 / AI-lawyer |
-| 优化方向调研报告 V1.0 | HMC开源 / AI-lawyer |
-| 代码结构盘点与优化规划 V1.0 | HMC开源 / AI-lawyer |
-| 容量基线与压测常态化 P7 | HMC开源 / AI-lawyer |
-| 下一步开发计划 V1.0 | HMC开源 / AI-lawyer |
+| AI律师话务系统综合文档 V2.0 | https://www.yuque.com/wengxiulin/gp6u6a/pun8a91kfh791tr0 |
+| 项目操作手册 | https://www.yuque.com/wengxiulin/gp6u6a/ulk94bdsfdem7uwx |
+| 优化方向调研报告 V1.0 | https://www.yuque.com/wengxiulin/gp6u6a/rqccg6dw32l9ab63 |
+| 代码结构盘点与优化规划 V1.0 | https://www.yuque.com/wengxiulin/gp6u6a/mmv876ixargouhul |
+| 容量基线与压测常态化 P7 | https://www.yuque.com/wengxiulin/gp6u6a/rwl70gi4qca4bh8n |
+| 下一步开发计划 V1.0 | https://www.yuque.com/wengxiulin/gp6u6a/next-dev-plan-v1 |
 
-> 迁移完成前以本地 `doc/`（已被 `.gitignore` 忽略）为准；迁移完成后以语雀为准，仓库只保留跳转链接。
+> 自 2026-11-11 起语雀为唯一维护源；本地 `doc/` 为迁移前历史副本（已被 `.gitignore` 忽略），不再更新。
