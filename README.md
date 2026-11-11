@@ -350,4 +350,4 @@ fs_cli -x "events plain CHANNEL_CREATE CHANNEL_ANSWER CHANNEL_HANGUP"
 | 容量基线与压测常态化 P7 | https://www.yuque.com/wengxiulin/gp6u6a/rwl70gi4qca4bh8n |
 | 下一步开发计划 V1.0 | https://www.yuque.com/wengxiulin/gp6u6a/next-dev-plan-v1 |
 
-> 自 2026-11-11 起语雀为唯一维护源；本地 `doc/` 为迁移前历史副本（已被 `.gitignore` 忽略），不再更新。
+> 自 2026-11-11 起语雀为唯一维护源，本地 `doc/` 已移除；仓库内不再保留文档正文。
