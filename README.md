@@ -335,3 +335,19 @@ fs_cli -x "events plain CHANNEL_CREATE CHANNEL_ANSWER CHANNEL_HANGUP"
 - 增加预测式外呼，主动服务
 - 引入实时语音情感分析，辅助坐席调整沟通策略
 - 支持与第三方政务平台（如12345）工单互通
+
+
+## 十、文档索引
+
+项目文档统一维护在**语雀知识库「HMC开源」→「AI-lawyer」目录**，仓库不再存放文档正文，仅保留本索引。
+
+| 文档 | 语雀位置 |
+|---|---|
+| AI律师话务系统综合文档 V2.0 | HMC开源 / AI-lawyer |
+| 项目操作手册 | HMC开源 / AI-lawyer |
+| 优化方向调研报告 V1.0 | HMC开源 / AI-lawyer |
+| 代码结构盘点与优化规划 V1.0 | HMC开源 / AI-lawyer |
+| 容量基线与压测常态化 P7 | HMC开源 / AI-lawyer |
+| 下一步开发计划 V1.0 | HMC开源 / AI-lawyer |
+
+> 迁移完成前以本地 `doc/`（已被 `.gitignore` 忽略）为准；迁移完成后以语雀为准，仓库只保留跳转链接。
