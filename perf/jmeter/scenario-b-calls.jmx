@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
   <hashTree>
-    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="P7-场景B-并发通话">
-      <stringProp name="TestPlan.comments">并发通话容量测试：网关事件洪峰(@Anonymous /lawyers/call/event，走 CallEventBus→Stream→Processor 全链路) + 话单查询读负载。参数：-Jhost -Jport -JtierB -JrampB -Jduration -JcallsPerMin -Juser -Jpassword</stringProp>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="P7-场景B-网关回调入口">
+      <stringProp name="TestPlan.comments">网关回调入口容量测试：@Anonymous /lawyers/call/event（onCallEvent 按 callUuid 回写 ai_call_dial_log；未知 uuid 仅记录告警后返回，不产生 Stream 消息） + 话单查询读负载。注意：真正的 Stream→Processor 事件链由 ESL/AMI 在应用进程内投递，无 HTTP 入口，本场景不覆盖。参数：-Jhost -Jport -JtierB -JrampB -Jduration -JcallsPerMin -JreadersB -Juser -Jpassword</stringProp>
       <stringProp name="TestPlan.user_define_classpath"></stringProp>
       <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments">
         <collectionProp name="Arguments.arguments"/>
@@ -85,7 +85,7 @@ if (json.code == 200 &amp;&amp; json.token) { props.put(&quot;token&quot;, json.
             <collectionProp name="Arguments.arguments">
               <elementProp name="" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.value">{"callUuid":"sim-${__threadNum}-${__counter(FALSE,)}","event":"${__jexl3(${__threadNum} % 3 == 0 ? 'HANGUP' : (${__threadNum} % 3 == 1 ? 'INBOUND' : 'ANSWERED'))}","callerNumber":"138${__Random(10000000,99999999,)}","talkDuration":${__Random(5,120,)},"hangupCause":"NORMAL_CLEARING"}</stringProp>
+                <stringProp name="Argument.value">{"callUuid":"sim-${__threadNum}-${__counter(FALSE,)}","event":"${__chooseRandom(ANSWERED,HANGUP,FAILED)}","callerNumber":"138${__Random(10000000,99999999,)}","talkDuration":${__Random(5,120,)},"hangupCause":"NORMAL_CLEARING"}</stringProp>
                 <stringProp name="Argument.metadata">=</stringProp>
               </elementProp>
             </collectionProp>
@@ -104,6 +104,15 @@ if (json.code == 200 &amp;&amp; json.token) { props.put(&quot;token&quot;, json.
               </elementProp>
             </collectionProp>
           </HeaderManager>
+          <hashTree/>
+          <JSONPathAssertion guiclass="JSONPathAssertionGui" testclass="JSONPathAssertion" testname="断言 code=200">
+            <stringProp name="JSON_PATH">$.code</stringProp>
+            <stringProp name="EXPECTED_VALUE">200</stringProp>
+            <boolProp name="JSONVALIDATION">false</boolProp>
+            <boolProp name="EXPECT_NULL">false</boolProp>
+            <boolProp name="INVERT">false</boolProp>
+            <boolProp name="ISREGEX">false</boolProp>
+          </JSONPathAssertion>
           <hashTree/>
         </hashTree>
         <ConstantThroughputTimer guiclass="TestBeanGUI" testclass="ConstantThroughputTimer" testname="事件速率控制">
@@ -148,7 +157,17 @@ if (json.code == 200 &amp;&amp; json.token) { props.put(&quot;token&quot;, json.
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
         </HTTPSamplerProxy>
-        <hashTree/>
+        <hashTree>
+          <JSONPathAssertion guiclass="JSONPathAssertionGui" testclass="JSONPathAssertion" testname="断言 code=200">
+            <stringProp name="JSON_PATH">$.code</stringProp>
+            <stringProp name="EXPECTED_VALUE">200</stringProp>
+            <boolProp name="JSONVALIDATION">false</boolProp>
+            <boolProp name="EXPECT_NULL">false</boolProp>
+            <boolProp name="INVERT">false</boolProp>
+            <boolProp name="ISREGEX">false</boolProp>
+          </JSONPathAssertion>
+          <hashTree/>
+        </hashTree>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="GET 调度状态">
           <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments">
             <collectionProp name="Arguments.arguments"/>
@@ -158,7 +177,17 @@ if (json.code == 200 &amp;&amp; json.token) { props.put(&quot;token&quot;, json.
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
         </HTTPSamplerProxy>
-        <hashTree/>
+        <hashTree>
+          <JSONPathAssertion guiclass="JSONPathAssertionGui" testclass="JSONPathAssertion" testname="断言 code=200">
+            <stringProp name="JSON_PATH">$.code</stringProp>
+            <stringProp name="EXPECTED_VALUE">200</stringProp>
+            <boolProp name="JSONVALIDATION">false</boolProp>
+            <boolProp name="EXPECT_NULL">false</boolProp>
+            <boolProp name="INVERT">false</boolProp>
+            <boolProp name="ISREGEX">false</boolProp>
+          </JSONPathAssertion>
+          <hashTree/>
+        </hashTree>
         <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="读间隔">
           <stringProp name="ConstantTimer.delay">${__P(readerThinkMs,1000)}</stringProp>
         </ConstantTimer>

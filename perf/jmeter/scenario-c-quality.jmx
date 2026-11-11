@@ -2,7 +2,7 @@
 <jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
   <hashTree>
     <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="P7-场景C-质检吞吐">
-      <stringProp name="TestPlan.comments">质检吞吐测试：单话单质检执行(规则+LLM mock) + 质检列表读负载。前置：预置 records 条话单。参数：-Jhost -Jport -JtierC -JrampC -Jduration -JinspectionsPerMin -Jrecords -Juser -Jpassword</stringProp>
+      <stringProp name="TestPlan.comments">质检吞吐测试：单话单质检执行(规则+LLM mock) + 质检列表读负载。前置：预置 N 条未质检话单（record_id 连续 1..N，N ≥ 质检速率×10 分钟：T1 1000 / T2 3000 / T3 6000，建议 +10% 余量），且 ai.quality.enabled=true / auto-on-hangup=true / sample-rate=1.0；已完成质检的话单会命中幂等快路径，故每轮前须重置该池质检记录。参数：-Jhost -Jport -JtierC -JrampC -Jduration -JinspectionsPerMin -Juser -Jpassword</stringProp>
       <stringProp name="TestPlan.user_define_classpath"></stringProp>
       <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments">
         <collectionProp name="Arguments.arguments"/>
@@ -96,12 +96,22 @@ if (json.code == 200 &amp;&amp; json.token) { props.put(&quot;token&quot;, json.
           <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments">
             <collectionProp name="Arguments.arguments"/>
           </elementProp>
-          <stringProp name="HTTPSampler.path">/lawyers/quality/inspect/${__Random(1,${__P(records,1000)},)}</stringProp>
+          <stringProp name="HTTPSampler.path">/lawyers/quality/inspect/${__counter(TRUE,)}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
         </HTTPSamplerProxy>
-        <hashTree/>
+        <hashTree>
+          <JSONPathAssertion guiclass="JSONPathAssertionGui" testclass="JSONPathAssertion" testname="断言 code=200">
+            <stringProp name="JSON_PATH">$.code</stringProp>
+            <stringProp name="EXPECTED_VALUE">200</stringProp>
+            <boolProp name="JSONVALIDATION">false</boolProp>
+            <boolProp name="EXPECT_NULL">false</boolProp>
+            <boolProp name="INVERT">false</boolProp>
+            <boolProp name="ISREGEX">false</boolProp>
+          </JSONPathAssertion>
+          <hashTree/>
+        </hashTree>
 
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="GET 质检列表">
           <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments">
@@ -112,7 +122,17 @@ if (json.code == 200 &amp;&amp; json.token) { props.put(&quot;token&quot;, json.
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
         </HTTPSamplerProxy>
-        <hashTree/>
+        <hashTree>
+          <JSONPathAssertion guiclass="JSONPathAssertionGui" testclass="JSONPathAssertion" testname="断言 code=200">
+            <stringProp name="JSON_PATH">$.code</stringProp>
+            <stringProp name="EXPECTED_VALUE">200</stringProp>
+            <boolProp name="JSONVALIDATION">false</boolProp>
+            <boolProp name="EXPECT_NULL">false</boolProp>
+            <boolProp name="INVERT">false</boolProp>
+            <boolProp name="ISREGEX">false</boolProp>
+          </JSONPathAssertion>
+          <hashTree/>
+        </hashTree>
 
         <ConstantThroughputTimer guiclass="TestBeanGUI" testclass="ConstantThroughputTimer" testname="质检速率控制">
           <doubleProp>
