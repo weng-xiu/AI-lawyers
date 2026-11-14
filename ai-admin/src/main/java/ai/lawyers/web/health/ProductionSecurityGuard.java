@@ -26,9 +26,20 @@ public class ProductionSecurityGuard implements ApplicationRunner
 {
     private static final Logger log = LoggerFactory.getLogger(ProductionSecurityGuard.class);
 
-    /** JWT 默认密钥（须与 application.yml 中占位符默认值一致） */
+    /** JWT 默认密钥（docker-compose.yml 的 TOKEN_SECRET 兜底值，两者必须保持一致） */
     public static final String DEFAULT_TOKEN_SECRET =
             "Z2xwLWExMmwtbGF3eWVycy1qd3Qtc2VjcmV0LWtleS0yMDI2LWNoYW5nZS1tZS1pbi1wcm9kLTA5ODc2NTQz";
+
+    /**
+     * P3-② 裸机 {@code java -jar} 路径的 application.yml 兜底密钥。
+     *
+     * <p>历史上这里写作 {@code ${TOKEN_SECRET:+h5L5...}}（Shell 语法），Spring 只按 {@code :} 切分默认值，
+     * 未注入时实际取到带前导 {@code +} 的串，与 Compose 兜底值不同，导致 guard 漏检。现已改回
+     * {@code ${TOKEN_SECRET:h5L5...}} 并把该值纳入违规判定；带前导 {@code +} 的历史写法同样视为违规，
+     * 防止再有人改回 Shell 语法后重新出现漏检。</p>
+     */
+    public static final String DEFAULT_TOKEN_SECRET_YML =
+            "h5L5r+irKjj1DKlQKkO0yE+cVAB/VT5O8Zq+MbIGSWwYSEltV2q3Ke6xjZayQlscgoJ2jZC4jhJ+P414YNX1g==";
     public static final String DEFAULT_DB_PASSWORD = "root";
     public static final String DEFAULT_DRUID_CONSOLE_PASSWORD = "Druid@2026!ChangeMe";
     public static final String DEFAULT_CALLBACK_SIGN_SECRET = "ai-lawyers-callback-dev-secret-change-me-2026";
@@ -88,9 +99,10 @@ public class ProductionSecurityGuard implements ApplicationRunner
         List<String> violations = new ArrayList<>();
 
         String tokenSecret = props.apply("token.secret");
-        if (isBlank(tokenSecret) || DEFAULT_TOKEN_SECRET.equals(tokenSecret))
+        if (isBlank(tokenSecret) || DEFAULT_TOKEN_SECRET.equals(tokenSecret) || DEFAULT_TOKEN_SECRET_YML.equals(tokenSecret)
+                || ("+" + DEFAULT_TOKEN_SECRET_YML).equals(tokenSecret))
         {
-            violations.add("token.secret 为空或仍为内置默认值，须经 TOKEN_SECRET 注入 >=32 字节随机密钥");
+            violations.add("token.secret 为空或仍为内置默认值（Compose 与裸机 yml 两套兜底均已禁用），须经 TOKEN_SECRET 注入 >=32 字节随机密钥");
         }
 
         String dbPassword = props.apply("spring.datasource.druid.master.password");

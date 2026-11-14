@@ -38,6 +38,30 @@ public class ProductionSecurityGuardTest
         assertTrue(violations.get(2).contains("Druid"));
     }
 
+    /** P3-②：Compose 路径——TOKEN_SECRET 未设置时注入的兜底值必须被拒绝 */
+    @Test
+    public void composeDefaultTokenSecretIsRejected()
+    {
+        Map<String, String> props = defaultProps();
+        props.put("token.secret", ProductionSecurityGuard.DEFAULT_TOKEN_SECRET);
+
+        List<String> violations = ProductionSecurityGuard.findViolations(props::get);
+        assertTrue(violations.get(0).contains("token.secret"));
+    }
+
+    /** P3-②：裸机 java -jar 路径——application.yml 兜底值（含历史 `:+` 写法产生的带 + 值）必须被拒绝 */
+    @Test
+    public void bareMetalYmlDefaultTokenSecretIsRejected()
+    {
+        Map<String, String> props = defaultProps();
+        props.put("token.secret", ProductionSecurityGuard.DEFAULT_TOKEN_SECRET_YML);
+        assertTrue(ProductionSecurityGuard.findViolations(props::get).get(0).contains("token.secret"));
+
+        // 回归：Shell 的 `${TOKEN_SECRET:+xxx}` 在 Spring 下未注入时会取到 "+xxx"，同样不得放行
+        props.put("token.secret", "+" + ProductionSecurityGuard.DEFAULT_TOKEN_SECRET_YML);
+        assertTrue(ProductionSecurityGuard.findViolations(props::get).get(0).contains("token.secret"));
+    }
+
     @Test
     public void strongConfigAndConsoleDisabledPass()
     {

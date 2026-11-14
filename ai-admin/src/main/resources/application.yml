@@ -163,7 +163,9 @@ token:
   # 令牌自定义标识
   header: Authorization
   # 令牌密钥：生产环境必须通过环境变量 TOKEN_SECRET 注入 >=64字节随机密钥（HS512 要求 >=512 bits），禁止使用默认值入库入git
-  secret: ${TOKEN_SECRET:+h5L5r+irKjj1DKlQKkO0yE+cVAB/VT5O8Zq+MbIGSWwYSEltV2q3Ke6xjZayQlscgoJ2jZC4jhJ+P414YNX1g==}
+  # P3-②：此处为裸机 java -jar 的兜底值，已与 ProductionSecurityGuard.DEFAULT_TOKEN_SECRET_YML 对齐并纳入启动自检；
+  #        注意占位符只能写 `${TOKEN_SECRET:默认值}`，写成 Shell 的 `:+` 会多出前导 + 导致自检漏判
+  secret: ${TOKEN_SECRET:h5L5r+irKjj1DKlQKkO0yE+cVAB/VT5O8Zq+MbIGSWwYSEltV2q3Ke6xjZayQlscgoJ2jZC4jhJ+P414YNX1g==}
   # 上一版令牌密钥（密钥轮换过渡期使用，留空则不启用降级验签）：
   # 轮换流程——将旧 secret 移入 previous-secret，生成新 secret 填入，重启后旧 token 仍可验签至过期，平滑无感知
   previous-secret: ${TOKEN_PREVIOUS_SECRET:}
