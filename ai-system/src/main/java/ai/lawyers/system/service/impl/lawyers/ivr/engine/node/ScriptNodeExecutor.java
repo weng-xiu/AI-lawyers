@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.springframework.context.expression.MapAccessor;
 import org.springframework.expression.Expression;
+import org.springframework.expression.spel.support.DataBindingPropertyAccessor;
 import org.springframework.expression.spel.support.SimpleEvaluationContext;
 import org.springframework.stereotype.Component;
 
@@ -60,10 +61,10 @@ public class ScriptNodeExecutor implements IvrNodeExecutor
         {
             // JDK 17 迁移：Nashorn 已删除，改用 SpEL 表达式（与条件节点一致，复用现有安全沙箱）
             Expression expression = IvrNodeSupport.SPEL_PARSER.parseExpression(script);
-            SimpleEvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding()
+            SimpleEvaluationContext context = SimpleEvaluationContext
+                    .forPropertyAccessors(new MapAccessor(), DataBindingPropertyAccessor.forReadOnlyAccess())
                     .withRootObject(variables == null ? new HashMap<>() : variables)
                     .build();
-            context.getPropertyAccessors().add(0, new MapAccessor());
             if (variables != null)
             {
                 variables.forEach(context::setVariable);

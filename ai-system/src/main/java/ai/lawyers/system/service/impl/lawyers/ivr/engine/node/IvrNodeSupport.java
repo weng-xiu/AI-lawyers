@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.expression.MapAccessor;
 import org.springframework.expression.Expression;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.expression.spel.support.DataBindingPropertyAccessor;
 import org.springframework.expression.spel.support.SimpleEvaluationContext;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -125,12 +126,11 @@ final class IvrNodeSupport
         {
             Expression expression = SPEL_PARSER.parseExpression(expr);
             // 安全收口(S3)：只读数据绑定上下文，禁止 T(...) 类型表达式与任意方法调用；
-            // 追加 MapAccessor 并以变量 Map 为根对象，支持 root 键属性式访问。
-            // Spring 5.2.x 的 SimpleEvaluationContext 无 setRootObject，根对象须在 builder 阶段 withRootObject 传入
-            SimpleEvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding()
+            // MapAccessor 须在 builder 阶段注册：SimpleEvaluationContext 的属性访问器列表不可变，add 会抛异常
+            SimpleEvaluationContext context = SimpleEvaluationContext
+                    .forPropertyAccessors(new MapAccessor(), DataBindingPropertyAccessor.forReadOnlyAccess())
                     .withRootObject(variables == null ? new HashMap<>() : variables)
                     .build();
-            context.getPropertyAccessors().add(0, new MapAccessor());
             if (variables != null)
             {
                 variables.forEach(context::setVariable);

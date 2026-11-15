@@ -1,5 +1,6 @@
 package ai.lawyers.system.service.impl.lawyers.ivr.engine;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -7,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.expression.MapAccessor;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.expression.spel.support.DataBindingPropertyAccessor;
 import org.springframework.expression.spel.support.SimpleEvaluationContext;
 import org.springframework.stereotype.Component;
 import ai.lawyers.common.utils.StringUtils;
@@ -53,9 +55,11 @@ public class IvrTemplateRenderer
         try
         {
             // 安全收口(S3)：只读数据绑定上下文，禁止类型引用(T(...))/构造器/方法调用/赋值，杜绝 RCE；
-            // 追加 MapAccessor 以支持 ${#var} 之外的 Map 键属性式访问
-            SimpleEvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding().build();
-            context.getPropertyAccessors().add(0, new MapAccessor());
+            // MapAccessor 须在 builder 阶段注册：SimpleEvaluationContext 的属性访问器列表不可变，add 会抛异常
+            SimpleEvaluationContext context = SimpleEvaluationContext
+                    .forPropertyAccessors(new MapAccessor(), DataBindingPropertyAccessor.forReadOnlyAccess())
+                    .withRootObject(variables == null ? new HashMap<>() : variables)
+                    .build();
             if (variables != null)
             {
                 variables.forEach(context::setVariable);
