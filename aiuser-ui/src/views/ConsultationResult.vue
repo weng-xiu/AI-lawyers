@@ -30,7 +30,7 @@
           <el-col :span="24">
             <div class="ai-answer">
               <h3>AI法律解答</h3>
-              <div class="confidence-info">
+              <div class="confidence-info" v-if="consultationResult.confidence != null">
                 <span>置信度: </span>
                 <el-progress
                   :percentage="confidencePercent"

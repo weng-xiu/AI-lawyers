@@ -646,82 +646,31 @@ public class AiUserConsultationServiceImpl implements IAiUserConsultationService
     @Override
     public AiUserConsultation processAIConsultation(AiUserConsultation consultation)
     {
-        // 模拟AI处理过程
-        try {
-            // 更新状态为处理中
-            consultation.setStatus("PROCESSING");
-            aiUserConsultationMapper.updateAiUserConsultation(consultation);
-            
-            // 模拟AI处理时间
-            Thread.sleep(3000);
-            
-            // 生成AI回答
-            String aiAnswer = generateAIAnswer(consultation.getCategory(), consultation.getContent());
-            String relatedLaws = generateRelatedLaws(consultation.getCategory());
-            String relatedCases = generateRelatedCases(consultation.getCategory());
-            Double confidence = generateConfidence();
-            
-            // 更新咨询结果
-            consultation.setAiAnswer(aiAnswer);
-            consultation.setRelatedLaws(relatedLaws);
-            consultation.setRelatedCases(relatedCases);
-            consultation.setConfidence(confidence);
-            consultation.setStatus("COMPLETED");
-            consultation.setUpdateTime(new Date());
-            
-            aiUserConsultationMapper.updateAiUserConsultation(consultation);
-            
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            consultation.setStatus("FAILED");
-            consultation.setUpdateTime(new Date());
-            aiUserConsultationMapper.updateAiUserConsultation(consultation);
-        }
-        
+        // 更新状态为处理中
+        consultation.setStatus("PROCESSING");
+        aiUserConsultationMapper.updateAiUserConsultation(consultation);
+
+        // P3-⑨：当前未接入法规库/案例库与智能问答模型，禁止编造法条、案号与置信度。
+        // 相关法条/案例留空、置信度置 null（前端已按「暂无/未知」渲染），回答明确告知未接入。
+        consultation.setAiAnswer(buildFallbackAnswer(consultation.getCategory()));
+        consultation.setRelatedLaws(null);
+        consultation.setRelatedCases(null);
+        consultation.setConfidence(null);
+        consultation.setStatus("COMPLETED");
+        consultation.setUpdateTime(new Date());
+
+        aiUserConsultationMapper.updateAiUserConsultation(consultation);
+
         return consultation;
     }
     
     /**
-     * 生成AI回答
+     * 未接入智能问答时的兜底回答：明确告知能力边界，不输出任何“建议”或法条引用。
      */
-    private String generateAIAnswer(String category, String content)
+    private String buildFallbackAnswer(String category)
     {
-        // 这里应该调用真实的AI服务，暂时返回模拟数据
-        return "根据您提供的" + getCategoryName(category) + "问题，我为您提供以下法律建议：\n\n" +
-               "1. 首先，您需要了解相关法律法规的基本规定...\n" +
-               "2. 其次，针对您的具体情况，建议采取以下措施...\n" +
-               "3. 最后，如果问题无法通过协商解决，可以考虑以下法律途径...\n\n" +
-               "请注意，以上回答仅供参考，具体法律问题建议咨询专业律师。";
-    }
-    
-    /**
-     * 生成相关法条
-     */
-    private String generateRelatedLaws(String category)
-    {
-        // 这里应该根据分类查询相关法条，暂时返回模拟数据
-        return "1. 《中华人民共和国民法典》第XXX条\n" +
-               "2. 《中华人民共和国民事诉讼法》第XXX条\n" +
-               "3. 《最高人民法院关于适用<中华人民共和国民法典>的解释》第XXX条";
-    }
-    
-    /**
-     * 生成相关案例
-     */
-    private String generateRelatedCases(String category)
-    {
-        // 这里应该根据分类查询相关案例，暂时返回模拟数据
-        return "1. 案例一：XXX诉XXX纠纷案（案号：(2023)XX民初XX号）\n" +
-               "2. 案例二：XXX诉XXX合同纠纷案（案号：(2023)XX民终XX号）";
-    }
-    
-    /**
-     * 生成置信度
-     */
-    private Double generateConfidence()
-    {
-        // 生成0.8-0.95之间的随机置信度
-        return 0.8 + Math.random() * 0.15;
+        return "当前系统尚未接入法规库与智能问答服务，无法针对您的" + getCategoryName(category) + "问题生成具体法律意见。\n\n"
+                + "您可补充材料后转人工律师咨询，或拨打法律援助热线 12348。";
     }
     
     /**

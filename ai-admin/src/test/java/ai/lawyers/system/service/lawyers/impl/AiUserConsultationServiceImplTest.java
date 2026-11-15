@@ -208,6 +208,24 @@ class AiUserConsultationServiceImplTest
         return captor.getValue();
     }
 
+    /** P3-⑨：未接入法规库/案例库时，不得编造法条、案号或随机置信度 */
+    @Test
+    void processAIConsultationDoesNotFabricateLegalContent()
+    {
+        AiUserConsultation consultation = consultation("PROCESSING", USER_ID, null, null);
+        consultation.setCategory("labor_dispute");
+
+        AiUserConsultation result = service.processAIConsultation(consultation);
+
+        assertEquals("COMPLETED", result.getStatus());
+        assertNull(result.getRelatedLaws());
+        assertNull(result.getRelatedCases());
+        assertNull(result.getConfidence());
+        assertTrue(result.getAiAnswer().contains("尚未接入"));
+        assertFalse(result.getAiAnswer().contains("第XXX条"));
+        verify(aiUserConsultationMapper, Mockito.times(2)).updateAiUserConsultation(any());
+    }
+
     private static AiUserConsultation consultation(String status, Long userId, String attachments,
                                                    String remark)
     {
