@@ -120,9 +120,10 @@ public class SecurityConfig
                 requests.requestMatchers("/login", "/register", "/captchaImage").permitAll()
                     // 静态资源，可匿名访问
                     .requestMatchers(HttpMethod.GET, "/", "/*.html", "/*.css", "/*.js", "/profile/**").permitAll()
-                    .requestMatchers("/swagger-ui.html", "/swagger-resources/**", "/webjars/**", "/*/api-docs", "/druid/**").permitAll()
-                    // T5-1 监控端点：仅放行 prometheus 抓取与 health/info，生产需经内网/网关 ACL 限制抓取源
-                    .requestMatchers("/actuator/prometheus", "/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
+                    // P3-⑫：Druid 控制台不再 permitAll（生产默认关闭 bean；确需开启须 JWT + 控制台口令双重校验）
+                    .requestMatchers("/swagger-ui.html", "/swagger-resources/**", "/webjars/**", "/*/api-docs").permitAll()
+                    // T5-1 监控端点：仅放行探针 health/info；prometheus 抓取需 JWT 或经内网管理端口/网关 ACL
+                    .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                     // WebSocket（呼叫事件 / 图文对话）：JSR-356 握手无法携带 Authorization 头，
                     // Security 层放行握手，N5 鉴权由 WebSocketAuthGuard 在 @OnOpen 期校验 query token
                     // （JWT 有效 + /ws/call 的 userId 归属一致），应急可置 websocket.auth.enabled=false

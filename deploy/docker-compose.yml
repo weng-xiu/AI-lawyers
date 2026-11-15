@@ -119,6 +119,8 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       # —— JWT 密钥（生产必须注入 >=32 字节随机串，禁止默认值）——
       TOKEN_SECRET: ${TOKEN_SECRET:-Z2xwLWExMmwtbGF3eWVycy1qd3Qtc2VjcmV0LWtleS0yMDI2LWNoYW5nZS1tZS1pbi1wcm9kLTA5ODc2NTQz}
+      # —— 生产安全自检（P3-⑫：上线必须 true 且配合全部强口令；dev 快速体验可保持 false）——
+      APP_SECURITY_GUARD: ${APP_SECURITY_GUARD:-false}
       # —— 网关/短信上行回调签名（S7 收口：生产 CALLBACK_SIGN_ENABLED=true + CALLBACK_SIGN_SECRET 强随机）——
       CALLBACK_SIGN_ENABLED: ${CALLBACK_SIGN_ENABLED:-false}
       CALLBACK_SIGN_SECRET: ${CALLBACK_SIGN_SECRET:-ai-lawyers-callback-dev-secret-change-me-2026}
@@ -133,8 +135,8 @@ services:
       ESL_PASSWORD: ${ESL_PASSWORD:-ClueCon}
       AMI_USER: ${AMI_USER:-admin}
       AMI_PASSWORD: ${AMI_PASSWORD:-amp111}
-      # —— Druid 控制台（生产 DRUID_CONSOLE_ENABLED=false 或限内网+强口令）——
-      DRUID_CONSOLE_ENABLED: ${DRUID_CONSOLE_ENABLED:-true}
+      # —— Druid 控制台（P3-⑫：生产默认关闭；确需保留则限内网 + 强口令）——
+      DRUID_CONSOLE_ENABLED: ${DRUID_CONSOLE_ENABLED:-false}
       DRUID_CONSOLE_ALLOW: ${DRUID_CONSOLE_ALLOW:-127.0.0.1,0:0:0:0:0:0:0:1}
       DRUID_CONSOLE_USER: ${DRUID_CONSOLE_USER:-admin}
       DRUID_CONSOLE_PASSWORD: ${DRUID_CONSOLE_PASSWORD:-Druid@2026!ChangeMe}
@@ -165,8 +167,9 @@ services:
       FILE_PATH: /ruoyi/uploadPath
     volumes:
       - backend-upload:/ruoyi/uploadPath
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
+    # P3-⑫：后端端口仅容器内网，禁止宿主直连绕过 nginx；如需本地调试请用 docker exec 或临时覆盖
     networks: [ccnet]
 
   frontend:

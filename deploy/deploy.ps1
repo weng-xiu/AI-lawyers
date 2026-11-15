@@ -140,8 +140,13 @@ Write-Host "等待 MySQL(3306)..."
 $null = Test-Tcp "localhost" 3306 90
 Write-Host "等待 Redis(6379)..."
 $null = Test-Tcp "localhost" 6379 60
-Write-Host "等待 后端(8080)，Spring Boot 启动约需 30-60 秒..."
-if (Test-Tcp "localhost" 8080 150) { Ok "后端端口 8080 已就绪" } else { Warn "后端 8080 等待超时，请用 docker logs ai12348-backend 查看" }
+Write-Host "等待后端容器启动（P3-⑫：8080 仅容器内网，Spring Boot 约需 30-60 秒）..."
+$backendReady = $false
+for ($i = 0; $i -lt 50; $i++) {
+    if ((docker inspect -f '{{.State.Running}}' ai12348-backend 2>$null) -eq 'true') { $backendReady = $true; break }
+    Start-Sleep -Seconds 3
+}
+if ($backendReady) { Ok "后端容器已运行（端口仅容器内网）" } else { Warn "后端容器未运行，请用 docker logs ai12348-backend 查看" }
 Write-Host "等待 前端(80)..."
 if (Test-Tcp "localhost" 80 90) { Ok "前端端口 80 已就绪" } else { Warn "前端 80 等待超时" }
 
@@ -156,8 +161,8 @@ Ok "部署流程完成！"
 Write-Host ""
 Write-Host "访问入口：" -ForegroundColor White
 Write-Host "  管理后台/工作台 : http://localhost" -ForegroundColor Green
-Write-Host "  后端接口       : http://localhost:8080" -ForegroundColor Gray
-Write-Host "  Druid 监控     : http://localhost:8080/druid (生产关闭；开发默认 admin/Druid@2026!ChangeMe)" -ForegroundColor Gray
+Write-Host "  后端接口       : 仅容器内网 :8080（统一经前端 /prod-api 访问）" -ForegroundColor Gray
+Write-Host "  Druid 监控     : 默认关闭；如需开启请配置强口令并从容器内网访问 /druid" -ForegroundColor Gray
 Write-Host ""
 Write-Host "常用命令（在 deploy 目录执行）：" -ForegroundColor White
 Write-Host "  docker compose logs -f backend     # 查看后端日志" -ForegroundColor Gray

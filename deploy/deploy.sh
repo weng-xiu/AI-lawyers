@@ -78,8 +78,15 @@ wait_tcp(){ local host=$1 port=$2 timeout=$3; local start=$(date +%s);
 
 echo "等待 MySQL/Redis..."
 wait_tcp localhost 3306 90; wait_tcp localhost 6379 60
-echo "等待后端 8080（Spring Boot 启动约 30-60 秒）..."
-wait_tcp localhost 8080 150 && ok "后端 8080 就绪" || warn "后端超时，docker logs ai12348-backend 查看"
+echo "等待后端容器启动（P3-⑫：8080 仅容器内网，约 30-60 秒）..."
+backend_ready=0
+for i in $(seq 1 50); do
+  if [ "$(docker inspect -f '{{.State.Running}}' ai12348-backend 2>/dev/null)" = "true" ]; then
+    backend_ready=1; break
+  fi
+  sleep 3
+done
+[ "$backend_ready" = "1" ] && ok "后端容器已运行（端口仅容器内网）" || warn "后端容器未运行，docker logs ai12348-backend 查看"
 echo "等待前端 80..."
 wait_tcp localhost 80 90 && ok "前端 80 就绪" || warn "前端超时"
 
@@ -90,7 +97,7 @@ step "6/6 容器状态"
 echo ""
 echo "======================================================================"
 ok "部署流程完成！"
-echo "管理后台: http://localhost    后端接口: http://localhost:8080"
+echo "管理后台: http://localhost    后端接口: 仅容器内网 :8080（经前端 /prod-api 访问）"
 echo "日志: docker compose logs -f backend | freeswitch"
 echo "停止: docker compose down"
 echo "分机热加载: docker exec ai12348-freeswitch /usr/local/freeswitch/bin/fs_cli -x 'reloadxml'"
