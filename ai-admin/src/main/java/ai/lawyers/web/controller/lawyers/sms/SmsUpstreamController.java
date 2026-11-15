@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,6 +20,7 @@ import ai.lawyers.common.utils.DesensitizedUtil;
 import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.system.service.lawyers.IAiCallBlacklistService;
 import ai.lawyers.system.service.lawyers.sms.UpstreamAuthVerifier;
+import ai.lawyers.web.health.ProductionSecurityGuard;
 
 /**
  * W4：短信上行回调——用户回复"T/TD/退订"自动写入退订名单（list_type=3），
@@ -29,7 +31,8 @@ import ai.lawyers.system.service.lawyers.sms.UpstreamAuthVerifier;
  *
  * <p>安全：优先 HMAC-SHA256 签名校验（X-Callback-Timestamp / X-Callback-Sign，与网关回调一致）；
  * 服务商无法携带自定义 header 时可用 token 校验（{@code call.sms.upstream.token}，header/query/body 三通道）。
- * 生产环境必须配置其一，否则启动后本接口对未校验请求告警放行（仅开发联调用）。</p>
+ * 生产环境（prod profile 或 {@code app.security.guard=true}）必须配置其一，否则本接口直接拒绝；
+ * 仅非生产环境在两者均未配置时告警放行（开发联调）。</p>
  *
  * <p>频率控制：同号码每分钟退订频控（{@code call.sms.upstream.rate-limit-per-min}，默认 10），防恶意刷退订。</p>
  *
@@ -52,6 +55,9 @@ public class SmsUpstreamController extends BaseController
 
     @Autowired(required = false)
     private RedisCache redisCache;
+
+    @Autowired
+    private Environment environment;
 
     @Value("${call.sms.upstream.enabled:true}")
     private boolean upstreamEnabled;
@@ -121,19 +127,23 @@ public class SmsUpstreamController extends BaseController
      * 安全校验：生产必须开启 HMAC 签名或配置 token 二者其一（双配时任一通道通过即放行）。
      * 决策逻辑见 {@link UpstreamAuthVerifier}，本方法仅负责请求参数提取与未配置告警。
      *
+     * <p>P3-⑩：生产 profile 或 {@code app.security.guard=true} 时，两项均未配置直接拒绝，
+     * 不再沿用开发联调的告警放行。</p>
+     *
      * @return true 校验通过
      */
     private boolean verify(HttpServletRequest request, Map<String, Object> body, String phone, String content)
     {
+        boolean authRequired = ProductionSecurityGuard.enforcementEnabled(
+                environment.getActiveProfiles(), environment.getProperty("app.security.guard"));
         if (!signEnabled && StringUtils.isEmpty(upstreamToken))
         {
             log.warn("短信上行回调未配置签名/令牌校验，生产环境必须设置 CALLBACK_SIGN_ENABLED=true 或 SMS_UPSTREAM_TOKEN");
-            return true;
         }
         return UpstreamAuthVerifier.verify(signEnabled, signSecret, upstreamToken,
                 request.getHeader("X-Upstream-Token"), request.getParameter("token"), body.get("token"),
                 request.getHeader("X-Callback-Timestamp"), request.getHeader("X-Callback-Sign"),
-                phone, content);
+                phone, content, authRequired);
     }
 
     /** 同号码退订频控（Redis INCR + 60s 过期；Redis 故障放行并告警） */

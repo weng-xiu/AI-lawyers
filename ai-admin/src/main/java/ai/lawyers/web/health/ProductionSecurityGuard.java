@@ -18,8 +18,8 @@ import org.springframework.stereotype.Component;
  * 默认关闭，本地/docker 开发环境零影响；生产部署须显式开启。</p>
  *
  * <p>命中以下任一默认值/空值即拒绝启动：JWT {@code token.secret}、
- * 主库密码 root、Druid 控制台开启且仍为默认口令。{@code call.pbx.media.auth-key}
- * 为空不阻断（仅限完全隔离内网），但强 WARN 告警。</p>
+ * 主库密码 root、Druid 控制台开启且仍为默认口令、短信上行回调签名/token 均未配置。
+ * {@code call.pbx.media.auth-key} 为空不阻断（仅限完全隔离内网），但强 WARN 告警。</p>
  */
 @Component
 public class ProductionSecurityGuard implements ApplicationRunner
@@ -122,6 +122,17 @@ public class ProductionSecurityGuard implements ApplicationRunner
                 violations.add("Druid 控制台已开启但口令为空或仍为默认值，须经 DRUID_CONSOLE_PASSWORD 注入强口令"
                         + "（或置 DRUID_CONSOLE_ENABLED=false 关闭控制台）");
             }
+        }
+
+        // P3-⑩：短信上行回调不得零鉴权（签名与 token 双空时 UpstreamAuthVerifier 在开发环境放行）
+        boolean signReady = Boolean.parseBoolean(props.apply("call.callback.sign-enabled"))
+                && !isBlank(props.apply("call.callback.sign-secret"))
+                && !DEFAULT_CALLBACK_SIGN_SECRET.equals(props.apply("call.callback.sign-secret"));
+        boolean tokenReady = !isBlank(props.apply("call.sms.upstream.token"));
+        if (!signReady && !tokenReady)
+        {
+            violations.add("短信上行回调鉴权未配置：call.sms.upstream.token 为空且回调签名未启用/密钥为空或默认值，"
+                    + "须经 SMS_UPSTREAM_TOKEN 注入，或开启 CALLBACK_SIGN_ENABLED=true 并注入 CALLBACK_SIGN_SECRET");
         }
         return violations;
     }

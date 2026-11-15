@@ -9,7 +9,7 @@ import ai.lawyers.common.utils.sign.CallbackSignUtils;
 /**
  * {@link UpstreamAuthVerifier} 鉴权组合矩阵测试（W4 上行回调安全收口）。
  *
- * <p>覆盖：未配置放行 / 仅签名 / 仅 token（header·query·body 三通道）/ 双配（签名优先 + token 兜底）。</p>
+ * <p>覆盖：未配置放行/未配置生产拒绝 / 仅签名 / 仅 token（header·query·body 三通道）/ 双配（签名优先 + token 兜底）。</p>
  *
  * @author ai-lawyers
  */
@@ -30,8 +30,20 @@ class UpstreamAuthVerifierTest
     @Test
     void verify_noAuthConfigured_passesThrough()
     {
-        assertThat(UpstreamAuthVerifier.verify(false, null, null, null, null, null, null, null, PHONE, CONTENT))
+        assertThat(UpstreamAuthVerifier.verify(false, null, null, null, null, null, null, null, PHONE, CONTENT, false))
                 .isTrue();
+    }
+
+    // ---------- 均未配置：生产强制鉴权拒绝（P3-⑩） ----------
+
+    @Test
+    void verify_noAuthConfigured_authRequired_rejected()
+    {
+        assertThat(UpstreamAuthVerifier.verify(false, null, null, null, null, null, null, null, PHONE, CONTENT, true))
+                .isFalse();
+        // 签名开关打开但密钥为空同样视为未配置
+        assertThat(UpstreamAuthVerifier.verify(true, "", null, null, null, null, null, null, PHONE, CONTENT, true))
+                .isFalse();
     }
 
     // ---------- 仅配签名 ----------
@@ -41,7 +53,7 @@ class UpstreamAuthVerifierTest
     {
         String ts = String.valueOf(System.currentTimeMillis());
         String sign = CallbackSignUtils.sign(SECRET, PHONE + "|" + CONTENT, ts);
-        assertThat(UpstreamAuthVerifier.verify(true, SECRET, null, null, null, null, ts, sign, PHONE, CONTENT))
+        assertThat(UpstreamAuthVerifier.verify(true, SECRET, null, null, null, null, ts, sign, PHONE, CONTENT, false))
                 .isTrue();
     }
 
@@ -49,14 +61,14 @@ class UpstreamAuthVerifierTest
     void verify_signOnly_invalidSign_rejected()
     {
         String ts = String.valueOf(System.currentTimeMillis());
-        assertThat(UpstreamAuthVerifier.verify(true, SECRET, null, null, null, null, ts, "bad-sign", PHONE, CONTENT))
+        assertThat(UpstreamAuthVerifier.verify(true, SECRET, null, null, null, null, ts, "bad-sign", PHONE, CONTENT, false))
                 .isFalse();
     }
 
     @Test
     void verify_signOnly_missingSign_rejected()
     {
-        assertThat(UpstreamAuthVerifier.verify(true, SECRET, null, null, null, null, null, null, PHONE, CONTENT))
+        assertThat(UpstreamAuthVerifier.verify(true, SECRET, null, null, null, null, null, null, PHONE, CONTENT, false))
                 .isFalse();
     }
 
@@ -65,30 +77,30 @@ class UpstreamAuthVerifierTest
     @Test
     void verify_tokenOnly_validHeaderToken_passes()
     {
-        assertThat(UpstreamAuthVerifier.verify(false, null, TOKEN, TOKEN, null, null, null, null, PHONE, CONTENT))
+        assertThat(UpstreamAuthVerifier.verify(false, null, TOKEN, TOKEN, null, null, null, null, PHONE, CONTENT, false))
                 .isTrue();
     }
 
     @Test
     void verify_tokenOnly_validQueryToken_passes()
     {
-        assertThat(UpstreamAuthVerifier.verify(false, null, TOKEN, null, TOKEN, null, null, null, PHONE, CONTENT))
+        assertThat(UpstreamAuthVerifier.verify(false, null, TOKEN, null, TOKEN, null, null, null, PHONE, CONTENT, false))
                 .isTrue();
     }
 
     @Test
     void verify_tokenOnly_validBodyToken_passes()
     {
-        assertThat(UpstreamAuthVerifier.verify(false, null, TOKEN, null, null, TOKEN, null, null, PHONE, CONTENT))
+        assertThat(UpstreamAuthVerifier.verify(false, null, TOKEN, null, null, TOKEN, null, null, PHONE, CONTENT, false))
                 .isTrue();
     }
 
     @Test
     void verify_tokenOnly_wrongToken_rejected()
     {
-        assertThat(UpstreamAuthVerifier.verify(false, null, TOKEN, "wrong", null, null, null, null, PHONE, CONTENT))
+        assertThat(UpstreamAuthVerifier.verify(false, null, TOKEN, "wrong", null, null, null, null, PHONE, CONTENT, false))
                 .isFalse();
-        assertThat(UpstreamAuthVerifier.verify(false, null, TOKEN, null, null, null, null, null, PHONE, CONTENT))
+        assertThat(UpstreamAuthVerifier.verify(false, null, TOKEN, null, null, null, null, null, PHONE, CONTENT, false))
                 .isFalse();
     }
 
@@ -99,7 +111,7 @@ class UpstreamAuthVerifierTest
     {
         String ts = String.valueOf(System.currentTimeMillis());
         String sign = CallbackSignUtils.sign(SECRET, PHONE + "|" + CONTENT, ts);
-        assertThat(UpstreamAuthVerifier.verify(true, SECRET, TOKEN, null, null, null, ts, sign, PHONE, CONTENT))
+        assertThat(UpstreamAuthVerifier.verify(true, SECRET, TOKEN, null, null, null, ts, sign, PHONE, CONTENT, false))
                 .isTrue();
     }
 
@@ -107,20 +119,20 @@ class UpstreamAuthVerifierTest
     void verify_bothConfigured_signInvalid_validToken_fallback_passes()
     {
         // 服务商仅支持自定义 header 携带 token：签名缺失/失败时降级 token 校验
-        assertThat(UpstreamAuthVerifier.verify(true, SECRET, TOKEN, TOKEN, null, null, null, null, PHONE, CONTENT))
+        assertThat(UpstreamAuthVerifier.verify(true, SECRET, TOKEN, TOKEN, null, null, null, null, PHONE, CONTENT, false))
                 .isTrue();
         assertThat(UpstreamAuthVerifier.verify(true, SECRET, TOKEN, TOKEN, null, null,
-                String.valueOf(System.currentTimeMillis()), "bad-sign", PHONE, CONTENT))
+                String.valueOf(System.currentTimeMillis()), "bad-sign", PHONE, CONTENT, false))
                 .isTrue();
     }
 
     @Test
     void verify_bothConfigured_neitherValid_rejected()
     {
-        assertThat(UpstreamAuthVerifier.verify(true, SECRET, TOKEN, null, null, null, null, null, PHONE, CONTENT))
+        assertThat(UpstreamAuthVerifier.verify(true, SECRET, TOKEN, null, null, null, null, null, PHONE, CONTENT, false))
                 .isFalse();
         assertThat(UpstreamAuthVerifier.verify(true, SECRET, TOKEN, "wrong", null, null,
-                String.valueOf(System.currentTimeMillis()), "bad-sign", PHONE, CONTENT))
+                String.valueOf(System.currentTimeMillis()), "bad-sign", PHONE, CONTENT, false))
                 .isFalse();
     }
 }

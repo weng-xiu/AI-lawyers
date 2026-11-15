@@ -11,7 +11,8 @@ import ai.lawyers.common.utils.sign.CallbackSignUtils;
  *   <li>仅配签名（CALLBACK_SIGN_ENABLED=true + CALLBACK_SIGN_SECRET）：仅校验 HMAC 签名，失败即拒绝</li>
  *   <li>仅配 token（SMS_UPSTREAM_TOKEN）：仅校验 token（header/query/body 三通道）</li>
  *   <li>两者同配：签名优先，签名缺失/失败时降级校验 token，任一通过即放行</li>
- *   <li>均未配置：返回 true（开发联调放行，由调用方告警）</li>
+ *   <li>均未配置：{@code authRequired=false} 时放行（开发联调，由调用方告警）；
+ *       {@code authRequired=true} 时拒绝（P3-⑩ 生产环境禁止上行回调零鉴权）</li>
  * </ul>
  *
  * @author ai-lawyers
@@ -33,12 +34,13 @@ public final class UpstreamAuthVerifier
      * @param headerSignature    请求头 {@code X-Callback-Sign}
      * @param phone              上行手机号（签名指纹组成部分）
      * @param content            上行内容（签名指纹组成部分）
+     * @param authRequired       是否强制鉴权（生产环境为 true：签名与 token 均未配置时拒绝）
      * @return true 鉴权通过
      */
     public static boolean verify(boolean signEnabled, String signSecret, String upstreamToken,
             String headerToken, String queryToken, Object bodyToken,
             String headerTimestamp, String headerSignature,
-            String phone, String content)
+            String phone, String content, boolean authRequired)
     {
         boolean signConfigured = signEnabled && StringUtils.isNotEmpty(signSecret);
         boolean tokenConfigured = StringUtils.isNotEmpty(upstreamToken);
@@ -67,7 +69,7 @@ public final class UpstreamAuthVerifier
             }
             return upstreamToken.equals(token);
         }
-        // 4) 均未配置：联调放行
-        return true;
+        // 4) 均未配置：生产强制鉴权时拒绝，开发联调放行
+        return !authRequired;
     }
 }

@@ -32,10 +32,11 @@ public class ProductionSecurityGuardTest
     public void defaultsProduceAllViolations()
     {
         List<String> violations = ProductionSecurityGuard.findViolations(defaultProps()::get);
-        assertEquals(3, violations.size());
+        assertEquals(4, violations.size());
         assertTrue(violations.get(0).contains("token.secret"));
         assertTrue(violations.get(1).contains("数据库"));
         assertTrue(violations.get(2).contains("Druid"));
+        assertTrue(violations.get(3).contains("短信上行回调"));
     }
 
     /** P3-②：Compose 路径——TOKEN_SECRET 未设置时注入的兜底值必须被拒绝 */
@@ -69,17 +70,49 @@ public class ProductionSecurityGuardTest
         props.put("token.secret", "a-very-strong-random-jwt-secret-key-0123456789");
         props.put("spring.datasource.druid.master.password", "Str0ng!Db#Pass");
         props.put("spring.datasource.druid.statViewServlet.enabled", "false");
+        props.put("call.sms.upstream.token", "strong-sms-upstream-token-32bytes");
 
         assertTrue(ProductionSecurityGuard.findViolations(props::get).isEmpty());
     }
 
+    /** P3-⑩：短信上行回调零鉴权必须阻断启动；token 或有效签名任一配置即通过 */
     @Test
-    public void blankAuthKeyWarnsButDoesNotBlock()
+    public void smsUpstreamWithoutAuthIsRejected()
+    {
+        Map<String, String> props = strongBaseProps();
+        List<String> violations = ProductionSecurityGuard.findViolations(props::get);
+        assertEquals(1, violations.size());
+        assertTrue(violations.get(0).contains("短信上行回调"));
+
+        props.put("call.sms.upstream.token", "strong-sms-upstream-token-32bytes");
+        assertTrue(ProductionSecurityGuard.findViolations(props::get).isEmpty());
+
+        // 改用签名通道：开关打开 + 强密钥（默认开发密钥不算有效配置）
+        props.remove("call.sms.upstream.token");
+        props.put("call.callback.sign-enabled", "true");
+        props.put("call.callback.sign-secret", "strong-callback-sign-secret-32bytes");
+        assertTrue(ProductionSecurityGuard.findViolations(props::get).isEmpty());
+
+        // 默认开发密钥不得视为已配置
+        props.put("call.callback.sign-secret", ProductionSecurityGuard.DEFAULT_CALLBACK_SIGN_SECRET);
+        assertFalse(ProductionSecurityGuard.findViolations(props::get).isEmpty());
+    }
+
+    /** 构造除短信上行鉴权外全部合规的配置 */
+    private Map<String, String> strongBaseProps()
     {
         Map<String, String> props = defaultProps();
         props.put("token.secret", "a-very-strong-random-jwt-secret-key-0123456789");
         props.put("spring.datasource.druid.master.password", "Str0ng!Db#Pass");
         props.put("spring.datasource.druid.statViewServlet.enabled", "false");
+        return props;
+    }
+
+    @Test
+    public void blankAuthKeyWarnsButDoesNotBlock()
+    {
+        Map<String, String> props = strongBaseProps();
+        props.put("call.sms.upstream.token", "strong-sms-upstream-token-32bytes");
 
         assertTrue(ProductionSecurityGuard.findViolations(props::get).isEmpty());
         List<String> warnings = ProductionSecurityGuard.findWarnings(props::get);
