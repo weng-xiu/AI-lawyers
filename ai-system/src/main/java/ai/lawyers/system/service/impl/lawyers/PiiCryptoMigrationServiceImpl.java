@@ -172,7 +172,7 @@ public class PiiCryptoMigrationServiceImpl implements IPiiCryptoMigrationService
             catch (Exception e)
             {
                 failed++;
-                log.warn("话单 PII 迁移单行失败 recordId={}: {}", asLong(row.get("recordId")), e.getMessage());
+                log.warn("话单 PII 迁移单行失败 recordId={}: {}", row.get("recordId"), e.getMessage());
             }
         }
 
@@ -206,7 +206,7 @@ public class PiiCryptoMigrationServiceImpl implements IPiiCryptoMigrationService
             catch (Exception e)
             {
                 failed++;
-                log.warn("归档话单 PII 迁移单行失败 recordId={}: {}", asLong(row.get("recordId")), e.getMessage());
+                log.warn("归档话单 PII 迁移单行失败 recordId={}: {}", row.get("recordId"), e.getMessage());
             }
         }
 
@@ -263,7 +263,7 @@ public class PiiCryptoMigrationServiceImpl implements IPiiCryptoMigrationService
             catch (Exception e)
             {
                 failed++;
-                log.warn("台账 PII 迁移单行失败 ledgerId={}: {}", asLong(row.get("ledgerId")), e.getMessage());
+                log.warn("台账 PII 迁移单行失败 ledgerId={}: {}", row.get("ledgerId"), e.getMessage());
             }
         }
         Map<String, Object> result = new HashMap<>();
