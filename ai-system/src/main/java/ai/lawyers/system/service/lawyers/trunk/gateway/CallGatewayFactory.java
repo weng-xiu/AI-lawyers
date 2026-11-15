@@ -52,6 +52,7 @@ public class CallGatewayFactory
 
     /**
      * 按线路取适配器，找不到时回退到模拟器，保证系统不因配置错误而崩溃。
+     * 生产环境会在启动日志由 {@code MockFallbackReporter} 集中列出该兜底。
      */
     public ICallGatewayAdapter get(AiCallTrunk trunk)
     {
@@ -69,6 +70,10 @@ public class CallGatewayFactory
                 return adapter;
             }
             log.warn("未找到 vendor={} 的网关适配器，回退到 {}", vendor, FALLBACK_VENDOR);
+        }
+        else
+        {
+            log.warn("线路未配置 vendor，回退到 {}", FALLBACK_VENDOR);
         }
         return adapterMap.get(FALLBACK_VENDOR);
     }
