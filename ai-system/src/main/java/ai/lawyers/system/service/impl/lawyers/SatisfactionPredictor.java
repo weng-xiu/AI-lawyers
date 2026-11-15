@@ -50,11 +50,11 @@ public final class SatisfactionPredictor
         double score = 1.0;
         if (w != null)
         {
-            if ("URGENT".equals(emotion))
+            if ("URGENT".equalsIgnoreCase(emotion))
             {
                 score += w.urgent;
             }
-            else if ("NEGATIVE".equals(emotion))
+            else if ("NEGATIVE".equalsIgnoreCase(emotion))
             {
                 score += w.negative;
             }
@@ -96,11 +96,11 @@ public final class SatisfactionPredictor
                                 Integer duration, String status, Weights w)
     {
         StringBuilder sb = new StringBuilder();
-        if ("URGENT".equals(emotion))
+        if ("URGENT".equalsIgnoreCase(emotion))
         {
             sb.append("紧急情绪");
         }
-        else if ("NEGATIVE".equals(emotion))
+        else if ("NEGATIVE".equalsIgnoreCase(emotion))
         {
             sb.append("负面情绪");
         }
