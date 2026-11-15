@@ -2,216 +2,199 @@ package ai.lawyers.system.service.impl.lawyers.storage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import ai.lawyers.system.service.lawyers.storage.RecordingCryptoService;
 
 /**
- * LocalRecordingStorageService 单测：本地文件保存/读取/删除/存在性，
- * 以及加密开关下的原地加密、流式加密保存与读取解密。
+ * F2/G1-b3：{@link LocalRecordingStorageService} 本地录音存储测试。
+ *
+ * <p>覆盖明文模式直接读取、加密模式原地/流式加密保存、解密读取、文件存在判断、
+ * 幂等删除与删除失败、路径解析（绝对路径、recordings_dir 前缀）、播放 URL 与存储类型。</p>
  *
  * @author ai-lawyers
  */
-@ExtendWith(MockitoExtension.class)
 class LocalRecordingStorageServiceTest
 {
     @TempDir
     Path tempDir;
 
-    @Mock
-    private RecordingCryptoService cryptoService;
-
     private LocalRecordingStorageService service;
+
+    private RecordingCryptoService crypto;
 
     @BeforeEach
     void setUp()
     {
         service = new LocalRecordingStorageService();
+        crypto = mock(RecordingCryptoService.class);
         ReflectionTestUtils.setField(service, "recordingBasePath", tempDir.toString());
-    }
-
-    private void enableEncryption()
-    {
-        ReflectionTestUtils.setField(service, "encryptEnabled", true);
-        ReflectionTestUtils.setField(service, "recordingCryptoService", cryptoService);
+        ReflectionTestUtils.setField(service, "encryptEnabled", false);
+        ReflectionTestUtils.setField(service, "recordingCryptoService", crypto);
     }
 
     @Test
-    void saveFileWithoutEncryptionIsNoop() throws Exception
+    void plainModeReadsAndIgnoresSave() throws IOException
     {
-        File file = tempDir.resolve("a.wav").toFile();
-        Files.write(file.toPath(), "PLAIN".getBytes(StandardCharsets.UTF_8));
+        Path file = Files.write(tempDir.resolve("a.wav"), "voice".getBytes(StandardCharsets.UTF_8));
 
-        service.save("a.wav", file);
+        service.save("a.wav", file.toFile());
+        service.save("a.wav", new ByteArrayInputStream(new byte[] { 1 }), 1L, null);
 
-        assertThat(Files.readAllBytes(file.toPath())).isEqualTo("PLAIN".getBytes(StandardCharsets.UTF_8));
+        assertThat(read(service.load("a.wav"))).isEqualTo("voice");
+        verify(crypto, never()).encrypt(any());
     }
 
     @Test
-    void saveFileEncryptsInPlace() throws Exception
-    {
-        enableEncryption();
-        File file = tempDir.resolve("a.wav").toFile();
-        Files.write(file.toPath(), "PLAIN".getBytes(StandardCharsets.UTF_8));
-        when(cryptoService.isEncrypted(any())).thenReturn(false);
-        when(cryptoService.encrypt(any(InputStream.class))).thenReturn("CIPHER".getBytes(StandardCharsets.UTF_8));
-
-        service.save("a.wav", file);
-
-        assertThat(Files.readAllBytes(file.toPath())).isEqualTo("CIPHER".getBytes(StandardCharsets.UTF_8));
-    }
-
-    @Test
-    void saveFileAlreadyEncryptedSkipped() throws Exception
-    {
-        enableEncryption();
-        File file = tempDir.resolve("a.wav").toFile();
-        Files.write(file.toPath(), "CIPHER".getBytes(StandardCharsets.UTF_8));
-        when(cryptoService.isEncrypted(any())).thenReturn(true);
-
-        service.save("a.wav", file);
-
-        verify(cryptoService, never()).encrypt(any(InputStream.class));
-        assertThat(Files.readAllBytes(file.toPath())).isEqualTo("CIPHER".getBytes(StandardCharsets.UTF_8));
-    }
-
-    @Test
-    void saveMissingFileIsNoop() throws Exception
-    {
-        enableEncryption();
-        File file = tempDir.resolve("missing.wav").toFile();
-
-        service.save("missing.wav", file);
-
-        verify(cryptoService, never()).isEncrypted(any());
-        assertThat(file).doesNotExist();
-    }
-
-    @Test
-    void saveStreamWithoutEncryptionWritesNothing() throws Exception
-    {
-        service.save("sub/a.wav", new ByteArrayInputStream("x".getBytes(StandardCharsets.UTF_8)), 1L, "audio/wav");
-
-        assertThat(tempDir.resolve("sub/a.wav")).doesNotExist();
-    }
-
-    @Test
-    void saveStreamEncryptsAndCreatesDirectories() throws Exception
-    {
-        enableEncryption();
-        when(cryptoService.encrypt(any(InputStream.class))).thenReturn("CIPHER".getBytes(StandardCharsets.UTF_8));
-
-        service.save("sub/a.wav", new ByteArrayInputStream("x".getBytes(StandardCharsets.UTF_8)), 1L, "audio/wav");
-
-        Path target = tempDir.resolve("sub/a.wav");
-        assertThat(Files.readAllBytes(target)).isEqualTo("CIPHER".getBytes(StandardCharsets.UTF_8));
-    }
-
-    @Test
-    void saveStreamWithEmptyKeyIgnored() throws Exception
-    {
-        enableEncryption();
-
-        service.save("", new ByteArrayInputStream("x".getBytes(StandardCharsets.UTF_8)), 1L, "audio/wav");
-
-        verify(cryptoService, never()).encrypt(any(InputStream.class));
-    }
-
-    @Test
-    void loadMissingFileReturnsNull() throws Exception
+    void loadReturnsNullForMissingOrBlankKey() throws IOException
     {
         assertThat(service.load("missing.wav")).isNull();
-        assertThat(service.load("")).isNull();
+        assertThat(service.load("  ")).isNull();
+
+        Path dir = Files.createDirectory(tempDir.resolve("dir"));
+        assertThat(service.load("dir")).isNull();
     }
 
     @Test
-    void loadPlainFileReturnsBytes() throws Exception
+    void streamSaveEncryptsToResolvedPath() throws IOException
     {
-        Files.write(tempDir.resolve("a.wav"), "PLAIN".getBytes(StandardCharsets.UTF_8));
+        ReflectionTestUtils.setField(service, "encryptEnabled", true);
+        when(crypto.encrypt(any(InputStream.class))).thenReturn("cipher".getBytes(StandardCharsets.UTF_8));
 
-        InputStream in = service.load("a.wav");
+        service.save("2026/01/b.wav", new ByteArrayInputStream("plain".getBytes(StandardCharsets.UTF_8)),
+                5L, "audio/wav");
 
-        assertThat(in).isNotNull();
-        assertThat(read(in)).isEqualTo("PLAIN");
+        Path saved = tempDir.resolve("2026/01/b.wav");
+        assertThat(saved).exists();
+        assertThat(new String(Files.readAllBytes(saved), StandardCharsets.UTF_8)).isEqualTo("cipher");
     }
 
     @Test
-    void loadEncryptedFileDecrypts() throws Exception
+    void streamSaveSkipsWhenCryptoMissingOrKeyBlank() throws IOException
     {
-        enableEncryption();
-        Files.write(tempDir.resolve("a.wav"), "CIPHER".getBytes(StandardCharsets.UTF_8));
-        when(cryptoService.decrypt(any(InputStream.class))).thenReturn("PLAIN".getBytes(StandardCharsets.UTF_8));
+        ReflectionTestUtils.setField(service, "encryptEnabled", true);
 
-        InputStream in = service.load("a.wav");
+        service.save("  ", new ByteArrayInputStream(new byte[] { 1 }), 1L, null);
+        ReflectionTestUtils.setField(service, "recordingCryptoService", null);
+        service.save("c.wav", new ByteArrayInputStream(new byte[] { 1 }), 1L, null);
 
-        assertThat(read(in)).isEqualTo("PLAIN");
+        assertThat(tempDir.resolve("c.wav")).doesNotExist();
     }
 
     @Test
-    void deleteExistingAndMissingFile() throws Exception
+    void saveEncryptsExistingFileInPlace() throws IOException
     {
-        File file = tempDir.resolve("a.wav").toFile();
-        Files.write(file.toPath(), new byte[] { 1 });
+        ReflectionTestUtils.setField(service, "encryptEnabled", true);
+        Path file = Files.write(tempDir.resolve("d.wav"), "plain".getBytes(StandardCharsets.UTF_8));
+        when(crypto.isEncrypted(any())).thenReturn(false);
+        when(crypto.encrypt(any(InputStream.class))).thenReturn("ENC".getBytes(StandardCharsets.UTF_8));
 
-        assertThat(service.delete("a.wav")).isTrue();
-        assertThat(file).doesNotExist();
-        assertThat(service.delete("a.wav")).isTrue();
-        assertThat(service.delete("")).isFalse();
+        service.save("d.wav", file.toFile());
+
+        assertThat(new String(Files.readAllBytes(file), StandardCharsets.UTF_8)).isEqualTo("ENC");
+        assertThat(tempDir.resolve("d.wav.enc.tmp")).doesNotExist();
     }
 
     @Test
-    void existsChecksFile() throws Exception
+    void saveSkipsAlreadyEncryptedFile() throws IOException
     {
-        Files.write(tempDir.resolve("a.wav"), new byte[] { 1 });
+        ReflectionTestUtils.setField(service, "encryptEnabled", true);
+        Path file = Files.write(tempDir.resolve("e.wav"), "cipher".getBytes(StandardCharsets.UTF_8));
+        when(crypto.isEncrypted(any())).thenReturn(true);
 
-        assertThat(service.exists("a.wav")).isTrue();
-        assertThat(service.exists("missing.wav")).isFalse();
-        assertThat(service.exists("")).isFalse();
+        service.save("e.wav", file.toFile());
+        service.save("e.wav", (File) null);
+        service.save("f.wav", tempDir.resolve("absent.wav").toFile());
+
+        verify(crypto, never()).encrypt(any());
     }
 
     @Test
-    void absolutePathUsedDirectly() throws Exception
+    void encryptedLoadDecryptsStoredBytes() throws IOException
     {
-        Path absolute = tempDir.resolve("abs.wav");
-        Files.write(absolute, new byte[] { 1 });
+        ReflectionTestUtils.setField(service, "encryptEnabled", true);
+        Files.write(tempDir.resolve("g.wav"), new byte[] { 9, 9 });
+        when(crypto.decrypt(any(InputStream.class))).thenReturn("plain".getBytes(StandardCharsets.UTF_8));
 
+        assertThat(read(service.load("g.wav"))).isEqualTo("plain");
+    }
+
+    @Test
+    void deleteIsIdempotentAndReportsFailure()
+    {
+        assertThat(service.delete("  ")).isFalse();
+        assertThat(service.delete("never.wav")).isTrue();
+
+        try
+        {
+            Path file = Files.write(tempDir.resolve("h.wav"), new byte[] { 1 });
+            assertThat(service.delete("h.wav")).isTrue();
+            assertThat(file).doesNotExist();
+
+            Files.createDirectory(tempDir.resolve("nonempty"));
+            Files.write(tempDir.resolve("nonempty/child"), new byte[] { 1 });
+            assertThat(service.delete("nonempty")).isFalse();
+        }
+        catch (IOException e)
+        {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    @Test
+    void existsOnlyForRegularFiles() throws IOException
+    {
+        Files.write(tempDir.resolve("i.wav"), new byte[] { 1 });
+        Files.createDirectory(tempDir.resolve("folder"));
+
+        assertThat(service.exists("i.wav")).isTrue();
+        assertThat(service.exists("folder")).isFalse();
+        assertThat(service.exists("absent.wav")).isFalse();
+        assertThat(service.exists(null)).isFalse();
+    }
+
+    @Test
+    void resolvesAbsoluteAndRecordingsDirPaths() throws IOException
+    {
+        Path absolute = Files.write(tempDir.resolve("abs.wav"), new byte[] { 1 });
         assertThat(service.exists(absolute.toString())).isTrue();
+
+        Path prefixed = tempDir.resolve("sub/pre.wav");
+        Files.createDirectories(prefixed.getParent());
+        Files.write(prefixed, new byte[] { 1 });
+        assertThat(service.exists("$${recordings_dir}/sub/pre.wav")).isTrue();
     }
 
     @Test
-    void localModeHasNoPlayUrlOrObjectStorage()
+    void localModeHasNoPlayUrlAndIsNotObjectStorage()
     {
         assertThat(service.getPlayUrl("a.wav", 60)).isNull();
         assertThat(service.isObjectStorage()).isFalse();
     }
 
-    private String read(InputStream in) throws Exception
+    private String read(InputStream in) throws IOException
     {
-        try (InputStream source = in)
+        if (in == null)
         {
-            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
-            byte[] buf = new byte[1024];
-            int n;
-            while ((n = source.read(buf)) != -1)
-            {
-                out.write(buf, 0, n);
-            }
-            return new String(out.toByteArray(), StandardCharsets.UTF_8);
+            return null;
+        }
+        try (InputStream input = in)
+        {
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
         }
     }
 }
