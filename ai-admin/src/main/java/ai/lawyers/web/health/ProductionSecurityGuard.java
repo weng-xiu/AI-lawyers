@@ -18,7 +18,9 @@ import org.springframework.stereotype.Component;
  * 默认关闭，本地/docker 开发环境零影响；生产部署须显式开启。</p>
  *
  * <p>命中以下任一默认值/空值即拒绝启动：JWT {@code token.secret}、
- * 主库密码 root、Druid 控制台开启且仍为默认口令、短信上行回调签名/token 均未配置。
+ * 主库密码 root、Druid 控制台开启且仍为默认口令、短信上行回调签名/token 均未配置、
+ * ESL/AMI 网关口令仍为默认值、Redis 未设密码、外呼模拟接通仍开启、
+ * 凭据加密根密钥 {@code APP_SECRET_KEY} 缺失。
  * {@code call.pbx.media.auth-key} 为空不阻断（仅限完全隔离内网），但强 WARN 告警。</p>
  */
 @Component
@@ -43,6 +45,12 @@ public class ProductionSecurityGuard implements ApplicationRunner
     public static final String DEFAULT_DB_PASSWORD = "root";
     public static final String DEFAULT_DRUID_CONSOLE_PASSWORD = "Druid@2026!ChangeMe";
     public static final String DEFAULT_CALLBACK_SIGN_SECRET = "ai-lawyers-callback-dev-secret-change-me-2026";
+    /** FreeSWITCH ESL 默认口令（application.yml / docker-compose.yml 兜底值） */
+    public static final String DEFAULT_ESL_PASSWORD = "ClueCon";
+    /** Asterisk AMI 默认口令（application.yml / docker-compose.yml 兜底值） */
+    public static final String DEFAULT_AMI_PASSWORD = "amp111";
+    /** 凭据加密开发兜底密钥（SecretCryptoUtils / PiiCryptoUtils 共用） */
+    public static final String DEFAULT_APP_SECRET_KEY = "ai-lawyers-dev-secret-change-me-in-production-2026";
 
     private final Environment environment;
 
@@ -70,7 +78,7 @@ public class ProductionSecurityGuard implements ApplicationRunner
         {
             log.warn("[生产安全自检] {}", warning);
         }
-        log.info("[生产安全自检] JWT/数据库/Druid 口令检查全部通过");
+        log.info("[生产安全自检] JWT/数据库/Redis/Druid/网关口令、回调鉴权与根密钥检查全部通过");
     }
 
     /**
@@ -133,6 +141,43 @@ public class ProductionSecurityGuard implements ApplicationRunner
         {
             violations.add("短信上行回调鉴权未配置：call.sms.upstream.token 为空且回调签名未启用/密钥为空或默认值，"
                     + "须经 SMS_UPSTREAM_TOKEN 注入，或开启 CALLBACK_SIGN_ENABLED=true 并注入 CALLBACK_SIGN_SECRET");
+        }
+
+        // P3-③：FreeSWITCH ESL / Asterisk AMI 网关口令不得沿用内置默认值
+        String eslPassword = props.apply("call.gateway.freeswitch.eslPassword");
+        if (isBlank(eslPassword) || DEFAULT_ESL_PASSWORD.equals(eslPassword))
+        {
+            violations.add("FreeSWITCH ESL 口令为空或仍为默认值 ClueCon，须经 ESL_PASSWORD 注入强口令");
+        }
+        String amiPassword = props.apply("call.gateway.asterisk.amiPassword");
+        if (isBlank(amiPassword) || DEFAULT_AMI_PASSWORD.equals(amiPassword))
+        {
+            violations.add("Asterisk AMI 口令为空或仍为默认值 amp111，须经 AMI_PASSWORD 注入强口令");
+        }
+
+        // P3-①：Redis 无 requirepass 时直接拒绝启动
+        if (isBlank(props.apply("spring.data.redis.password")))
+        {
+            violations.add("Redis 未设置密码（spring.data.redis.password 为空），须经 REDIS_PASSWORD 注入强密码并开启 requirepass");
+        }
+
+        // P3-⑤：生产环境不得模拟接通，否则会写入虚假话单与统计
+        if (Boolean.parseBoolean(props.apply("call.outbound.simulateAnswer")))
+        {
+            violations.add("外呼模拟接通已开启（call.outbound.simulateAnswer=true），生产环境会生成虚假话单/统计，"
+                    + "须经 CALL_OUTBOUND_SIMULATEANSWER=false 关闭");
+        }
+
+        // P3-⑧：凭据加密根密钥缺失时 SecretCryptoUtils 会静默回落到开发密钥
+        String appSecretKey = props.apply("APP_SECRET_KEY");
+        if (isBlank(appSecretKey))
+        {
+            appSecretKey = props.apply("app.secret.key");
+        }
+        if (isBlank(appSecretKey) || DEFAULT_APP_SECRET_KEY.equals(appSecretKey))
+        {
+            violations.add("凭据加密根密钥缺失或仍为开发兜底值，须经环境变量 APP_SECRET_KEY（或 -Dapp.secret.key）"
+                    + "注入 >=32 字节随机串");
         }
         return violations;
     }

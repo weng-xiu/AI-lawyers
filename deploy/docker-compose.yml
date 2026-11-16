@@ -119,6 +119,8 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       # —— JWT 密钥（生产必须注入 >=32 字节随机串，禁止默认值）——
       TOKEN_SECRET: ${TOKEN_SECRET:-Z2xwLWExMmwtbGF3eWVycy1qd3Qtc2VjcmV0LWtleS0yMDI2LWNoYW5nZS1tZS1pbi1wcm9kLTA5ODc2NTQz}
+      # —— 凭据加密根密钥（P3-⑧/C3：生产必须注入 >=32 字节随机串，缺失或开发兜底值时 guard 拒绝启动）——
+      APP_SECRET_KEY: ${APP_SECRET_KEY:-}
       # —— 生产安全自检（P3-⑫：上线必须 true 且配合全部强口令；dev 快速体验可保持 false）——
       APP_SECURITY_GUARD: ${APP_SECURITY_GUARD:-false}
       # —— 网关/短信上行回调签名（S7 收口：生产 CALLBACK_SIGN_ENABLED=true + CALLBACK_SIGN_SECRET 强随机）——
@@ -176,6 +178,9 @@ services:
     build:
       context: ..
       dockerfile: deploy/docker/frontend/Dockerfile
+      # P3-⑧（C8）：SIP 密码仅构建期注入，不写入 .env.production
+      args:
+        VUE_APP_SIP_PASSWORD: ${VUE_APP_SIP_PASSWORD:-}
     image: ai12348-frontend:latest
     container_name: ai12348-frontend
     restart: always

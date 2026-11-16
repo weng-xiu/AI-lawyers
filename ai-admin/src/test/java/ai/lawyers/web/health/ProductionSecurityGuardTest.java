@@ -25,6 +25,11 @@ public class ProductionSecurityGuardTest
         props.put("spring.datasource.druid.statViewServlet.login-password",
                 ProductionSecurityGuard.DEFAULT_DRUID_CONSOLE_PASSWORD);
         props.put("call.pbx.media.auth-key", "");
+        props.put("call.gateway.freeswitch.eslPassword", ProductionSecurityGuard.DEFAULT_ESL_PASSWORD);
+        props.put("call.gateway.asterisk.amiPassword", ProductionSecurityGuard.DEFAULT_AMI_PASSWORD);
+        props.put("spring.data.redis.password", "");
+        props.put("call.outbound.simulateAnswer", "true");
+        props.put("APP_SECRET_KEY", "");
         return props;
     }
 
@@ -32,11 +37,16 @@ public class ProductionSecurityGuardTest
     public void defaultsProduceAllViolations()
     {
         List<String> violations = ProductionSecurityGuard.findViolations(defaultProps()::get);
-        assertEquals(4, violations.size());
+        assertEquals(9, violations.size());
         assertTrue(violations.get(0).contains("token.secret"));
         assertTrue(violations.get(1).contains("数据库"));
         assertTrue(violations.get(2).contains("Druid"));
         assertTrue(violations.get(3).contains("短信上行回调"));
+        assertTrue(violations.get(4).contains("ESL"));
+        assertTrue(violations.get(5).contains("AMI"));
+        assertTrue(violations.get(6).contains("Redis"));
+        assertTrue(violations.get(7).contains("模拟接通"));
+        assertTrue(violations.get(8).contains("APP_SECRET_KEY"));
     }
 
     /** P3-②：Compose 路径——TOKEN_SECRET 未设置时注入的兜底值必须被拒绝 */
@@ -66,10 +76,7 @@ public class ProductionSecurityGuardTest
     @Test
     public void strongConfigAndConsoleDisabledPass()
     {
-        Map<String, String> props = defaultProps();
-        props.put("token.secret", "a-very-strong-random-jwt-secret-key-0123456789");
-        props.put("spring.datasource.druid.master.password", "Str0ng!Db#Pass");
-        props.put("spring.datasource.druid.statViewServlet.enabled", "false");
+        Map<String, String> props = strongBaseProps();
         props.put("call.sms.upstream.token", "strong-sms-upstream-token-32bytes");
 
         assertTrue(ProductionSecurityGuard.findViolations(props::get).isEmpty());
@@ -105,7 +112,70 @@ public class ProductionSecurityGuardTest
         props.put("token.secret", "a-very-strong-random-jwt-secret-key-0123456789");
         props.put("spring.datasource.druid.master.password", "Str0ng!Db#Pass");
         props.put("spring.datasource.druid.statViewServlet.enabled", "false");
+        props.put("call.gateway.freeswitch.eslPassword", "Str0ng!Esl#Pass");
+        props.put("call.gateway.asterisk.amiPassword", "Str0ng!Ami#Pass");
+        props.put("spring.data.redis.password", "Str0ng!Redis#Pass");
+        props.put("call.outbound.simulateAnswer", "false");
+        props.put("APP_SECRET_KEY", "a-very-strong-app-secret-key-32bytes-0123456789");
         return props;
+    }
+
+    /** P3-③：ESL / AMI 沿用内置默认口令必须阻断启动 */
+    @Test
+    public void defaultGatewayPasswordsAreRejected()
+    {
+        Map<String, String> props = strongBaseProps();
+        props.put("call.sms.upstream.token", "strong-sms-upstream-token-32bytes");
+        props.put("call.gateway.freeswitch.eslPassword", ProductionSecurityGuard.DEFAULT_ESL_PASSWORD);
+        props.put("call.gateway.asterisk.amiPassword", ProductionSecurityGuard.DEFAULT_AMI_PASSWORD);
+
+        List<String> violations = ProductionSecurityGuard.findViolations(props::get);
+        assertEquals(2, violations.size());
+        assertTrue(violations.get(0).contains("ESL"));
+        assertTrue(violations.get(1).contains("AMI"));
+    }
+
+    /** P3-①：Redis 未设密码必须阻断启动 */
+    @Test
+    public void redisWithoutPasswordIsRejected()
+    {
+        Map<String, String> props = strongBaseProps();
+        props.put("call.sms.upstream.token", "strong-sms-upstream-token-32bytes");
+        props.put("spring.data.redis.password", "");
+
+        List<String> violations = ProductionSecurityGuard.findViolations(props::get);
+        assertEquals(1, violations.size());
+        assertTrue(violations.get(0).contains("Redis"));
+    }
+
+    /** P3-⑤：生产环境模拟接通必须阻断启动 */
+    @Test
+    public void simulateAnswerIsRejected()
+    {
+        Map<String, String> props = strongBaseProps();
+        props.put("call.sms.upstream.token", "strong-sms-upstream-token-32bytes");
+        props.put("call.outbound.simulateAnswer", "true");
+
+        List<String> violations = ProductionSecurityGuard.findViolations(props::get);
+        assertEquals(1, violations.size());
+        assertTrue(violations.get(0).contains("模拟接通"));
+    }
+
+    /** P3-⑧：凭据加密根密钥缺失/开发兜底必须阻断启动，-Dapp.secret.key 通道同样有效 */
+    @Test
+    public void appSecretKeyMissingOrDevDefaultIsRejected()
+    {
+        Map<String, String> props = strongBaseProps();
+        props.put("call.sms.upstream.token", "strong-sms-upstream-token-32bytes");
+        props.put("APP_SECRET_KEY", "");
+        assertTrue(ProductionSecurityGuard.findViolations(props::get).get(0).contains("APP_SECRET_KEY"));
+
+        props.put("APP_SECRET_KEY", ProductionSecurityGuard.DEFAULT_APP_SECRET_KEY);
+        assertTrue(ProductionSecurityGuard.findViolations(props::get).get(0).contains("APP_SECRET_KEY"));
+
+        props.put("APP_SECRET_KEY", "");
+        props.put("app.secret.key", "a-very-strong-app-secret-key-32bytes-0123456789");
+        assertTrue(ProductionSecurityGuard.findViolations(props::get).isEmpty());
     }
 
     @Test
@@ -124,10 +194,8 @@ public class ProductionSecurityGuardTest
     @Test
     public void strongCallbackSecretSuppressesWarning()
     {
-        Map<String, String> props = defaultProps();
-        props.put("token.secret", "a-very-strong-random-jwt-secret-key-0123456789");
-        props.put("spring.datasource.druid.master.password", "Str0ng!Db#Pass");
-        props.put("spring.datasource.druid.statViewServlet.enabled", "false");
+        Map<String, String> props = strongBaseProps();
+        props.put("call.sms.upstream.token", "strong-sms-upstream-token-32bytes");
         props.put("call.pbx.media.auth-key", "strong-pbx-auth-key-32bytes");
         props.put("call.callback.sign-secret", "strong-callback-sign-secret-32bytes");
 

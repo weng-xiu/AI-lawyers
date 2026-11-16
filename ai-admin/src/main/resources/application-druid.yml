@@ -42,8 +42,9 @@ spring:
             webStatFilter: 
                 enabled: true
             statViewServlet:
-                # Druid 监控台：生产环境建议关闭（DRUID_CONSOLE_ENABLED=false），开启时仅限本机/内网访问
-                enabled: ${DRUID_CONSOLE_ENABLED:true}
+                # Druid 监控台：P3-④ 默认关闭（bean 不注册，/druid/** 无入口）；
+                # 本地调试可置 DRUID_CONSOLE_ENABLED=true，生产确需保留须同时注入强口令并限制 allow 内网
+                enabled: ${DRUID_CONSOLE_ENABLED:false}
                 # IP白名单：默认仅本机，生产通过环境变量 DRUID_CONSOLE_ALLOW 配置内网网段（如 10.0.0.0/8）
                 allow: ${DRUID_CONSOLE_ALLOW:127.0.0.1,0:0:0:0:0:0:0:1}
                 url-pattern: /druid/*
