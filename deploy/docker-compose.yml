@@ -36,8 +36,8 @@ services:
     volumes:
       - mysql-data:/var/lib/mysql
       # 首次启动自动导入（仅当数据目录为空）：
-      #   01-init.sql   业务库结构+基础数据（由部署脚本 mysqldump 生成）
-      #   99-*.sql      容器环境线路主机名修正
+      #   01-init.sql   业务库结构+种子数据（仓库基线，随仓库维护；迁移时可用部署脚本 --dump-from-local 覆盖）
+      #   99-*.sql      容器环境线路主机名修正（部署脚本启动前复制到 init 目录）
       - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]

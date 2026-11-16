@@ -1,9 +1,10 @@
-# =====================================================================
+﻿# =====================================================================
 # 12348 公共法律服务热线 —— 全容器化一键部署（Windows / Docker Desktop）
 #
 # 完成动作：
 #   1. 检查 Docker 环境
-#   2. 从本地 MySQL 导出业务库结构+基础数据 -> deploy/docker/mysql/init/01-init.sql
+#   2. 准备初始化 SQL：默认直接使用仓库基线 deploy/docker/mysql/init/01-init.sql
+#      （仅在显式 -DumpFromLocal 时，才从本机 MySQL 导出 ai-law 库覆盖基线）
 #   3. 复制 FreeSWITCH 线路主机名修正 SQL 到 init 目录
 #   4. docker compose build 构建后端/前端镜像
 #   5. docker compose up -d 启动 mysql/redis/freeswitch/backend/frontend
@@ -12,10 +13,13 @@
 # 用法：
 #   powershell -ExecutionPolicy Bypass -File deploy\deploy.ps1
 # 可选参数：
-#   -SkipDump   跳过数据库导出（使用已存在的 01-init.sql）
-#   -NoBuild    跳过镜像构建
+#   -DumpFromLocal  从本机已有 MySQL 库 ai-law 导出，覆盖仓库基线 01-init.sql
+#                   （迁移/同步线上库时使用；空环境请勿使用）
+#   -SkipDump       兼容旧参数：现已默认不导出，保留仅为不破坏既有调用脚本
+#   -NoBuild        跳过镜像构建
 # =====================================================================
 param(
+    [switch]$DumpFromLocal,
     [switch]$SkipDump,
     [switch]$NoBuild
 )
@@ -50,8 +54,8 @@ $r = Invoke-Native { docker compose version }
 if ($r.Code -ne 0) { Die "需要 Docker Compose v2（docker compose）。" }
 Ok "Docker 与 Compose 可用"
 
-# ---- 2. 导出数据库 ----
-Step "2/6 导出业务数据库 $DbName"
+# ---- 2. 准备初始化 SQL ----
+Step "2/6 准备数据库初始化脚本"
 New-Item -ItemType Directory -Force -Path $InitSqlDir | Out-Null
 $dumpFile = Join-Path $InitSqlDir "01-init.sql"
 
@@ -61,41 +65,47 @@ $trunkFixDst = Join-Path $InitSqlDir "99-container-trunk-fix.sql"
 Copy-Item $trunkFixSrc $trunkFixDst -Force
 Ok "已放入线路主机名修正 SQL"
 
-if ($SkipDump -and (Test-Path $dumpFile)) {
-    Warn "跳过数据库导出，使用已有 $dumpFile"
-} else {
+if ($DumpFromLocal) {
+    if ($SkipDump) { Warn "-SkipDump 与 -DumpFromLocal 同时指定，按 -DumpFromLocal 执行" }
     $mysqldump = Get-Command mysqldump -ErrorAction SilentlyContinue
-    if (-not $mysqldump) {
-        Warn "未找到 mysqldump 命令。"
-        if (Test-Path $dumpFile) {
-            Warn "将使用已有 $dumpFile"
-        } else {
-            Die "无法导出数据库且无历史 01-init.sql。请手动导出 $DbName 到 $dumpFile"
-        }
-    } else {
-        Write-Host "正在导出 $DbName ..."
-        # 用 --result-file 直接落盘，避免 PowerShell 管道改写编码/换行（MySQL 容器需无 BOM UTF-8）
-        $env:MYSQL_PWD = $DbPass
-        if (Test-Path $dumpFile) { Remove-Item $dumpFile -Force }
+    if (-not $mysqldump) { Die "未找到 mysqldump 命令，无法执行 -DumpFromLocal。" }
+    Write-Host "正在从本机 $DbName 导出（会覆盖仓库基线 $dumpFile）..."
+    $tmpDump = "$dumpFile.tmp"
+    if (Test-Path $tmpDump) { Remove-Item $tmpDump -Force }
+    # 用 --result-file 直接落盘，避免 PowerShell 管道改写编码/换行（MySQL 容器需无 BOM UTF-8）
+    $env:MYSQL_PWD = $DbPass
+    & mysqldump -u$DbUser --default-character-set=utf8mb4 `
+        --single-transaction --routines --triggers --events `
+        --column-statistics=0 `
+        --result-file="$tmpDump" $DbName 2>&1 | Out-Null
+    $dumpCode = $LASTEXITCODE
+    if ($dumpCode -ne 0 -or -not (Test-Path $tmpDump)) {
+        # MySQL 5.7 客户端不支持 --column-statistics，去掉重试
         & mysqldump -u$DbUser --default-character-set=utf8mb4 `
             --single-transaction --routines --triggers --events `
-            --column-statistics=0 `
-            --result-file="$dumpFile" $DbName 2>&1 | Out-Null
+            --result-file="$tmpDump" $DbName 2>&1 | Out-Null
         $dumpCode = $LASTEXITCODE
-        $env:MYSQL_PWD = ""
-        if ($dumpCode -ne 0 -or -not (Test-Path $dumpFile)) {
-            # MySQL 5.7 客户端不支持 --column-statistics，去掉重试
-            $env:MYSQL_PWD = $DbPass
-            & mysqldump -u$DbUser --default-character-set=utf8mb4 `
-                --single-transaction --routines --triggers --events `
-                --result-file="$dumpFile" $DbName 2>&1 | Out-Null
-            $dumpCode = $LASTEXITCODE
-            $env:MYSQL_PWD = ""
-        }
-        if ($dumpCode -ne 0 -or -not (Test-Path $dumpFile)) { Die "数据库导出失败（mysqldump 退出码 $dumpCode）。" }
-        $size = [math]::Round((Get-Item $dumpFile).Length/1KB,1)
-        Ok "数据库已导出：$dumpFile（${size} KB）"
     }
+    $env:MYSQL_PWD = ""
+    if ($dumpCode -ne 0 -or -not (Test-Path $tmpDump)) {
+        if (Test-Path $tmpDump) { Remove-Item $tmpDump -Force }
+        Die "从本机导出 $DbName 失败（mysqldump 退出码 $dumpCode），仓库基线未被修改。"
+    }
+    if ((Get-Item $tmpDump).Length -lt 1024) {
+        Remove-Item $tmpDump -Force
+        Die "导出的文件过小，疑似空库，仓库基线未被修改。"
+    }
+    Move-Item $tmpDump $dumpFile -Force
+    $size = [math]::Round((Get-Item $dumpFile).Length/1KB,1)
+    Ok "已从本机导出并覆盖基线：$dumpFile（${size} KB）"
+} else {
+    if (-not (Test-Path $dumpFile)) {
+        Die "缺少仓库基线 $dumpFile。请从仓库恢复该文件，或使用 -DumpFromLocal 从本机导出。"
+    }
+    if ($SkipDump) { Warn "已默认使用仓库基线，-SkipDump 参数不再需要" }
+    $size = [math]::Round((Get-Item $dumpFile).Length/1KB,1)
+    $tableCount = (Select-String -Path $dumpFile -Pattern '^CREATE TABLE' -AllMatches).Count
+    Ok "使用仓库基线：$dumpFile（${size} KB，$tableCount 张表）"
 }
 
 # ---- 3. 构建镜像 ----

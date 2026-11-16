@@ -4,9 +4,10 @@
 #
 # 用法：
 #   chmod +x deploy/deploy.sh
-#   ./deploy/deploy.sh            # 完整部署（导出库+构建+启动）
-#   ./deploy/deploy.sh --skip-dump  # 使用已有 01-init.sql
-#   ./deploy/deploy.sh --no-build   # 跳过构建
+#   ./deploy/deploy.sh                 # 完整部署（使用仓库基线 01-init.sql + 构建 + 启动）
+#   ./deploy/deploy.sh --dump-from-local  # 从本机已有 ai-law 库导出，覆盖仓库基线（迁移场景）
+#   ./deploy/deploy.sh --no-build      # 跳过构建
+#   ./deploy/deploy.sh --skip-dump     # 兼容旧参数：现已默认不导出
 # =====================================================================
 set -e
 
@@ -15,10 +16,11 @@ PROJECT_ROOT="$(cd "$DEPLOY_DIR/.." && pwd)"
 INIT_DIR="$DEPLOY_DIR/docker/mysql/init"
 DB_NAME="ai-law"; DB_USER="root"; DB_PASS="root"
 
-SKIP_DUMP=0; NO_BUILD=0
+DUMP_FROM_LOCAL=0; SKIP_DUMP=0; NO_BUILD=0
 for arg in "$@"; do
   case "$arg" in
-    --skip-dump) SKIP_DUMP=1 ;;
+    --dump-from-local) DUMP_FROM_LOCAL=1 ;;
+    --skip-dump)  SKIP_DUMP=1 ;;
     --no-build)  NO_BUILD=1 ;;
   esac
 done
@@ -35,23 +37,30 @@ docker info >/dev/null 2>&1 || die "Docker 未运行，请先启动 Docker。"
 docker compose version >/dev/null 2>&1 || die "需要 Docker Compose v2。"
 ok "Docker 与 Compose 可用"
 
-# 2. 导出数据库
-step "2/6 导出业务数据库 $DB_NAME"
+# 2. 准备初始化 SQL
+step "2/6 准备数据库初始化脚本"
 mkdir -p "$INIT_DIR"
 cp "$DEPLOY_DIR/docker/mysql/99-container-trunk-fix.sql" "$INIT_DIR/99-container-trunk-fix.sql"
 DUMP="$INIT_DIR/01-init.sql"
 
-if [ "$SKIP_DUMP" -eq 1 ] && [ -f "$DUMP" ]; then
-  warn "跳过导出，使用已有 $DUMP"
-elif command -v mysqldump >/dev/null 2>&1; then
-  echo "正在导出 $DB_NAME ..."
-  mysqldump -u"$DB_USER" -p"$DB_PASS" --default-character-set=utf8mb4 \
-    --single-transaction --routines --triggers --events \
-    "$DB_NAME" > "$DUMP" 2>/dev/null || warn "mysqldump 报错，请检查 $DUMP"
-  ok "数据库已导出：$DUMP"
+if [ "$DUMP_FROM_LOCAL" -eq 1 ]; then
+  [ "$SKIP_DUMP" -eq 1 ] && warn "--skip-dump 与 --dump-from-local 同时指定，按 --dump-from-local 执行"
+  command -v mysqldump >/dev/null 2>&1 || die "未找到 mysqldump，无法执行 --dump-from-local。"
+  echo "正在从本机 $DB_NAME 导出（会覆盖仓库基线 $DUMP）..."
+  TMP_DUMP="$DUMP.tmp"
+  rm -f "$TMP_DUMP"
+  if ! mysqldump -u"$DB_USER" -p"$DB_PASS" --default-character-set=utf8mb4 \
+      --single-transaction --routines --triggers --events \
+      "$DB_NAME" > "$TMP_DUMP" 2>/dev/null || [ ! -s "$TMP_DUMP" ]; then
+    rm -f "$TMP_DUMP"
+    die "从本机导出 $DB_NAME 失败，仓库基线未被修改。"
+  fi
+  mv "$TMP_DUMP" "$DUMP"
+  ok "已从本机导出并覆盖基线：$DUMP ($(wc -c < "$DUMP") 字节)"
 else
-  warn "未找到 mysqldump。"
-  [ -f "$DUMP" ] && warn "使用已有 $DUMP" || die "请手动导出 $DB_NAME 到 $DUMP"
+  [ -f "$DUMP" ] || die "缺少仓库基线 $DUMP。请从仓库恢复该文件，或使用 --dump-from-local 从本机导出。"
+  [ "$SKIP_DUMP" -eq 1 ] && warn "已默认使用仓库基线，--skip-dump 参数不再需要"
+  ok "使用仓库基线：$DUMP（$(grep -c '^CREATE TABLE' "$DUMP" || true) 张表，$(wc -c < "$DUMP") 字节）"
 fi
 
 # 3. 构建镜像
