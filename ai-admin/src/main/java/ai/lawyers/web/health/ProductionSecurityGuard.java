@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
  * 默认关闭，本地/docker 开发环境零影响；生产部署须显式开启。</p>
  *
  * <p>命中以下任一默认值/空值即拒绝启动：JWT {@code token.secret}、
- * 主库密码 root、Druid 控制台开启且仍为默认口令、短信上行回调签名/token 均未配置、
+ * 主库密码 root / 主库账号仍为 root、Druid 控制台开启且仍为默认口令、短信上行回调签名/token 均未配置、
  * ESL/AMI 网关口令仍为默认值、Redis 未设密码、外呼模拟接通仍开启、
  * 凭据加密根密钥 {@code APP_SECRET_KEY} 缺失。
  * {@code call.pbx.media.auth-key} 为空不阻断（仅限完全隔离内网），但强 WARN 告警。</p>
@@ -43,6 +43,8 @@ public class ProductionSecurityGuard implements ApplicationRunner
     public static final String DEFAULT_TOKEN_SECRET_YML =
             "h5L5r+irKjj1DKlQKkO0yE+cVAB/VT5O8Zq+MbIGSWwYSEltV2q3Ke6xjZayQlscgoJ2jZC4jhJ+P414YNX1g==";
     public static final String DEFAULT_DB_PASSWORD = "root";
+    /** 生产禁止后端直连数据库 root 账号（P3-①） */
+    public static final String DEFAULT_DB_USERNAME = "root";
     public static final String DEFAULT_DRUID_CONSOLE_PASSWORD = "Druid@2026!ChangeMe";
     public static final String DEFAULT_CALLBACK_SIGN_SECRET = "ai-lawyers-callback-dev-secret-change-me-2026";
     /** FreeSWITCH ESL 默认口令（application.yml / docker-compose.yml 兜底值） */
@@ -78,7 +80,7 @@ public class ProductionSecurityGuard implements ApplicationRunner
         {
             log.warn("[生产安全自检] {}", warning);
         }
-        log.info("[生产安全自检] JWT/数据库/Redis/Druid/网关口令、回调鉴权与根密钥检查全部通过");
+        log.info("[生产安全自检] JWT/数据库账号与密码/Redis/Druid/网关口令、回调鉴权与根密钥检查全部通过");
     }
 
     /**
@@ -117,6 +119,13 @@ public class ProductionSecurityGuard implements ApplicationRunner
         if (isBlank(dbPassword) || DEFAULT_DB_PASSWORD.equals(dbPassword))
         {
             violations.add("数据库主库密码为空或仍为弱口令 root，须经 DB_PASSWORD 注入强密码");
+        }
+
+        String dbUsername = props.apply("spring.datasource.druid.master.username");
+        if (isBlank(dbUsername) || DEFAULT_DB_USERNAME.equalsIgnoreCase(dbUsername.trim()))
+        {
+            violations.add("数据库账号为空或仍为 root，生产须经 DB_USERNAME 注入独立业务账号"
+                    + "（Compose 侧用 MYSQL_USER/MYSQL_PASSWORD 创建）");
         }
 
         boolean consoleEnabled = Boolean.parseBoolean(

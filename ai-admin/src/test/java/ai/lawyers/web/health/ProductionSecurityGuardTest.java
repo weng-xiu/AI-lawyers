@@ -21,6 +21,7 @@ public class ProductionSecurityGuardTest
         Map<String, String> props = new HashMap<>();
         props.put("token.secret", ProductionSecurityGuard.DEFAULT_TOKEN_SECRET);
         props.put("spring.datasource.druid.master.password", "root");
+        props.put("spring.datasource.druid.master.username", ProductionSecurityGuard.DEFAULT_DB_USERNAME);
         props.put("spring.datasource.druid.statViewServlet.enabled", "true");
         props.put("spring.datasource.druid.statViewServlet.login-password",
                 ProductionSecurityGuard.DEFAULT_DRUID_CONSOLE_PASSWORD);
@@ -37,16 +38,17 @@ public class ProductionSecurityGuardTest
     public void defaultsProduceAllViolations()
     {
         List<String> violations = ProductionSecurityGuard.findViolations(defaultProps()::get);
-        assertEquals(9, violations.size());
+        assertEquals(10, violations.size());
         assertTrue(violations.get(0).contains("token.secret"));
-        assertTrue(violations.get(1).contains("数据库"));
-        assertTrue(violations.get(2).contains("Druid"));
-        assertTrue(violations.get(3).contains("短信上行回调"));
-        assertTrue(violations.get(4).contains("ESL"));
-        assertTrue(violations.get(5).contains("AMI"));
-        assertTrue(violations.get(6).contains("Redis"));
-        assertTrue(violations.get(7).contains("模拟接通"));
-        assertTrue(violations.get(8).contains("APP_SECRET_KEY"));
+        assertTrue(violations.get(1).contains("数据库主库密码"));
+        assertTrue(violations.get(2).contains("数据库账号"));
+        assertTrue(violations.get(3).contains("Druid"));
+        assertTrue(violations.get(4).contains("短信上行回调"));
+        assertTrue(violations.get(5).contains("ESL"));
+        assertTrue(violations.get(6).contains("AMI"));
+        assertTrue(violations.get(7).contains("Redis"));
+        assertTrue(violations.get(8).contains("模拟接通"));
+        assertTrue(violations.get(9).contains("APP_SECRET_KEY"));
     }
 
     /** P3-②：Compose 路径——TOKEN_SECRET 未设置时注入的兜底值必须被拒绝 */
@@ -111,6 +113,7 @@ public class ProductionSecurityGuardTest
         Map<String, String> props = defaultProps();
         props.put("token.secret", "a-very-strong-random-jwt-secret-key-0123456789");
         props.put("spring.datasource.druid.master.password", "Str0ng!Db#Pass");
+        props.put("spring.datasource.druid.master.username", "ai_law");
         props.put("spring.datasource.druid.statViewServlet.enabled", "false");
         props.put("call.gateway.freeswitch.eslPassword", "Str0ng!Esl#Pass");
         props.put("call.gateway.asterisk.amiPassword", "Str0ng!Ami#Pass");
@@ -159,6 +162,22 @@ public class ProductionSecurityGuardTest
         List<String> violations = ProductionSecurityGuard.findViolations(props::get);
         assertEquals(1, violations.size());
         assertTrue(violations.get(0).contains("模拟接通"));
+    }
+
+    /** P3-①：生产不得使用数据库 root 账号（空账号同样阻断） */
+    @Test
+    public void rootDbUsernameIsRejected()
+    {
+        Map<String, String> props = strongBaseProps();
+        props.put("call.sms.upstream.token", "strong-sms-upstream-token-32bytes");
+
+        props.put("spring.datasource.druid.master.username", "root");
+        List<String> violations = ProductionSecurityGuard.findViolations(props::get);
+        assertEquals(1, violations.size());
+        assertTrue(violations.get(0).contains("数据库账号"));
+
+        props.put("spring.datasource.druid.master.username", "");
+        assertTrue(ProductionSecurityGuard.findViolations(props::get).get(0).contains("数据库账号"));
     }
 
     /** P3-⑧：凭据加密根密钥缺失/开发兜底必须阻断启动，-Dapp.secret.key 通道同样有效 */

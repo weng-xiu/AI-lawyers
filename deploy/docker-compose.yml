@@ -19,7 +19,11 @@ services:
     container_name: ai12348-mysql
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      # P3-①：生产经 .env 注入强口令；默认值仅用于本地快速体验
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      # P3-①：生产创建独立业务账号（MYSQL_USER 为空时容器忽略），后端不直连 root
+      MYSQL_USER: ${MYSQL_USER:-}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-}
       MYSQL_DATABASE: ai-law
       TZ: Asia/Shanghai
       # MySQL8 兼容参数
@@ -40,7 +44,8 @@ services:
       #   99-*.sql      容器环境线路主机名修正（部署脚本启动前复制到 init 目录）
       - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      # 口令随环境变量变化，容器内展开，避免健康检查仍用旧默认口令
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -50,14 +55,17 @@ services:
     image: redis:7-alpine
     container_name: ai12348-redis
     restart: always
-    command: redis-server --appendonly yes
+    # P3-①：设置 REDIS_PASSWORD 时启用 requirepass；为空则保持本地无密码模式
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    command: ["sh", "-c", "redis-server --appendonly yes $${REDIS_PASSWORD:+--requirepass \"$$REDIS_PASSWORD\"}"]
     # 仅容器内网访问，不映射宿主 6379，避免与宿主已运行的 Redis 冲突
     expose:
       - "6379"
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli $${REDIS_PASSWORD:+-a \"$$REDIS_PASSWORD\"} ping"]
       interval: 10s
       timeout: 3s
       retries: 10
@@ -130,6 +138,8 @@ services:
       SMS_UPSTREAM_ENABLED: ${SMS_UPSTREAM_ENABLED:-true}
       SMS_UPSTREAM_TOKEN: ${SMS_UPSTREAM_TOKEN:-}
       SMS_UPSTREAM_RATE_LIMIT: ${SMS_UPSTREAM_RATE_LIMIT:-10}
+      # —— PBX 媒体 fork 共享密钥（P3-⑦：生产注入后 guard 告警清零）——
+      CALL_PBX_MEDIA_AUTH_KEY: ${CALL_PBX_MEDIA_AUTH_KEY:-}
       # —— 外呼合规（W4：模拟接通生产必须 false；时段按业务配置）——
       CALL_OUTBOUND_SIMULATEANSWER: ${CALL_OUTBOUND_SIMULATEANSWER:-true}
       CALL_OUTBOUND_ALLOWED_HOURS: ${CALL_OUTBOUND_ALLOWED_HOURS:-09:00-21:00}
@@ -167,10 +177,14 @@ services:
       # —— 上传路径（容器内）——
       RUOYI_PROFILE: /ruoyi/uploadPath
       FILE_PATH: /ruoyi/uploadPath
+      # —— P3-⑫：Actuator 独立管理端口，仅容器内网可抓取，不映射宿主 ——
+      MANAGEMENT_SERVER_PORT: ${MANAGEMENT_SERVER_PORT:-8081}
     volumes:
       - backend-upload:/ruoyi/uploadPath
     expose:
       - "8080"
+      # 仅容器内网：供同网络 Prometheus 抓取，不映射宿主
+      - "8081"
     # P3-⑫：后端端口仅容器内网，禁止宿主直连绕过 nginx；如需本地调试请用 docker exec 或临时覆盖
     networks: [ccnet]
 
