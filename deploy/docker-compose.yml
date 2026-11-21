@@ -202,6 +202,15 @@ services:
       - backend
     ports:
       - "80:80"
+      - "443:443"
+    environment:
+      # P3-①：true 时 HTTP 301 跳转 HTTPS；默认 false 便于本地与内网探测
+      TLS_FORCE_REDIRECT: ${TLS_FORCE_REDIRECT:-false}
+      # 自签证书 CN/SAN，仅证书缺失时生效
+      TLS_SERVER_NAME: ${TLS_SERVER_NAME:-localhost}
+    volumes:
+      # 生产放入正式 server.crt/server.key；缺失时容器启动自动生成自签证书
+      - ./docker/frontend/certs:/etc/nginx/certs
     networks: [ccnet]
 
 networks:

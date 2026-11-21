@@ -15,8 +15,14 @@ RUN npm run build:prod
 # 阶段2：Nginx 托管
 FROM nginx:1.24-alpine
 ENV TZ=Asia/Shanghai
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+# P3-①：openssl 用于证书缺失时生成自签证书，保证空环境可首启
+RUN apk add --no-cache openssl \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 COPY deploy/docker/frontend/nginx.conf /etc/nginx/conf.d/default.conf
+COPY deploy/docker/frontend/app-locations.conf /etc/nginx/snippets/app-locations.conf
+COPY deploy/docker/frontend/tls-redirect.conf /etc/nginx/snippets/tls-redirect.conf
+COPY deploy/docker/frontend/40-tls-setup.sh /docker-entrypoint.d/40-tls-setup.sh
+RUN chmod +x /docker-entrypoint.d/40-tls-setup.sh
 COPY --from=builder /build/dist /usr/share/nginx/html
-EXPOSE 80
+EXPOSE 80 443
 CMD ["nginx", "-g", "daemon off;"]

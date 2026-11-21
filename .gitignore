@@ -65,3 +65,5 @@ nbdist/
 /ai-ui/test-results/
 # 本地工具产物目录（非仓库资产）
 /.workbuddy/
+# Nginx TLS 证书（自签或正式证书均不入库）
+/deploy/docker/frontend/certs/

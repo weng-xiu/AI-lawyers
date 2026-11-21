@@ -171,6 +171,7 @@ Ok "部署流程完成！"
 Write-Host ""
 Write-Host "访问入口：" -ForegroundColor White
 Write-Host "  管理后台/工作台 : http://localhost" -ForegroundColor Green
+Write-Host "  HTTPS（自签）   : https://localhost  （生产挂载正式证书并设 TLS_FORCE_REDIRECT=true）" -ForegroundColor Green
 Write-Host "  后端接口       : 仅容器内网 :8080（统一经前端 /prod-api 访问）" -ForegroundColor Gray
 Write-Host "  Druid 监控     : 默认关闭；如需开启请配置强口令并从容器内网访问 /druid" -ForegroundColor Gray
 Write-Host ""
