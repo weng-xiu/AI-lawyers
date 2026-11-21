@@ -6,7 +6,8 @@
 #   redis      缓存/Token
 #   freeswitch SIP/VoIP 软交换（含律师分机 1003-1006）
 #   backend    Spring Boot 后端（:8080）
-#   frontend   Nginx + Vue 前端（:80）
+#   frontend   Nginx + Vue 管理端（:80/:443）
+#   aiuser     Nginx + Vue 公众端（:8082/:8443）
 #
 # 启动：  docker compose up -d --build
 # 停止：  docker compose down
@@ -132,8 +133,9 @@ services:
       # —— 生产安全自检（P3-⑫：上线必须 true 且配合全部强口令；dev 快速体验可保持 false）——
       APP_SECURITY_GUARD: ${APP_SECURITY_GUARD:-false}
       # —— 网关/短信上行回调签名（S7 收口：生产 CALLBACK_SIGN_ENABLED=true + CALLBACK_SIGN_SECRET 强随机）——
+      # 密钥默认留空：禁止部署产物携带开发默认密钥，未注入时上游签名校验不可用
       CALLBACK_SIGN_ENABLED: ${CALLBACK_SIGN_ENABLED:-false}
-      CALLBACK_SIGN_SECRET: ${CALLBACK_SIGN_SECRET:-ai-lawyers-callback-dev-secret-change-me-2026}
+      CALLBACK_SIGN_SECRET: ${CALLBACK_SIGN_SECRET:-}
       # —— 短信上行退订回调（W4：签名/token 任配其一即可；同配时签名优先、token 兜底，任一通过即放行）——
       SMS_UPSTREAM_ENABLED: ${SMS_UPSTREAM_ENABLED:-true}
       SMS_UPSTREAM_TOKEN: ${SMS_UPSTREAM_TOKEN:-}
@@ -211,6 +213,28 @@ services:
     volumes:
       # 生产放入正式 server.crt/server.key；缺失时容器启动自动生成自签证书
       - ./docker/frontend/certs:/etc/nginx/certs
+    networks: [ccnet]
+
+  # ===== 公众端（AI律师用户端）：独立站点与镜像，对外发布 =====
+  aiuser:
+    build:
+      context: ..
+      dockerfile: deploy/docker/aiuser-frontend/Dockerfile
+    image: ai12348-aiuser:latest
+    container_name: ai12348-aiuser
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "8082:80"
+      - "8443:443"
+    environment:
+      # true 时 HTTP 301 跳转 HTTPS；默认 false 便于本地与内网探测
+      TLS_FORCE_REDIRECT: ${AIUSER_TLS_FORCE_REDIRECT:-false}
+      TLS_SERVER_NAME: ${AIUSER_TLS_SERVER_NAME:-localhost}
+    volumes:
+      # 独立证书目录，避免与管理端容器并发生成自签证书时互相覆盖
+      - ./docker/aiuser-frontend/certs:/etc/nginx/certs
     networks: [ccnet]
 
 networks:

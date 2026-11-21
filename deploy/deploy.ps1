@@ -108,6 +108,52 @@ if ($DumpFromLocal) {
     Ok "使用仓库基线：$dumpFile（${size} KB，$tableCount 张表）"
 }
 
+# ---- 2.5 生产上线前置检查（与 preflight-prod.sh 口径一致） ----
+if (-not $NoBuild) {
+    Step "2.5/6 生产上线前置检查"
+    if ($env:APP_SECURITY_GUARD -ne 'true') {
+        Warn "APP_SECURITY_GUARD 未开启：跳过生产强制校验（仅适用于本地/联调）"
+    } else {
+        $bad = @()
+        $need = @{
+            TOKEN_SECRET           = @($env:TOKEN_SECRET, 32)
+            DB_PASSWORD            = @($env:DB_PASSWORD, 12)
+            REDIS_PASSWORD         = @($env:REDIS_PASSWORD, 12)
+            APP_SECRET_KEY         = @($env:APP_SECRET_KEY, 32)
+            CALLBACK_SIGN_SECRET   = @($env:CALLBACK_SIGN_SECRET, 32)
+            ESL_PASSWORD           = @($env:ESL_PASSWORD, 12)
+            AMI_PASSWORD           = @($env:AMI_PASSWORD, 12)
+            MYSQL_ROOT_PASSWORD    = @($env:MYSQL_ROOT_PASSWORD, 12)
+            VUE_APP_SIP_PASSWORD   = @($env:VUE_APP_SIP_PASSWORD, 8)
+        }
+        foreach ($k in $need.Keys) {
+            $v = [string]$need[$k][0]; $min = [int]$need[$k][1]
+            if ([string]::IsNullOrWhiteSpace($v)) { $bad += "$k 未设置" }
+            elseif ($v.Length -lt $min) { $bad += "$k 长度不足 $min 字节" }
+        }
+        $defaults = @{
+            TOKEN_SECRET         = 'Z2xwLWExMmwtbGF3eWVycy1qd3Qtc2VjcmV0LWtleS0yMDI2LWNoYW5nZS1tZS1pbi1wcm9kLTA5ODc2NTQz'
+            DB_PASSWORD          = 'root'
+            APP_SECRET_KEY       = 'ai-lawyers-dev-secret-change-me-in-production-2026'
+            CALLBACK_SIGN_SECRET = 'ai-lawyers-callback-dev-secret-change-me-2026'
+            ESL_PASSWORD         = 'ClueCon'
+            AMI_PASSWORD         = 'amp111'
+        }
+        foreach ($k in $defaults.Keys) {
+            if ([Environment]::GetEnvironmentVariable($k) -eq $defaults[$k]) { $bad += "$k 仍为默认值" }
+        }
+        if ([string]::IsNullOrWhiteSpace($env:DB_USERNAME) -or $env:DB_USERNAME -eq 'root') { $bad += "DB_USERNAME 不得为空或 root" }
+        if ($env:CALLBACK_SIGN_ENABLED -ne 'true') { $bad += "CALLBACK_SIGN_ENABLED 必须为 true（P3-⑥）" }
+        if ($env:CALL_OUTBOUND_SIMULATEANSWER -ne 'false') { $bad += "CALL_OUTBOUND_SIMULATEANSWER 必须为 false" }
+
+        if ($bad.Count -gt 0) {
+            $bad | ForEach-Object { Write-Host "  [X] $_" -ForegroundColor Red }
+            Die "生产前置检查未通过，请补齐后重试（参考 deploy/.env.example）"
+        }
+        Ok "生产前置检查全部通过"
+    }
+}
+
 # ---- 3. 构建镜像 ----
 if (-not $NoBuild) {
     Step "3/6 构建后端/前端镜像（首次较慢，Maven + npm，可能需数分钟）"
@@ -159,6 +205,8 @@ for ($i = 0; $i -lt 50; $i++) {
 if ($backendReady) { Ok "后端容器已运行（端口仅容器内网）" } else { Warn "后端容器未运行，请用 docker logs ai12348-backend 查看" }
 Write-Host "等待 前端(80)..."
 if (Test-Tcp "localhost" 80 90) { Ok "前端端口 80 已就绪" } else { Warn "前端 80 等待超时" }
+Write-Host "等待 公众端(8082)..."
+if (Test-Tcp "localhost" 8082 90) { Ok "公众端端口 8082 已就绪" } else { Warn "公众端 8082 等待超时（docker logs ai12348-aiuser 查看）" }
 
 # ---- 6. 状态汇总 ----
 Step "6/6 容器状态"
@@ -171,6 +219,7 @@ Ok "部署流程完成！"
 Write-Host ""
 Write-Host "访问入口：" -ForegroundColor White
 Write-Host "  管理后台/工作台 : http://localhost" -ForegroundColor Green
+Write-Host "  公众端         : http://localhost:8082" -ForegroundColor Green
 Write-Host "  HTTPS（自签）   : https://localhost  （生产挂载正式证书并设 TLS_FORCE_REDIRECT=true）" -ForegroundColor Green
 Write-Host "  后端接口       : 仅容器内网 :8080（统一经前端 /prod-api 访问）" -ForegroundColor Gray
 Write-Host "  Druid 监控     : 默认关闭；如需开启请配置强口令并从容器内网访问 /druid" -ForegroundColor Gray

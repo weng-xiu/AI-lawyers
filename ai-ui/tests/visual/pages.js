@@ -1,0 +1,47 @@
+'use strict'
+
+// P5 视觉回归页面清单：覆盖管理端 40 个业务页面（U 系列迁移后的业务候选）。
+// 新增页面时在此追加一行即可：component 为 src/views 下的相对路径（不含 .vue），
+// slug 仅用于生成测试路由，不参与业务。
+module.exports = [
+  { name: '坐席配置', slug: 'agent-config', component: 'lawyers/agent/config' },
+  { name: '黑名单', slug: 'blacklist', component: 'lawyers/blacklist/index' },
+  { name: '回调管理', slug: 'callback', component: 'lawyers/callback/index' },
+  { name: '回调任务', slug: 'callback-task', component: 'lawyers/callback/task' },
+  { name: '咨询分类', slug: 'category', component: 'lawyers/category/index' },
+  { name: '在线咨询', slug: 'chat', component: 'lawyers/chat/index' },
+  { name: '协同渠道', slug: 'collab-channel', component: 'lawyers/collab/channel/index' },
+  { name: '外部机构', slug: 'collab-external-org', component: 'lawyers/collab/externalOrg/index' },
+  { name: 'SLA 看板', slug: 'collab-sla-board', component: 'lawyers/collab/slaBoard/index' },
+  { name: 'SLA 策略', slug: 'collab-sla-policy', component: 'lawyers/collab/slaPolicy/index' },
+  { name: '转办管理', slug: 'collab-transfer', component: 'lawyers/collab/transfer/index' },
+  { name: '回访满意度', slug: 'collab-visit-satisfaction', component: 'lawyers/collab/visitSatisfaction/index' },
+  { name: '咨询记录', slug: 'consultation', component: 'lawyers/consultation/index' },
+  { name: '数据看板', slug: 'dashboard', component: 'lawyers/dashboard/index' },
+  { name: '热点抑制', slug: 'hotspot-suppress', component: 'lawyers/hotspotSuppress/index' },
+  { name: 'IVR 执行日志', slug: 'ivr-execution-log', component: 'lawyers/ivr/executionLog' },
+  { name: 'IVR 流程', slug: 'ivr-flow', component: 'lawyers/ivr/flow/index' },
+  { name: 'IVR 意图', slug: 'ivr-intention', component: 'lawyers/ivr/intention/index' },
+  { name: '知识库', slug: 'knowledge', component: 'lawyers/knowledge/index' },
+  { name: '知识运营', slug: 'knowledge-ops', component: 'lawyers/knowledge/KnowledgeOps' },
+  { name: '知识审核', slug: 'knowledge-audit', component: 'lawyers/knowledgeAudit/index' },
+  { name: '消息管理', slug: 'message', component: 'lawyers/message/index' },
+  { name: '模型配置', slug: 'model-config', component: 'lawyers/modelConfig/index' },
+  { name: '模型成本', slug: 'model-cost', component: 'lawyers/modelCost/index' },
+  { name: '外呼名单', slug: 'outbound-callee', component: 'lawyers/outbound/callee/index' },
+  { name: '外呼结果', slug: 'outbound-result', component: 'lawyers/outbound/result' },
+  { name: '外呼任务', slug: 'outbound-task', component: 'lawyers/outbound/task/index' },
+  { name: '付费服务', slug: 'paid-service', component: 'lawyers/paidService/index' },
+  { name: '坐席绩效', slug: 'performance-agent', component: 'lawyers/performance/agent' },
+  { name: '质检管理', slug: 'quality-inspection', component: 'lawyers/quality/inspection' },
+  { name: '排队监控', slug: 'queue-monitor', component: 'lawyers/queueMonitor/index' },
+  { name: '录音管理', slug: 'recording', component: 'lawyers/recording/index' },
+  { name: '风险预警', slug: 'risk-warning', component: 'lawyers/riskWarning/index' },
+  { name: '排班管理', slug: 'schedule', component: 'lawyers/schedule/index' },
+  { name: '话务预测', slug: 'schedule-forecast', component: 'lawyers/schedule/forecastSlot' },
+  { name: '换班管理', slug: 'schedule-shift', component: 'lawyers/schedule/shiftChange' },
+  { name: '签约记录', slug: 'sign-record', component: 'lawyers/signRecord/index' },
+  { name: '模拟演练', slug: 'simulation', component: 'lawyers/simulation/index' },
+  { name: '技能组', slug: 'skill-group', component: 'lawyers/skill/group' },
+  { name: '技能队列', slug: 'skill-queue', component: 'lawyers/skill/queue' }
+]

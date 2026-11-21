@@ -1,0 +1,113 @@
+name: PR Gate
+
+# P2：PR 门禁流水线（后端单测 + 管理端 + 公众端 + 管理端 E2E）
+# 说明：
+#   1. 全部 job 不依赖外部数据库/Redis/Java 服务，前端接口由 Playwright 内置 mock；
+#   2. 压测不在本流水线内（需独立环境与 JMeter 5.6.3），见 perf/README；
+#   3. 生产构建前如需注入 SIP 密码，请通过仓库 Secrets 传入 build-arg，禁止写入代码。
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: pr-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (mvn test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Run backend tests
+        run: mvn -B -ntp test
+      - name: Upload surefire reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: '**/target/surefire-reports/**'
+          if-no-files-found: ignore
+
+  admin-ui:
+    name: Admin UI (unit + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ai-ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: ai-ui/package-lock.json
+      - run: npm ci
+      - name: Unit tests
+        run: npm run test:unit
+      - name: Production build
+        env:
+          # webpack 4 在 Node 17+ 需显式启用 legacy provider
+          NODE_OPTIONS: --openssl-legacy-provider
+        run: npm run build:prod
+
+  public-ui:
+    name: Public UI (a11y gate + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: aiuser-ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: aiuser-ui/package-lock.json
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Unit tests
+        run: npm run test:unit
+      - name: Accessibility gate (critical/serious 违规即失败)
+        run: npm run test:a11y:gate
+      - name: Production build
+        env:
+          NODE_OPTIONS: --openssl-legacy-provider
+        run: npm run build:prod
+
+  admin-e2e:
+    name: Admin UI (E2E)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ai-ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: ai-ui/package-lock.json
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Key-link E2E
+        run: npm run test:e2e
+      - name: Upload E2E artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-artifacts
+          path: |
+            ai-ui/tests/e2e-results/**
+            ai-ui/test-results/**
+          if-no-files-found: ignore

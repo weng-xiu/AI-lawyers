@@ -10,7 +10,9 @@
     "build:stage": "vue-cli-service build --mode staging",
     "preview": "node build/index.js --preview",
     "test:unit": "jest --config jest.config.js",
-    "test:e2e": "playwright test --config=playwright.config.js"
+    "test:e2e": "playwright test --config=playwright.config.js",
+    "test:visual": "playwright test --config=tests/visual/visual.config.js",
+    "test:visual:update": "playwright test --config=tests/visual/visual.config.js --update-snapshots"
   },
   "keywords": [
     "vue",

@@ -67,3 +67,6 @@ nbdist/
 /.workbuddy/
 # Nginx TLS 证书（自签或正式证书均不入库）
 /deploy/docker/frontend/certs/
+/deploy/docker/aiuser-frontend/certs/
+# 视觉回归运行产物（基线快照需入库，结果目录不入库）
+/ai-ui/tests/visual-results/

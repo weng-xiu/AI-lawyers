@@ -65,6 +65,9 @@ fi
 
 # 3. 构建镜像
 if [ "$NO_BUILD" -eq 0 ]; then
+  step "2.5/6 生产上线前置检查"
+  sh "$DEPLOY_DIR/preflight-prod.sh" || die "生产前置检查未通过（APP_SECURITY_GUARD=true 时强制校验，见 deploy/.env.example）"
+
   step "3/6 构建后端/前端镜像（首次较慢）"
   (cd "$DEPLOY_DIR" && docker compose build)
   ok "镜像构建完成"
@@ -98,6 +101,8 @@ done
 [ "$backend_ready" = "1" ] && ok "后端容器已运行（端口仅容器内网）" || warn "后端容器未运行，docker logs ai12348-backend 查看"
 echo "等待前端 80..."
 wait_tcp localhost 80 90 && ok "前端 80 就绪" || warn "前端超时"
+echo "等待公众端 8082..."
+wait_tcp localhost 8082 90 && ok "公众端 8082 就绪" || warn "公众端超时（docker logs ai12348-aiuser 查看）"
 
 # 6. 状态
 step "6/6 容器状态"
@@ -107,6 +112,7 @@ echo ""
 echo "======================================================================"
 ok "部署流程完成！"
 echo "管理后台: http://localhost    后端接口: 仅容器内网 :8080（经前端 /prod-api 访问）"
+echo "公众端: http://localhost:8082    公众端 HTTPS（自签）: https://localhost:8443"
 echo "HTTPS（自签）: https://localhost    生产挂载正式证书并设 TLS_FORCE_REDIRECT=true"
 echo "日志: docker compose logs -f backend | freeswitch"
 echo "停止: docker compose down"
