@@ -26,6 +26,15 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 RUN mkdir -p /ruoyi/uploadPath
 COPY --from=builder /build/ai-admin/target/ai-admin.jar /app/ai-admin.jar
 
+# C2/C5：容器健康检查。运行镜像仅含 JRE（无 curl/wget，且 JDK17 已移除 Nashorn 不能用 jrunscript），
+# 改用 Java 17 单文件源码运行（java HealthCheck.java，无需 javac/第三方包）探测 readiness 探针；
+# HTTP 200 且 JSON status=UP 才健康。readiness 组含 readinessState + drain：排空时自动
+# OUT_OF_SERVICE，配合负载均衡摘流量。脚本退出码已在 JDK17 实测：UP=0 / 503或连不通=1。
+COPY docker/backend/HealthCheck.java /app/HealthCheck.java
+
 EXPOSE 8080
+# C2/C5：readiness 健康检查（启动宽限期覆盖 Spring 容器初始化；连续 3 次失败标记 unhealthy）
+HEALTHCHECK --interval=15s --timeout=5s --start-period=90s --retries=3 \
+  CMD java /app/HealthCheck.java || exit 1
 # 容器内通过环境变量覆盖数据库/Redis/ESL 连接（见 docker-compose.yml）
 ENTRYPOINT ["java", "-Xms256m", "-Xmx1024m", "-XX:+UseG1GC", "-Djava.security.egd=file:/dev/./urandom", "-jar", "/app/ai-admin.jar"]

@@ -48,9 +48,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: npm
-          cache-dependency-path: ai-ui/package-lock.json
-      - run: npm ci
+      # ai-ui/package-lock.json 按仓库约定被 .gitignore 忽略、不入库，不能用 npm ci
+      - run: npm install
       - name: Unit tests
         run: npm run test:unit
       - name: Production build
@@ -95,9 +94,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: npm
-          cache-dependency-path: ai-ui/package-lock.json
-      - run: npm ci
+      # ai-ui/package-lock.json 按仓库约定被 .gitignore 忽略、不入库，不能用 npm ci
+      - run: npm install
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Key-link E2E

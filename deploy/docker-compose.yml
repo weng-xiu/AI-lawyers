@@ -187,6 +187,14 @@ services:
       - "8080"
       # 仅容器内网：供同网络 Prometheus 抓取，不映射宿主
       - "8081"
+    # C2/C5：readiness 健康检查，打独立管理端口 8081 的 readiness 探针（与 Dockerfile HEALTHCHECK 同构，
+    # 在 compose 层显式声明便于运维统一调参）。start_period 覆盖 Spring 容器初始化。
+    healthcheck:
+      test: ["CMD-SHELL", "java /app/HealthCheck.java || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
     # P3-⑫：后端端口仅容器内网，禁止宿主直连绕过 nginx；如需本地调试请用 docker exec 或临时覆盖
     networks: [ccnet]
 
@@ -200,8 +208,10 @@ services:
     image: ai12348-frontend:latest
     container_name: ai12348-frontend
     restart: always
+    # C5：等后端 readiness 健康后再启动 nginx，避免窗口内 502
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "80:80"
       - "443:443"
@@ -223,8 +233,10 @@ services:
     image: ai12348-aiuser:latest
     container_name: ai12348-aiuser
     restart: always
+    # C5：等后端 readiness 健康后再启动 nginx，避免窗口内 502
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "8082:80"
       - "8443:443"

@@ -50,6 +50,11 @@ logging:
 # 或通过 management.server.port 使用独立管理端口
 # ============================================================
 management:
+  # P3-⑫：独立管理端口。容器经 MANAGEMENT_SERVER_PORT=8081 与业务端口 8080 隔离，
+  # 仅容器内网可抓取（compose 只 expose 不发布宿主）；本地默认 8080，开发零影响。
+  # 不设置该环境变量时与业务端口共用，保持历史行为。
+  server:
+    port: ${MANAGEMENT_SERVER_PORT:8080}
   endpoints:
     web:
       exposure:
