@@ -128,28 +128,44 @@ AI律师话务系统是一套面向公共法律服务热线的**专业呼叫中�
 
 ### 6.1 环境要求
 
-- JDK 1.8+
-- MySQL 5.7+
-- Redis 6.0+
+- JDK 17（Spring Boot 3.2，最低 17，不再支持 JDK 8）
+- MySQL 8.0（容器镜像 mysql:8.0；基线脚本按 MySQL 8 导出）
+- Redis 6.0+（容器镜像 redis:7-alpine）
 - Node.js 16+
 - FreeSWITCH 1.10+（或 Asterisk）
 
 ### 6.2 数据库初始化
 
 ```bash
-# 导入基础库与话务业务库
-mysql -u root -p < sql/ry_2025.sql
-mysql -u root -p < sql/legal_call.sql
+# 创建数据库（库名用连字符 ai-law，SQL 中需反引号引用；业务账号名用下划线 ai_law）
+mysql -u root -p -e "CREATE DATABASE \`ai-law\` DEFAULT CHARACTER SET utf8mb4;"
 
-# 话单表 agent_id 字段需允许为空（来话在坐席分配前先落单）
-mysql -u root -p -e "ALTER TABLE ai_call_record MODIFY COLUMN agent_id bigint(20) DEFAULT NULL;"
+# 导入 RuoYi 基础表与 Quartz 调度表
+mysql -u root -p ai-law < sql/ry_20250522.sql
+mysql -u root -p ai-law < sql/quartz.sql
 
-# 坐席表新增 SIP 分机绑定字段
-mysql -u root -p -e "ALTER TABLE ai_call_agent_status ADD COLUMN sip_extension varchar(20) DEFAULT NULL COMMENT 'SIP分机号' AFTER call_status;"
-
-# 为管理员坐席（agent_id=100）绑定分机 1002
-mysql -u root -p -e "UPDATE ai_call_agent_status SET sip_extension='1002' WHERE agent_id=100;"
+# 再按文件名时间戳顺序导入 sql/ 下全部 ai_system_*.sql、ai_*.sql 增量脚本。
+# 注意：手工增量路径历史脚本含重复菜单 ID（后出脚本已修复），
+# 全新环境优先使用 Docker 全量基线，可避免顺序与重复问题。
 ```
+
+> Docker 部署时数据库由 `deploy/docker/mysql/init/01-init.sql`（全量基线，含种子数据）
+> 自动初始化：历史 ALTER 已折叠进建表语句，其中
+> `ai_call_record`/`ai_call_record_archive.agent_id` 已为可空，
+> `ai_call_agent_status` 与 `sys_user` 均已内置 `sip_extension` 列，无需再手工执行上述 ALTER。
+
+如需在裸机手工执行增量脚本，`sql/` 目录按以下五类顺序处理（同类内按文件名日期先后）：
+
+| 顺序 | 类别 | 文件示例 | 说明 |
+|------|------|----------|------|
+| 1 | 框架基础 | `ry_20250522.sql`、`quartz.sql` | RuoYi 系统表与 Quartz 调度表，必装 |
+| 2 | 业务基线 | `ai_lawyers_tables_20250623.sql`、`ai_user_tables_20231119.sql`、`ai_system_call_center_20260715.sql` 等 | 建表 + 早期种子数据 |
+| 3 | 功能增量 | `ai_system_*.sql`、`ai_admin_*.sql`、`ai_lawyers_*.sql` | 按日期递增的功能表/菜单/字典 |
+| 4 | 修复回填 | `*_fix_*.sql`、`*_repair_*.sql`、`config_lawyer_sip_*.sql`、`add_lawyer_users_*.sql` | 仅存量库需要，按脚本头部说明执行 |
+| 5 | 临时冒烟 | `temp_*.sql`、`*_smoke_data.sql`、`*_smoke_cleanup.sql` | **禁止在生产执行**；造数后必须成对执行 cleanup |
+
+> 第 5 类仅供接口联调造数，`*_data.sql` 与同名 `*_cleanup.sql` 必须配对使用。
+> 全新环境推荐直接用 Docker 全量基线，避免手工顺序带来的重复菜单 ID 与漏执行问题。
 
 ### 6.3 FreeSWITCH 安装与配置
 
@@ -159,7 +175,9 @@ mysql -u root -p -e "UPDATE ai_call_agent_status SET sip_extension='1002' WHERE 
    <param name="ws-binding"  value=":5066"/>
    <param name="wss-binding" value=":7443"/>
    ```
-3. 默认分机配置在 `conf/directory/default/` 下，已预置 **1001** 和 **1002**（密码均为 `1234`）
+3. 律师坐席分机配置在仓库 `freeswitch-conf/directory/default/` 下，已预置 **1003～1006**
+   （注册密码取 vars.xml 的 `$${default_password}`，默认 `1234`；工号 102～105 对应四位律师）。
+   Docker 部署由 compose 卷挂载自动生效；裸机可用 `freeswitch-conf/deploy-agent-extensions.ps1` 一键下发。
 4. 启动 FreeSWITCH（**Windows 下建议加 `-nonat` 参数避免 NAT 检测卡死**）：
    ```bat
    cd "C:\Program Files\FreeSWITCH"
@@ -230,10 +248,10 @@ npm run dev
    ```bat
    "C:\Program Files\FreeSWITCH\fs_cli.exe" -x "show registrations"
    ```
-3. 如使用桌面软电话测试，配置 1001 分机：
+3. 如使用桌面软电话测试，可注册任一律师分机（1003～1006，密码均为 `1234`），例如 1003：
    - SIP 服务器：`198.18.0.1`（或 FreeSWITCH 绑定的 IP）
    - 端口：`5060`
-   - 用户名/登录名：`1001`
+   - 用户名/登录名：`1003`
    - 密码：`1234`
    - 传输协议：UDP
 
@@ -241,31 +259,32 @@ npm run dev
 
 ### 7.3 坐席签入（自动注册浏览器分机）
 
-1. 浏览器访问 `http://localhost/`，使用 admin/admin123 登录
+1. 浏览器访问 `http://localhost/`，使用律师账号登录（如 **zhangls/123456**，对应工号 102、分机 1003）。
+   注意：admin 账号对应坐席（工号 100）未绑定 `sip_extension`，不能注册网页软电话，仅用于后台管理。
 2. 浏览器地址栏右侧弹出麦克风权限请求时，点击**允许**（WebRTC 通话必需）
-3. 进入呼叫中心工作台，点击**签入**（工号 100）
+3. 进入呼叫中心工作台，点击**签入**（工号 102）
 4. 观察右上角坐席状态栏：
-   - 🟡 `分机 1002 注册中…` → 正在通过 WebSocket 连接 FreeSWITCH
-   - 🟢 `分机 1002 已就绪` → 注册成功，可接听来电
-   - 🔴 `分机 1002 注册失败` → 鼠标悬停查看错误原因
+   - 🟡 `分机 1003 注册中…` → 正在通过 WebSocket 连接 FreeSWITCH
+   - 🟢 `分机 1003 已就绪` → 注册成功，可接听来电
+   - 🔴 `分机 1003 注册失败` → 鼠标悬停查看错误原因
 5. 后端验证：
    ```bat
    fs_cli -x "show registrations"
    ```
-   应看到 1002 分机通过 `network_proto=ws` 注册。
+   应看到 1003 分机通过 `network_proto=ws` 注册。
 
-### 7.4 呼入测试（1001 拨打 1002）
+### 7.4 呼入测试（1004 拨打 1003）
 
-1. 确保软电话 1001 已注册，坐席 100（分机 1002）已签入且状态为"空闲"
-2. 用软电话 1001 拨打 **1002**
+1. 确保桌面软电话 1004（或另一浏览器登录 lils 签入）已注册，坐席 102（分机 1003）已签入且状态为"空闲"
+2. 用软电话 1004 拨打 **1003**
 3. 事件链路：
 
 ```
 FreeSWITCH CHANNEL_CREATE
     → 后端 ESL 捕获（DefaultInboundCallHandler）
-    → 插入话单（ai_call_record）
+    → 插入话单（ai_call_record，agent_id 暂空，分配后回填）
     → ACD 分配坐席（AgentDispatchServiceImpl，策略 round_robin）
-    → 桥接分机 1002（uuid_transfer → user/1002）
+    → 桥接分机 1003（uuid_transfer → user/1003）
     → 浏览器收到来电（SipIncomingAlert 浮层 + 来电弹屏）
     → 点击"接听"（WebRTC 建立语音通道）
     → 通话中可：保持/转接/三方/挂机
@@ -274,17 +293,17 @@ FreeSWITCH CHANNEL_CREATE
 
 4. 后端实时日志（`logs/sys-info.log`）关键字段：
    ```
-   [ESL] 入站来话 1001 -> 1002
-   [Inbound] 收到来话 caller=1001 dnis=1002
-   分配成功：主叫[1001] → 坐席[管理员] 技能组[综合咨询组]
-   bridgeToAssignedAgent: 桥接坐席 ext=1002 result=true
+   [ESL] 入站来话 1004 -> 1003
+   [Inbound] 收到来话 caller=1004 dnis=1003
+   分配成功：主叫[1004] → 坐席[张律师] 技能组[综合咨询组]
+   bridgeToAssignedAgent: 桥接坐席 ext=1003 result=true
    ```
 
 ### 7.5 呼出测试
 
-1. 坐席签入后，在工作台外呼面板输入目标号码（如另一部分机 1001）
+1. 坐席签入后，在工作台外呼面板输入目标号码（如另一部分机 1004）
 2. 点击外呼，后端通过 ESL 向 FreeSWITCH 发送 originate 命令
-3. FreeSWITCH 先呼叫坐席分机 1002，坐席接听后再呼叫被叫号码
+3. FreeSWITCH 先呼叫坐席分机 1003，坐席接听后再呼叫被叫号码
 4. 通话建立后同样支持保持、转接、挂机等操作
 
 ### 7.6 常用调试命令
@@ -312,8 +331,8 @@ fs_cli -x "events plain CHANNEL_CREATE CHANNEL_ANSWER CHANNEL_HANGUP"
 |------|------|----------|
 | 浏览器分机一直"注册中…" | 5 秒轮询重复注册导致连接被杀 | 已修复（agent.js 增加 Promise 守卫）；强制刷新页面 |
 | FreeSWITCH 启动卡住（68MB 内存不监听端口） | NAT/UPnP 检测卡死 | 启动时加 `-nonat` 参数 |
-| 话单插入失败 `Field 'agent_id' doesn't have a default value` | 来话先落单后分配坐席 | 执行 `ALTER TABLE ai_call_record MODIFY agent_id bigint DEFAULT NULL` |
-| 1002 软电话未注册导致 FreeSWITCH 崩溃 | B-leg 无法建立 | 使用浏览器自动注册，确保 5066 端口可达 |
+| 话单插入失败 `Field 'agent_id' doesn't have a default value` | 来话先落单后分配坐席，而列被建成 NOT NULL | 全量基线 01-init.sql 已将两张话单表 agent_id 建为可空；存量库手工执行 `ALTER TABLE ai_call_record MODIFY COLUMN agent_id bigint DEFAULT NULL` |
+| 律师分机（1003～1006）软电话未注册导致 FreeSWITCH 崩溃 | B-leg 无法建立 | 使用浏览器自动注册（坐席 sip_extension 须非空，admin 坐席无分机不可用于通话），确保 5066 端口可达 |
 | 浏览器无法获取麦克风 | 非 HTTPS/localhost 访问 | 通过 `http://localhost/` 访问，或配置 HTTPS（WSS 7443） |
 | ESL 连接断开 | FreeSWITCH 重启 | 后端自动重连，查看日志 `[ESL-127.0.0.1] 鉴权成功` |
 

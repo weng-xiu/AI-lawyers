@@ -179,10 +179,15 @@ services:
       # —— 上传路径（容器内）——
       RUOYI_PROFILE: /ruoyi/uploadPath
       FILE_PATH: /ruoyi/uploadPath
+      # —— C4：日志落盘路径，与 logback.xml 的 ${LOG_PATH:-/home/ruoyi/logs} 占位符一致；
+      # 配合 backend-logs 命名卷持久化 sys-info/sys-error/sys-user 日志（容器重建不丢）——
+      LOG_PATH: ${LOG_PATH:-/home/ruoyi/logs}
       # —— P3-⑫：Actuator 独立管理端口，仅容器内网可抓取，不映射宿主 ——
       MANAGEMENT_SERVER_PORT: ${MANAGEMENT_SERVER_PORT:-8081}
     volumes:
       - backend-upload:/ruoyi/uploadPath
+      # C4：日志命名卷，落盘日志在容器重建后保留；docker volume inspect ai12348_backend-logs 可查宿主路径
+      - backend-logs:/home/ruoyi/logs
     expose:
       - "8080"
       # 仅容器内网：供同网络 Prometheus 抓取，不映射宿主
@@ -259,3 +264,5 @@ volumes:
   fs-log:
   fs-record:
   backend-upload:
+  # C4：后端落盘日志（sys-info/sys-error/sys-user，logback.xml 按天滚动保留 60 天）
+  backend-logs:
