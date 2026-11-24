@@ -149,6 +149,16 @@ mysql -u root -p ai-law < sql/quartz.sql
 # 全新环境优先使用 Docker 全量基线，可避免顺序与重复问题。
 ```
 
+> **菜单 ID 冲突（2026-11-24 复核）**：以下 6 个增量脚本存在 34 个 `sys_menu` 主键重叠，
+> 不可在同一库上全量重放：`ai_admin_call_center_menu_20260716.sql`、
+> `ai_admin_call_center_v2_menu_20260314.sql`、`ai_system_call_popup_p1_1_20260801.sql`、
+> `ai_system_chat_p1_1_20260810.sql`、`ai_system_missed_call_p1_2_20260801.sql`、
+> `ai_system_video_p1_2_20260810.sql`（另 `ai_system_callback_p2_1`、`ai_system_paid_service_p1_3`、
+> `ai_system_risk_warning_p1_5`、`ai_system_consultation_center_p1_3` 各含 1～2 个重叠）。
+> 冲突段为 3500–3545、3644–3655、3670–3671；`01-init.sql` 已通过改号解决
+> （图文对话 3720–3725、视频咨询 3730–3735、有偿服务 3740–3745、风险预警 3750–3755）。
+> **升级库（已执行过历史脚本）与空库的菜单 ID 会存在分叉，对账以实际库为准，禁止重放。**
+
 > Docker 部署时数据库由 `deploy/docker/mysql/init/01-init.sql`（全量基线，含种子数据）
 > 自动初始化：历史 ALTER 已折叠进建表语句，其中
 > `ai_call_record`/`ai_call_record_archive.agent_id` 已为可空，
