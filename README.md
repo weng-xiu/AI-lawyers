@@ -162,9 +162,9 @@ mysql -u root -p ai-law < sql/quartz.sql
 | 2 | 业务基线 | `ai_lawyers_tables_20250623.sql`、`ai_user_tables_20231119.sql`、`ai_system_call_center_20260715.sql` 等 | 建表 + 早期种子数据 |
 | 3 | 功能增量 | `ai_system_*.sql`、`ai_admin_*.sql`、`ai_lawyers_*.sql` | 按日期递增的功能表/菜单/字典 |
 | 4 | 修复回填 | `*_fix_*.sql`、`*_repair_*.sql`、`config_lawyer_sip_*.sql`、`add_lawyer_users_*.sql` | 仅存量库需要，按脚本头部说明执行 |
-| 5 | 临时冒烟 | `temp_*.sql`、`*_smoke_data.sql`、`*_smoke_cleanup.sql` | **禁止在生产执行**；造数后必须成对执行 cleanup |
+| 5 | 临时冒烟 | `_temp/temp_*.sql`、`_temp/*_smoke_data.sql`、`_temp/*_smoke_cleanup.sql` | 统一收纳在 `sql/_temp/`，**禁止在生产执行**；造数后必须成对执行 cleanup |
 
-> 第 5 类仅供接口联调造数，`*_data.sql` 与同名 `*_cleanup.sql` 必须配对使用。
+> 第 5 类脚本已全部移入 `sql/_temp/` 子目录，与正式增量脚本物理隔离；仅供接口联调造数，`*_data.sql` 与同名 `*_cleanup.sql` 必须配对使用。
 > 全新环境推荐直接用 Docker 全量基线，避免手工顺序带来的重复菜单 ID 与漏执行问题。
 
 ### 6.3 FreeSWITCH 安装与配置
