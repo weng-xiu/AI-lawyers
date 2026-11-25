@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 
 import java.lang.reflect.Field;
 import java.util.concurrent.TimeUnit;
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
@@ -61,9 +62,15 @@ class HotlineMetricsTest
         assertThat(asr.totalTime(TimeUnit.MILLISECONDS)).isEqualTo(250.0);
         assertThat(tts.totalTime(TimeUnit.MILLISECONDS)).isEqualTo(180.0);
         assertThat(e2e.totalTime(TimeUnit.MILLISECONDS)).isEqualTo(1100.0);
-        // bargein 按 trigger 分 tag
+        // bargein 按 trigger 分 tag（N6 追加 result 标签：120ms 与 90ms 均 ≤300ms → within300）
         assertThat(registry.find("hotline_voice.bargein.stop.ms").tag("trigger", "vad").timer().count()).isEqualTo(1);
         assertThat(registry.find("hotline_voice.bargein.stop.ms").tag("trigger", "bargein").timer().count()).isEqualTo(1);
+        // trigger 不同即不同 Timer，result 维度需跨 meter 汇总
+        long within300 = registry.getMeters().stream()
+                .filter(mt -> mt.getId().getName().equals("hotline_voice.bargein.stop.ms")
+                        && "within300".equals(mt.getId().getTag("result")))
+                .mapToLong(mt -> ((Timer) mt).count()).sum();
+        assertThat(within300).isEqualTo(2L);
         // E3 指标名与 e2e source tag
         assertThat(registry.find("hotline_voice.rag.ms").timer().totalTime(TimeUnit.MILLISECONDS)).isEqualTo(30.0);
         assertThat(registry.find("hotline_voice.llm.first.token.ms").timer().totalTime(TimeUnit.MILLISECONDS)).isEqualTo(500.0);
@@ -108,6 +115,71 @@ class HotlineMetricsTest
             m.recordVoiceRagMs(10, "s3");
             m.recordVoiceLlmFirstTokenMs(10, "s3");
             m.recordVoiceE2eFirstMs(10, "robot", "s3");
+        }).doesNotThrowAnyException();
+    }
+
+    @Test
+    void n6VoiceSlo_metricsWithDocumentedNames() throws Exception
+    {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        HotlineMetrics m = withRegistry(registry);
+
+        // N6-1 TTFW（source 分 tag）
+        m.recordVoiceTtfwMs(900, "robot", "s1");
+        m.recordVoiceTtfwMs(400, "ask", "s1");
+        // N6-2 ASR final
+        m.recordVoiceAsrFinalMs(500, "s1");
+        // N6-4 下行帧 accepted/dropped
+        m.incrementVoiceDownlinkFrame(true);
+        m.incrementVoiceDownlinkFrame(true);
+        m.incrementVoiceDownlinkFrame(false);
+        // N6-6 降级按 reason
+        m.incrementVoiceDegrade("llm_error");
+        m.incrementVoiceDegrade("robot_disabled");
+        // N6-5 bargein result 标签：预算内 within300 / 超预算 over300
+        m.recordVoiceBargeinStopMs(120, "vad", "s1");
+        m.recordVoiceBargeinStopMs(HotlineMetrics.BUDGET_VOICE_BARGEIN_STOP_MS + 1, "bargein", "s1");
+
+        assertThat(registry.find("hotline_voice.ttfw.ms").tag("source", "robot").timer()
+                .totalTime(TimeUnit.MILLISECONDS)).isEqualTo(900.0);
+        assertThat(registry.find("hotline_voice.ttfw.ms").tag("source", "ask").timer().count()).isEqualTo(1);
+        assertThat(registry.find("hotline_voice.asr.final.ms").timer().totalTime(TimeUnit.MILLISECONDS))
+                .isEqualTo(500.0);
+
+        Counter accepted = registry.find("hotline_voice.downlink.frame.total")
+                .tag("result", "accepted").counter();
+        Counter dropped = registry.find("hotline_voice.downlink.frame.total")
+                .tag("result", "dropped").counter();
+        assertThat(accepted.count()).isEqualTo(2.0);
+        assertThat(dropped.count()).isEqualTo(1.0);
+
+        assertThat(registry.find("hotline_voice.degrade.total").tag("reason", "llm_error").counter().count())
+                .isEqualTo(1.0);
+        assertThat(registry.find("hotline_voice.degrade.total").tag("reason", "robot_disabled").counter().count())
+                .isEqualTo(1.0);
+
+        long n6Within300 = registry.getMeters().stream()
+                .filter(mt -> mt.getId().getName().equals("hotline_voice.bargein.stop.ms")
+                        && "within300".equals(mt.getId().getTag("result")))
+                .mapToLong(mt -> ((Timer) mt).count()).sum();
+        long n6Over300 = registry.getMeters().stream()
+                .filter(mt -> mt.getId().getName().equals("hotline_voice.bargein.stop.ms")
+                        && "over300".equals(mt.getId().getTag("result")))
+                .mapToLong(mt -> ((Timer) mt).count()).sum();
+        assertThat(n6Within300).isEqualTo(1L);
+        assertThat(n6Over300).isEqualTo(1L);
+    }
+
+    @Test
+    void n6VoiceSlo_noRegistry_allNoop()
+    {
+        HotlineMetrics m = new HotlineMetrics();
+        assertThatCode(() -> {
+            m.recordVoiceTtfwMs(10, "robot", "s3");
+            m.recordVoiceAsrFinalMs(10, "s3");
+            m.incrementVoiceDownlinkFrame(true);
+            m.incrementVoiceDownlinkFrame(false);
+            m.incrementVoiceDegrade("llm_error");
         }).doesNotThrowAnyException();
     }
 

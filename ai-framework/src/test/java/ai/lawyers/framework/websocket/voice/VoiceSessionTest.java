@@ -333,6 +333,9 @@ class VoiceSessionTest
         await(n -> type(n, "tts_audio"));
         verify(m, org.mockito.Mockito.timeout(2000).times(1)).recordVoiceTtsFirstMs(anyLong(), eq("sess-1"));
         verify(m, org.mockito.Mockito.timeout(2000).times(1)).recordVoiceE2eFirstMs(anyLong(), eq("sess-1"));
+        // N6：非 robot 模式首帧 TTFW（source=ask），同首分片只记一次
+        verify(m, org.mockito.Mockito.timeout(2000).times(1))
+                .recordVoiceTtfwMs(anyLong(), eq("ask"), eq("sess-1"));
 
         // 手动 bargein → recordVoiceBargeinStopMs(trigger=bargein)
         session.handleText("{\"type\":\"bargein\"}");
@@ -378,6 +381,52 @@ class VoiceSessionTest
         await(n -> type(n, "tts_audio"));
         session.handleText("{\"type\":\"bargein\"}");
         await(n -> type(n, "tts_end") && n.path("interrupted").asBoolean(false));
+    }
+
+    // ---------- N6（语雀 7.8）：语音 SLO 埋点 ----------
+
+    @Test
+    void n6AsrFinal_recordedOnceAfterVadSpeechEnd() throws Exception
+    {
+        HotlineMetrics m = mock(HotlineMetrics.class);
+        session.shutdown();
+        session = new VoiceSession(wsSession, "sess-1", "agent", 1000, null, true, m);
+        session.handleText("{\"type\":\"start\"}");
+        await(n -> type(n, "started"));
+
+        // 有声 → speechStart；400ms 尾静默 → speechEnd 锚定
+        session.handleBinary(sine16k(3));
+        await(n -> type(n, "vad_speech_start"));
+        session.handleBinary(new byte[20 * 320 * 2]);
+        await(n -> type(n, "vad_speech_end"));
+        // stop 触发 mock 引擎 onFinal → ASR final 耗时（一段只记一次）
+        session.handleText("{\"type\":\"stop\"}");
+        await(n -> type(n, "asr_final"));
+        verify(m, org.mockito.Mockito.timeout(2000).times(1)).recordVoiceAsrFinalMs(anyLong(), eq("sess-1"));
+    }
+
+    @Test
+    void n6Ttfw_robotModeTaggedRobot() throws Exception
+    {
+        HotlineMetrics m = mock(HotlineMetrics.class);
+        ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotService robot =
+                mock(ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotService.class);
+        when(robot.answer(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any()))
+                .thenReturn(ai.lawyers.system.service.lawyers.voice.robot.VoiceRobotResult.ok("建议申请劳动仲裁。"));
+        session.shutdown();
+        session = new VoiceSession(wsSession, "sess-1", "caller", 1000, null, true, m, robot);
+
+        session.handleText("{\"type\":\"start\",\"robot\":true}");
+        await(n -> type(n, "started"));
+        session.handleText("{\"type\":\"ask\",\"text\":\"欠薪怎么办\"}");
+        await(n -> type(n, "tts_audio"));
+
+        // robot 模式应答首帧 → TTFW source=robot
+        verify(m, org.mockito.Mockito.timeout(2000).times(1))
+                .recordVoiceTtfwMs(anyLong(), eq("robot"), eq("sess-1"));
+        verify(m, org.mockito.Mockito.never())
+                .recordVoiceTtfwMs(anyLong(), eq("ask"), eq("sess-1"));
     }
 
     // ---------- E3：语音机器人（ask 帧 / robot 自动应答） ----------

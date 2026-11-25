@@ -144,6 +144,44 @@ class VoiceRobotTurnRunnerTest
         JsonNode done = mapper.readTree(frames.get(1));
         assertThat(done.get("degraded").asBoolean()).isTrue();
         assertThat(tts).containsExactly("请稍候转人工");
+        // N6（语雀 7.8-6）：降级兜底计数，reason 透传
+        verify(metrics).incrementVoiceDegrade("robot_disabled");
+    }
+
+    @Test
+    void submitTurn_okResult_doesNotCountDegrade() throws Exception
+    {
+        when(robotService.answer("问题", SESSION, null)).thenReturn(VoiceRobotResult.ok("正常应答"));
+
+        newRunner();
+        runner.submitTurn("问题");
+        awaitTrue(() -> tts.size() == 1);
+
+        verify(metrics, never()).incrementVoiceDegrade(anyString());
+    }
+
+    @Test
+    void staleDegradedTurn_discardedWithoutDegradeMetric() throws Exception
+    {
+        CountDownLatch firstStarted = new CountDownLatch(1);
+        CountDownLatch releaseFirst = new CountDownLatch(1);
+        when(robotService.answer("旧问题", SESSION, null)).thenAnswer(inv ->
+        {
+            firstStarted.countDown();
+            releaseFirst.await(WAIT_MS, TimeUnit.MILLISECONDS);
+            // 旧回合虽降级，但结果产出时已失效（迟到），不计降级指标
+            return VoiceRobotResult.degraded("旧兜底", "llm_error");
+        });
+        when(robotService.answer("新问题", SESSION, null)).thenReturn(VoiceRobotResult.ok("新应答"));
+
+        newRunner();
+        runner.submitTurn("旧问题");
+        assertStarted(firstStarted);
+        runner.submitTurn("新问题");
+        releaseFirst.countDown();
+
+        awaitTrue(() -> tts.size() == 1);
+        verify(metrics, never()).incrementVoiceDegrade(anyString());
     }
 
     @Test

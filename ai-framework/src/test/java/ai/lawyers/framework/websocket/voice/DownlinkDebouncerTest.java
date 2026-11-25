@@ -1,12 +1,18 @@
 package ai.lawyers.framework.websocket.voice;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
 
 /**
  * {@link DownlinkDebouncer} 测试：窗口钳制 100~200、满窗排空、未满窗 flush 补写、
@@ -25,6 +31,9 @@ class DownlinkDebouncerTest
 
         boolean failNext;
 
+        /** N6：write 返回值桩（默认受理） */
+        boolean accept = true;
+
         @Override
         public boolean write(byte[] pcm, int sampleRate)
         {
@@ -35,7 +44,7 @@ class DownlinkDebouncerTest
             }
             chunks.add(pcm);
             rates.add(sampleRate);
-            return true;
+            return accept;
         }
     }
 
@@ -132,6 +141,63 @@ class DownlinkDebouncerTest
         d.offer(msPcm(50, 16000), 0);
         d.flush();
         assertThat(sink.chunks).isEmpty();
+    }
+
+    /* ================= N6（语雀 7.8-4）：下行帧 accepted/dropped 打点 ================= */
+
+    @Test
+    void n6受理帧计accepted()
+    {
+        PbxDownlinkAudioSink sink = mock(PbxDownlinkAudioSink.class);
+        when(sink.write(org.mockito.ArgumentMatchers.any(byte[].class),
+                org.mockito.ArgumentMatchers.anyInt())).thenReturn(true);
+        HotlineMetrics metrics = mock(HotlineMetrics.class);
+        DownlinkDebouncer d = new DownlinkDebouncer(sink, 100, metrics);
+
+        d.offer(msPcm(120, 16000), 16000);
+        d.offer(msPcm(120, 16000), 16000);
+
+        verify(metrics, times(2)).incrementVoiceDownlinkFrame(true);
+        verify(metrics, never()).incrementVoiceDownlinkFrame(false);
+    }
+
+    @Test
+    void n6拒绝帧计dropped()
+    {
+        PbxDownlinkAudioSink sink = mock(PbxDownlinkAudioSink.class);
+        when(sink.write(org.mockito.ArgumentMatchers.any(byte[].class),
+                org.mockito.ArgumentMatchers.anyInt())).thenReturn(false);
+        HotlineMetrics metrics = mock(HotlineMetrics.class);
+        DownlinkDebouncer d = new DownlinkDebouncer(sink, 100, metrics);
+
+        d.offer(msPcm(120, 16000), 16000);
+
+        verify(metrics).incrementVoiceDownlinkFrame(false);
+        verify(metrics, never()).incrementVoiceDownlinkFrame(true);
+    }
+
+    @Test
+    void n6写异常计dropped且不外抛()
+    {
+        CapturingSink sink = new CapturingSink();
+        sink.failNext = true;
+        HotlineMetrics metrics = mock(HotlineMetrics.class);
+        DownlinkDebouncer d = new DownlinkDebouncer(sink, 100, metrics);
+
+        d.offer(msPcm(150, 16000), 16000);
+
+        verify(metrics).incrementVoiceDownlinkFrame(false);
+    }
+
+    @Test
+    void n6metrics可空时行为不变()
+    {
+        CapturingSink sink = new CapturingSink();
+        // 两参构造器（metrics 缺省）：无埋点路径，防抖行为保持
+        DownlinkDebouncer d = new DownlinkDebouncer(sink, 100);
+        d.offer(msPcm(120, 16000), 16000);
+        d.flush();
+        assertThat(sink.chunks).hasSize(1);
     }
 
     @Test

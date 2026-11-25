@@ -39,7 +39,12 @@ import io.micrometer.core.instrument.Timer;
  *   <li>hotline_voice_asr_first_ms            A5：ASR 流式首包（start→首 partial，预算 280ms）</li>
  *   <li>hotline_voice_tts_first_ms            A5：TTS 首包（tts 帧→首音频分片，预算 200ms）</li>
  *   <li>hotline_voice_e2e_first_ms{source}    A5：端到端首响（start=会话起点≈1.2s；robot=E3 机器人回合 ASR final→首 TTS 分片）</li>
- *   <li>hotline_voice_bargein_stop_ms         A5：打断停止耗时（VAD/bargein→tts_end 入队，预算 300ms）</li>
+ *   <li>hotline_voice_bargein_stop_ms         A5：打断停止耗时（VAD/bargein→tts_end 入队，预算 300ms；N6 追加 result 标签 within300/over300，Grafana 算打断成功率）</li>
+ *   <li>hotline_voice_ttfw_ms{source}         N6（语雀 7.8-1）：用户停止说话→首帧音频下发 TTFW（预算 P95 1500ms，source ∈ robot/ask）</li>
+ *   <li>hotline_voice_asr_final_ms            N6（语雀 7.8-2）：语音段结束→ASR final（预算 P95 800ms）</li>
+ *   <li>hotline_voice_downlink_frame_total{result} N6（语雀 7.8-4）：PBX 下行帧（accepted/dropped，Grafana 算丢帧率，>0.5% 告警）</li>
+ *   <li>hotline_voice_degrade_total{reason}   N6（语雀 7.8-6）：机器人降级兜底次数（5min>5 告警）</li>
+ *   <li>ai_model_cost_per_call                语雀 7.8-9 单通成本：当前模型响应无成本字段，本地不可做，待账单/定价数据源就绪后补埋点</li>
  *   <li>hotline_voice_rag_ms                  E3：机器人 RAG 检索（预算 40ms）</li>
  *   <li>hotline_voice_llm_first_token_ms      E3：机器人 LLM 首 token（预算 600ms，非流式期口径=整段返回）</li>
  *   <li>hotline_voice_emotion_total{level}    E4：实时情绪识别触发（urgent/negative）</li>
@@ -81,6 +86,10 @@ public class HotlineMetrics
     public static final long BUDGET_VOICE_RAG_MS = 40;
     /** E3：LLM 首 token 预算（当前为非流式 chat，口径=调用返回耗时，流式化后为真实首 token） */
     public static final long BUDGET_VOICE_LLM_FIRST_TOKEN_MS = 600;
+    /** N6（语雀 7.8-1）：用户停止说话→首帧音频下发（TTFW）预算，P95 超 1500ms 告警 */
+    public static final long BUDGET_VOICE_TTFW_MS = 1500;
+    /** N6（语雀 7.8-2）：语音段结束→ASR final 预算，P95 超 800ms 告警 */
+    public static final long BUDGET_VOICE_ASR_FINAL_MS = 800;
 
     @Autowired(required = false)
     @Qualifier("prometheusMeterRegistry")
@@ -216,10 +225,18 @@ public class HotlineMetrics
         }
     }
 
-    /** barge-in 打断停止耗时（预算 {@link #BUDGET_VOICE_BARGEIN_STOP_MS}ms）；trigger ∈ vad/bargein */
+    /**
+     * barge-in 打断停止耗时（预算 {@link #BUDGET_VOICE_BARGEIN_STOP_MS}ms）；trigger ∈ vad/bargein。
+     *
+     * <p>N6（语雀 7.8-5）：追加 result 标签——within300（≤预算，300ms 内停播成功）/
+     * over300（超预算），Grafana 用 {@code rate(...result="within300") / rate(...)}
+     * 计算打断成功率 voice_bargein_success_ratio（&lt;95% 告警），不再单设指标。</p>
+     */
     public void recordVoiceBargeinStopMs(long elapsedMs, String trigger, String sessionId)
     {
-        timer("voice.bargein.stop.ms", "trigger", trigger).record(elapsedMs, TimeUnit.MILLISECONDS);
+        String result = elapsedMs <= BUDGET_VOICE_BARGEIN_STOP_MS ? "within300" : "over300";
+        timer("voice.bargein.stop.ms", "trigger", trigger, "result", result)
+                .record(elapsedMs, TimeUnit.MILLISECONDS);
         if (elapsedMs > BUDGET_VOICE_BARGEIN_STOP_MS)
         {
             log.warn("[A5预算超支] barge-in 停止 {}ms > {}ms, trigger={}, sessionId={}",
@@ -231,6 +248,55 @@ public class HotlineMetrics
     public void incrementVoiceEmotion(String level)
     {
         counter("voice.emotion.total", "level", level).increment();
+    }
+
+    /* ================= N6（语雀 7.8）：语音 SLO 指标 ================= */
+
+    /**
+     * N6-1：用户停止说话→首帧音频下发 TTFW（预算 {@link #BUDGET_VOICE_TTFW_MS}ms，P95 超 1500ms 告警）。
+     *
+     * @param source robot（机器人自动应答回合）/ ask（显式提问或 tts 帧）
+     */
+    public void recordVoiceTtfwMs(long elapsedMs, String source, String sessionId)
+    {
+        timer("voice.ttfw.ms", "source", source).record(elapsedMs, TimeUnit.MILLISECONDS);
+        if (elapsedMs > BUDGET_VOICE_TTFW_MS)
+        {
+            log.warn("[N6预算超支] TTFW 首帧下发 {}ms > {}ms, source={}, sessionId={}",
+                    elapsedMs, BUDGET_VOICE_TTFW_MS, source, sessionId);
+        }
+    }
+
+    /** N6-2：语音段结束（VAD speechEnd）→ ASR final 耗时（预算 {@link #BUDGET_VOICE_ASR_FINAL_MS}ms，P95 超 800ms 告警） */
+    public void recordVoiceAsrFinalMs(long elapsedMs, String sessionId)
+    {
+        timer("voice.asr.final.ms").record(elapsedMs, TimeUnit.MILLISECONDS);
+        if (elapsedMs > BUDGET_VOICE_ASR_FINAL_MS)
+        {
+            log.warn("[N6预算超支] ASR final {}ms > {}ms, sessionId={}",
+                    elapsedMs, BUDGET_VOICE_ASR_FINAL_MS, sessionId);
+        }
+    }
+
+    /**
+     * N6-4：PBX 下行帧计数（防抖窗口合片写入 sink 一次记一帧）。
+     * Grafana 用 {@code rate(...result="dropped") / rate(...)} 计算 voice_downlink_drop_ratio（&gt;0.5% 告警）。
+     *
+     * @param accepted true=sink 受理；false=sink 拒绝（write 返回 false）或写异常导致分片丢弃
+     */
+    public void incrementVoiceDownlinkFrame(boolean accepted)
+    {
+        counter("voice.downlink.frame.total", "result", accepted ? "accepted" : "dropped").increment();
+    }
+
+    /**
+     * N6-6：机器人降级到 Mock/兜底话术计数（5 分钟窗口 &gt;5 告警）。
+     *
+     * @param reason ∈ empty_question/robot_disabled/llm_error/llm_empty（VoiceRobotResult.fallbackReason）
+     */
+    public void incrementVoiceDegrade(String reason)
+    {
+        counter("voice.degrade.total", "reason", reason).increment();
     }
 
     /** F4：Copilot 实时辅助回合计数（一次要素+法条+工单辅助完成记一次） */

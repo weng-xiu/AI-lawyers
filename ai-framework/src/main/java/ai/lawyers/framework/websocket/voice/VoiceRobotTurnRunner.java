@@ -165,6 +165,11 @@ final class VoiceRobotTurnRunner
         {
             return;
         }
+        // N6（语雀 7.8-6）：降级兜底计数（迟到回合已在上面丢弃，不计入）
+        if (metrics != null && result.isDegraded())
+        {
+            metrics.incrementVoiceDegrade(result.getFallbackReason());
+        }
         host.send(VoiceFrames.answerDelta(turnId, 0, result.getAnswer()));
         host.send(VoiceFrames.answerDone(turnId, result.getRagHits(),
                 result.getSources(), result.isDegraded()));

@@ -108,6 +108,12 @@ public class VoiceSession
     private final AtomicBoolean ttsFirstMarked = new AtomicBoolean();
     /** start 后首包 TTS 音频已上报标记（E2E 只记一次） */
     private final AtomicBoolean e2eFirstMarked = new AtomicBoolean();
+    /** N6：最近一次 VAD 语音段结束时刻（ASR final 耗时起点；0=尚无 speechEnd） */
+    private volatile long speechEndNanos;
+    /** N6：本语音段 ASR final 已上报标记（新 start 重置，一段只记一次） */
+    private final AtomicBoolean asrFinalMarked = new AtomicBoolean();
+    /** N6：本会话 TTFW（停止说话→首帧音频）已上报标记（新 start/新 tts 请求重置） */
+    private final AtomicBoolean ttfwMarked = new AtomicBoolean();
 
     /* ---- #1 下行媒体预留（PBX 侧空实现；媒体桥接就绪后替换 sink 即可） ---- */
     /** 下行防抖缓冲（attach 时创建，内含 sink 引用；可空=未挂下行） */
@@ -235,7 +241,7 @@ public class VoiceSession
      */
     void attachDownlinkSink(PbxDownlinkAudioSink sink, int bufferMs)
     {
-        this.downlinkDebouncer = sink == null ? null : new DownlinkDebouncer(sink, bufferMs);
+        this.downlinkDebouncer = sink == null ? null : new DownlinkDebouncer(sink, bufferMs, metrics);
         log.info("VoiceWS downlink sink attached conn={} sink={} bufferMs={}", connId,
                 sink == null ? "none" : sink.getClass().getSimpleName(),
                 downlinkDebouncer == null ? -1 : downlinkDebouncer.getBufferMillis());
@@ -469,6 +475,10 @@ public class VoiceSession
         this.asrFirstMarked.set(false);
         this.ttsFirstMarked.set(false);
         this.e2eFirstMarked.set(false);
+        // N6：重置语音 SLO 一次性标记（新识别流重新计 ASR final/TTFW）
+        this.speechEndNanos = 0L;
+        this.asrFinalMarked.set(false);
+        this.ttfwMarked.set(false);
         VoiceAsrContext ctx = new VoiceAsrContext(sessionId, role, "pcm", rate);
         engineInstance.open(ctx, new AsrStreamCallback()
         {
@@ -493,6 +503,12 @@ public class VoiceSession
             {
                 if (!shutdown.get())
                 {
+                    // N6：语音段结束→ASR final 耗时（speechEndNanos 由 VAD speechEnd 锚定，一段只记一次）
+                    long speechEnd = speechEndNanos;
+                    if (metrics != null && speechEnd > 0 && asrFinalMarked.compareAndSet(false, true))
+                    {
+                        metrics.recordVoiceAsrFinalMs(nanosToMs(System.nanoTime() - speechEnd), sessionId);
+                    }
                     enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.asr(VoiceFrames.T_ASR_FINAL, asrSeq.incrementAndGet(), text));
                     // E4：final 完整识别（urgent/negative）
                     detectEmotion(text, true);
@@ -588,6 +604,8 @@ public class VoiceSession
         // A5：TTS 首包计时起点（新请求重置，覆盖旧任务）
         this.ttsStartNanos = System.nanoTime();
         this.ttsFirstMarked.set(false);
+        // N6：每次合成请求重置 TTFW 标记（同一识别流内多轮播报各自计一次首帧）
+        this.ttfwMarked.set(false);
         // A2/A3：TTS 引擎跟随 start 帧选定的引擎（mock/dashscope）
         StreamTtsEngine ttsEngine = engineRegistry.createTts(this.engine);
         if (ttsEngine == null)
@@ -615,6 +633,12 @@ public class VoiceSession
                         if (metrics != null && e2eFirstMarked.compareAndSet(false, true))
                         {
                             metrics.recordVoiceE2eFirstMs(nanosToMs(System.nanoTime() - startNanos), sessionId);
+                        }
+                        // N6：TTFW（停止说话→首帧音频下发，会话口径锚点同 E2E；robot 回合精确口径由 TurnRunner 的 e2e robot 覆盖）
+                        if (metrics != null && ttfwMarked.compareAndSet(false, true))
+                        {
+                            metrics.recordVoiceTtfwMs(nanosToMs(System.nanoTime() - startNanos),
+                                    robotMode ? "robot" : "ask", sessionId);
                         }
                         // E3：机器人回合 E2E（问题就绪→应答首个音频分片，仅记一次）
                         robot.markE2eIfNeeded();
@@ -782,6 +806,9 @@ public class VoiceSession
     {
         if (!shutdown.get())
         {
+            // N6：锚定语音段结束时刻，作为 ASR final 耗时起点（下一段 speechStart 后可被再次覆盖）
+            this.speechEndNanos = System.nanoTime();
+            this.asrFinalMarked.set(false);
             enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.vad(VoiceFrames.T_VAD_SPEECH_END));
         }
     }

@@ -3,6 +3,7 @@ package ai.lawyers.framework.websocket.voice;
 import java.io.ByteArrayOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
 
 /**
  * #1：下行防抖缓冲（100~200ms 参数化）。
@@ -32,6 +33,9 @@ public class DownlinkDebouncer
 
     private final int bufferMillis;
 
+    /** N6：指标门面（null 时丢帧埋点静默跳过，不影响防抖行为） */
+    private final HotlineMetrics metrics;
+
     private final ByteArrayOutputStream buf = new ByteArrayOutputStream(8192);
 
     /** 已累积时长（纳秒） */
@@ -42,7 +46,13 @@ public class DownlinkDebouncer
 
     public DownlinkDebouncer(PbxDownlinkAudioSink sink, int bufferMillis)
     {
+        this(sink, bufferMillis, null);
+    }
+
+    public DownlinkDebouncer(PbxDownlinkAudioSink sink, int bufferMillis, HotlineMetrics metrics)
+    {
         this.sink = sink;
+        this.metrics = metrics;
         int b = bufferMillis;
         if (b < MIN_BUFFER_MS)
         {
@@ -120,13 +130,19 @@ public class DownlinkDebouncer
         byte[] out = buf.toByteArray();
         buf.reset();
         bufferedNanos = 0;
+        // N6：sink 拒绝（false）或写异常均计 dropped，供 Grafana 算下行丢帧率
+        boolean accepted = false;
         try
         {
-            sink.write(out, lastRate);
+            accepted = sink.write(out, lastRate);
         }
         catch (Exception e)
         {
             log.warn("[PbxDownlink] sink 写入异常（分片丢弃）: {}", e.getMessage());
+        }
+        if (metrics != null)
+        {
+            metrics.incrementVoiceDownlinkFrame(accepted);
         }
     }
 
