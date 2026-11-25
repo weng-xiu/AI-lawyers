@@ -34,6 +34,7 @@ import com.sun.net.httpserver.HttpServer;
 import ai.lawyers.system.domain.lawyers.AiLegalKnowledgeChunk;
 import ai.lawyers.system.domain.lawyers.stat.AiModelCallLog;
 import ai.lawyers.system.mapper.lawyers.AiLegalKnowledgeChunkMapper;
+import ai.lawyers.system.mapper.lawyers.AiLegalKnowledgeMapper;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
 import ai.lawyers.system.service.lawyers.stat.AiModelCallLogRecorder;
@@ -52,6 +53,8 @@ import ai.lawyers.system.service.lawyers.stat.ModelUsage;
 class RagSearchServiceTest
 {
     private AiLegalKnowledgeChunkMapper chunkMapper;
+
+    private AiLegalKnowledgeMapper knowledgeMapper;
 
     private IAiModelConfigService modelConfigService;
 
@@ -73,6 +76,7 @@ class RagSearchServiceTest
     void setUp() throws IOException
     {
         chunkMapper = mock(AiLegalKnowledgeChunkMapper.class);
+        knowledgeMapper = mock(AiLegalKnowledgeMapper.class);
         modelConfigService = mock(IAiModelConfigService.class);
         vectorIndex = mock(VectorIndex.class);
         metrics = mock(HotlineMetrics.class);
@@ -81,6 +85,7 @@ class RagSearchServiceTest
 
         service = new RagSearchService();
         ReflectionTestUtils.setField(service, "chunkMapper", chunkMapper);
+        ReflectionTestUtils.setField(service, "knowledgeMapper", knowledgeMapper);
         ReflectionTestUtils.setField(service, "modelConfigService", modelConfigService);
         ReflectionTestUtils.setField(service, "vectorIndex", vectorIndex);
         ReflectionTestUtils.setField(service, "metrics", metrics);
@@ -95,6 +100,10 @@ class RagSearchServiceTest
         ReflectionTestUtils.setField(service, "rerankApiKey", "");
         ReflectionTestUtils.setField(service, "chunkMaxLen", 10);
         service.init();
+
+        // N3：默认全库存在有效知识，resolveActiveScope 全库路返回 null（等同旧行为，不影响既有断言）
+        when(knowledgeMapper.selectActiveKnowledgeIds(any()))
+                .thenReturn(Collections.singletonList(999L));
 
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         context("/ok", 200, "{\"results\":[{\"index\":1,\"relevance_score\":0.9},"
@@ -494,6 +503,65 @@ class RagSearchServiceTest
                 .thenReturn(Collections.singletonList(chunk(1L, 11L, "合同")));
 
         assertThat(service.search("合同", null)).hasSize(1);
+    }
+
+    // ---------- N3：运行时效力过滤（失效/修订法条零召回） ----------
+
+    @Test
+    void explicitScopeAllInvalidReturnsEmptyAndNoneRoute()
+    {
+        // 调用方限定的两个知识均已失效/修订，有效集合求交为空 → 直接零召回，不触分块检索
+        when(knowledgeMapper.selectActiveKnowledgeIds(Arrays.asList(11L, 12L)))
+                .thenReturn(new ArrayList<>());
+
+        assertThat(service.search("劳动合同", Arrays.asList(11L, 12L))).isEmpty();
+
+        verify(chunkMapper, never()).searchByFulltext(any(), any(), anyInt());
+        verify(chunkMapper, never()).searchByLike(any(), any(), anyInt());
+        verify(metrics).incrementRagHit("none");
+        verify(queryLogRecorder).record(eq("劳动合同"), anyString(), isNull(), eq("none"), anyLong());
+    }
+
+    @Test
+    void explicitScopeIntersectsActiveSetBeforeRecall()
+    {
+        // 显式范围 11/12/13 中仅 11、13 仍有效：关键词路只能收到求交后的范围
+        when(knowledgeMapper.selectActiveKnowledgeIds(Arrays.asList(11L, 12L, 13L)))
+                .thenReturn(Arrays.asList(11L, 13L));
+        when(chunkMapper.searchByFulltext(eq("合同"), eq(Arrays.asList(11L, 13L)), eq(20)))
+                .thenReturn(Collections.singletonList(chunk(1L, 11L, "合同")));
+
+        List<RagChunk> hits = service.search("合同", Arrays.asList(11L, 12L, 13L));
+
+        assertThat(hits).extracting(RagChunk::getChunkId).containsExactly(1L);
+        verify(metrics).incrementRagHit("keyword");
+    }
+
+    @Test
+    void fullScanWithoutAnyActiveKnowledgeReturnsEmpty()
+    {
+        // 全库检索（scope=null）但库中已无有效知识 → 零召回
+        when(knowledgeMapper.selectActiveKnowledgeIds(isNull())).thenReturn(new ArrayList<>());
+
+        assertThat(service.search("继承", null)).isEmpty();
+
+        verify(chunkMapper, never()).searchByFulltext(any(), any(), anyInt());
+        verify(metrics).incrementRagHit("none");
+    }
+
+    @Test
+    void activeScopeQueryFailureDegradesToOriginalScope()
+    {
+        // 有效集合查询故障不阻断主链路：降级使用原 scope，关键词路照常召回
+        when(knowledgeMapper.selectActiveKnowledgeIds(anyList()))
+                .thenThrow(new IllegalStateException("db down"));
+        when(chunkMapper.searchByFulltext(eq("工资"), eq(Arrays.asList(13L)), eq(20)))
+                .thenReturn(Collections.singletonList(chunk(3L, 13L, "工资")));
+
+        List<RagChunk> hits = service.search("工资", Arrays.asList(13L));
+
+        assertThat(hits).extracting(RagChunk::getChunkId).containsExactly(3L);
+        verify(metrics).incrementRagHit("keyword");
     }
 
     private com.fasterxml.jackson.databind.JsonNode read(ObjectMapper om, String json)

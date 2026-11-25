@@ -12,12 +12,15 @@ import java.util.Arrays;
 import java.util.Collections;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.test.util.ReflectionTestUtils;
 import ai.lawyers.common.exception.ServiceException;
+import ai.lawyers.system.domain.lawyers.AiKnowledgeAudit;
 import ai.lawyers.system.domain.lawyers.AiLegalKnowledge;
 import ai.lawyers.system.mapper.SysUserMapper;
+import ai.lawyers.system.mapper.lawyers.AiKnowledgeAuditMapper;
 import ai.lawyers.system.mapper.lawyers.AiLegalKnowledgeMapper;
 import ai.lawyers.system.service.lawyers.queue.MessageNotifyDispatcher;
 import ai.lawyers.system.service.lawyers.rag.IRagIndexService;
@@ -38,6 +41,7 @@ class AiLegalKnowledgeServiceImplTest
     @Mock private IRagIndexService ragIndexService;
     @Mock private MessageNotifyDispatcher messageNotifyDispatcher;
     @Mock private SysUserMapper sysUserMapper;
+    @Mock private AiKnowledgeAuditMapper knowledgeAuditMapper;
 
     @BeforeEach
     void setUp()
@@ -48,6 +52,7 @@ class AiLegalKnowledgeServiceImplTest
         ReflectionTestUtils.setField(service, "ragIndexService", ragIndexService);
         ReflectionTestUtils.setField(service, "messageNotifyDispatcher", messageNotifyDispatcher);
         ReflectionTestUtils.setField(service, "sysUserMapper", sysUserMapper);
+        ReflectionTestUtils.setField(service, "knowledgeAuditMapper", knowledgeAuditMapper);
     }
 
     private AiLegalKnowledge givenKnowledge()
@@ -138,5 +143,66 @@ class AiLegalKnowledgeServiceImplTest
 
         assertEquals(1, rows);
         verify(ragIndexService).rebuildKnowledgeAsync(KID);
+    }
+
+    // ---------- N3：效力变更 ai_knowledge_audit 留痕（VALID_STATUS） ----------
+
+    @Test
+    void markValidStatus_writesValidStatusAuditTrail()
+    {
+        when(knowledgeMapper.selectAiLegalKnowledgeById(KID)).thenReturn(givenKnowledge());
+        when(knowledgeMapper.updateAiLegalKnowledge(any())).thenReturn(1);
+        when(sysUserMapper.selectUserIdsByRoleKey("admin"))
+                .thenReturn(Collections.singletonList(1L));
+
+        service.markValidStatus(KID, "3", "新法已取代", "admin01");
+
+        ArgumentCaptor<AiKnowledgeAudit> captor = ArgumentCaptor.forClass(AiKnowledgeAudit.class);
+        verify(knowledgeAuditMapper).insertAiKnowledgeAudit(captor.capture());
+        AiKnowledgeAudit audit = captor.getValue();
+        assertEquals(KID, audit.getKnowledgeId());
+        assertEquals("中华人民共和国民法典", audit.getTitle());
+        assertEquals("VALID_STATUS", audit.getAction());
+        assertEquals("1", audit.getFromStatus());
+        assertEquals("3", audit.getToStatus());
+        assertEquals("新法已取代", audit.getAuditOpinion());
+        assertEquals("admin01", audit.getAuditor());
+    }
+
+    @Test
+    void markValidStatus_auditFailure_doesNotBreakMainFlow()
+    {
+        when(knowledgeMapper.selectAiLegalKnowledgeById(KID)).thenReturn(givenKnowledge());
+        when(knowledgeMapper.updateAiLegalKnowledge(any())).thenReturn(1);
+        // 留痕落库异常被吞掉，不影响效力变更返回与索引刷新
+        org.mockito.Mockito.doThrow(new RuntimeException("audit table down"))
+                .when(knowledgeAuditMapper).insertAiKnowledgeAudit(any());
+
+        int rows = service.markValidStatus(KID, "2", "条文修订", "admin01");
+
+        assertEquals(1, rows);
+        verify(knowledgeAuditMapper).insertAiKnowledgeAudit(any());
+        verify(ragIndexService).rebuildKnowledgeAsync(KID);
+    }
+
+    @Test
+    void markValidStatus_blankOperatorAndReason_useDefaults()
+    {
+        AiLegalKnowledge blank = givenKnowledge();
+        blank.setValidStatus(null); // 旧效力为空时留痕 fromStatus 回退为 "1"
+        when(knowledgeMapper.selectAiLegalKnowledgeById(KID)).thenReturn(blank);
+        when(knowledgeMapper.updateAiLegalKnowledge(any())).thenReturn(1);
+
+        service.markValidStatus(KID, "2", null, null);
+
+        ArgumentCaptor<AiKnowledgeAudit> captor = ArgumentCaptor.forClass(AiKnowledgeAudit.class);
+        verify(knowledgeAuditMapper).insertAiKnowledgeAudit(captor.capture());
+        AiKnowledgeAudit audit = captor.getValue();
+        assertEquals("VALID_STATUS", audit.getAction());
+        assertEquals("1", audit.getFromStatus());
+        assertEquals("2", audit.getToStatus());
+        assertEquals("法规效力状态变更", audit.getAuditOpinion());
+        assertEquals("system", audit.getAuditor());
+        assertEquals("system", audit.getCreateBy());
     }
 }

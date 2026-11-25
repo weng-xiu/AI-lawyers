@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.system.domain.lawyers.AiLegalKnowledgeChunk;
 import ai.lawyers.system.mapper.lawyers.AiLegalKnowledgeChunkMapper;
+import ai.lawyers.system.mapper.lawyers.AiLegalKnowledgeMapper;
 import ai.lawyers.system.domain.lawyers.stat.AiModelCallLog;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
@@ -57,6 +58,10 @@ public class RagSearchService
 
     @Autowired
     private AiLegalKnowledgeChunkMapper chunkMapper;
+
+    /** N3：知识主表 Mapper，用于检索运行时效力过滤（失效/修订/下架/未过审法条零召回） */
+    @Autowired
+    private AiLegalKnowledgeMapper knowledgeMapper;
 
     @Autowired
     private IAiModelConfigService modelConfigService;
@@ -171,11 +176,25 @@ public class RagSearchService
         long start = System.currentTimeMillis();
         int cand = candidateSize > 0 ? candidateSize : 20;
 
+        // N3：运行时效力过滤——与建索引口径一致（启用+审核通过+现行有效）。
+        // 即使失效条目的旧分块尚未完成异步索引重建，也会因 knowledgeId 不在有效集合而被拦截。
+        List<Long> allowedIds = resolveActiveScope(knowledgeIds);
+        if (allowedIds != null && allowedIds.isEmpty())
+        {
+            // 调用方显式限定的范围内已无有效知识（或全部失效/下架），直接零召回
+            if (metrics != null)
+            {
+                metrics.incrementRagHit("none");
+            }
+            recordQueryLog(query, scene, null, "none", start);
+            return new ArrayList<>();
+        }
+
         // ① 关键词路：FULLTEXT 优先，异常/无结果退回 LIKE
-        List<AiLegalKnowledgeChunk> keywordHits = keywordRoute(query, knowledgeIds, cand);
+        List<AiLegalKnowledgeChunk> keywordHits = keywordRoute(query, allowedIds, cand);
 
         // ② 向量路：embedding + 内存近邻；任何异常（未配置/服务不可用）都降级跳过
-        List<RagChunk> vectorHits = vectorRoute(query, knowledgeIds, cand);
+        List<RagChunk> vectorHits = vectorRoute(query, allowedIds, cand);
 
         // ③ RRF 融合
         Map<Long, RagChunk> fused = rrfFuse(keywordHits, vectorHits);
@@ -207,6 +226,42 @@ public class RagSearchService
                 ? new ArrayList<>(candidates.subList(0, k)) : candidates;
         recordQueryLog(query, scene, result, route, start);
         return result;
+    }
+
+    /**
+     * N3：解析本次检索的有效知识范围。
+     *
+     * <ul>
+     *   <li>入参 {@code scope} 为 null（全库检索）：查全库有效ID，数据正常时返回 null
+     *       表示不在 SQL/内存层加 knowledgeId 限定（有效过滤已由查询本身保证）；
+     *       若查得有效集合为空则返回空列表，调用方据此零召回。</li>
+     *   <li>入参非空（显式限定范围）：与有效集合求交，返回交集（可能为空列表）。</li>
+     * </ul>
+     * 任何 DB 异常都降级为原 scope（不因治理过滤故障阻断问答主链路）。
+     */
+    private List<Long> resolveActiveScope(List<Long> scope)
+    {
+        try
+        {
+            boolean fullScan = scope == null || scope.isEmpty();
+            List<Long> activeIds = knowledgeMapper.selectActiveKnowledgeIds(fullScan ? null : scope);
+            if (activeIds == null)
+            {
+                activeIds = new ArrayList<>();
+            }
+            if (fullScan)
+            {
+                // 全库：无有效知识→空列表（零召回）；否则返回 null 不加 knowledgeId 限定
+                return activeIds.isEmpty() ? new ArrayList<>() : null;
+            }
+            return activeIds;
+        }
+        catch (Exception e)
+        {
+            // 治理过滤查询故障不阻断检索：退回原范围，保持主链路可用
+            log.warn("N3 有效知识范围查询失败，降级为不过滤效力：{}", e.getMessage());
+            return scope;
+        }
     }
 
     /** F8：异步记录检索查询日志，任何异常都不影响检索结果 */

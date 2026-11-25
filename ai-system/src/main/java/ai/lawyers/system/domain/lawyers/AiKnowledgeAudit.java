@@ -11,7 +11,8 @@ import ai.lawyers.common.core.domain.BaseEntity;
  * 知识库审核发布流水对象 ai_knowledge_audit（F7）
  *
  * <p>记录知识条目"草稿→待审核→已发布→已下线"全过程动作留痕：
- * SUBMIT 提交 / APPROVE 通过 / REJECT 驳回 / PUBLISH 发布 / OFFLINE 下线。</p>
+ * SUBMIT 提交 / APPROVE 通过 / REJECT 驳回 / PUBLISH 发布 / OFFLINE 下线 /
+ * VALID_STATUS 效力状态变更（N3：现行有效/已修订/已失效，含失效法条下线留痕）。</p>
  *
  * @author ai-lawyers
  */
@@ -29,7 +30,7 @@ public class AiKnowledgeAudit extends BaseEntity
 
     private Integer publishVersion;
 
-    /** 动作 SUBMIT/APPROVE/REJECT/PUBLISH/OFFLINE */
+    /** 动作 SUBMIT/APPROVE/REJECT/PUBLISH/OFFLINE/VALID_STATUS */
     @Excel(name = "动作")
     private String action;
 

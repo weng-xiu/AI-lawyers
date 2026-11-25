@@ -101,6 +101,20 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where status = '0' and audit_status = '1'
         and (valid_status is null or valid_status = '1')
     </select>
+
+    <!-- N3：检索运行时有效知识ID（启用+审核通过+现行有效），scopeIds 非空时限定范围 -->
+    <select id="selectActiveKnowledgeIds" resultType="java.lang.Long">
+        select knowledge_id
+        from ai_legal_knowledge
+        where status = '0' and audit_status = '1'
+        and (valid_status is null or valid_status = '1')
+        <if test="scopeIds != null and scopeIds.size() > 0">
+            and knowledge_id in
+            <foreach item="kid" collection="scopeIds" open="(" separator="," close=")">
+                #{kid}
+            </foreach>
+        </if>
+    </select>
         
     <insert id="insertAiLegalKnowledge" parameterType="AiLegalKnowledge" useGeneratedKeys="true" keyProperty="knowledgeId">
         insert into ai_legal_knowledge

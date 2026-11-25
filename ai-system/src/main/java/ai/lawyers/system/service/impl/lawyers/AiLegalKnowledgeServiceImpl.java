@@ -35,6 +35,10 @@ public class AiLegalKnowledgeServiceImpl implements IAiLegalKnowledgeService
     @Autowired
     private ai.lawyers.system.mapper.SysUserMapper sysUserMapper;
 
+    /** N3：效力状态变更留痕（失效/修订/恢复均写 ai_knowledge_audit，满足可追溯验收） */
+    @Autowired
+    private ai.lawyers.system.mapper.lawyers.AiKnowledgeAuditMapper knowledgeAuditMapper;
+
     /**
      * 查询法律知识库
      * 
@@ -292,6 +296,7 @@ public class AiLegalKnowledgeServiceImpl implements IAiLegalKnowledgeService
         {
             throw new ServiceException("法律知识库不存在！");
         }
+        String fromValidStatus = knowledge.getValidStatus();
         knowledge.setValidStatus(validStatus);
         knowledge.setUpdateBy(StringUtils.isNotEmpty(operator) ? operator : "system");
         knowledge.setUpdateTime(DateUtils.getNowDate());
@@ -302,11 +307,43 @@ public class AiLegalKnowledgeServiceImpl implements IAiLegalKnowledgeService
         int rows = aiLegalKnowledgeMapper.updateAiLegalKnowledge(knowledge);
         if (rows > 0)
         {
+            // N3：效力变更写审核发布流水（VALID_STATUS 动作），留痕失败不阻断主流程
+            writeValidStatusAudit(knowledge, fromValidStatus, validStatus, reason, operator);
             // 失效/修订立即从向量索引移除（复用单条重建，内部已按 valid_status 过滤）
             ragIndexService.rebuildKnowledgeAsync(knowledgeId);
             notifyValidStatusChanged(knowledge, validStatus, reason);
         }
         return rows;
+    }
+
+    /** N3：效力状态变更留痕（动作 VALID_STATUS，from/to 记录新旧效力码） */
+    private void writeValidStatusAudit(AiLegalKnowledge knowledge, String from, String to,
+                                       String reason, String operator)
+    {
+        try
+        {
+            ai.lawyers.system.domain.lawyers.AiKnowledgeAudit audit =
+                    new ai.lawyers.system.domain.lawyers.AiKnowledgeAudit();
+            audit.setKnowledgeId(knowledge.getKnowledgeId());
+            audit.setTitle(knowledge.getTitle());
+            audit.setPublishVersion(knowledge.getPublishVersion());
+            audit.setAction("VALID_STATUS");
+            audit.setFromStatus(StringUtils.isNotEmpty(from) ? from : "1");
+            audit.setToStatus(to);
+            audit.setAuditOpinion(StringUtils.isNotEmpty(reason)
+                    ? StringUtils.substring(reason, 0, 500) : "法规效力状态变更");
+            String auditor = StringUtils.isNotEmpty(operator) ? operator : "system";
+            audit.setAuditor(auditor);
+            audit.setAuditTime(DateUtils.getNowDate());
+            audit.setCreateBy(auditor);
+            knowledgeAuditMapper.insertAiKnowledgeAudit(audit);
+        }
+        catch (Exception e)
+        {
+            // 留痕失败仅告警，不回滚效力变更与索引刷新
+            org.slf4j.LoggerFactory.getLogger(AiLegalKnowledgeServiceImpl.class)
+                    .warn("N3 效力变更留痕失败 knowledgeId={}：{}", knowledge.getKnowledgeId(), e.getMessage());
+        }
     }
 
     /** 给管理员角色发效力变更站内信提醒 */

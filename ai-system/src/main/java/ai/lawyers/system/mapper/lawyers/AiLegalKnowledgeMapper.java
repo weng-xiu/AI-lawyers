@@ -69,6 +69,18 @@ public interface AiLegalKnowledgeMapper
     public List<AiLegalKnowledge> selectIndexableKnowledge();
 
     /**
+     * N3：检索运行时有效知识ID集合（启用 status='0' + 审核通过 audit_status='1' +
+     * 现行有效 valid_status 为空或 '1'）。
+     *
+     * <p>用于 RAG 召回的运行时效力过滤：即便失效条目的旧分块尚未完成异步索引重建，
+     * 也因其 knowledgeId 不在本集合而被拦截，保证失效/修订法条零召回。</p>
+     *
+     * @param scopeIds 可选范围限定（可空=全库有效知识）；非空时只返回该范围内仍有效的ID
+     * @return 有效知识ID集合
+     */
+    public List<Long> selectActiveKnowledgeIds(@Param("scopeIds") List<Long> scopeIds);
+
+    /**
      * 新增法律知识库
      * 
      * @param aiLegalKnowledge 法律知识库
