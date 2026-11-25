@@ -1,0 +1,83 @@
+# =====================================================================
+# 广东12348公共法律服务热线 —— 监控栈（N6 语雀 7.8）
+#
+# 独立于主部署 docker-compose.yml，不改动既有业务编排：
+#   prometheus   抓取 backend:8081/actuator/prometheus + 加载语音 SLO 告警规则
+#   grafana      自动装配数据源与单页语音 SLO 看板（:3000）
+#   alertmanager 可选：接收 4 条核心告警（默认仅本地去重，不接外发渠道）
+#
+# 前置：主栈已在同一 Docker 网络（默认项目名 deploy 生成的 deploy_ccnet）。
+#   网络名随主 compose 的项目目录变化，用外部门户 network 接入，启动前确认：
+#     docker network ls | findstr ccnet
+#   若实际网络名不同，用 -p 或修改下方 external name 对齐（主栈默认 deploy_ccnet）。
+#
+# 启动（在 deploy/ 目录）：
+#   docker compose -f monitoring/docker-compose.monitoring.yml up -d
+# 访问：
+#   Grafana      http://localhost:3000  （admin / 由 GRAFANA_ADMIN_PASSWORD 注入，默认 admin123）
+#   Prometheus   http://localhost:9090  （Status > Rules 可见 5 条语音 SLO 告警）
+# 停止：
+#   docker compose -f monitoring/docker-compose.monitoring.yml down
+# =====================================================================
+services:
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: ai12348-prometheus
+    restart: always
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+      - prom-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks: [ccnet]
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: ai12348-alertmanager
+    restart: always
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - am-data:/alertmanager
+    expose:
+      - "9093"
+    networks: [ccnet]
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: ai12348-grafana
+    restart: always
+    depends_on:
+      - prometheus
+    environment:
+      TZ: Asia/Shanghai
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin123}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/voice-slo.json
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    networks: [ccnet]
+
+# 接入主栈外部网络（主 docker-compose.yml 中定义的 ccnet）
+networks:
+  ccnet:
+    external: true
+    name: deploy_ccnet
+
+volumes:
+  prom-data:
+  am-data:
+  grafana-data:

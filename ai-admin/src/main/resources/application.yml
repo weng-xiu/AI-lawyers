@@ -82,8 +82,24 @@ management:
       # 百分位直方图，供 Prometheus histogram_quantile 计算 P95/P99
       percentiles-histogram:
         http.server.requests: true
+        # N6（语雀 7.8）：语音链路 8 个 Timer 开启直方图，Grafana/告警用 histogram_quantile 算 P95/P99，
+        # 键为 Micrometer 逻辑名（点分），Prometheus 导出为 hotline_voice_*_ms_seconds_bucket
+        hotline_voice.vad.ms: true
+        hotline_voice.asr.first.ms: true
+        hotline_voice.tts.first.ms: true
+        hotline_voice.e2e.first.ms: true
+        hotline_voice.bargein.stop.ms: true
+        hotline_voice.rag.ms: true
+        hotline_voice.llm.first.token.ms: true
+        hotline_voice.ttfw.ms: true
+        hotline_voice.asr.final.ms: true
       sla:
         http.server.requests: 50ms,100ms,200ms,500ms,1s,2s,5s
+        # N6：语音延迟 SLO 预算桶（毫秒），覆盖 7.8 各阈值（TTFW 1500 / ASR-final 800 / 打断 300 等）
+        hotline_voice.ttfw.ms: 500ms,800ms,1s,1.5s,2s,3s
+        hotline_voice.asr.final.ms: 200ms,400ms,600ms,800ms,1s,1.5s
+        hotline_voice.bargein.stop.ms: 100ms,200ms,300ms,500ms,800ms
+        hotline_voice.e2e.first.ms: 800ms,1.2s,1.5s,2s,3s
 
 # P3-C6：在途通话排空配置（无损发布 drain 参数）
 app:

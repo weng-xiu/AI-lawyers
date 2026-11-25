@@ -1,0 +1,331 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "N6（语雀《下一步开发计划V1.2》7.8）单页语音 SLO 看板：TTFW/ASR-final/丢帧率/打断成功率 4 核心 SLO + 全链路语音延迟与降级明细。指标来自 HotlineMetrics 经 /actuator/prometheus 导出。",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "liveNow": false,
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["ai12348", "voice", "slo", "n6"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "12348 热线 · 语音 SLO 单页看板（N6 7.8）",
+  "uid": "ai12348-voice-slo",
+  "version": 1,
+  "weekStart": "",
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "核心 SLO（4 项验收指标）",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "① TTFW P95（停止说话→首帧音频，预算 1500ms）单位:ms",
+      "description": "histogram_quantile 计算，按 source(robot/ask) 分线；超 1500ms 触发 VoiceTtfwP95OverBudget",
+      "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": false },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1.5 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+          "expr": "histogram_quantile(0.95, sum by (le, source) (rate(hotline_voice_ttfw_ms_seconds_bucket[5m])))",
+          "legendFormat": "P95 {{source}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "② ASR final P95（语音段结束→final，预算 800ms）单位:ms",
+      "description": "超 800ms 触发 VoiceAsrFinalP95OverBudget",
+      "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": false },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.8 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(hotline_voice_asr_final_ms_seconds_bucket[5m])))",
+          "legendFormat": "ASR final P95"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "④ PBX 下行丢帧率（预算 < 0.5%）",
+      "description": "dropped/(accepted+dropped)；超 0.5% 触发 VoiceDownlinkDropRatioHigh",
+      "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 9 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.005 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+          "expr": "sum(rate(hotline_voice_downlink_frame_total{result=\"dropped\"}[5m])) / (sum(rate(hotline_voice_downlink_frame_total{result=\"accepted\"}[5m])) + sum(rate(hotline_voice_downlink_frame_total{result=\"dropped\"}[5m])))",
+          "legendFormat": "丢帧率"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "⑤ 打断成功率（within300，预算 ≥ 95%）",
+      "description": "300ms 内停播占比；低于 95% 触发 VoiceBargeinSuccessRatioLow",
+      "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 9 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 0.95 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+          "expr": "sum(rate(hotline_voice_bargein_stop_ms_seconds_count{result=\"within300\"}[5m])) / sum(rate(hotline_voice_bargein_stop_ms_seconds_count[5m]))",
+          "legendFormat": "打断成功率"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "row",
+      "title": "全链路语音延迟分位（明细）",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "端到端首响 P50/P95/P99（预算 1200ms）单位:ms",
+      "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "lineWidth": 2, "fillOpacity": 8, "showPoints": "never", "spanNulls": false }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        {
+          "refId": "P50",
+          "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(hotline_voice_e2e_first_ms_seconds_bucket[5m])))",
+          "legendFormat": "P50"
+        },
+        {
+          "refId": "P95",
+          "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(hotline_voice_e2e_first_ms_seconds_bucket[5m])))",
+          "legendFormat": "P95"
+        },
+        {
+          "refId": "P99",
+          "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(hotline_voice_e2e_first_ms_seconds_bucket[5m])))",
+          "legendFormat": "P99"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "链路分段延迟 P95（VAD/ASR首包/TTS首包/RAG/LLM首token）单位:ms",
+      "description": "各段预算：VAD 80 / ASR首包 280 / TTS首包 200 / RAG 40 / LLM首token 600",
+      "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "lineWidth": 2, "fillOpacity": 8, "showPoints": "never", "spanNulls": false }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        {
+          "refId": "VAD",
+          "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(hotline_voice_vad_ms_seconds_bucket[5m])))",
+          "legendFormat": "VAD P95"
+        },
+        {
+          "refId": "ASR1",
+          "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(hotline_voice_asr_first_ms_seconds_bucket[5m])))",
+          "legendFormat": "ASR首包 P95"
+        },
+        {
+          "refId": "TTS1",
+          "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(hotline_voice_tts_first_ms_seconds_bucket[5m])))",
+          "legendFormat": "TTS首包 P95"
+        },
+        {
+          "refId": "RAG",
+          "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(hotline_voice_rag_ms_seconds_bucket[5m])))",
+          "legendFormat": "RAG P95"
+        },
+        {
+          "refId": "LLM",
+          "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(hotline_voice_llm_first_token_ms_seconds_bucket[5m])))",
+          "legendFormat": "LLM首token P95"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "type": "row",
+      "title": "吞吐 / 降级 / 打断明细",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "下行帧速率（accepted / dropped，帧/秒）",
+      "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 26 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": false }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+          "expr": "sum by (result) (rate(hotline_voice_downlink_frame_total[5m]))",
+          "legendFormat": "{{result}}"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "打断停止耗时计数（within300 / over300，按 trigger）",
+      "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 26 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": false }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+          "expr": "sum by (result, trigger) (rate(hotline_voice_bargein_stop_ms_seconds_count[5m]))",
+          "legendFormat": "{{trigger}}-{{result}}"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "type": "timeseries",
+      "title": "机器人降级兜底次数（按 reason，5min 增量）",
+      "description": "reason ∈ empty_question/robot_disabled/llm_error/llm_empty；5min > 5 触发 VoiceDegradeTooFrequent",
+      "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 26 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "bars", "lineInterpolation": "linear", "lineWidth": 2, "fillOpacity": 40, "showPoints": "never", "spanNulls": false }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+          "expr": "sum by (reason) (increase(hotline_voice_degrade_total[5m]))",
+          "legendFormat": "{{reason}}"
+        }
+      ]
+    }
+  ]
+}

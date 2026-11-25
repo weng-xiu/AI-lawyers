@@ -1,0 +1,15 @@
+# Grafana 看板自动装配（N6 语雀 7.8）
+# 扫描 /var/lib/grafana/dashboards 下的 JSON 并自动导入
+apiVersion: 1
+
+providers:
+  - name: ai12348-voice-slo
+    orgId: 1
+    folder: 12348热线
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

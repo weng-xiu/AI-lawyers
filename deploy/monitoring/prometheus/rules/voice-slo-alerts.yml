@@ -1,0 +1,95 @@
+# =====================================================================
+# N6（语雀《下一步开发计划V1.2》7.8）语音 SLO 核心告警规则
+#
+# 指标来源：HotlineMetrics（Micrometer），经 /actuator/prometheus 导出
+#   命名规则：逻辑名 hotline_voice.xxx.ms（点分）→ Prometheus hotline_voice_xxx_ms_seconds
+#   - Timer：导出 *_seconds（含 _bucket/_count/_sum），P95 用 histogram_quantile
+#     （直方图桶已在 application.yml percentiles-histogram 对 8 个语音 Timer 开启）
+#   - Counter：名称含 .total 的导出保留 _total 后缀，用 rate 求每秒速率
+#
+# 4 条核心告警对应 7.8 验收：TTFW P95、ASR-final P95、下行丢帧率、打断成功率；
+# 另附降级兜底次数告警（7.8-6）。for 窗口抑制瞬时抖动。
+# =====================================================================
+groups:
+  - name: voice-slo
+    interval: 30s
+    rules:
+
+      # ① N6-1 TTFW（用户停止说话→首帧音频下发）P95 > 1500ms
+      #    source ∈ robot/ask，按来源分别评估，任一超阈即告警
+      - alert: VoiceTtfwP95OverBudget
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le, source) (rate(hotline_voice_ttfw_ms_seconds_bucket[5m]))
+          ) > 1.5
+        for: 5m
+        labels:
+          severity: warning
+          slo: voice-ttfw
+        annotations:
+          summary: "语音 TTFW P95 超预算（source={{ $labels.source }}）"
+          description: "停止说话→首帧音频 P95={{ $value | humanizeDuration }}，预算 1500ms，持续 5 分钟。排查 ASR/LLM/TTS 串行耗时。"
+
+      # ② N6-2 ASR final（语音段结束→ASR final）P95 > 800ms
+      - alert: VoiceAsrFinalP95OverBudget
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(hotline_voice_asr_final_ms_seconds_bucket[5m]))
+          ) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          slo: voice-asr-final
+        annotations:
+          summary: "ASR final P95 超预算"
+          description: "语音段结束→ASR final P95={{ $value | humanizeDuration }}，预算 800ms，持续 5 分钟。排查 ASR 提供商 final 延迟与网络。"
+
+      # ④ N6-4 PBX 下行丢帧率 > 0.5%
+      #    dropped/(accepted+dropped)；仅在 5min 内有足够样本（总量>50）时评估，避免低流量误报
+      - alert: VoiceDownlinkDropRatioHigh
+        expr: |
+          (
+            sum(rate(hotline_voice_downlink_frame_total{result="dropped"}[5m]))
+            /
+            (sum(rate(hotline_voice_downlink_frame_total{result="accepted"}[5m]))
+             + sum(rate(hotline_voice_downlink_frame_total{result="dropped"}[5m])))
+          ) > 0.005
+            and
+          sum(rate(hotline_voice_downlink_frame_total[5m])) * 300 > 50
+        for: 5m
+        labels:
+          severity: warning
+          slo: voice-downlink
+        annotations:
+          summary: "PBX 下行丢帧率超 0.5%"
+          description: "近 5 分钟下行丢帧率={{ $value | humanizePercentage }}，阈值 0.5%。排查 DownlinkDebouncer 防抖窗口与 sink 背压。"
+
+      # ⑤ N6-5 打断成功率 < 95%
+      #    result=within300 为 300ms 内停播成功；样本量门槛同样避免低流量误报
+      - alert: VoiceBargeinSuccessRatioLow
+        expr: |
+          (
+            sum(rate(hotline_voice_bargein_stop_ms_seconds_count{result="within300"}[5m]))
+            /
+            sum(rate(hotline_voice_bargein_stop_ms_seconds_count[5m]))
+          ) < 0.95
+            and
+          sum(rate(hotline_voice_bargein_stop_ms_seconds_count[5m])) * 300 > 50
+        for: 5m
+        labels:
+          severity: warning
+          slo: voice-bargein
+        annotations:
+          summary: "barge-in 打断成功率低于 95%"
+          description: "近 5 分钟 300ms 内停播成功率={{ $value | humanizePercentage }}，阈值 95%。排查 TTS stop 链路与命令面延迟。"
+
+      # ⑥ N6-6 机器人降级兜底 5 分钟 > 5 次
+      - alert: VoiceDegradeTooFrequent
+        expr: sum(increase(hotline_voice_degrade_total[5m])) > 5
+        for: 1m
+        labels:
+          severity: warning
+          slo: voice-degrade
+        annotations:
+          summary: "机器人降级兜底过于频繁"
+          description: "近 5 分钟降级 {{ $value }} 次（阈值 5）。按 reason 标签定位 empty_question/robot_disabled/llm_error/llm_empty。"
