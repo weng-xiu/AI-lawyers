@@ -106,6 +106,10 @@ SELECT
 --
 -- 若使用了 emit-call-events.ps1（会话号 perf-<RunId>-<seq>），按号段清理拨号日志：
 -- DELETE FROM ai_call_dial_log WHERE call_uuid LIKE 'perf-<RunId>-%';
--- 注意：ai_call_dial_log 不在仓库 DDL 内，执行前先 SHOW CREATE TABLE 核对列名与索引。
+-- 注意：ai_call_dial_log 已纳入空库基线 deploy/docker/mysql/init/01-init.sql（L306 起），
+-- 空库（仅执行 01-init.sql DDL，不导入业务种子）可直接运行本脚本。若压测库导入过含
+-- ai_call_agent_status / ai_call_record / ai_quality_inspection 种子的全量脚本，本脚本
+-- 1..100、1..1100 自增主键会与种子行撞号（ON DUPLICATE 覆盖），清理 DELETE 还会删掉被覆盖
+-- 的种子行；因此压测库必须独立且仅做 DDL 初始化。列名已与 01-init.sql 逐一核对一致。
 
 DROP TEMPORARY TABLE IF EXISTS tmp_perf_seq;
