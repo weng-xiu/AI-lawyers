@@ -29,6 +29,9 @@ public class AgentChatResult implements Serializable
     /** 当前轮次序号 */
     private int turnNo;
 
+    /** N4 隐式标识：非 null 表示本条回复为 AI 生成（值为标识标签，开关关闭时为 null） */
+    private String aiLabel;
+
     public AgentChatResult() {}
 
     public AgentChatResult(String reply, boolean handoff, String reason) {
@@ -54,4 +57,7 @@ public class AgentChatResult implements Serializable
 
     public int getTurnNo() { return turnNo; }
     public void setTurnNo(int turnNo) { this.turnNo = turnNo; }
+
+    public String getAiLabel() { return aiLabel; }
+    public void setAiLabel(String aiLabel) { this.aiLabel = aiLabel; }
 }

@@ -354,6 +354,21 @@ ai:
     script-enabled: ${AI_COPILOT_SCRIPT_ENABLED:true}
     # P1-8：坐席采纳画像回溯天数（注入话术 SYSTEM_PROMPT，贴合坐席表达习惯）
     profile-days: ${AI_COPILOT_PROFILE_DAYS:30}
+  # N4 AI 生成合成内容标识（《人工智能生成合成内容标识办法》2025-09-01 施行）
+  # 总开关默认关闭：备案/模型就绪后由环境变量显式开启；关闭时统一出口全方法原样透传
+  compliance:
+    label:
+      enabled: ${AI_COMPLIANCE_LABEL_ENABLED:false}
+      # 文本通道显式标识（IVR 智能体文本回复首尾追加提示语）
+      text-label-enabled: ${AI_COMPLIANCE_TEXT_LABEL_ENABLED:true}
+      text-prefix: ${AI_COMPLIANCE_TEXT_PREFIX:【AI生成】}
+      text-suffix: ${AI_COMPLIANCE_TEXT_SUFFIX:（以上内容由人工智能生成，仅供参考）}
+      # 语音通道显式标识（TTS 播报首句前插入语音提示，随正文一次合成）
+      voice-label-enabled: ${AI_COMPLIANCE_VOICE_LABEL_ENABLED:true}
+      voice-prefix: ${AI_COMPLIANCE_VOICE_PREFIX:以下内容由人工智能生成，仅供参考。}
+      # 隐式标识（响应体/数据留痕标签，前端可据此渲染角标）
+      metadata-enabled: ${AI_COMPLIANCE_METADATA_ENABLED:true}
+      metadata-tag: ${AI_COMPLIANCE_METADATA_TAG:AI_GENERATED}
   # P1-8 仿真评测（Copilot/机器人统一异步任务平台 + 语义打分）
   simulation:
     # 检查点 embedding 语义相似度判分开关（关闭回退纯关键词）

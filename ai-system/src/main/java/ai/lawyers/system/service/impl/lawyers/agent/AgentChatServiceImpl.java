@@ -23,6 +23,7 @@ import ai.lawyers.system.mapper.lawyers.agent.AiAgentMessageMapper;
 import ai.lawyers.system.service.lawyers.IAiLegalKnowledgeService;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 import ai.lawyers.system.service.lawyers.agent.IAgentChatService;
+import ai.lawyers.system.service.lawyers.compliance.AiContentLabelService;
 import ai.lawyers.system.service.lawyers.rag.KnowledgeQueryLogRecorder;
 import ai.lawyers.system.service.lawyers.rag.RagChunk;
 import ai.lawyers.system.service.lawyers.rag.RagSearchService;
@@ -72,6 +73,10 @@ public class AgentChatServiceImpl implements IAgentChatService
 
     @Autowired
     private RedisCache redisCache;
+
+    /** N4：AI 生成内容标识统一出口（开关关闭时透传，零行为差异） */
+    @Autowired
+    private AiContentLabelService aiContentLabelService;
 
     @Override
     public AgentChatResult chat(Long agentId, String sessionId, String userMessage,
@@ -144,9 +149,12 @@ public class AgentChatServiceImpl implements IAgentChatService
                 reason = "模型无有效回复";
             }
 
-            AgentChatResult result = new AgentChatResult(reply, handoff, reason);
+            // N4：模型生成回复离服务前经统一标识出口（显式文本标识 + 隐式元数据；开关关闭原样透传）
+            AgentChatResult result = new AgentChatResult(aiContentLabelService.applyTextLabel(reply),
+                    handoff, reason);
             result.setCategoryId(categoryId);
             result.setKnowledgeRefs(knowledgeRefs);
+            result.setAiLabel(aiContentLabelService.metadataTag());
 
             // 5. 双写会话历史
             persistTurn(config, sessionId, userMessage, result, recordId, flowId, nodeId, callerNumber);
