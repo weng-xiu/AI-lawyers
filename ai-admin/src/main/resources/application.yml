@@ -286,6 +286,11 @@ ai:
     rerank-url: ${AI_RAG_RERANK_URL:}
     rerank-model: ${AI_RAG_RERANK_MODEL:bge-reranker-base}
     rerank-api-key: ${AI_RAG_RERANK_API_KEY:}
+    # N3 法条引用幻觉拦截：抽取答复中"第X条"与检索命中核验，无支撑则改写保守表述
+    citation-guard-enabled: ${AI_RAG_CITATION_GUARD_ENABLED:true}
+    # 改写模式：disclaimer=追加核实提示（默认，保留原文）；strip=删除无支撑条号替换为"相关法律规定"
+    citation-guard-mode: ${AI_RAG_CITATION_GUARD_MODE:disclaimer}
+    citation-no-context-hint: ${AI_RAG_CITATION_NO_CONTEXT_HINT:（以上涉及的具体法条请以官方公布原文为准，建议查阅原文或咨询人工坐席核实。）}
   # P1-10 知识库自动运营
   knowledge:
     # 自动沉淀定时任务总开关

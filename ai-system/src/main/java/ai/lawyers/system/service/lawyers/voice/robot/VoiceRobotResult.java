@@ -2,6 +2,7 @@ package ai.lawyers.system.service.lawyers.voice.robot;
 
 import java.util.ArrayList;
 import java.util.List;
+import ai.lawyers.system.service.lawyers.rag.RagSourceRef;
 
 /**
  * P3-E3：语音机器人单轮应答结果。
@@ -21,6 +22,15 @@ public class VoiceRobotResult
 
     /** 溯源清单（标题 + 法条） */
     private List<String> sources = new ArrayList<>();
+
+    /** N3 结构化引用溯源（可点回原文，无命中为空列表） */
+    private List<RagSourceRef> sourceRefs = new ArrayList<>();
+
+    /** N3 法条引用幻觉拦截：是否改写过答复 */
+    private boolean citationIntercepted;
+
+    /** N3 被拦截的无支撑法条引用（留痕审计） */
+    private List<String> unsupportedCitations = new ArrayList<>();
 
     /** RAG 检索耗时（ms） */
     private long ragMs;
@@ -98,6 +108,36 @@ public class VoiceRobotResult
     public void setSources(List<String> sources)
     {
         this.sources = sources == null ? new ArrayList<>() : sources;
+    }
+
+    public List<RagSourceRef> getSourceRefs()
+    {
+        return sourceRefs;
+    }
+
+    public void setSourceRefs(List<RagSourceRef> sourceRefs)
+    {
+        this.sourceRefs = sourceRefs == null ? new ArrayList<>() : sourceRefs;
+    }
+
+    public boolean isCitationIntercepted()
+    {
+        return citationIntercepted;
+    }
+
+    public void setCitationIntercepted(boolean citationIntercepted)
+    {
+        this.citationIntercepted = citationIntercepted;
+    }
+
+    public List<String> getUnsupportedCitations()
+    {
+        return unsupportedCitations;
+    }
+
+    public void setUnsupportedCitations(List<String> unsupportedCitations)
+    {
+        this.unsupportedCitations = unsupportedCitations == null ? new ArrayList<>() : unsupportedCitations;
     }
 
     public long getRagMs()

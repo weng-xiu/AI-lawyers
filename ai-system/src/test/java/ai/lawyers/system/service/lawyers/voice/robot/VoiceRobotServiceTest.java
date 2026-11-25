@@ -26,6 +26,8 @@ import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 import ai.lawyers.system.service.lawyers.compliance.AiContentLabelProperties;
 import ai.lawyers.system.service.lawyers.compliance.AiContentLabelService;
 import ai.lawyers.system.service.lawyers.rag.KnowledgeQueryLogRecorder;
+import ai.lawyers.system.service.lawyers.rag.LegalCitationGuard;
+import ai.lawyers.system.service.lawyers.rag.RagSourceRef;
 import ai.lawyers.system.service.lawyers.rag.RagChunk;
 import ai.lawyers.system.service.lawyers.rag.RagSearchService;
 import ai.lawyers.system.service.lawyers.stat.AiModelCallLogRecorder;
@@ -62,6 +64,8 @@ class VoiceRobotServiceTest
         inject("callRecordService", callRecordService);
         inject("callTicketService", callTicketService);
         inject("selfQueryEnabled", true);
+        // N3：装配真实法条引用校验器（默认开启）；无"第X条"的既有断言不受影响
+        inject("legalCitationGuard", new LegalCitationGuard());
         service.setEnabled(true);
     }
 
@@ -395,5 +399,45 @@ class VoiceRobotServiceTest
         assertThat(r.isDegraded()).isTrue();
         assertThat(r.getAnswer()).isEqualTo(VoiceRobotService.FALLBACK_ANSWER);
         assertThat(r.getAiLabel()).isNull();
+    }
+
+    /* ---- N3：RAG 引用溯源 + 法条幻觉拦截 ---- */
+
+    @Test
+    void answer_unsupportedCitation_interceptedAndRecorded()
+    {
+        List<RagChunk> hits = new ArrayList<>();
+        hits.add(chunk("劳动合同法", null, "劳动合同法第三十九条规定了解除情形。"));
+        when(ragSearchService.search(anyString(), any(),
+                eq(KnowledgeQueryLogRecorder.SCENE_VOICE_ROBOT))).thenReturn(hits);
+        when(modelConfigService.chat(anyString(), anyString(), anyString()))
+                .thenReturn("根据第一百零八条，单位应当赔偿。");
+
+        VoiceRobotResult r = service.answer("被辞退怎么赔偿", "sess-n3-1");
+
+        assertThat(r.isCitationIntercepted()).isTrue();
+        assertThat(r.getUnsupportedCitations()).containsExactly("第一百零八条");
+        assertThat(r.getAnswer()).contains("请以官方公布原文为准");
+    }
+
+    @Test
+    void answer_supportedCitation_notInterceptedAndSourceRefsBuilt()
+    {
+        List<RagChunk> hits = new ArrayList<>();
+        hits.add(chunk("劳动合同法", "第三十九条", "劳动合同法第三十九条规定了解除情形。"));
+        when(ragSearchService.search(anyString(), any(),
+                eq(KnowledgeQueryLogRecorder.SCENE_VOICE_ROBOT))).thenReturn(hits);
+        when(modelConfigService.chat(anyString(), anyString(), anyString()))
+                .thenReturn("根据劳动合同法第三十九条，单位可以解除合同。");
+
+        VoiceRobotResult r = service.answer("被辞退怎么赔偿", "sess-n3-2");
+
+        assertThat(r.isCitationIntercepted()).isFalse();
+        assertThat(r.getUnsupportedCitations()).isEmpty();
+        List<RagSourceRef> refs = r.getSourceRefs();
+        assertThat(refs).hasSize(1);
+        assertThat(refs.get(0).getTitle()).isEqualTo("劳动合同法");
+        assertThat(refs.get(0).getLawArticle()).isEqualTo("第三十九条");
+        assertThat(refs.get(0).getSnippet()).contains("第三十九条");
     }
 }

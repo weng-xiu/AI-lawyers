@@ -26,6 +26,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.test.util.ReflectionTestUtils;
 import ai.lawyers.common.core.redis.RedisCache;
 import ai.lawyers.system.domain.lawyers.AiLegalKnowledge;
+import ai.lawyers.system.domain.lawyers.AiLegalKnowledgeChunk;
 import ai.lawyers.system.domain.lawyers.agent.AgentChatResult;
 import ai.lawyers.system.domain.lawyers.agent.AiAgentConfig;
 import ai.lawyers.system.domain.lawyers.agent.AiAgentMessage;
@@ -35,6 +36,7 @@ import ai.lawyers.system.service.lawyers.IAiLegalKnowledgeService;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 import ai.lawyers.system.service.lawyers.compliance.AiContentLabelProperties;
 import ai.lawyers.system.service.lawyers.compliance.AiContentLabelService;
+import ai.lawyers.system.service.lawyers.rag.LegalCitationGuard;
 import ai.lawyers.system.service.lawyers.rag.RagChunk;
 import ai.lawyers.system.service.lawyers.rag.RagSearchService;
 
@@ -71,6 +73,8 @@ class AgentChatServiceImplTest
         // N4：默认装配"开关关闭"的真实标识服务，保证既有断言（原文透传）不被破坏
         ReflectionTestUtils.setField(service, "aiContentLabelService",
                 new AiContentLabelService(new AiContentLabelProperties()));
+        // N3：装配真实法条引用校验器（默认开启）；无 RAG 命中的既有用例不受影响
+        ReflectionTestUtils.setField(service, "legalCitationGuard", new LegalCitationGuard());
     }
 
     /** N4：装配开关开启的标识服务 */
@@ -487,5 +491,61 @@ class AgentChatServiceImplTest
         assertFalse(result.getReply().contains("AI生成"));
         org.junit.jupiter.api.Assertions.assertNull(result.getAiLabel());
         verify(modelConfigService, never()).chatJson(anyString(), anyString(), anyString());
+    }
+
+    /* ---- N3：RAG 引用溯源 + 法条幻觉拦截 ---- */
+
+    private RagChunk ragChunk(Long knowledgeId, Long chunkId, String title, String lawArticle, String content)
+    {
+        AiLegalKnowledgeChunk entity = new AiLegalKnowledgeChunk();
+        entity.setKnowledgeId(knowledgeId);
+        entity.setChunkId(chunkId);
+        entity.setTitle(title);
+        entity.setLawArticle(lawArticle);
+        entity.setChunkContent(content);
+        return new RagChunk(entity, 0.9d);
+    }
+
+    @Test
+    void chat_ragHit_supportedCitationNotInterceptedAndSourceRefsBuilt()
+    {
+        when(agentConfigMapper.selectAiAgentConfigByAgentId(1L))
+            .thenReturn(config(null, null, null, "1", null, null));
+        when(ragSearchService.isEnabled()).thenReturn(true);
+        when(ragSearchService.search(anyString(), anyList(), anyString()))
+            .thenReturn(Collections.singletonList(
+                    ragChunk(7L, 700L, "劳动合同法", null, "劳动合同法第三十九条规定了解除情形。")));
+        when(ragSearchService.buildContext(anyList())).thenReturn("RAG上下文");
+        when(modelConfigService.chatJson(anyString(), anyString(), anyString()))
+            .thenReturn("{\"reply\":\"根据劳动合同法第三十九条，单位可以解除合同。\",\"handoff\":false}");
+
+        AgentChatResult result = service.chat(1L, "s1", "问题", null, null, null, null);
+
+        assertFalse(result.isCitationIntercepted());
+        assertTrue(result.getUnsupportedCitations().isEmpty());
+        assertEquals(1, result.getSourceRefs().size());
+        assertEquals(Long.valueOf(7L), result.getSourceRefs().get(0).getKnowledgeId());
+        assertEquals(Long.valueOf(700L), result.getSourceRefs().get(0).getChunkId());
+        assertEquals("/lawyers/knowledge/7", result.getSourceRefs().get(0).getAdminPath());
+    }
+
+    @Test
+    void chat_ragHit_unsupportedCitationInterceptedAndRecorded()
+    {
+        when(agentConfigMapper.selectAiAgentConfigByAgentId(1L))
+            .thenReturn(config(null, null, null, "1", null, null));
+        when(ragSearchService.isEnabled()).thenReturn(true);
+        when(ragSearchService.search(anyString(), anyList(), anyString()))
+            .thenReturn(Collections.singletonList(
+                    ragChunk(7L, 700L, "劳动合同法", null, "劳动合同法第三十九条规定了解除情形。")));
+        when(ragSearchService.buildContext(anyList())).thenReturn("RAG上下文");
+        when(modelConfigService.chatJson(anyString(), anyString(), anyString()))
+            .thenReturn("{\"reply\":\"根据第一百零八条，单位应当赔偿。\",\"handoff\":false}");
+
+        AgentChatResult result = service.chat(1L, "s1", "问题", null, null, null, null);
+
+        assertTrue(result.isCitationIntercepted());
+        assertTrue(result.getUnsupportedCitations().contains("第一百零八条"));
+        assertTrue(result.getReply().contains("请以官方公布原文为准"));
     }
 }

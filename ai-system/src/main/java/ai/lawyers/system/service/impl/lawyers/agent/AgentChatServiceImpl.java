@@ -24,9 +24,12 @@ import ai.lawyers.system.service.lawyers.IAiLegalKnowledgeService;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 import ai.lawyers.system.service.lawyers.agent.IAgentChatService;
 import ai.lawyers.system.service.lawyers.compliance.AiContentLabelService;
+import ai.lawyers.system.service.lawyers.rag.CitationCheckResult;
 import ai.lawyers.system.service.lawyers.rag.KnowledgeQueryLogRecorder;
+import ai.lawyers.system.service.lawyers.rag.LegalCitationGuard;
 import ai.lawyers.system.service.lawyers.rag.RagChunk;
 import ai.lawyers.system.service.lawyers.rag.RagSearchService;
+import ai.lawyers.system.service.lawyers.rag.RagSourceRef;
 
 /**
  * 智能体对话服务实现
@@ -78,6 +81,10 @@ public class AgentChatServiceImpl implements IAgentChatService
     @Autowired
     private AiContentLabelService aiContentLabelService;
 
+    /** N3：法条引用幻觉拦截器 */
+    @Autowired
+    private LegalCitationGuard legalCitationGuard;
+
     @Override
     public AgentChatResult chat(Long agentId, String sessionId, String userMessage,
                                 Long recordId, Long flowId, Long nodeId, String callerNumber)
@@ -108,10 +115,14 @@ public class AgentChatServiceImpl implements IAgentChatService
         // 2. 检索知识（提到 try 外，R3：模型故障时用知识库话术兜底，避免一律转人工打爆人工坐席）
         String knowledgeRefs = null;
         String knowledgeContext = "";
+        // N3：保留 RAG 命中分块，供法条引用核验与结构化溯源（旧 LIKE 路无分块，留空）
+        List<RagChunk> ragHits = new ArrayList<>();
         if (isUseKnowledge(config))
         {
             List<Long> scopeIds = parseIds(config.getKnowledgeIds());
-            knowledgeContext = buildKnowledgeContext(userMessage, scopeIds);
+            RagSearchResult ragResult = searchRag(userMessage, scopeIds);
+            ragHits = ragResult.getHits();
+            knowledgeContext = ragResult.getContext();
             // knowledgeRefs 优先留痕智能体配置的限定知识范围；混合检索命中时留痕实际命中的知识
             knowledgeRefs = StringUtils.isNotEmpty(config.getKnowledgeIds())
                     ? config.getKnowledgeIds() : null;
@@ -149,12 +160,23 @@ public class AgentChatServiceImpl implements IAgentChatService
                 reason = "模型无有效回复";
             }
 
-            // N4：模型生成回复离服务前经统一标识出口（显式文本标识 + 隐式元数据；开关关闭原样透传）
-            AgentChatResult result = new AgentChatResult(aiContentLabelService.applyTextLabel(reply),
-                    handoff, reason);
+            // N3：法条引用幻觉拦截（基于本次 RAG 命中核验条号，无支撑则改写保守表述）
+            CitationCheckResult citation = legalCitationGuard.check(reply, ragHits);
+            if (citation.isIntercepted())
+            {
+                log.info("智能体法条引用拦截 agentId={} sessionId={} unsupported={}",
+                        agentId, sessionId, citation.getUnsupportedCitations());
+            }
+            // N4：模型生成回复离服务前经统一标识出口（显式文本标识 + 隐式元数据；开关关闭原样透传）。
+            // 顺序：N3 拦截改写 → N4 标识。
+            AgentChatResult result = new AgentChatResult(
+                    aiContentLabelService.applyTextLabel(citation.getAnswer()), handoff, reason);
             result.setCategoryId(categoryId);
             result.setKnowledgeRefs(knowledgeRefs);
             result.setAiLabel(aiContentLabelService.metadataTag());
+            result.setCitationIntercepted(citation.isIntercepted());
+            result.setUnsupportedCitations(citation.getUnsupportedCitations());
+            result.setSourceRefs(buildSourceRefs(ragHits));
 
             // 5. 双写会话历史
             persistTurn(config, sessionId, userMessage, result, recordId, flowId, nodeId, callerNumber);
@@ -176,6 +198,34 @@ public class AgentChatServiceImpl implements IAgentChatService
             catch (Exception ignore) {}
             return result;
         }
+    }
+
+    /** N3：将 RAG 命中分块转为结构化溯源（文档ID/分块ID/标题/片段/法条/后台详情路径） */
+    private List<RagSourceRef> buildSourceRefs(List<RagChunk> hits)
+    {
+        List<RagSourceRef> refs = new ArrayList<>();
+        if (hits == null)
+        {
+            return refs;
+        }
+        for (RagChunk hit : hits)
+        {
+            RagSourceRef ref = new RagSourceRef();
+            ref.setKnowledgeId(hit.getKnowledgeId());
+            ref.setChunkId(hit.getChunkId());
+            ref.setTitle(hit.getTitle());
+            ref.setLawArticle(hit.getLawArticle());
+            ref.setScore(hit.getScore());
+            String content = hit.getContent();
+            ref.setSnippet(content == null ? null
+                    : content.substring(0, Math.min(content.length(), 120)));
+            if (hit.getKnowledgeId() != null)
+            {
+                ref.setAdminPath("/lawyers/knowledge/" + hit.getKnowledgeId());
+            }
+            refs.add(ref);
+        }
+        return refs;
     }
 
     /**
@@ -201,21 +251,46 @@ public class AgentChatServiceImpl implements IAgentChatService
      */
     private String buildKnowledgeContext(String userMessage, List<Long> scopeIds)
     {
+        return searchRag(userMessage, scopeIds).getContext();
+    }
+
+    /**
+     * N3：RAG 混合检索并同时返回命中分块（供法条引用核验/结构化溯源）与拼好的上下文。
+     * 分块表未就绪/两路均无命中/异常时 hits 与 context 均为空，由调用方回退旧整知识 LIKE 路。
+     */
+    private RagSearchResult searchRag(String userMessage, List<Long> scopeIds)
+    {
         try
         {
             List<RagChunk> hits = ragSearchService.search(userMessage, scopeIds,
                     KnowledgeQueryLogRecorder.SCENE_AGENT);
             if (hits == null || hits.isEmpty())
             {
-                return "";
+                return new RagSearchResult(new ArrayList<>(), "");
             }
-            return ragSearchService.buildContext(hits);
+            return new RagSearchResult(hits, ragSearchService.buildContext(hits));
         }
         catch (Exception e)
         {
             log.warn("RAG 混合检索异常，将回退旧检索路：{}", e.getMessage());
-            return "";
+            return new RagSearchResult(new ArrayList<>(), "");
         }
+    }
+
+    /** N3：RAG 检索内部承载（命中分块 + 上下文文本） */
+    private static class RagSearchResult
+    {
+        private final List<RagChunk> hits;
+        private final String context;
+
+        RagSearchResult(List<RagChunk> hits, String context)
+        {
+            this.hits = hits;
+            this.context = context;
+        }
+
+        List<RagChunk> getHits() { return hits; }
+        String getContext() { return context; }
     }
 
     /**

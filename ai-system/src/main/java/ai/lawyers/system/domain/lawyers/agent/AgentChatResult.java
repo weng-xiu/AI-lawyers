@@ -1,6 +1,9 @@
 package ai.lawyers.system.domain.lawyers.agent;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+import ai.lawyers.system.service.lawyers.rag.RagSourceRef;
 
 /**
  * 智能体对话结果
@@ -32,6 +35,15 @@ public class AgentChatResult implements Serializable
     /** N4 隐式标识：非 null 表示本条回复为 AI 生成（值为标识标签，开关关闭时为 null） */
     private String aiLabel;
 
+    /** N3 结构化引用溯源（可点回原文，无命中为空列表） */
+    private List<RagSourceRef> sourceRefs = new ArrayList<>();
+
+    /** N3 法条引用幻觉拦截：是否改写过回复 */
+    private boolean citationIntercepted;
+
+    /** N3 被拦截的无支撑法条引用（留痕审计） */
+    private List<String> unsupportedCitations = new ArrayList<>();
+
     public AgentChatResult() {}
 
     public AgentChatResult(String reply, boolean handoff, String reason) {
@@ -60,4 +72,22 @@ public class AgentChatResult implements Serializable
 
     public String getAiLabel() { return aiLabel; }
     public void setAiLabel(String aiLabel) { this.aiLabel = aiLabel; }
+
+    public List<RagSourceRef> getSourceRefs() { return sourceRefs; }
+    public void setSourceRefs(List<RagSourceRef> sourceRefs)
+    {
+        this.sourceRefs = sourceRefs == null ? new ArrayList<>() : sourceRefs;
+    }
+
+    public boolean isCitationIntercepted() { return citationIntercepted; }
+    public void setCitationIntercepted(boolean citationIntercepted)
+    {
+        this.citationIntercepted = citationIntercepted;
+    }
+
+    public List<String> getUnsupportedCitations() { return unsupportedCitations; }
+    public void setUnsupportedCitations(List<String> unsupportedCitations)
+    {
+        this.unsupportedCitations = unsupportedCitations == null ? new ArrayList<>() : unsupportedCitations;
+    }
 }

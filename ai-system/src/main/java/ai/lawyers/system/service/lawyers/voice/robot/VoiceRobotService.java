@@ -11,9 +11,12 @@ import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
 import ai.lawyers.system.service.lawyers.compliance.AiContentLabelService;
 import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
+import ai.lawyers.system.service.lawyers.rag.CitationCheckResult;
 import ai.lawyers.system.service.lawyers.rag.KnowledgeQueryLogRecorder;
+import ai.lawyers.system.service.lawyers.rag.LegalCitationGuard;
 import ai.lawyers.system.service.lawyers.rag.RagChunk;
 import ai.lawyers.system.service.lawyers.rag.RagSearchService;
+import ai.lawyers.system.service.lawyers.rag.RagSourceRef;
 import ai.lawyers.system.service.lawyers.stat.AiModelCallLogRecorder;
 
 /**
@@ -85,6 +88,10 @@ public class VoiceRobotService
     /** N4：AI 生成内容标识统一出口（开关关闭时透传，零行为差异） */
     @Autowired(required = false)
     private AiContentLabelService aiContentLabelService;
+
+    /** N3：法条引用幻觉拦截器（未装配时跳过校验，零行为差异） */
+    @Autowired(required = false)
+    private LegalCitationGuard legalCitationGuard;
 
     /** G6：话单服务（按服务端锚定 recordId 取来电号码；未装配时自助查询不生效） */
     @Autowired(required = false)
@@ -343,16 +350,56 @@ public class VoiceRobotService
             r.setLlmMs(llmMs);
             return r;
         }
-        // N4：LLM 生成答复在送 TTS 前经统一标识出口（首句语音提示随正文一次合成；开关关闭原样透传）。
-        // 先截断控制播报时长，再加前缀，避免提示语挤占 answerMaxChars 预算。
+        // N3：先做法条引用幻觉拦截（基于本次检索命中核验条号），再截断、再 N4 标识。
+        CitationCheckResult citation = checkCitation(answer.trim(), hits);
         VoiceRobotResult r = VoiceRobotResult.ok(
-                labelVoice(truncate(answer.trim(), answerMaxChars)));
+                labelVoice(truncate(citation.getAnswer(), answerMaxChars)));
         r.setRagHits(hits.size());
         r.setSources(collectSources(hits));
+        r.setSourceRefs(collectSourceRefs(hits));
+        r.setCitationIntercepted(citation.isIntercepted());
+        r.setUnsupportedCitations(citation.getUnsupportedCitations());
         r.setRagMs(ragMs);
         r.setLlmMs(llmMs);
         r.setAiLabel(metadataTag());
+        if (citation.isIntercepted())
+        {
+            log.info("VoiceRobot 法条引用拦截 sessionId={} unsupported={}",
+                    sessionId, citation.getUnsupportedCitations());
+        }
         return r;
+    }
+
+    /** N3：法条引用校验（拦截器未装配时原样放行） */
+    private CitationCheckResult checkCitation(String answer, List<RagChunk> hits)
+    {
+        if (legalCitationGuard == null)
+        {
+            return CitationCheckResult.pass(answer);
+        }
+        return legalCitationGuard.check(answer, hits);
+    }
+
+    /** N3：结构化引用溯源（文档ID/分块ID/标题/片段/法条，供前端点回原文） */
+    private List<RagSourceRef> collectSourceRefs(List<RagChunk> hits)
+    {
+        List<RagSourceRef> refs = new ArrayList<>();
+        for (RagChunk hit : hits)
+        {
+            RagSourceRef ref = new RagSourceRef();
+            ref.setKnowledgeId(hit.getKnowledgeId());
+            ref.setChunkId(hit.getChunkId());
+            ref.setTitle(hit.getTitle());
+            ref.setLawArticle(hit.getLawArticle());
+            ref.setScore(hit.getScore());
+            ref.setSnippet(truncate(hit.getContent(), 120));
+            if (hit.getKnowledgeId() != null)
+            {
+                ref.setAdminPath("/lawyers/knowledge/" + hit.getKnowledgeId());
+            }
+            refs.add(ref);
+        }
+        return refs;
     }
 
     /** N4：语音显式标识（服务未装配时原样返回，保证单元测试/裁剪部署不报错） */
