@@ -23,6 +23,8 @@ import ai.lawyers.system.domain.lawyers.AiLegalKnowledgeChunk;
 import ai.lawyers.system.service.lawyers.IAiCallRecordService;
 import ai.lawyers.system.service.lawyers.IAiCallTicketService;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
+import ai.lawyers.system.service.lawyers.compliance.AiContentLabelProperties;
+import ai.lawyers.system.service.lawyers.compliance.AiContentLabelService;
 import ai.lawyers.system.service.lawyers.rag.KnowledgeQueryLogRecorder;
 import ai.lawyers.system.service.lawyers.rag.RagChunk;
 import ai.lawyers.system.service.lawyers.rag.RagSearchService;
@@ -339,5 +341,59 @@ class VoiceRobotServiceTest
         assertThat(VoiceRobotService.isTicketQueryIntent("我之前的工单办理得怎么样了")).isTrue();
         assertThat(VoiceRobotService.isTicketQueryIntent("借钱不还怎么办")).isFalse();
         assertThat(VoiceRobotService.isTicketQueryIntent("办理居住证需要什么材料")).isFalse();
+    }
+
+    /* ---- N4：AI 生成内容标识 ---- */
+
+    private void enableAiLabel() throws Exception
+    {
+        AiContentLabelProperties props = new AiContentLabelProperties();
+        props.setEnabled(true);
+        inject("aiContentLabelService", new AiContentLabelService(props));
+    }
+
+    @Test
+    void answer_labelServiceAbsent_passesThroughAndNoTag()
+    {
+        // 未装配标识服务（裁剪部署/历史装配）：null 兜底，零行为差异
+        when(ragSearchService.search(anyString(), any(),
+                eq(KnowledgeQueryLogRecorder.SCENE_VOICE_ROBOT))).thenReturn(Collections.emptyList());
+        when(modelConfigService.chat(anyString(), anyString(), anyString())).thenReturn("法律解答");
+
+        VoiceRobotResult r = service.answer("问题", "sess-n4-1");
+
+        assertThat(r.getAnswer()).isEqualTo("法律解答");
+        assertThat(r.getAiLabel()).isNull();
+    }
+
+    @Test
+    void answer_labelEnabled_llmReplyGetsVoicePrefixAndTag() throws Exception
+    {
+        enableAiLabel();
+        when(ragSearchService.search(anyString(), any(),
+                eq(KnowledgeQueryLogRecorder.SCENE_VOICE_ROBOT))).thenReturn(Collections.emptyList());
+        when(modelConfigService.chat(anyString(), anyString(), anyString())).thenReturn("法律解答");
+
+        VoiceRobotResult r = service.answer("问题", "sess-n4-2");
+
+        assertThat(r.getAnswer()).startsWith("以下内容由人工智能生成").endsWith("法律解答");
+        assertThat(r.getAiLabel()).isEqualTo("AI_GENERATED");
+    }
+
+    @Test
+    void answer_labelEnabled_fallbackAnswerNotLabeled() throws Exception
+    {
+        enableAiLabel();
+        when(ragSearchService.search(anyString(), any(),
+                eq(KnowledgeQueryLogRecorder.SCENE_VOICE_ROBOT))).thenReturn(Collections.emptyList());
+        when(modelConfigService.chat(anyString(), anyString(), anyString()))
+                .thenThrow(new RuntimeException("boom"));
+
+        // LLM 失败走固定兜底话术：非 AI 合成内容，不加语音提示与标签
+        VoiceRobotResult r = service.answer("问题", "sess-n4-3");
+
+        assertThat(r.isDegraded()).isTrue();
+        assertThat(r.getAnswer()).isEqualTo(VoiceRobotService.FALLBACK_ANSWER);
+        assertThat(r.getAiLabel()).isNull();
     }
 }

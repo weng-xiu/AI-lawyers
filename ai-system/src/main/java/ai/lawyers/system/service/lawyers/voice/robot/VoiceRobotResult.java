@@ -43,6 +43,9 @@ public class VoiceRobotResult
     /** G6：命中工单的工单号清单（供前端展示，不涉敏感信息） */
     private List<String> ticketNos = new ArrayList<>();
 
+    /** N4 隐式标识：非 null 表示本条播报含 AI 生成内容（值为标识标签，开关关闭时为 null） */
+    private String aiLabel;
+
     public static VoiceRobotResult ok(String answer)
     {
         VoiceRobotResult r = new VoiceRobotResult();
@@ -140,5 +143,15 @@ public class VoiceRobotResult
     public List<String> getTicketNos()
     {
         return ticketNos;
+    }
+
+    public String getAiLabel()
+    {
+        return aiLabel;
+    }
+
+    public void setAiLabel(String aiLabel)
+    {
+        this.aiLabel = aiLabel;
     }
 }

@@ -33,6 +33,8 @@ import ai.lawyers.system.mapper.lawyers.agent.AiAgentConfigMapper;
 import ai.lawyers.system.mapper.lawyers.agent.AiAgentMessageMapper;
 import ai.lawyers.system.service.lawyers.IAiLegalKnowledgeService;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
+import ai.lawyers.system.service.lawyers.compliance.AiContentLabelProperties;
+import ai.lawyers.system.service.lawyers.compliance.AiContentLabelService;
 import ai.lawyers.system.service.lawyers.rag.RagChunk;
 import ai.lawyers.system.service.lawyers.rag.RagSearchService;
 
@@ -66,6 +68,17 @@ class AgentChatServiceImplTest
         ReflectionTestUtils.setField(service, "modelConfigService", modelConfigService);
         ReflectionTestUtils.setField(service, "ragSearchService", ragSearchService);
         ReflectionTestUtils.setField(service, "redisCache", redisCache);
+        // N4：默认装配"开关关闭"的真实标识服务，保证既有断言（原文透传）不被破坏
+        ReflectionTestUtils.setField(service, "aiContentLabelService",
+                new AiContentLabelService(new AiContentLabelProperties()));
+    }
+
+    /** N4：装配开关开启的标识服务 */
+    private void enableAiLabel()
+    {
+        AiContentLabelProperties props = new AiContentLabelProperties();
+        props.setEnabled(true);
+        ReflectionTestUtils.setField(service, "aiContentLabelService", new AiContentLabelService(props));
     }
 
     private static AiAgentConfig config(String welcome, String handoffKeywords, String knowledgeIds,
@@ -425,5 +438,54 @@ class AgentChatServiceImplTest
         // parseIds 解析失败在 try 外，按当前实现会抛 NumberFormatException
         org.junit.jupiter.api.Assertions.assertThrows(NumberFormatException.class,
             () -> service.chat(1L, "s1", "问题", null, null, null, null));
+    }
+
+    @Test
+    void chat_labelDisabled_modelReplyPassesThroughAndNoTag()
+    {
+        when(agentConfigMapper.selectAiAgentConfigByAgentId(1L))
+            .thenReturn(config(null, null, null, "1", null, null));
+        when(ragSearchService.isEnabled()).thenReturn(false);
+        when(modelConfigService.chatJson(anyString(), anyString(), anyString()))
+            .thenReturn("{\"reply\":\"原始答复\",\"handoff\":false}");
+
+        AgentChatResult result = service.chat(1L, "s1", "问题", null, null, null, null);
+
+        assertEquals("原始答复", result.getReply());
+        // 开关关闭：无显式标识、无隐式标签
+        assertFalse(result.getReply().contains("AI生成"));
+        org.junit.jupiter.api.Assertions.assertNull(result.getAiLabel());
+    }
+
+    @Test
+    void chat_labelEnabled_modelReplyWrappedAndTagged()
+    {
+        enableAiLabel();
+        when(agentConfigMapper.selectAiAgentConfigByAgentId(1L))
+            .thenReturn(config(null, null, null, "1", null, null));
+        when(ragSearchService.isEnabled()).thenReturn(false);
+        when(modelConfigService.chatJson(anyString(), anyString(), anyString()))
+            .thenReturn("{\"reply\":\"原始答复\",\"handoff\":false}");
+
+        AgentChatResult result = service.chat(1L, "s1", "问题", null, null, null, null);
+
+        assertTrue(result.getReply().startsWith("【AI生成】"));
+        assertTrue(result.getReply().contains("原始答复"));
+        assertEquals("AI_GENERATED", result.getAiLabel());
+    }
+
+    @Test
+    void chat_labelEnabled_handoffKeywordReplyNotLabeled()
+    {
+        enableAiLabel();
+        when(agentConfigMapper.selectAiAgentConfigByAgentId(1L))
+            .thenReturn(config(null, "人工", null, "1", null, null));
+
+        // 命中转人工关键词：固定话术非模型生成，不应加标识/标签
+        AgentChatResult result = service.chat(1L, "s1", "人工", null, null, null, null);
+
+        assertFalse(result.getReply().contains("AI生成"));
+        org.junit.jupiter.api.Assertions.assertNull(result.getAiLabel());
+        verify(modelConfigService, never()).chatJson(anyString(), anyString(), anyString());
     }
 }

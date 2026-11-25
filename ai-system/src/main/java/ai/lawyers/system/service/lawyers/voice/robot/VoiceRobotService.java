@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import ai.lawyers.common.utils.StringUtils;
 import ai.lawyers.system.service.lawyers.IAiModelConfigService;
+import ai.lawyers.system.service.lawyers.compliance.AiContentLabelService;
 import ai.lawyers.system.service.lawyers.metrics.HotlineMetrics;
 import ai.lawyers.system.service.lawyers.rag.KnowledgeQueryLogRecorder;
 import ai.lawyers.system.service.lawyers.rag.RagChunk;
@@ -80,6 +81,10 @@ public class VoiceRobotService
 
     @Autowired(required = false)
     private HotlineMetrics metrics;
+
+    /** N4：AI 生成内容标识统一出口（开关关闭时透传，零行为差异） */
+    @Autowired(required = false)
+    private AiContentLabelService aiContentLabelService;
 
     /** G6：话单服务（按服务端锚定 recordId 取来电号码；未装配时自助查询不生效） */
     @Autowired(required = false)
@@ -338,12 +343,28 @@ public class VoiceRobotService
             r.setLlmMs(llmMs);
             return r;
         }
-        VoiceRobotResult r = VoiceRobotResult.ok(truncate(answer.trim(), answerMaxChars));
+        // N4：LLM 生成答复在送 TTS 前经统一标识出口（首句语音提示随正文一次合成；开关关闭原样透传）。
+        // 先截断控制播报时长，再加前缀，避免提示语挤占 answerMaxChars 预算。
+        VoiceRobotResult r = VoiceRobotResult.ok(
+                labelVoice(truncate(answer.trim(), answerMaxChars)));
         r.setRagHits(hits.size());
         r.setSources(collectSources(hits));
         r.setRagMs(ragMs);
         r.setLlmMs(llmMs);
+        r.setAiLabel(metadataTag());
         return r;
+    }
+
+    /** N4：语音显式标识（服务未装配时原样返回，保证单元测试/裁剪部署不报错） */
+    private String labelVoice(String text)
+    {
+        return aiContentLabelService == null ? text : aiContentLabelService.applyVoicePrefix(text);
+    }
+
+    /** N4：隐式标识标签（服务未装配或开关关闭时为 null） */
+    private String metadataTag()
+    {
+        return aiContentLabelService == null ? null : aiContentLabelService.metadataTag();
     }
 
     /** 装配用户消息：检索依据（标题+法条+内容，总长按 contextMaxChars 截断）+ 群众问题 */
