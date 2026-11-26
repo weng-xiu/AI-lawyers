@@ -2,6 +2,7 @@ package ai.lawyers.framework.websocket.voice;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -50,6 +51,7 @@ class PbxMediaForkHandlerTest
         ReflectionTestUtils.setField(properties, "enabled", true);
         ReflectionTestUtils.setField(properties, "authKey", "");
         ReflectionTestUtils.setField(properties, "defaultRate", 16000);
+        ReflectionTestUtils.setField(properties, "downlinkBufferMs", 150);
         when(manager.register(any(Session.class), any(String.class), eq("caller")))
                 .thenReturn(voiceSession);
         handler = new PbxMediaForkHandler("2000", wsSession, manager, properties);
@@ -173,6 +175,55 @@ class PbxMediaForkHandlerTest
         handler.handleText("{\"type\":\"start\",\"sampleRate\":16000}");
         handler.handleText("{\"type\":\"end\"}");
         verify(voiceSession).handleText("{\"type\":\"stop\"}");
+    }
+
+    // ---------- N1：下行 sink 协议选择 ----------
+
+    @Test
+    void downlinkDisabled_noSinkAttached()
+    {
+        handler.handleText("{\"type\":\"start\",\"sampleRate\":16000}");
+        verify(voiceSession, never())
+                .attachDownlinkSink(any(PbxDownlinkAudioSink.class), anyInt());
+    }
+
+    @Test
+    void downlinkNoop_attachesNoopSink()
+    {
+        ReflectionTestUtils.setField(properties, "downlinkEnabled", true);
+        ReflectionTestUtils.setField(properties, "downlinkProtocol", "noop");
+
+        handler.handleText("{\"type\":\"start\",\"sampleRate\":16000}");
+
+        ArgumentCaptor<PbxDownlinkAudioSink> cap = ArgumentCaptor.forClass(PbxDownlinkAudioSink.class);
+        verify(voiceSession).attachDownlinkSink(cap.capture(), eq(150));
+        assertThat(cap.getValue()).isInstanceOf(NoopPbxDownlinkAudioSink.class);
+    }
+
+    @Test
+    void downlinkModAudioStream_attachesWsSink()
+    {
+        ReflectionTestUtils.setField(properties, "downlinkEnabled", true);
+        ReflectionTestUtils.setField(properties, "downlinkProtocol", "mod_audio_stream");
+
+        handler.handleText("{\"type\":\"start\",\"sampleRate\":16000}");
+
+        ArgumentCaptor<PbxDownlinkAudioSink> cap = ArgumentCaptor.forClass(PbxDownlinkAudioSink.class);
+        verify(voiceSession).attachDownlinkSink(cap.capture(), eq(150));
+        assertThat(cap.getValue()).isInstanceOf(PbxWsDownlinkSink.class);
+    }
+
+    @Test
+    void downlinkUnknownProtocol_fallsBackToNoop()
+    {
+        ReflectionTestUtils.setField(properties, "downlinkEnabled", true);
+        ReflectionTestUtils.setField(properties, "downlinkProtocol", "unknown_proto");
+
+        handler.handleText("{\"type\":\"start\",\"sampleRate\":16000}");
+
+        ArgumentCaptor<PbxDownlinkAudioSink> cap = ArgumentCaptor.forClass(PbxDownlinkAudioSink.class);
+        verify(voiceSession).attachDownlinkSink(cap.capture(), eq(150));
+        assertThat(cap.getValue()).isInstanceOf(NoopPbxDownlinkAudioSink.class);
     }
 
     // ---------- 异常路径 ----------

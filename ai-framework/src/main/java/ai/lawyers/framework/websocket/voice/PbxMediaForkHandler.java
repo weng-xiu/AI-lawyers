@@ -34,6 +34,11 @@ public class PbxMediaForkHandler
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    /** #1 下行协议标识（与 {@link PbxMediaForkProperties#getDownlinkProtocol()} 对齐） */
+    static final String DOWNLINK_PROTOCOL_NOOP = "noop";
+
+    static final String DOWNLINK_PROTOCOL_MOD_AUDIO_STREAM = "mod_audio_stream";
+
     private final String recordId;
 
     private final Session wsSession;
@@ -185,11 +190,10 @@ public class PbxMediaForkHandler
 
         this.voiceSession = session;
         this.started = true;
-        // #1：下行媒体预留——按开关给会话挂下行 sink（当前空实现，TTS 分片经防抖缓冲双路分发；
-        // 真实 PBX 播放模块就绪后替换 NoopPbxDownlinkAudioSink 即可）
+        // #1：下行媒体预留——按协议给会话挂下行 sink（noop 空实现零差异 / mod_audio_stream 对称下行）
         if (properties.isDownlinkEnabled())
         {
-            session.attachDownlinkSink(new NoopPbxDownlinkAudioSink(), properties.getDownlinkBufferMs());
+            session.attachDownlinkSink(resolveDownlinkSink(), properties.getDownlinkBufferMs());
         }
         PbxMediaWebSocketServer.onForkStarted(this);
         log.info("[PbxMedia] caller 媒体链路已接通 recordId={} rate={} connId={} downlink={}",
@@ -206,6 +210,24 @@ public class PbxMediaForkHandler
         started = false;
         stopReceived = true;
         log.info("[PbxMedia] PBX 通知媒体结束 recordId={}", recordId);
+    }
+
+    /**
+     * #1：按下行协议构造 sink。{@code mod_audio_stream} 复用本 fork 会话对称下行；
+     * {@code noop}/未知协议回退空实现（零差异，与 N1 验收「mock 行为一致」对齐）。
+     */
+    private PbxDownlinkAudioSink resolveDownlinkSink()
+    {
+        String protocol = properties.getDownlinkProtocol();
+        if (DOWNLINK_PROTOCOL_MOD_AUDIO_STREAM.equals(protocol))
+        {
+            return new PbxWsDownlinkSink(wsSession, recordId);
+        }
+        if (protocol != null && !protocol.isEmpty() && !DOWNLINK_PROTOCOL_NOOP.equals(protocol))
+        {
+            log.warn("[PbxMedia] 未知下行协议 {}，回退空实现 recordId={}", protocol, recordId);
+        }
+        return new NoopPbxDownlinkAudioSink();
     }
 
     /** mod_audio_stream 的 base64 音频帧：解码后走二进制通道 */
