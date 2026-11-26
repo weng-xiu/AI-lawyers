@@ -43,6 +43,8 @@ import io.micrometer.core.instrument.Timer;
  *   <li>hotline_voice_ttfw_ms{source}         N6（语雀 7.8-1）：用户停止说话→首帧音频下发 TTFW（预算 P95 1500ms，source ∈ robot/ask）</li>
  *   <li>hotline_voice_asr_final_ms            N6（语雀 7.8-2）：语音段结束→ASR final（预算 P95 800ms）</li>
  *   <li>hotline_voice_downlink_frame_total{result} N6（语雀 7.8-4）：PBX 下行帧（accepted/dropped，Grafana 算丢帧率，>0.5% 告警）</li>
+ *   <li>hotline_voice_downlink_buffer_ms     N1④（语雀 7.3.2⑤）：下行防抖合片批次缓冲墙钟耗时（预算 200ms，超支 WARN）</li>
+ *   <li>hotline_voice_vad_tail_ms            N1④（语雀 7.3.2①）：VAD 尾静默（结束）判定耗时（预算 700ms，区别于起始判定 80ms）</li>
  *   <li>hotline_voice_degrade_total{reason}   N6（语雀 7.8-6）：机器人降级兜底次数（5min>5 告警）</li>
  *   <li>ai_model_cost_per_call                语雀 7.8-9 单通成本：当前模型响应无成本字段，本地不可做，待账单/定价数据源就绪后补埋点</li>
  *   <li>hotline_voice_rag_ms                  E3：机器人 RAG 检索（预算 40ms）</li>
@@ -90,6 +92,10 @@ public class HotlineMetrics
     public static final long BUDGET_VOICE_TTFW_MS = 1500;
     /** N6（语雀 7.8-2）：语音段结束→ASR final 预算，P95 超 800ms 告警 */
     public static final long BUDGET_VOICE_ASR_FINAL_MS = 800;
+    /** N1④（语雀 7.3.2 第⑤段）：下行防抖合片缓冲墙钟预算（窗口钳制 [100,200]，超 200ms WARN） */
+    public static final long BUDGET_VOICE_DOWNLINK_BUFFER_MS = 200;
+    /** N1④（语雀 7.3.2 第①段）：VAD 尾静默判定预算（结束判定，区别于 80ms 的起始判定），超 700ms WARN */
+    public static final long BUDGET_VOICE_VAD_TAIL_MS = 700;
 
     @Autowired(required = false)
     @Qualifier("prometheusMeterRegistry")
@@ -287,6 +293,36 @@ public class HotlineMetrics
     public void incrementVoiceDownlinkFrame(boolean accepted)
     {
         counter("voice.downlink.frame.total", "result", accepted ? "accepted" : "dropped").increment();
+    }
+
+    /**
+     * N1④（语雀 7.3.2 第⑤段）：下行防抖合片批次的缓冲墙钟耗时（首片进入→攒满窗口写出，预算
+     * {@link #BUDGET_VOICE_DOWNLINK_BUFFER_MS}ms）。窗口虽钳制 [100,200]，实际延迟受 TTS 分片到达
+     * 节奏影响，用本 Timer 验证合片段预算，与 {@link #incrementVoiceDownlinkFrame} 的丢帧率互补。
+     */
+    public void recordVoiceDownlinkBufferMs(long elapsedMs, String sessionId)
+    {
+        timer("voice.downlink.buffer.ms").record(elapsedMs, TimeUnit.MILLISECONDS);
+        if (elapsedMs > BUDGET_VOICE_DOWNLINK_BUFFER_MS)
+        {
+            log.warn("[N1④预算超支] 下行合片缓冲 {}ms > {}ms, sessionId={}",
+                    elapsedMs, BUDGET_VOICE_DOWNLINK_BUFFER_MS, sessionId);
+        }
+    }
+
+    /**
+     * N1④（语雀 7.3.2 第①段）：VAD 尾静默判定耗时（结束判定，预算
+     * {@link #BUDGET_VOICE_VAD_TAIL_MS}ms）。区别于 {@link #recordVoiceVadMs} 的语音起始判定（80ms），
+     * 本指标度量从最后一个语音帧到 onSpeechEnd 触发所累积的尾静默帧时长。
+     */
+    public void recordVoiceVadTailMs(long elapsedMs, String sessionId)
+    {
+        timer("voice.vad.tail.ms").record(elapsedMs, TimeUnit.MILLISECONDS);
+        if (elapsedMs > BUDGET_VOICE_VAD_TAIL_MS)
+        {
+            log.warn("[N1④预算超支] VAD 尾静默判定 {}ms > {}ms, sessionId={}",
+                    elapsedMs, BUDGET_VOICE_VAD_TAIL_MS, sessionId);
+        }
     }
 
     /**

@@ -241,7 +241,7 @@ public class VoiceSession
      */
     void attachDownlinkSink(PbxDownlinkAudioSink sink, int bufferMs)
     {
-        this.downlinkDebouncer = sink == null ? null : new DownlinkDebouncer(sink, bufferMs, metrics);
+        this.downlinkDebouncer = sink == null ? null : new DownlinkDebouncer(sink, bufferMs, metrics, sessionId);
         log.info("VoiceWS downlink sink attached conn={} sink={} bufferMs={}", connId,
                 sink == null ? "none" : sink.getClass().getSimpleName(),
                 downlinkDebouncer == null ? -1 : downlinkDebouncer.getBufferMillis());
@@ -806,6 +806,12 @@ public class VoiceSession
     {
         if (!shutdown.get())
         {
+            // N1④：VAD 尾静默（结束）判定耗时（首个静默帧 → 判定触发，语雀 7.3.2 第①段，预算 700ms）
+            VoiceActivityDetector detector = vad;
+            if (metrics != null && detector != null)
+            {
+                metrics.recordVoiceVadTailMs(detector.getLastTailDetectionMs(), sessionId);
+            }
             // N6：锚定语音段结束时刻，作为 ASR final 耗时起点（下一段 speechStart 后可被再次覆盖）
             this.speechEndNanos = System.nanoTime();
             this.asrFinalMarked.set(false);

@@ -93,6 +93,39 @@ class VoiceActivityDetectorTest
     }
 
     @Test
+    void n1FourTailDetection_timingFromFirstSilentFrame()
+    {
+        Rec rec = new Rec();
+        // 尾静默阈值压到 5 帧（100ms），用小帧集验证计时口径：首个静默帧 → onSpeechEnd
+        VoiceActivityDetector vad = new VoiceActivityDetector(16000, 500.0, 0.002, 0.40, 3, 5, rec);
+        // 未触发过尾静默判定：getter 为 0
+        assertThat(vad.getLastTailDetectionMs()).isZero();
+        vad.feed(sine16k(3));
+        assertThat(rec.events).containsExactly("start");
+        // 说话中插入 1 帧有声不打断尾静默计时：先 2 静默、1 有声、再 5 静默
+        vad.feed(silence16k(2));
+        vad.feed(sine16k(1));
+        vad.feed(silence16k(5));
+        assertThat(rec.events).containsExactly("start", "end");
+        // 尾静默判定耗时 = 连续 5 静默帧的墙钟（机器执行极快，毫秒级可能取整为 0），仅断言非负且未污染起始口径
+        assertThat(vad.getLastTailDetectionMs()).isGreaterThanOrEqualTo(0L);
+    }
+
+    @Test
+    void n1FourTailDetection_silenceOnlyAndResetStayZero()
+    {
+        Rec rec = new Rec();
+        VoiceActivityDetector vad = new VoiceActivityDetector(16000, rec);
+        // 全程静默：尾静默判定从未触发
+        vad.feed(silence16k(50));
+        assertThat(vad.getLastTailDetectionMs()).isZero();
+        // 起始后立即 reset（不补发 end）：尾静默口径仍为 0
+        vad.feed(sine16k(3));
+        vad.reset();
+        assertThat(vad.getLastTailDetectionMs()).isZero();
+    }
+
+    @Test
     void dcBias_isRejectedByZcrFloor()
     {
         Rec rec = new Rec();

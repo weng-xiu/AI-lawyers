@@ -368,6 +368,24 @@ class VoiceSessionTest
     }
 
     @Test
+    void n1FourVadTail_recordedOnSpeechEnd() throws Exception
+    {
+        HotlineMetrics m = mock(HotlineMetrics.class);
+        session.shutdown();
+        session = new VoiceSession(wsSession, "sess-1", "agent", 1000, null, true, m);
+        session.handleText("{\"type\":\"start\"}");
+        await(n -> type(n, "started"));
+
+        // 有声 → speechStart（起始埋点）；400ms 尾静默 → speechEnd（N1④ 尾静默埋点，透传 sessionId）
+        session.handleBinary(sine16k(3));
+        await(n -> type(n, "vad_speech_start"));
+        session.handleBinary(new byte[20 * 320 * 2]);
+        await(n -> type(n, "vad_speech_end"));
+        verify(m, org.mockito.Mockito.timeout(2000).times(1))
+                .recordVoiceVadTailMs(anyLong(), eq("sess-1"));
+    }
+
+    @Test
     void metrics_nullSafeWhenAbsent() throws Exception
     {
         // metrics=null（6 参构造兜底）全链路不抛异常

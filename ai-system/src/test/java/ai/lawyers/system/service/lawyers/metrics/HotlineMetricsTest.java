@@ -184,6 +184,48 @@ class HotlineMetricsTest
     }
 
     @Test
+    void n1FourTimers_recordWithDocumentedNames() throws Exception
+    {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        HotlineMetrics m = withRegistry(registry);
+
+        // N1④ 缺口1：下行合片缓冲墙钟（预算 200ms）
+        m.recordVoiceDownlinkBufferMs(150, "s1");
+        // N1④ 缺口2：VAD 尾静默结束判定（预算 700ms）
+        m.recordVoiceVadTailMs(400, "s1");
+
+        Timer downlink = registry.find("hotline_voice.downlink.buffer.ms").timer();
+        Timer vadTail = registry.find("hotline_voice.vad.tail.ms").timer();
+        assertThat(downlink).isNotNull();
+        assertThat(vadTail).isNotNull();
+        assertThat(downlink.count()).isEqualTo(1);
+        assertThat(downlink.totalTime(TimeUnit.MILLISECONDS)).isEqualTo(150.0);
+        assertThat(vadTail.count()).isEqualTo(1);
+        assertThat(vadTail.totalTime(TimeUnit.MILLISECONDS)).isEqualTo(400.0);
+    }
+
+    @Test
+    void n1FourTimers_overBudgetStillRecords_andNoRegistryNoop()
+    {
+        // 超预算：仍记录且只产生 WARN，不抛异常
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        assertThatCode(() -> {
+            HotlineMetrics m = withRegistry(registry);
+            m.recordVoiceDownlinkBufferMs(HotlineMetrics.BUDGET_VOICE_DOWNLINK_BUFFER_MS + 1, "s2");
+            m.recordVoiceVadTailMs(HotlineMetrics.BUDGET_VOICE_VAD_TAIL_MS + 1, "s2");
+        }).doesNotThrowAnyException();
+        assertThat(registry.find("hotline_voice.downlink.buffer.ms").timer().count()).isEqualTo(1);
+        assertThat(registry.find("hotline_voice.vad.tail.ms").timer().count()).isEqualTo(1);
+
+        // 未装配 MeterRegistry：两个新埋点全部静默跳过
+        HotlineMetrics noop = new HotlineMetrics();
+        assertThatCode(() -> {
+            noop.recordVoiceDownlinkBufferMs(10, "s3");
+            noop.recordVoiceVadTailMs(10, "s3");
+        }).doesNotThrowAnyException();
+    }
+
+    @Test
     void pbxFork_metricsWithDocumentedNames() throws Exception
     {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();

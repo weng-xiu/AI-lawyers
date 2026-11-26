@@ -36,23 +36,35 @@ public class DownlinkDebouncer
     /** N6：指标门面（null 时丢帧埋点静默跳过，不影响防抖行为） */
     private final HotlineMetrics metrics;
 
+    /** N1④：会话标识，预算超支 WARN 时定位 */
+    private final String sessionId;
+
     private final ByteArrayOutputStream buf = new ByteArrayOutputStream(8192);
 
     /** 已累积时长（纳秒） */
     private long bufferedNanos;
+
+    /** N1④：当前批次首片进入的墙钟时间（纳秒），空窗时为 0 */
+    private long batchStartNanos;
 
     /** 上次写入 sink 的采样率（flush 用） */
     private int lastRate;
 
     public DownlinkDebouncer(PbxDownlinkAudioSink sink, int bufferMillis)
     {
-        this(sink, bufferMillis, null);
+        this(sink, bufferMillis, null, null);
     }
 
     public DownlinkDebouncer(PbxDownlinkAudioSink sink, int bufferMillis, HotlineMetrics metrics)
     {
+        this(sink, bufferMillis, metrics, null);
+    }
+
+    public DownlinkDebouncer(PbxDownlinkAudioSink sink, int bufferMillis, HotlineMetrics metrics, String sessionId)
+    {
         this.sink = sink;
         this.metrics = metrics;
+        this.sessionId = sessionId;
         int b = bufferMillis;
         if (b < MIN_BUFFER_MS)
         {
@@ -79,6 +91,11 @@ public class DownlinkDebouncer
             return;
         }
         this.lastRate = sampleRate;
+        if (buf.size() == 0)
+        {
+            // N1④：新批次首片进入，记录墙钟起点（空窗后第一片）
+            batchStartNanos = System.nanoTime();
+        }
         buf.write(pcm, 0, pcm.length);
         bufferedNanos += pcmNanos(pcm.length, sampleRate);
         if (bufferedNanos >= millisToNanos(bufferMillis))
@@ -103,6 +120,7 @@ public class DownlinkDebouncer
         }
         buf.reset();
         bufferedNanos = 0;
+        batchStartNanos = 0;
     }
 
     /** 会话释放（幂等：清残余缓冲，不重复 close） */
@@ -110,6 +128,7 @@ public class DownlinkDebouncer
     {
         buf.reset();
         bufferedNanos = 0;
+        batchStartNanos = 0;
         try
         {
             sink.close();
@@ -130,6 +149,9 @@ public class DownlinkDebouncer
         byte[] out = buf.toByteArray();
         buf.reset();
         bufferedNanos = 0;
+        // N1④：批次缓冲墙钟耗时（首片→写出），验证 7.3.2 第⑤段 100~200ms 合片预算
+        long bufferWallMs = nanosToMs(System.nanoTime() - batchStartNanos);
+        batchStartNanos = 0;
         // N6：sink 拒绝（false）或写异常均计 dropped，供 Grafana 算下行丢帧率
         boolean accepted = false;
         try
@@ -143,6 +165,7 @@ public class DownlinkDebouncer
         if (metrics != null)
         {
             metrics.incrementVoiceDownlinkFrame(accepted);
+            metrics.recordVoiceDownlinkBufferMs(bufferWallMs, sessionId);
         }
     }
 

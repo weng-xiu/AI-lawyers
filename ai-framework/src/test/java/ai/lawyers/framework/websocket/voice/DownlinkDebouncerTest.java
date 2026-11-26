@@ -1,6 +1,7 @@
 package ai.lawyers.framework.websocket.voice;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -207,5 +208,54 @@ class DownlinkDebouncerTest
         assertThat(DownlinkDebouncer.pcmNanos(32000, 16000)).isEqualTo(1_000_000_000L);
         // 8kHz：1ms = 16 字节
         assertThat(DownlinkDebouncer.pcmNanos(160, 8000)).isEqualTo(10_000_000L);
+    }
+
+    /* ================= N1④（语雀 7.3.2⑤）：下行合片缓冲墙钟埋点 ================= */
+
+    @Test
+    void n1四drain记录批次缓冲墙钟并透传sessionId()
+    {
+        PbxDownlinkAudioSink sink = mock(PbxDownlinkAudioSink.class);
+        when(sink.write(org.mockito.ArgumentMatchers.any(byte[].class),
+                org.mockito.ArgumentMatchers.anyInt())).thenReturn(true);
+        HotlineMetrics metrics = mock(HotlineMetrics.class);
+        DownlinkDebouncer d = new DownlinkDebouncer(sink, 100, metrics, "sess-1");
+
+        // 首片进入后留 20ms 再补满窗口，墙钟耗时应被记录且非负
+        d.offer(msPcm(60, 16000), 16000);
+        sleepQuietly(20);
+        d.offer(msPcm(60, 16000), 16000);
+
+        verify(metrics, times(1)).recordVoiceDownlinkBufferMs(anyLong(), org.mockito.ArgumentMatchers.eq("sess-1"));
+        // flush 空窗为 no-op，不产生第二次记录
+        d.flush();
+        verify(metrics, times(1)).recordVoiceDownlinkBufferMs(anyLong(), org.mockito.ArgumentMatchers.eq("sess-1"));
+    }
+
+    @Test
+    void n1四discard与release不触发缓冲埋点()
+    {
+        CapturingSink sink = new CapturingSink();
+        HotlineMetrics metrics = mock(HotlineMetrics.class);
+        DownlinkDebouncer d = new DownlinkDebouncer(sink, 200, metrics, "sess-1");
+        d.offer(msPcm(80, 16000), 16000);
+        d.discard();
+        verify(metrics, never()).recordVoiceDownlinkBufferMs(anyLong(), org.mockito.ArgumentMatchers.any());
+
+        d.offer(msPcm(80, 16000), 16000);
+        d.release();
+        verify(metrics, never()).recordVoiceDownlinkBufferMs(anyLong(), org.mockito.ArgumentMatchers.any());
+    }
+
+    private static void sleepQuietly(long ms)
+    {
+        try
+        {
+            Thread.sleep(ms);
+        }
+        catch (InterruptedException e)
+        {
+            Thread.currentThread().interrupt();
+        }
     }
 }

@@ -75,6 +75,12 @@ public class VoiceActivityDetector
     /** A5：最近一次起始判定耗时（纳秒），onSpeechStart 触发时刷新 */
     private volatile long lastDetectionNanos;
 
+    /** N1④：当前尾静默段首个静默帧时刻（System.nanoTime），speaking 态下 consecutiveSilence 0→1 时记录 */
+    private long tailSilenceBeginNanos;
+
+    /** N1④：最近一次尾静默（结束）判定耗时（纳秒），onSpeechEnd 触发时刷新 */
+    private volatile long lastTailDetectionNanos;
+
     public VoiceActivityDetector(int sampleRate, Listener listener)
     {
         this(sampleRate, DEFAULT_ENERGY_THRESHOLD, DEFAULT_ZCR_MIN, DEFAULT_ZCR_MAX,
@@ -154,6 +160,12 @@ public class VoiceActivityDetector
         return lastDetectionNanos / 1_000_000L;
     }
 
+    /** N1④：最近一次 VAD 尾静默（结束）判定耗时（毫秒，首个静默帧→onSpeechEnd）；未触发过时为 0 */
+    public long getLastTailDetectionMs()
+    {
+        return lastTailDetectionNanos / 1_000_000L;
+    }
+
     /* ================= 内部 ================= */
 
     private void processFrame(byte[] buf, int off)
@@ -208,12 +220,18 @@ public class VoiceActivityDetector
         }
         else
         {
+            if (!voiced && consecutiveSilence == 0)
+            {
+                // N1④：speaking 态下首个静默帧，记尾静默起点（语雀 7.3.2 第①段判定口径）
+                tailSilenceBeginNanos = System.nanoTime();
+            }
             consecutiveSilence = voiced ? 0 : consecutiveSilence + 1;
             if (consecutiveSilence >= endSilenceFrames)
             {
                 speaking = false;
                 consecutiveSilence = 0;
                 consecutiveVoice = 0;
+                lastTailDetectionNanos = System.nanoTime() - tailSilenceBeginNanos;
                 if (listener != null)
                 {
                     listener.onSpeechEnd();

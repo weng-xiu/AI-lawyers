@@ -205,8 +205,8 @@
     {
       "id": 12,
       "type": "timeseries",
-      "title": "链路分段延迟 P95（VAD/ASR首包/TTS首包/RAG/LLM首token）单位:ms",
-      "description": "各段预算：VAD 80 / ASR首包 280 / TTS首包 200 / RAG 40 / LLM首token 600",
+      "title": "链路分段延迟 P95（VAD起始/ASR首包/TTS首包/RAG/LLM首token）单位:ms",
+      "description": "各段预算：VAD起始 80 / ASR首包 280 / TTS首包 200 / RAG 40 / LLM首token 600；N1④ 新增 VAD 尾静默与下行合片两段，见下一 panel",
       "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
       "fieldConfig": {
@@ -251,18 +251,48 @@
       ]
     },
     {
+      "id": 13,
+      "type": "timeseries",
+      "title": "N1④ 五段预算缺口 P95（VAD 尾静默 700ms / 下行合片缓冲 200ms）单位:ms",
+      "description": "语雀 7.3.2 第①段尾静默结束判定（hotline_voice_vad_tail_ms）与第⑤段下行防抖合片墙钟（hotline_voice_downlink_buffer_ms），补齐前五段时延预算可观测缺口",
+      "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "lineWidth": 2, "fillOpacity": 8, "showPoints": "never", "spanNulls": false }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        {
+          "refId": "VADT",
+          "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(hotline_voice_vad_tail_ms_seconds_bucket[5m])))",
+          "legendFormat": "VAD尾静默 P95"
+        },
+        {
+          "refId": "DLB",
+          "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(hotline_voice_downlink_buffer_ms_seconds_bucket[5m])))",
+          "legendFormat": "下行合片缓冲 P95"
+        }
+      ]
+    },
+    {
       "id": 20,
       "type": "row",
       "title": "吞吐 / 降级 / 打断明细",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 }
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 33 }
     },
     {
       "id": 21,
       "type": "timeseries",
       "title": "下行帧速率（accepted / dropped，帧/秒）",
       "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 26 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 34 },
       "fieldConfig": {
         "defaults": {
           "unit": "ops",
@@ -285,7 +315,7 @@
       "type": "timeseries",
       "title": "打断停止耗时计数（within300 / over300，按 trigger）",
       "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 26 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 34 },
       "fieldConfig": {
         "defaults": {
           "unit": "ops",
@@ -309,7 +339,7 @@
       "title": "机器人降级兜底次数（按 reason，5min 增量）",
       "description": "reason ∈ empty_question/robot_disabled/llm_error/llm_empty；5min > 5 触发 VoiceDegradeTooFrequent",
       "datasource": { "type": "prometheus", "uid": "ai12348-prom" },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 26 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 34 },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
