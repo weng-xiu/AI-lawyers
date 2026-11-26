@@ -158,6 +158,33 @@ services:
       SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
       # —— N5 WebSocket 握手 JWT 鉴权（生产保持 true；联调应急可关）——
       WEBSOCKET_AUTH_ENABLED: ${WEBSOCKET_AUTH_ENABLED:-true}
+      # —— N1② 流式语音（application.yml 的 voice.* 占位一一对应；默认 mock + 凭证留空，零差异）——
+      # 引擎选择：mock（本地联调）/ dashscope（云，paraformer-realtime-v2 ASR + cosyvoice-v1 TTS）/ cosyvoice2（内网 TTS）
+      VOICE_ENGINE: ${VOICE_ENGINE:-mock}
+      # DashScope 云侧凭证：dashscope 引擎的 ASR/TTS 共用此 API Key，未注入则该引擎不可用（显式回 ENGINE_UNAVAILABLE）
+      VOICE_DASHSCOPE_API_KEY: ${VOICE_DASHSCOPE_API_KEY:-}
+      VOICE_DASHSCOPE_BASE_URL: ${VOICE_DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/api/v1}
+      # N1②：流式实时 ASR 模型（全双工 WebSocket，/ws/voice engine=dashscope 时生效）
+      VOICE_DASHSCOPE_ASR_MODEL: ${VOICE_DASHSCOPE_ASR_MODEL:-paraformer-realtime-v2}
+      VOICE_DASHSCOPE_TTS_MODEL: ${VOICE_DASHSCOPE_TTS_MODEL:-cosyvoice-v1}
+      VOICE_DASHSCOPE_VOICE: ${VOICE_DASHSCOPE_VOICE:-longxiaochun}
+      # N1③：内网自建 CosyVoice 2（OpenAI 兼容 /audio/speech）；base-url 留空时该引擎不可用
+      VOICE_COSYVOICE2_TTS_BASE_URL: ${VOICE_COSYVOICE2_TTS_BASE_URL:-}
+      VOICE_COSYVOICE2_TTS_MODEL: ${VOICE_COSYVOICE2_TTS_MODEL:-CosyVoice2-0.5B}
+      VOICE_COSYVOICE2_VOICE: ${VOICE_COSYVOICE2_VOICE:-longxiaochun}
+      VOICE_COSYVOICE2_API_KEY: ${VOICE_COSYVOICE2_API_KEY:-}
+      # 质检转写 ASR（Whisper 兼容 /audio/transcriptions，非实时链路）
+      VOICE_ASR_BASE_URL: ${VOICE_ASR_BASE_URL:-http://localhost:8000/v1}
+      VOICE_ASR_API_KEY: ${VOICE_ASR_API_KEY:-}
+      VOICE_ASR_MODEL: ${VOICE_ASR_MODEL:-whisper-1}
+      VOICE_ASR_LANGUAGE: ${VOICE_ASR_LANGUAGE:-zh}
+      # 服务端 VAD 与 Silero 影子验证
+      VOICE_VAD_ENABLED: ${VOICE_VAD_ENABLED:-true}
+      VOICE_VAD_SHADOW_ENABLED: ${VOICE_VAD_SHADOW_ENABLED:-false}
+      VOICE_VAD_SHADOW_MODEL_PATH: ${VOICE_VAD_SHADOW_MODEL_PATH:-models/silero_vad_int8.onnx}
+      VOICE_VAD_SHADOW_THRESHOLD: ${VOICE_VAD_SHADOW_THRESHOLD:-0.5}
+      VOICE_VAD_SHADOW_REPORT_CRON: ${VOICE_VAD_SHADOW_REPORT_CRON:-0 5 0 * * ?}
+      VOICE_VAD_SHADOW_SESSION_SAMPLE_RATE: ${VOICE_VAD_SHADOW_SESSION_SAMPLE_RATE:-0}
       # —— N1 Stream 重试开关与死消费者接管阈值（默认重试启用，PEL 空闲 60s 可被接管）——
       QUEUE_STREAM_RETRY_ENABLED: ${QUEUE_STREAM_RETRY_ENABLED:-true}
       QUEUE_STREAM_RECLAIM_MIN_IDLE_MS: ${QUEUE_STREAM_RECLAIM_MIN_IDLE_MS:-60000}

@@ -44,6 +44,32 @@ class VoiceEngineRegistryTest
         assertThat(reg.createAsr("dashscope")).isInstanceOf(DashScopeStreamAsrEngine.class);
     }
 
+    // ---------- N1②：paraformer-realtime-v2 流式 ASR 凭证与接线 ----------
+
+    @Test
+    void createAsr_dashscopeCaseInsensitive()
+    {
+        VoiceProperties props = new VoiceProperties();
+        props.setDashscopeApiKey("sk-test");
+        VoiceEngineRegistry reg = new VoiceEngineRegistry(props);
+
+        assertThat(reg.createAsr("DASHSCOPE")).isInstanceOf(DashScopeStreamAsrEngine.class);
+        assertThat(reg.createAsr("DashScope")).isInstanceOf(DashScopeStreamAsrEngine.class);
+    }
+
+    @Test
+    void asrModel_defaultsToParaformerRealtimeV2_andOverridable()
+    {
+        // 锁定语雀 7.3 N1② 指定的实时 ASR 模型默认值
+        VoiceProperties defaults = new VoiceProperties();
+        assertThat(defaults.getDashscopeAsrModel()).isEqualTo("paraformer-realtime-v2");
+
+        // 模型名可经配置覆盖，引擎按 properties 透传到 run-task
+        VoiceProperties overridden = new VoiceProperties();
+        overridden.setDashscopeAsrModel("paraformer-realtime-v2-8k");
+        assertThat(overridden.getDashscopeAsrModel()).isEqualTo("paraformer-realtime-v2-8k");
+    }
+
     @Test
     void createAsr_unknownReturnsNull()
     {
