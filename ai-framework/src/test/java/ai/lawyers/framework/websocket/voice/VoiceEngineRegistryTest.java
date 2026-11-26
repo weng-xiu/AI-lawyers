@@ -75,4 +75,36 @@ class VoiceEngineRegistryTest
         VoiceEngineRegistry reg = new VoiceEngineRegistry(props);
         assertThat(reg.createTts("dashscope")).isInstanceOf(DashScopeStreamTtsEngine.class);
     }
+
+    // ---------- N1③：内网 CosyVoice 2 流式 TTS ----------
+
+    @Test
+    void createTts_cosyvoice2_withBaseUrl_returnsEngine()
+    {
+        VoiceProperties props = new VoiceProperties();
+        props.setCosyvoice2TtsBaseUrl("http://10.0.0.8:9880/v1");
+        VoiceEngineRegistry reg = new VoiceEngineRegistry(props);
+
+        StreamTtsEngine tts = reg.createTts("cosyvoice2");
+        assertThat(tts).isInstanceOf(CosyVoice2StreamTtsEngine.class);
+        assertThat(tts.engineCode()).isEqualTo("cosyvoice2");
+    }
+
+    @Test
+    void createTts_cosyvoice2_caseInsensitive()
+    {
+        VoiceProperties props = new VoiceProperties();
+        props.setCosyvoice2TtsBaseUrl("http://10.0.0.8:9880/v1");
+        VoiceEngineRegistry reg = new VoiceEngineRegistry(props);
+
+        assertThat(reg.createTts("COSYVOICE2")).isInstanceOf(CosyVoice2StreamTtsEngine.class);
+    }
+
+    @Test
+    void createTts_cosyvoice2_withoutBaseUrl_returnsNull()
+    {
+        VoiceEngineRegistry reg = new VoiceEngineRegistry(new VoiceProperties());
+
+        assertThat(reg.createTts("cosyvoice2")).isNull();
+    }
 }

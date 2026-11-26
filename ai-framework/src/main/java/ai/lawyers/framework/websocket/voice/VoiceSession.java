@@ -423,7 +423,7 @@ public class VoiceSession
         {
             // 显式拒绝，禁止静默降级成 Mock 造成"假成功"（L4 教训）
             enqueue(VoiceSendQueue.Entry.Kind.OTHER, VoiceFrames.error("ENGINE_UNAVAILABLE",
-                    "流式引擎 " + reqEngine + " 不可用（未注册或凭证缺失），当前支持 mock/dashscope"));
+                    "流式引擎 " + reqEngine + " 不可用（未注册或凭证缺失），当前支持 mock/dashscope/cosyvoice2"));
             return;
         }
         this.engine = engineInstance.engineCode();
@@ -606,7 +606,7 @@ public class VoiceSession
         this.ttsFirstMarked.set(false);
         // N6：每次合成请求重置 TTFW 标记（同一识别流内多轮播报各自计一次首帧）
         this.ttfwMarked.set(false);
-        // A2/A3：TTS 引擎跟随 start 帧选定的引擎（mock/dashscope）
+        // A2/A3：TTS 引擎跟随 start 帧选定的引擎（mock/dashscope/cosyvoice2）
         StreamTtsEngine ttsEngine = engineRegistry.createTts(this.engine);
         if (ttsEngine == null)
         {

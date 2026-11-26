@@ -40,6 +40,22 @@ public class VoiceProperties
 
     private int dashscopeSampleRate = 16000;
 
+    /**
+     * N1③：内网自建 CosyVoice 2 流式 TTS 的 OpenAI 兼容端点根地址（如 http://10.0.0.8:9880/v1）。
+     * 为空时 cosyvoice2 引擎不可用（注册表返回 null，会话层显式回 ENGINE_UNAVAILABLE），
+     * 保证默认 voice.engine=mock 行为零差异。
+     */
+    private String cosyvoice2TtsBaseUrl = "";
+
+    /** N1③：内网 CosyVoice 2 合成模型名（按自建部署的模型注册名配置） */
+    private String cosyvoice2TtsModel = "CosyVoice2-0.5B";
+
+    /** N1③：默认发音人（CosyVoice 2 音色 ID / 预置音色名，可被 start 帧 voice 覆盖） */
+    private String cosyvoice2Voice = "longxiaochun";
+
+    /** N1③：可选鉴权头（内网无鉴权留空；OpenAI 兼容网关一般为 Bearer 密钥） */
+    private String cosyvoice2ApiKey = "";
+
     /** OpenAI/Whisper 兼容 ASR 服务地址（可指向 faster-whisper、vLLM 等） */
     private String asrBaseUrl = "http://localhost:8000/v1";
 
@@ -204,6 +220,46 @@ public class VoiceProperties
     public void setDashscopeSampleRate(int dashscopeSampleRate)
     {
         this.dashscopeSampleRate = dashscopeSampleRate;
+    }
+
+    public String getCosyvoice2TtsBaseUrl()
+    {
+        return cosyvoice2TtsBaseUrl;
+    }
+
+    public void setCosyvoice2TtsBaseUrl(String cosyvoice2TtsBaseUrl)
+    {
+        this.cosyvoice2TtsBaseUrl = cosyvoice2TtsBaseUrl;
+    }
+
+    public String getCosyvoice2TtsModel()
+    {
+        return cosyvoice2TtsModel;
+    }
+
+    public void setCosyvoice2TtsModel(String cosyvoice2TtsModel)
+    {
+        this.cosyvoice2TtsModel = cosyvoice2TtsModel;
+    }
+
+    public String getCosyvoice2Voice()
+    {
+        return cosyvoice2Voice;
+    }
+
+    public void setCosyvoice2Voice(String cosyvoice2Voice)
+    {
+        this.cosyvoice2Voice = cosyvoice2Voice;
+    }
+
+    public String getCosyvoice2ApiKey()
+    {
+        return cosyvoice2ApiKey;
+    }
+
+    public void setCosyvoice2ApiKey(String cosyvoice2ApiKey)
+    {
+        this.cosyvoice2ApiKey = cosyvoice2ApiKey;
     }
 
     public String getAsrBaseUrl()

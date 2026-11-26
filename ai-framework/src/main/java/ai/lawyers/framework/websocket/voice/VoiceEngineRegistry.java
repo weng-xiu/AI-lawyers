@@ -56,8 +56,8 @@ public class VoiceEngineRegistry
     /**
      * 获取流式 TTS 引擎实例。
      *
-     * @param code 引擎编码（mock/dashscope）
-     * @return 引擎实例；未知编码或凭证缺失返回 null
+     * @param code 引擎编码（mock/dashscope/cosyvoice2）
+     * @return 引擎实例；未知编码或凭证/端点缺失返回 null
      */
     public StreamTtsEngine createTts(String code)
     {
@@ -69,11 +69,21 @@ public class VoiceEngineRegistry
         {
             return hasDashscopeKey() ? new DashScopeStreamTtsEngine(properties) : null;
         }
+        // N1③：内网自建 CosyVoice 2（OpenAI 兼容流式），与云侧 dashscope 双轨可回退
+        if (CosyVoice2StreamTtsEngine.ENGINE_CODE.equalsIgnoreCase(code))
+        {
+            return hasCosyVoice2Endpoint() ? new CosyVoice2StreamTtsEngine(properties) : null;
+        }
         return null;
     }
 
     private boolean hasDashscopeKey()
     {
         return properties != null && StringUtils.isNotEmpty(properties.getDashscopeApiKey());
+    }
+
+    private boolean hasCosyVoice2Endpoint()
+    {
+        return properties != null && StringUtils.isNotEmpty(properties.getCosyvoice2TtsBaseUrl());
     }
 }
