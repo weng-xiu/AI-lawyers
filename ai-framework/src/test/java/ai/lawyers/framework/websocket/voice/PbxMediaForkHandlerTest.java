@@ -214,6 +214,19 @@ class PbxMediaForkHandlerTest
     }
 
     @Test
+    void downlinkModAudioFork_attachesBinarySink()
+    {
+        ReflectionTestUtils.setField(properties, "downlinkEnabled", true);
+        ReflectionTestUtils.setField(properties, "downlinkProtocol", "mod_audio_fork");
+
+        handler.handleText("{\"type\":\"start\",\"sampleRate\":16000}");
+
+        ArgumentCaptor<PbxDownlinkAudioSink> cap = ArgumentCaptor.forClass(PbxDownlinkAudioSink.class);
+        verify(voiceSession).attachDownlinkSink(cap.capture(), eq(150));
+        assertThat(cap.getValue()).isInstanceOf(PbxForkBinaryDownlinkSink.class);
+    }
+
+    @Test
     void downlinkUnknownProtocol_fallsBackToNoop()
     {
         ReflectionTestUtils.setField(properties, "downlinkEnabled", true);

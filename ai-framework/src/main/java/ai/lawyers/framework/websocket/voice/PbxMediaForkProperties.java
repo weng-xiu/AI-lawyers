@@ -31,9 +31,11 @@ public class PbxMediaForkProperties
     private boolean downlinkEnabled;
 
     /**
-     * #1 下行协议（N1 语雀 7.3）：
-     * {@code noop}=空实现（默认，行为与今日零差异）；{@code mod_audio_stream}=复用 fork
-     * 会话对称下行（{@link PbxWsDownlinkSink}），FreeSWITCH 边收边播。
+     * #1 下行协议（N1 语雀 7.3.3）：
+     * {@code noop}=空实现（默认，行为与今日零差异）；
+     * {@code mod_audio_stream}=复用 fork 会话对称下行文本 JSON base64（{@link PbxWsDownlinkSink}）；
+     * {@code mod_audio_fork}=复用 fork 会话对称下行二进制裸 PCM（{@link PbxForkBinaryDownlinkSink}），
+     * FreeSWITCH 边收边播。
      */
     @Value("${call.pbx.media.downlink-protocol:noop}")
     private String downlinkProtocol;

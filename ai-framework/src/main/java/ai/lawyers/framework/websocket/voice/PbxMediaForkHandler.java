@@ -39,6 +39,9 @@ public class PbxMediaForkHandler
 
     static final String DOWNLINK_PROTOCOL_MOD_AUDIO_STREAM = "mod_audio_stream";
 
+    /** N1①（语雀 7.3.3）：mod_audio_fork 下行走二进制裸 PCM（与上行二进制通道对称） */
+    static final String DOWNLINK_PROTOCOL_MOD_AUDIO_FORK = "mod_audio_fork";
+
     private final String recordId;
 
     private final Session wsSession;
@@ -213,8 +216,10 @@ public class PbxMediaForkHandler
     }
 
     /**
-     * #1：按下行协议构造 sink。{@code mod_audio_stream} 复用本 fork 会话对称下行；
-     * {@code noop}/未知协议回退空实现（零差异，与 N1 验收「mock 行为一致」对齐）。
+     * #1：按下行协议构造 sink。{@code mod_audio_stream} 复用本 fork 会话对称下行
+     * （文本 JSON base64，{@link PbxWsDownlinkSink}）；{@code mod_audio_fork} 对称下行
+     * 二进制裸 PCM（{@link PbxForkBinaryDownlinkSink}）；{@code noop}/未知协议回退空实现
+     * （零差异，与 N1 验收「mock 行为一致」对齐）。
      */
     private PbxDownlinkAudioSink resolveDownlinkSink()
     {
@@ -222,6 +227,10 @@ public class PbxMediaForkHandler
         if (DOWNLINK_PROTOCOL_MOD_AUDIO_STREAM.equals(protocol))
         {
             return new PbxWsDownlinkSink(wsSession, recordId);
+        }
+        if (DOWNLINK_PROTOCOL_MOD_AUDIO_FORK.equals(protocol))
+        {
+            return new PbxForkBinaryDownlinkSink(wsSession, recordId);
         }
         if (protocol != null && !protocol.isEmpty() && !DOWNLINK_PROTOCOL_NOOP.equals(protocol))
         {
