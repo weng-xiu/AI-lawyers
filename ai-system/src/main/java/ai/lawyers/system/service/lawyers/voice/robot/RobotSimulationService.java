@@ -3,6 +3,7 @@ package ai.lawyers.system.service.lawyers.voice.robot;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,6 +15,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import ai.lawyers.common.utils.StringUtils;
+import ai.lawyers.system.service.lawyers.voice.SimulationGateEvaluator;
+import ai.lawyers.system.service.lawyers.voice.SimulationGateProperties;
 import ai.lawyers.system.service.lawyers.voice.SimulationScorer;
 
 /**
@@ -47,6 +50,14 @@ public class RobotSimulationService
     /** P1-8：语义打分器（关键词降级 + embedding 相似度） */
     @Autowired
     private SimulationScorer scorer;
+
+    /** N2（语雀 7.4）：灰度准入门禁阈值，null 时（如纯 new 单测）不产出 gate 块 */
+    @Autowired(required = false)
+    private SimulationGateProperties gateProperties;
+
+    /** N2：门禁判定与报告拼装，与 gateProperties 同为可空 */
+    @Autowired(required = false)
+    private SimulationGateEvaluator gateEvaluator;
 
     /**
      * 用请求体用例集执行仿真。
@@ -178,6 +189,15 @@ public class RobotSimulationService
         report.put("casePassRate",
                 totalCases == 0 ? 0d : Math.round(passedCases * 1000d / totalCases) / 10d);
         report.set("details", details);
+        // N2（语雀 7.4 S3）：意图准确率准入门禁，用例通过率对照可配置门槛；无注入或无用例时分别跳过
+        if (gateProperties != null && gateEvaluator != null)
+        {
+            SimulationGateEvaluator.GateCheck intentGate = totalCases == 0
+                    ? gateEvaluator.skipped("intentAccuracy", "S3", "仿真无用例，无法计算意图准确率")
+                    : gateEvaluator.judged("intentAccuracy", "S3",
+                            (double) passedCases / totalCases, gateProperties.getIntentAccuracy());
+            report.set("gate", gateEvaluator.buildGate(Collections.singletonList(intentGate)));
+        }
         log.info("机器人仿真回归完成：用例 {}/{} 通过，轮次 {}/{} 通过",
                 passedCases, totalCases, passedTurns, totalTurns);
         return report;

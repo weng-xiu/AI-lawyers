@@ -3,6 +3,7 @@ package ai.lawyers.system.service.lawyers.voice.copilot;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,6 +15,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import ai.lawyers.common.utils.StringUtils;
+import ai.lawyers.system.service.lawyers.voice.SimulationGateEvaluator;
+import ai.lawyers.system.service.lawyers.voice.SimulationGateProperties;
 import ai.lawyers.system.service.lawyers.voice.SimulationScorer;
 
 /**
@@ -60,6 +63,14 @@ public class CopilotSimulationService
     @Autowired
     private SimulationScorer scorer;
 
+    /** N2（语雀 7.4）：灰度准入门禁阈值，null 时（如纯 new 单测）不产出 gate 块 */
+    @Autowired(required = false)
+    private SimulationGateProperties gateProperties;
+
+    /** N2：门禁判定与报告拼装，与 gateProperties 同为可空 */
+    @Autowired(required = false)
+    private SimulationGateEvaluator gateEvaluator;
+
     /**
      * 用给定用例集执行仿真。
      *
@@ -81,6 +92,8 @@ public class CopilotSimulationService
         ArrayNode details = MAPPER.createArrayNode();
         int totalCases = 0, passedCases = 0;
         int totalChecks = 0, passedChecks = 0;
+        // N2（语雀 7.4 S2）：法条命中专项计数，独立于全局检查点通过率
+        int lawHitTotal = 0, lawHitPassed = 0;
 
         JsonNode cases = root.path("cases");
         if (cases.isArray())
@@ -103,6 +116,8 @@ public class CopilotSimulationService
                 CheckCounter counter = evaluateCase(c.path("checks"), r, checkNodes);
                 totalChecks += counter.total;
                 passedChecks += counter.passed;
+                lawHitTotal += counter.lawHitTotal;
+                lawHitPassed += counter.lawHitPassed;
 
                 boolean casePassed = counter.total > 0 && counter.passed == counter.total;
                 caseNode.put("passed", casePassed);
@@ -123,6 +138,17 @@ public class CopilotSimulationService
         report.put("casePassRate", rate(passedCases, totalCases));
         report.put("checkPassRate", rate(passedChecks, totalChecks));
         report.set("details", details);
+        // N2（语雀 7.4 S2）：法条命中率 judged；工单有用率暂无检查点，预留 skipped
+        if (gateProperties != null && gateEvaluator != null)
+        {
+            SimulationGateEvaluator.GateCheck lawGate = lawHitTotal == 0
+                    ? gateEvaluator.skipped("lawHitRate", "S2", "用例集未配置 lawKeywords，无法条命中检查点")
+                    : gateEvaluator.judged("lawHitRate", "S2",
+                            (double) lawHitPassed / lawHitTotal, gateProperties.getLawHitRate());
+            SimulationGateEvaluator.GateCheck ticketGate = gateEvaluator.skipped(
+                    "ticketUsefulRate", "S2", "仿真尚未提供工单检查点，待 ticketKeywords 切片启用");
+            report.set("gate", gateEvaluator.buildGate(Arrays.asList(lawGate, ticketGate)));
+        }
         log.info("Copilot 仿真回归完成：用例 {}/{} 通过，检查点 {}/{} 通过",
                 passedCases, totalCases, passedChecks, totalChecks);
         return report;
@@ -175,8 +201,15 @@ public class CopilotSimulationService
             {
                 lawText.append(law.getTitle()).append(' ').append(law.getLawArticle()).append(' ');
             }
-            recordScore(out, counter, "法条命中 " + join(lawKws),
-                    scorer.scoreAny(lawText.toString(), toStringList(lawKws)));
+            SimulationScorer.Score lawScore =
+                    scorer.scoreAny(lawText.toString(), toStringList(lawKws));
+            recordScore(out, counter, "法条命中 " + join(lawKws), lawScore);
+            // N2：仅语义命中检查点计入法条命中率口径，"法条数≥N" 计数检查不混入
+            counter.lawHitTotal++;
+            if (scorer.passed(lawScore))
+            {
+                counter.lawHitPassed++;
+            }
         }
 
         // 法条数量下限
@@ -348,6 +381,13 @@ public class CopilotSimulationService
     private static class CheckCounter
     {
         int total;
+
         int passed;
+
+        /** N2：法条语义命中检查点总数（仅 lawKeywords 检查） */
+        int lawHitTotal;
+
+        /** N2：法条语义命中检查点通过数 */
+        int lawHitPassed;
     }
 }

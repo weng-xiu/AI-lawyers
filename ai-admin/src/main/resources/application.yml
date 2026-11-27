@@ -396,6 +396,14 @@ ai:
     semantic-enabled: ${AI_SIMULATION_SEMANTIC_ENABLED:true}
     # 语义判分通过阈值（余弦相似度，低于阈值视为未命中）
     semantic-threshold: ${AI_SIMULATION_SEMANTIC_THRESHOLD:0.75}
+    # N2（语雀 7.4）灰度准入门禁阈值（0~1 比率，仿真报告 gate 块逐项对照）
+    gate:
+      # S3 机器人意图准确率门槛（取机器人仿真用例通过率）
+      intent-accuracy: ${AI_SIMULATION_GATE_INTENT_ACCURACY:0.85}
+      # S2 Copilot 法条推荐命中率门槛
+      law-hit-rate: ${AI_SIMULATION_GATE_LAW_HIT_RATE:0.70}
+      # S2 相似工单 Top3 有用率（预留：仿真尚无工单检查点，当前不参与判定）
+      ticket-useful-rate: ${AI_SIMULATION_GATE_TICKET_USEFUL_RATE:0.60}
 
 # ============================================================
 # 语音引擎配置（TTS / ASR）。ASR 为 OpenAI/Whisper 兼容端点
