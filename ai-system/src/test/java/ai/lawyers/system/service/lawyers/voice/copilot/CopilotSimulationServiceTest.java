@@ -141,6 +141,70 @@ class CopilotSimulationServiceTest
         assertEquals(1, report.get("passedCases").asInt());
     }
 
+    @Test
+    void run_withGate_ticketHitJudgedAndPassed()
+    {
+        // 桩工单标题/片段含"工资/拖欠"，ticketKeywords 命中 → 工单有用率 1.0 ≥ 0.60
+        attachGate();
+        String cases = "{\"cases\":[{\"caseId\":\"u\",\"text\":\"OK\",\"checks\":{"
+                + "\"ticketKeywords\":[\"工资\",\"拖欠\"]}}]}";
+        ObjectNode gate = (ObjectNode) service.run(cases).get("gate");
+        ObjectNode ticket = (ObjectNode) gate.get("items").get(1);
+        assertEquals("ticketUsefulRate", ticket.get("name").asText());
+        assertEquals("judged", ticket.get("status").asText());
+        assertTrue(ticket.get("passed").asBoolean());
+        assertEquals(1.0d, ticket.get("actualRate").asDouble(), 0.0001);
+        assertEquals(0.60d, ticket.get("thresholdRate").asDouble(), 0.0001);
+        assertTrue(gate.get("passed").asBoolean());
+    }
+
+    @Test
+    void run_withGate_ticketMiss_gateFailed()
+    {
+        // 桩工单只含工资/欠薪文本，"押金/租赁"全不命中 → 有用率 0，judged 不通过，总判定 false
+        attachGate();
+        String cases = "{\"cases\":[{\"caseId\":\"u\",\"text\":\"OK\",\"checks\":{"
+                + "\"ticketKeywords\":[\"押金\",\"租赁\"]}}]}";
+        ObjectNode gate = (ObjectNode) service.run(cases).get("gate");
+        ObjectNode ticket = (ObjectNode) gate.get("items").get(1);
+        assertEquals("judged", ticket.get("status").asText());
+        assertFalse(ticket.get("passed").asBoolean());
+        assertEquals(0d, ticket.get("actualRate").asDouble(), 0.0001);
+        assertFalse(gate.get("passed").asBoolean());
+    }
+
+    @Test
+    void run_withGate_ticketKeywordsButNoTickets_zeroRate()
+    {
+        // 配了 ticketKeywords 但 assist 无工单推荐：仍计 total=1、passed=0，actualRate=0 判失败
+        attachGate();
+        String cases = "{\"cases\":[{\"caseId\":\"u\",\"text\":\"NOTICKET\",\"checks\":{"
+                + "\"ticketKeywords\":[\"工资\"]}}]}";
+        ObjectNode report = service.run(cases);
+        ObjectNode gate = (ObjectNode) report.get("gate");
+        ObjectNode ticket = (ObjectNode) gate.get("items").get(1);
+        assertEquals("judged", ticket.get("status").asText());
+        assertEquals(0d, ticket.get("actualRate").asDouble(), 0.0001);
+        assertFalse(ticket.get("passed").asBoolean());
+        // 该用例的工单检查点已计入全局检查点（1 个且不通过）
+        assertEquals(1, report.get("totalChecks").asInt());
+        assertEquals(0, report.get("passedChecks").asInt());
+    }
+
+    @Test
+    void run_withGate_noTicketKeywords_ticketItemSkipped()
+    {
+        // 用例不配 ticketKeywords → 无工单检查点，工单项 skipped 不参与总判定
+        attachGate();
+        String cases = "{\"cases\":[{\"caseId\":\"u\",\"text\":\"OK\",\"checks\":{"
+                + "\"disputeTypeKeywords\":[\"劳动\"]}}]}";
+        ObjectNode gate = (ObjectNode) service.run(cases).get("gate");
+        assertTrue(gate.get("passed").asBoolean());
+        ObjectNode ticket = (ObjectNode) gate.get("items").get(1);
+        assertEquals("ticketUsefulRate", ticket.get("name").asText());
+        assertEquals("skipped", ticket.get("status").asText());
+    }
+
     /** 桩 assist：按文本返回不同固定结果 */
     private CopilotAssistService stubAssist()
     {
@@ -159,6 +223,17 @@ class CopilotSimulationServiceTest
                 r.setUrgency("normal");
                 r.setClaims(Arrays.asList("支付拖欠工资"));
                 r.setLaws(Arrays.asList(new CopilotLaw(1L, "劳动法相关", "第X条", "law")));
+                if ("NOTICKET".equals(text))
+                {
+                    // N2：配置 ticketKeywords 但无工单推荐，验证空工单计 total 不 passed
+                    r.setTickets(java.util.Collections.emptyList());
+                }
+                else
+                {
+                    r.setTickets(Arrays.asList(
+                            new CopilotTicket(1L, "T001", "工资拖欠工单", "2", "老板拖欠工资内容片段"),
+                            new CopilotTicket(2L, "T002", "未签劳动合同咨询", "1", "餐饮店欠薪处理记录")));
+                }
                 Map<String, Object> payload = new LinkedHashMap<>();
                 if ("FORBID".equals(text))
                 {

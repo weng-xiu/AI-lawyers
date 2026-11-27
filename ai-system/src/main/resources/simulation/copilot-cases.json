@@ -11,6 +11,7 @@
         "claimKeywords": ["工资"],
         "expectUrgency": "normal",
         "lawKeywords": ["劳动"],
+        "ticketKeywords": ["工资", "拖欠"],
         "requireLawCount": 1,
         "expectActions": ["createTicket"],
         "forbidden": ["承诺胜诉", "包赢", "保证打赢"]
@@ -26,6 +27,7 @@
         "claimKeywords": ["押金"],
         "expectUrgency": "normal",
         "lawKeywords": ["合同"],
+        "ticketKeywords": ["押金", "租赁"],
         "requireLawCount": 1,
         "expectActions": ["createTicket"],
         "forbidden": ["包赢", "私了费"]
@@ -68,6 +70,7 @@
         "claimKeywords": ["借"],
         "expectUrgency": "normal",
         "lawKeywords": ["借贷"],
+        "ticketKeywords": ["借", "借条"],
         "requireLawCount": 1,
         "expectActions": ["createTicket"],
         "forbidden": ["保证打赢", "包赢"]

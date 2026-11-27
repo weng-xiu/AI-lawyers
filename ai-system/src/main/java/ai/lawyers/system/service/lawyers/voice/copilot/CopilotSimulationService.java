@@ -34,6 +34,7 @@ import ai.lawyers.system.service.lawyers.voice.SimulationScorer;
  *   "claimKeywords":["工资"],           // 诉求聚合文本须含任一关键词
  *   "expectUrgency":"normal|urgent",    // 紧急度须相等
  *   "lawKeywords":["劳动"],             // 法条标题/条号聚合文本须含任一关键词
+ *   "ticketKeywords":["工资"],          // Top3 工单标题/片段聚合文本须含任一关键词（用例级）
  *   "requireLawCount":1,                // 法条数下限
  *   "expectActions":["createTicket"],   // 动作白名单须全部出现
  *   "forbidden":["包赢"]                // 全部输出文本均不得出现
@@ -92,8 +93,9 @@ public class CopilotSimulationService
         ArrayNode details = MAPPER.createArrayNode();
         int totalCases = 0, passedCases = 0;
         int totalChecks = 0, passedChecks = 0;
-        // N2（语雀 7.4 S2）：法条命中专项计数，独立于全局检查点通过率
+        // N2（语雀 7.4 S2）：法条命中/工单有用专项计数，独立于全局检查点通过率
         int lawHitTotal = 0, lawHitPassed = 0;
+        int ticketHitTotal = 0, ticketHitPassed = 0;
 
         JsonNode cases = root.path("cases");
         if (cases.isArray())
@@ -118,6 +120,8 @@ public class CopilotSimulationService
                 passedChecks += counter.passed;
                 lawHitTotal += counter.lawHitTotal;
                 lawHitPassed += counter.lawHitPassed;
+                ticketHitTotal += counter.ticketHitTotal;
+                ticketHitPassed += counter.ticketHitPassed;
 
                 boolean casePassed = counter.total > 0 && counter.passed == counter.total;
                 caseNode.put("passed", casePassed);
@@ -138,15 +142,18 @@ public class CopilotSimulationService
         report.put("casePassRate", rate(passedCases, totalCases));
         report.put("checkPassRate", rate(passedChecks, totalChecks));
         report.set("details", details);
-        // N2（语雀 7.4 S2）：法条命中率 judged；工单有用率暂无检查点，预留 skipped
+        // N2（语雀 7.4 S2）：法条命中率与工单有用率均 judged；用例集未配置对应检查点时 skipped
         if (gateProperties != null && gateEvaluator != null)
         {
             SimulationGateEvaluator.GateCheck lawGate = lawHitTotal == 0
                     ? gateEvaluator.skipped("lawHitRate", "S2", "用例集未配置 lawKeywords，无法条命中检查点")
                     : gateEvaluator.judged("lawHitRate", "S2",
                             (double) lawHitPassed / lawHitTotal, gateProperties.getLawHitRate());
-            SimulationGateEvaluator.GateCheck ticketGate = gateEvaluator.skipped(
-                    "ticketUsefulRate", "S2", "仿真尚未提供工单检查点，待 ticketKeywords 切片启用");
+            SimulationGateEvaluator.GateCheck ticketGate = ticketHitTotal == 0
+                    ? gateEvaluator.skipped("ticketUsefulRate", "S2",
+                            "用例集未配置 ticketKeywords 或无工单推荐，跳过工单有用率")
+                    : gateEvaluator.judged("ticketUsefulRate", "S2",
+                            (double) ticketHitPassed / ticketHitTotal, gateProperties.getTicketUsefulRate());
             report.set("gate", gateEvaluator.buildGate(Arrays.asList(lawGate, ticketGate)));
         }
         log.info("Copilot 仿真回归完成：用例 {}/{} 通过，检查点 {}/{} 通过",
@@ -209,6 +216,26 @@ public class CopilotSimulationService
             if (scorer.passed(lawScore))
             {
                 counter.lawHitPassed++;
+            }
+        }
+
+        // N2（语雀 7.4 S2）：相似工单有用率，用例级口径——Top3 工单 title/contentSnippet
+        // 聚合文本任一关键词命中即该用例"工单有用"；无工单推荐时文本为空串，计 total 不 passed
+        JsonNode ticketKws = checks.path("ticketKeywords");
+        if (ticketKws.isArray() && ticketKws.size() > 0)
+        {
+            StringBuilder ticketText = new StringBuilder();
+            for (CopilotTicket t : r.getTickets())
+            {
+                ticketText.append(' ').append(t.getTitle()).append(' ').append(t.getContentSnippet());
+            }
+            SimulationScorer.Score ticketScore =
+                    scorer.scoreAny(ticketText.toString(), toStringList(ticketKws));
+            recordScore(out, counter, "工单有用 " + join(ticketKws), ticketScore);
+            counter.ticketHitTotal++;
+            if (scorer.passed(ticketScore))
+            {
+                counter.ticketHitPassed++;
             }
         }
 
@@ -389,5 +416,11 @@ public class CopilotSimulationService
 
         /** N2：法条语义命中检查点通过数 */
         int lawHitPassed;
+
+        /** N2（语雀 7.4 S2）：工单有用检查点总数（仅 ticketKeywords 检查，用例级口径） */
+        int ticketHitTotal;
+
+        /** N2：工单有用检查点通过数（Top3 工单聚合文本任一关键词命中） */
+        int ticketHitPassed;
     }
 }
