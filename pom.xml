@@ -276,7 +276,9 @@
                 <version>2.22.2</version>
                 <configuration>
                     <failIfNoTests>false</failIfNoTests>
-                    <argLine>-Xmx1024m</argLine>
+                    <!-- 单测均为 Mockito/MockMvc 小负载；用 SerialGC 替代 G1 并下调堆，
+                         显著降低 fork JVM 启动时的虚拟内存提交，规避低提交空间下的 G1 mmap 失败 -->
+                    <argLine>-Xmx768m -XX:+UseSerialGC</argLine>
                 </configuration>
             </plugin>
         </plugins>
