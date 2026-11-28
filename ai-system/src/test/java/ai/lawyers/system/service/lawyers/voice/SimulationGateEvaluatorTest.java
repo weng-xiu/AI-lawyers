@@ -78,4 +78,28 @@ class SimulationGateEvaluatorTest
                 evaluator.judged("x", "S2", 0.70099d, 0.70d)));
         assertEquals(0.701d, gate.get("items").get(0).get("actualRate").asDouble(), 0.00001);
     }
+
+    @Test
+    void judgedMax_actualAtOrBelowThreshold_passesWithDownDirection()
+    {
+        // CER「越低越好」：0.12 ≤ 0.15 通过，item 输出 direction=down，旧 up 项无该字段
+        ObjectNode gate = evaluator.buildGate(Collections.singletonList(
+                evaluator.judgedMax("maxCerRate", "S1", 0.12d, 0.15d)));
+        assertTrue(gate.get("passed").asBoolean());
+        ObjectNode item = (ObjectNode) gate.get("items").get(0);
+        assertEquals("judged", item.get("status").asText());
+        assertEquals("down", item.get("direction").asText());
+        assertTrue(item.get("passed").asBoolean());
+    }
+
+    @Test
+    void judgedMax_actualAboveThreshold_failsAndRounded()
+    {
+        ObjectNode gate = evaluator.buildGate(Collections.singletonList(
+                evaluator.judgedMax("maxCerRate", "S1", 0.2006d, 0.15d)));
+        assertFalse(gate.get("passed").asBoolean());
+        ObjectNode item = (ObjectNode) gate.get("items").get(0);
+        assertFalse(item.get("passed").asBoolean());
+        assertEquals(0.201d, item.get("actualRate").asDouble(), 0.00001);
+    }
 }

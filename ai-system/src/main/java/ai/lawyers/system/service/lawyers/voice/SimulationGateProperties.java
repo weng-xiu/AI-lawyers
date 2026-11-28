@@ -35,6 +35,9 @@ public class SimulationGateProperties
     /** S2：相似工单 Top3 有用率门槛（预留，当前仿真无工单检查点，不参与判定），默认 0.60 */
     private double ticketUsefulRate = 0.60d;
 
+    /** S1（语雀 7.4 第一阶段）：ASR 转写平均字错率（CER）上限，越低越好，默认 0.15 */
+    private double maxCerRate = 0.15d;
+
     public double getIntentAccuracy()
     {
         return intentAccuracy;
@@ -63,6 +66,16 @@ public class SimulationGateProperties
     public void setTicketUsefulRate(double ticketUsefulRate)
     {
         this.ticketUsefulRate = clamp(ticketUsefulRate);
+    }
+
+    public double getMaxCerRate()
+    {
+        return maxCerRate;
+    }
+
+    public void setMaxCerRate(double maxCerRate)
+    {
+        this.maxCerRate = clamp(maxCerRate);
     }
 
     /** 比率钳制到 [0,1]，容错非法配置 */

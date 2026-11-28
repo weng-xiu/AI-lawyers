@@ -30,7 +30,25 @@ public class SimulationGateEvaluator
         c.actualRate = round3(actualRate);
         c.thresholdRate = round3(thresholdRate);
         c.skipped = false;
+        c.direction = "up";
         c.passed = c.actualRate >= c.thresholdRate;
+        return c;
+    }
+
+    /**
+     * 构造一个「越低越好」的判定检查项（actual ≤ threshold 即通过），用于 CER 等错误率门槛。
+     * 与 {@link #judged} 方向相反，报告 item 额外输出 direction=down 以示区别。
+     */
+    public GateCheck judgedMax(String name, String stage, double actualRate, double thresholdRate)
+    {
+        GateCheck c = new GateCheck();
+        c.name = name;
+        c.stage = stage;
+        c.actualRate = round3(actualRate);
+        c.thresholdRate = round3(thresholdRate);
+        c.skipped = false;
+        c.direction = "down";
+        c.passed = c.actualRate <= c.thresholdRate;
         return c;
     }
 
@@ -68,6 +86,11 @@ public class SimulationGateEvaluator
                     item.put("status", "judged");
                     item.put("actualRate", c.actualRate);
                     item.put("thresholdRate", c.thresholdRate);
+                    // 仅「越低越好」项输出 direction，保持旧 up 项报告结构不变
+                    if ("down".equals(c.direction))
+                    {
+                        item.put("direction", c.direction);
+                    }
                     item.put("passed", c.passed);
                     if (!c.passed)
                     {
@@ -96,6 +119,9 @@ public class SimulationGateEvaluator
         private boolean skipped;
 
         private boolean passed;
+
+        /** 判定方向：up=越高越好（默认），down=越低越好（CER 等错误率） */
+        private String direction = "up";
 
         private double actualRate;
 

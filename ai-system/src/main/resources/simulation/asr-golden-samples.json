@@ -1,0 +1,35 @@
+{
+  "desc": "ASR 转写质量金标准集（S1）：每条给出人工参考文本 referenceText 与识别假设 hypothesisText，按字符级 CER 评测；带 audioPath 的音频驱动条目后续切片补充",
+  "samples": [
+    {
+      "sampleId": "asr-labor-salary",
+      "name": "劳动欠薪转写",
+      "referenceText": "我在餐饮店打工三个月，老板一直拖欠工资不给，没有签劳动合同。",
+      "hypothesisText": "我在餐饮店打工三个月，老板一直拖欠工资不给，没有签劳动合动。"
+    },
+    {
+      "sampleId": "asr-landlord-deposit",
+      "name": "租赁押金转写",
+      "referenceText": "租房到期我已经搬出去了，房东扣着三千块押金不退。",
+      "hypothesisText": "租房到期我已经搬出去了，房东扣着三千块压金不退。"
+    },
+    {
+      "sampleId": "asr-private-loan",
+      "name": "民间借贷转写",
+      "referenceText": "朋友两年前向我借了五万块钱，写了借条约定利息，现在到期不还。",
+      "hypothesisText": "朋友两年前向我借了五万块钱，写了借条约定利西，现在到期不还。"
+    },
+    {
+      "sampleId": "asr-divorce-property",
+      "name": "离婚财产转写",
+      "referenceText": "我和妻子准备离婚，婚后一起买的房子和一辆车，想咨询财产怎么分割。",
+      "hypothesisText": "我和妻子准备离婚，婚后一起买的房子和一辆车，想咨询材产怎么分割。"
+    },
+    {
+      "sampleId": "asr-low-quality",
+      "name": "低质转写（多字错）",
+      "referenceText": "我前夫堵在我家门口说要打我，我和孩子躲在屋里非常害怕。",
+      "hypothesisText": "我前夫堵在我家门口说要大我，我和孩多在屋里非长害怕。"
+    }
+  ]
+}
