@@ -39,3 +39,22 @@ export function getRobotSimulationProgress(taskId) {
     params: { taskId: taskId }
   })
 }
+
+// 提交 ASR 转写质量评测任务（samplesJson 为空串时跑内置默认金标准集）
+export function submitAsrSimulation(data) {
+  return request({
+    url: '/lawyers/asr/simulation/submit',
+    method: 'post',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    data: data || ''
+  })
+}
+
+// 查询 ASR 转写质量评测任务进度（完成后 data.report 为完整 CER 报告）
+export function getAsrSimulationProgress(taskId) {
+  return request({
+    url: '/lawyers/asr/simulation/progress',
+    method: 'get',
+    params: { taskId: taskId }
+  })
+}
